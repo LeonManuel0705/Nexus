@@ -8,6 +8,7 @@ scipy>=1.10.0
 
 faster-whisper>=1.0.0
 webrtcvad>=2.0.10
+speechbrain>=1.0.0
 
 language-tool-python>=2.7.0
 

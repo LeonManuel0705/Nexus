@@ -56,21 +56,40 @@ class RealtimeTranscriber:
         audio_data = self._preprocess_audio(audio_data, sample_rate)
 
         try:
+            # Build context prompt for better accuracy
+            base_prompt = ""
+            if self.language == "de":
+                base_prompt = "Dies ist eine Vorlesung oder Unterrichtsstunde auf Deutsch. "
+            elif self.language == "en":
+                base_prompt = "This is a lecture or class in English. "
+
+            if self.context_text:
+                initial_prompt = base_prompt + self.context_text[-300:]
+            else:
+                initial_prompt = base_prompt if base_prompt else None
+
             segments, info = self.model.transcribe(
                 audio_data,
                 language=self.language,
                 task="transcribe",
-                beam_size=3,
-                best_of=3,
-                patience=1.0,
+                beam_size=5,
+                best_of=5,
+                patience=1.5,
+                length_penalty=1.0,
+                repetition_penalty=1.2,
+                no_repeat_ngram_size=3,
+                temperature=[0.0, 0.2, 0.4],
+                compression_ratio_threshold=2.4,
+                log_prob_threshold=-1.0,
+                no_speech_threshold=0.6,
                 condition_on_previous_text=True,
-                initial_prompt=self.context_text[-200:] if self.context_text else None,
+                initial_prompt=initial_prompt,
                 vad_filter=True,
                 vad_parameters={
-                    "threshold": 0.3,
-                    "min_speech_duration_ms": 250,
-                    "min_silence_duration_ms": 100,
-                    "speech_pad_ms": 50,
+                    "threshold": 0.35,
+                    "min_speech_duration_ms": 200,
+                    "min_silence_duration_ms": 150,
+                    "speech_pad_ms": 100,
                 },
                 word_timestamps=False,
                 without_timestamps=True,

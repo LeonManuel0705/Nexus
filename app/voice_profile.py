@@ -8,10 +8,16 @@ import hashlib
 
 PROFILES_DIR = Path(__file__).parent.parent / "voice_profiles"
 EMBEDDING_DIM = 192
-VERIFICATION_THRESHOLD = 0.70
-HIGH_CONFIDENCE_THRESHOLD = 0.85
+VERIFICATION_THRESHOLD = 0.25  # Cosine similarity threshold (0.25 = ~75 degrees)
+HIGH_CONFIDENCE_THRESHOLD = 0.50
 MIN_ENROLLMENT_DURATION = 30.0
 SAMPLE_RATE = 16000
+
+# Use the larger, more accurate WavLM-based model
+# Options: "speechbrain/spkrec-ecapa-voxceleb" (faster, less accurate)
+#          "microsoft/wavlm-base-plus-sv" (slower, more accurate)
+#          "speechbrain/spkrec-resnet-voxceleb" (good balance)
+SPEAKER_MODEL = "speechbrain/spkrec-ecapa-voxceleb"  # Default, can be changed
 
 
 class VoiceProfile:
@@ -46,12 +52,47 @@ class VoiceProfile:
         if avg is None:
             return False, 0.0
 
-        similarity = np.dot(avg, embedding) / (
-            np.linalg.norm(avg) * np.linalg.norm(embedding) + 1e-8
-        )
+        # Normalize embeddings for cosine similarity
+        avg_norm = avg / (np.linalg.norm(avg) + 1e-8)
+        emb_norm = embedding / (np.linalg.norm(embedding) + 1e-8)
+
+        similarity = np.dot(avg_norm, emb_norm)
 
         is_match = similarity >= VERIFICATION_THRESHOLD
-        confidence = min(1.0, max(0.0, (similarity - 0.5) / 0.5))
+        # Map similarity to confidence: threshold -> 0.0, 1.0 -> 1.0
+        confidence = min(1.0, max(0.0, (similarity - VERIFICATION_THRESHOLD) / (1.0 - VERIFICATION_THRESHOLD)))
+
+        print(f"[VoiceFilter] Similarity: {similarity:.3f}, Threshold: {VERIFICATION_THRESHOLD}, Match: {is_match}, Confidence: {confidence:.3f}")
+
+        return is_match, confidence
+
+    def verify_multi(self, embedding: np.ndarray, top_k: int = 5) -> Tuple[bool, float]:
+        """Compare against multiple stored embeddings for more robust matching."""
+        if not self.embeddings:
+            return False, 0.0
+
+        # Compare against the most recent embeddings
+        recent_embeddings = self.embeddings[-top_k:] if len(self.embeddings) > top_k else self.embeddings
+
+        similarities = []
+        emb_norm = embedding / (np.linalg.norm(embedding) + 1e-8)
+
+        for stored_emb in recent_embeddings:
+            stored_norm = stored_emb / (np.linalg.norm(stored_emb) + 1e-8)
+            sim = np.dot(stored_norm, emb_norm)
+            similarities.append(sim)
+
+        # Use the maximum similarity (best match)
+        max_similarity = max(similarities)
+        avg_similarity = np.mean(similarities)
+
+        # Use a combination: mostly max, but penalize if average is low
+        combined_similarity = 0.7 * max_similarity + 0.3 * avg_similarity
+
+        is_match = combined_similarity >= VERIFICATION_THRESHOLD
+        confidence = min(1.0, max(0.0, (combined_similarity - VERIFICATION_THRESHOLD) / (1.0 - VERIFICATION_THRESHOLD)))
+
+        print(f"[VoiceFilter] Max: {max_similarity:.3f}, Avg: {avg_similarity:.3f}, Combined: {combined_similarity:.3f}, Match: {is_match}")
 
         return is_match, confidence
 
@@ -136,6 +177,32 @@ class VoiceProfileManager:
                 self._model_loaded = True
                 return False
 
+    def _preprocess_audio(self, audio: np.ndarray) -> np.ndarray:
+        """Preprocess audio for better speaker recognition."""
+        from scipy import signal
+
+        if audio.dtype != np.float32:
+            audio = audio.astype(np.float32)
+
+        # Remove DC offset
+        audio = audio - np.mean(audio)
+
+        # Check if audio has enough energy (not silence)
+        energy = np.sqrt(np.mean(audio ** 2))
+        if energy < 0.001:
+            return audio  # Return as-is if too quiet
+
+        # Apply pre-emphasis filter (boost high frequencies for speech)
+        pre_emphasis = 0.97
+        audio = np.append(audio[0], audio[1:] - pre_emphasis * audio[:-1])
+
+        # Normalize to [-1, 1]
+        max_val = np.max(np.abs(audio))
+        if max_val > 0:
+            audio = audio / max_val * 0.95
+
+        return audio
+
     def _extract_embedding(self, audio: np.ndarray) -> Optional[np.ndarray]:
         if not self._load_model() or self._model is None:
             return None
@@ -143,17 +210,24 @@ class VoiceProfileManager:
         try:
             import torch
 
-            if audio.dtype != np.float32:
-                audio = audio.astype(np.float32)
+            # Preprocess audio
+            audio = self._preprocess_audio(audio)
 
-            if np.max(np.abs(audio)) > 1.0:
-                audio = audio / (np.max(np.abs(audio)) + 1e-8)
+            # Check minimum length (at least 0.5 seconds)
+            min_samples = int(SAMPLE_RATE * 0.5)
+            if len(audio) < min_samples:
+                print(f"[VoiceFilter] Audio too short: {len(audio)} samples")
+                return None
 
             audio_tensor = torch.tensor(audio).unsqueeze(0)
 
             with torch.no_grad():
                 embedding = self._model.encode_batch(audio_tensor)
-                return embedding.squeeze().cpu().numpy()
+                emb = embedding.squeeze().cpu().numpy()
+
+                # L2 normalize the embedding
+                emb = emb / (np.linalg.norm(emb) + 1e-8)
+                return emb
 
         except Exception as e:
             print(f"Embedding extraction error: {e}")
@@ -249,13 +323,15 @@ class VoiceProfileManager:
 
         embedding = self._extract_embedding(audio)
         if embedding is None:
+            # If embedding extraction fails, allow transcription (don't block)
             return True, 0.5
 
-        return self._current_profile.verify(embedding)
+        # Use multi-comparison for more robust matching
+        return self._current_profile.verify_multi(embedding, top_k=5)
 
     def is_teacher_speaking(self, audio: np.ndarray) -> bool:
         is_match, confidence = self.verify_audio(audio)
-        return is_match and confidence >= 0.4
+        return is_match  # Just use the match result, confidence is already factored in
 
     def list_profiles(self) -> List[dict]:
         profiles = []
