@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Notes - Real-time Transcription</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>Voice Notes</h1>
+            </div>
+
+            <div class="sidebar-search">
+                <input type="text" id="searchInput" placeholder="Search notes...">
+            </div>
+
+            <div class="sidebar-section">
+                <div class="section-header">
+                    <span>Folders</span>
+                    <button class="btn-icon" id="addFolderBtn" title="Add folder">+</button>
+                </div>
+                <div id="folderTree" class="folder-tree">
+                    <!-- Folders will be loaded here -->
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="section-header">
+                    <span>Tags</span>
+                </div>
+                <div id="tagsList" class="tags-list">
+                    <!-- Tags will be loaded here -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <div class="breadcrumb" id="breadcrumb">
+                    <span>All Notes</span>
+                </div>
+                <div class="top-bar-actions">
+                    <button class="btn btn-secondary" id="exportFolderBtn" title="Export folder">
+                        Export
+                    </button>
+                </div>
+            </header>
+
+            <!-- Recording Section -->
+            <div class="recording-section">
+                <button class="record-btn" id="recordBtn">
+                    <span class="record-icon"></span>
+                    <span class="record-text">Click to Record</span>
+                </button>
+                <div class="recording-status" id="recordingStatus">
+                    <span class="status-text">Ready</span>
+                    <span class="status-duration" id="recordingDuration">00:00</span>
+                </div>
+            </div>
+
+            <!-- Live Transcription Display -->
+            <div class="live-transcription" id="liveTranscription">
+                <div class="live-transcription-header">
+                    <span class="live-indicator"></span>
+                    <span>Live Transcription</span>
+                    <span class="ai-badge" id="aiBadge">AI Corrected</span>
+                </div>
+                <div class="live-transcription-content" id="liveTranscriptionContent">
+                    <p class="placeholder">Start recording to see live transcription...</p>
+                </div>
+            </div>
+
+            <!-- Notes List -->
+            <div class="notes-container">
+                <div class="notes-list" id="notesList">
+                    <!-- Notes will be loaded here -->
+                </div>
+            </div>
+        </main>
+
+        <!-- Note Detail Panel -->
+        <aside class="detail-panel" id="detailPanel">
+            <div class="detail-header">
+                <input type="text" class="note-title-input" id="noteTitle" placeholder="Note title">
+                <div class="detail-actions">
+                    <button class="btn-icon" id="exportNoteBtn" title="Export note">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                    </button>
+                    <button class="btn-icon danger" id="deleteNoteBtn" title="Delete note">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="detail-meta">
+                <span id="noteDate"></span>
+                <span id="noteLanguage"></span>
+                <span id="noteDuration"></span>
+            </div>
+
+            <div class="detail-folder">
+                <label>Folder:</label>
+                <select id="noteFolderSelect">
+                    <option value="">No folder</option>
+                </select>
+            </div>
+
+            <div class="detail-tags">
+                <label>Tags:</label>
+                <div class="tags-container" id="noteTags">
+                    <!-- Tags will be loaded here -->
+                </div>
+                <div class="add-tag">
+                    <input type="text" id="newTagInput" placeholder="Add tag...">
+                    <button class="btn-small" id="addTagBtn">Add</button>
+                </div>
+            </div>
+
+            <div class="detail-content">
+                <textarea id="noteContent" placeholder="Note content..."></textarea>
+            </div>
+
+            <div class="detail-footer">
+                <button class="btn btn-primary" id="saveNoteBtn">Save Changes</button>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Modal for creating folders -->
+    <div class="modal" id="folderModal">
+        <div class="modal-content">
+            <h3 id="folderModalTitle">New Folder</h3>
+            <input type="text" id="folderNameInput" placeholder="Folder name">
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelFolderBtn">Cancel</button>
+                <button class="btn btn-primary" id="saveFolderBtn">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for export options -->
+    <div class="modal" id="exportModal">
+        <div class="modal-content">
+            <h3>Export Options</h3>
+            <div class="export-options">
+                <button class="btn btn-secondary" data-format="txt">Export as .txt</button>
+                <button class="btn btn-secondary" data-format="md">Export as .md</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelExportBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Context Menu -->
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" data-action="rename">Rename</div>
+        <div class="context-menu-item" data-action="subfolder">Add Subfolder</div>
+        <div class="context-menu-item danger" data-action="delete">Delete</div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar" id="statusBar">
+        <div class="status-bar-left">
+            <div class="status-item" id="offlineStatus">
+                <span class="status-dot online"></span>
+                <span>Offline Ready</span>
+            </div>
+            <div class="status-item" id="aiStatus">
+                <span class="status-dot"></span>
+                <span>AI Correction</span>
+            </div>
+            <div class="status-item" id="speakerStatus">
+                <span class="status-dot"></span>
+                <span>Speaker Detection</span>
+            </div>
+        </div>
+        <div class="status-bar-right">
+            <button class="backup-btn" id="backupBtn" title="Download full backup">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Backup
+            </button>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
