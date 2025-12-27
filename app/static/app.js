@@ -1,6 +1,86 @@
 const API_BASE = '';
 const socket = io();
 
+let modelsInitialized = false;
+
+function updateInitProgress(data) {
+    const overlay = document.getElementById('initOverlay');
+    if (!overlay) return;
+
+    const progressFill = document.getElementById('initProgressFill');
+    const progressText = document.getElementById('initProgressText');
+
+    if (data.all_progress) {
+        let total = 0;
+        let completed = 0;
+        for (const [model, info] of Object.entries(data.all_progress)) {
+            total += 100;
+            completed += info.progress || 0;
+        }
+        const percent = Math.round((completed / total) * 100);
+        if (progressFill) progressFill.style.width = percent + '%';
+        if (progressText) progressText.textContent = percent + '%';
+    }
+
+    if (data.model) {
+        const modelEl = document.querySelector(`.init-model[data-model="${data.model}"]`);
+        if (modelEl) {
+            const statusEl = modelEl.querySelector('.init-model-status');
+            const messageEl = modelEl.querySelector('.init-model-message');
+
+            statusEl.className = 'init-model-status ' + data.status;
+            if (messageEl) messageEl.textContent = data.message || '';
+        }
+    }
+}
+
+function hideInitOverlay() {
+    const overlay = document.getElementById('initOverlay');
+    if (overlay) {
+        overlay.classList.add('fade-out');
+        setTimeout(() => {
+            overlay.style.display = 'none';
+        }, 500);
+    }
+    modelsInitialized = true;
+}
+
+async function checkInitStatus() {
+    try {
+        const response = await fetch('/api/models/init-status');
+        const data = await response.json();
+
+        if (data.ready) {
+            for (const [model, info] of Object.entries(data.progress)) {
+                updateInitProgress({ model, ...info, all_progress: data.progress });
+            }
+            hideInitOverlay();
+            return true;
+        } else {
+            for (const [model, info] of Object.entries(data.progress)) {
+                updateInitProgress({ model, ...info, all_progress: data.progress });
+            }
+            return false;
+        }
+    } catch (e) {
+        console.error('Error checking init status:', e);
+        return false;
+    }
+}
+
+socket.on('model_progress', (data) => {
+    updateInitProgress(data);
+});
+
+socket.on('models_ready', (data) => {
+    if (data.ready) {
+        updateInitProgress({ all_progress: data.progress });
+        setTimeout(() => hideInitOverlay(), 500);
+    }
+});
+
+checkInitStatus();
+
 const i18n = {
     en: {
         folders: 'Folders',
