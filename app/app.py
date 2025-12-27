@@ -104,9 +104,9 @@ def analyze_audio_quality(audio_data, sample_rate):
     score = max(0, min(100, score))
 
     return {
-        'score': score,
+        'score': int(score),
         'issues': issues,
-        'energy': round(energy, 4),
+        'energy': round(float(energy), 4),
         'snr': round(float(snr), 2),
         'zcr': round(float(zcr), 4)
     }
@@ -373,15 +373,15 @@ def realtime_transcription_worker():
                         similarity_history.pop(0)
 
                     dashboard_data = {
-                        'similarity': confidence,
-                        'threshold': get_param('voice_threshold'),
-                        'is_match': is_match,
+                        'similarity': float(confidence),
+                        'threshold': float(get_param('voice_threshold')),
+                        'is_match': bool(is_match),
                         'mode': voice_filter_mode,
-                        'accepted': accepted_chunks,
-                        'rejected': skipped_chunks,
+                        'accepted': int(accepted_chunks),
+                        'rejected': int(skipped_chunks),
                         'audio_quality': audio_quality,
-                        'similarity_history': similarity_history[-20:],
-                        'avg_quality': sum(audio_quality_scores[-20:]) / len(audio_quality_scores[-20:]) if audio_quality_scores else 0
+                        'similarity_history': [float(x) for x in similarity_history[-20:]],
+                        'avg_quality': float(sum(audio_quality_scores[-20:]) / len(audio_quality_scores[-20:])) if audio_quality_scores else 0.0
                     }
                     socketio.emit('voice_filter_dashboard', dashboard_data)
 
@@ -391,9 +391,9 @@ def realtime_transcription_worker():
                             socketio.emit('voice_filter_status', {
                                 'filtering': True,
                                 'mode': 'include',
-                                'skipped': skipped_chunks,
-                                'accepted': accepted_chunks,
-                                'last_confidence': confidence
+                                'skipped': int(skipped_chunks),
+                                'accepted': int(accepted_chunks),
+                                'last_confidence': float(confidence)
                             })
                             continue
                         accepted_chunks += 1
@@ -403,9 +403,9 @@ def realtime_transcription_worker():
                             socketio.emit('voice_filter_status', {
                                 'filtering': True,
                                 'mode': 'exclude',
-                                'skipped': skipped_chunks,
-                                'accepted': accepted_chunks,
-                                'last_confidence': confidence
+                                'skipped': int(skipped_chunks),
+                                'accepted': int(accepted_chunks),
+                                'last_confidence': float(confidence)
                             })
                             continue
                         accepted_chunks += 1
