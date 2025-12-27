@@ -13,8 +13,8 @@ _realtime_model = None
 _accurate_model = None
 _model_lock = threading.Lock()
 
-REALTIME_MODEL = "small"
-ACCURATE_MODEL = "medium"
+REALTIME_MODEL = "medium"
+ACCURATE_MODEL = "large-v3"
 
 
 class RealtimeTranscriber:

@@ -701,6 +701,37 @@ body {
     border-radius: 4px;
 }
 
+.record-btn.processing {
+    background: var(--accent);
+    animation: pulse-processing 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-processing {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+}
+
+.processing-text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--text-secondary);
+}
+
+.spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 .recording-info {
     margin-top: 16px;
     text-align: center;

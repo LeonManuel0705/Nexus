@@ -580,53 +580,63 @@ def handle_stop_realtime(data):
     realtime_active = False
     audio_path, duration = recorder.stop_recording()
 
-    with correction_lock:
-        if last_correction_index < len(current_transcription):
-            remaining_segments = current_transcription[last_correction_index:]
-            if remaining_segments:
-                corrector = get_text_corrector(current_language)
-                remaining_text = ' '.join(remaining_segments)
-                corrected_remaining = corrector.correct_full(remaining_text)
-                corrected_remaining = apply_ai_correction(corrected_remaining, current_language)
-                corrected_segments.append(corrected_remaining)
+    emit('recording_stopping', {'message': 'Processing and saving...'})
 
-        final_text = ' '.join(corrected_segments)
+    raw_segments = list(current_transcription)
+    corrected_segs = list(corrected_segments)
+    last_idx = last_correction_index
+    lang = current_language
 
-    if not final_text.strip():
-        final_text = ' '.join(current_transcription)
+    def finalize_and_save():
+        with correction_lock:
+            if last_idx < len(raw_segments):
+                remaining_segments = raw_segments[last_idx:]
+                if remaining_segments:
+                    corrector = get_text_corrector(lang)
+                    remaining_text = ' '.join(remaining_segments)
+                    corrected_remaining = corrector.correct_full(remaining_text)
+                    corrected_remaining = apply_ai_correction(corrected_remaining, lang)
+                    corrected_segs.append(corrected_remaining)
+
+            final_text = ' '.join(corrected_segs)
+
+        if not final_text.strip():
+            final_text = ' '.join(raw_segments)
+            if final_text.strip():
+                corrector = get_text_corrector(lang)
+                final_text = corrector.correct_full(final_text)
+                final_text = apply_ai_correction(final_text, lang)
+
+        if audio_path:
+            cleanup_audio_file(audio_path)
+
         if final_text.strip():
-            corrector = get_text_corrector(current_language)
-            final_text = corrector.correct_full(final_text)
-            final_text = apply_ai_correction(final_text, current_language)
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+            title = f"Voice Note - {timestamp}"
 
-    if audio_path:
-        cleanup_audio_file(audio_path)
+            note_id = db.create_note(
+                title=title,
+                content=final_text,
+                folder_id=folder_id,
+                language=lang,
+                audio_duration=duration
+            )
 
-    if final_text.strip():
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-        title = f"Voice Note - {timestamp}"
+            note = db.get_note(note_id)
 
-        note_id = db.create_note(
-            title=title,
-            content=final_text,
-            folder_id=folder_id,
-            language=current_language,
-            audio_duration=duration
-        )
+            socketio.emit('recording_stopped', {
+                'success': True,
+                'note': note,
+                'final_text': final_text,
+                'duration': duration
+            })
+        else:
+            socketio.emit('recording_stopped', {
+                'success': False,
+                'message': 'No speech detected'
+            })
 
-        note = db.get_note(note_id)
-
-        emit('recording_stopped', {
-            'success': True,
-            'note': note,
-            'final_text': final_text,
-            'duration': duration
-        })
-    else:
-        emit('recording_stopped', {
-            'success': False,
-            'message': 'No speech detected'
-        })
+    threading.Thread(target=finalize_and_save, daemon=True).start()
 
 @socketio.on('set_language')
 def handle_set_language(data):
