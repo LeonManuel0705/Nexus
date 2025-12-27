@@ -10,69 +10,52 @@ from scipy import signal
 
 AUDIO_TEMP_PATH = os.path.expanduser("~/Documents/voice-notes/audio_temp")
 
-# Settings for teacher voice detection
-CHUNK_DURATION = 3.0  # Seconds per chunk for real-time transcription
-MIN_VOICE_DURATION = 0.5  # Minimum seconds of speech to consider (filters short sounds)
-VOLUME_THRESHOLD = 0.02  # Minimum volume to consider as speech (filters quiet sounds)
-DOMINANT_SPEAKER_RATIO = 1.5  # Speaker must be this much louder than background
+CHUNK_DURATION = 1.5
+MIN_VOICE_DURATION = 0.3
+VOLUME_THRESHOLD = 0.015
+DOMINANT_SPEAKER_RATIO = 1.3
 
-# Audio device recovery settings
 MAX_DEVICE_RETRIES = 3
-DEVICE_RETRY_DELAY = 0.5  # seconds
+DEVICE_RETRY_DELAY = 0.5
 
 
 class AudioRecorder:
     def __init__(self, sample_rate=16000, channels=1):
-        """Initialize the audio recorder with teacher voice detection."""
         self.sample_rate = sample_rate
         self.channels = channels
         self.recording = False
         self.audio_data = []
         self.stream = None
         self.start_time = None
-        self.last_error = None  # Track last error for debugging
-        self.device_id = None  # Currently used device
+        self.last_error = None
+        self.device_id = None
 
-        # Real-time transcription
         self.audio_queue = queue.Queue()
         self.current_chunk = []
         self.chunk_start_time = None
-        self.on_chunk_ready = None  # Callback for when a chunk is ready
+        self.on_chunk_ready = None
 
-        # Volume tracking for dominant speaker detection
-        self.background_volume = 0.01  # Running average of background noise
-        self.speech_volumes = []  # Track volumes during speech
+        self.background_volume = 0.01
+        self.speech_volumes = []
 
     def _calculate_volume(self, audio):
-        """Calculate RMS volume of audio."""
         return np.sqrt(np.mean(audio ** 2))
 
     def _is_teacher_speaking(self, audio):
-        """Detect if this is likely the teacher speaking.
-
-        Teacher characteristics:
-        - Louder than background (projecting voice)
-        - Sustained speech (not short comments)
-        - Consistent volume
-        """
         volume = self._calculate_volume(audio)
 
-        # Update background noise estimate (slow adaptation)
         if volume < self.background_volume:
             self.background_volume = 0.95 * self.background_volume + 0.05 * volume
 
-        # Check if loud enough to be teacher
         if volume < VOLUME_THRESHOLD:
             return False
 
-        # Check if significantly louder than background
         if volume < self.background_volume * DOMINANT_SPEAKER_RATIO:
             return False
 
         return True
 
     def _audio_callback(self, indata, frames, time_info, status):
-        """Callback for audio stream - processes audio in real-time."""
         if status:
             print(f"Audio status: {status}")
 
@@ -80,23 +63,17 @@ class AudioRecorder:
             return
 
         audio = indata.copy().flatten()
-
-        # Always save all audio for the final recording
         self.audio_data.append(indata.copy())
 
-        # For real-time: only queue audio that sounds like teacher
         if self._is_teacher_speaking(audio):
             self.current_chunk.append(audio)
 
             if self.chunk_start_time is None:
                 self.chunk_start_time = time.time()
 
-        # Check if we have enough audio for a chunk
         if self.chunk_start_time and (time.time() - self.chunk_start_time) >= CHUNK_DURATION:
             if len(self.current_chunk) > 0:
                 chunk_audio = np.concatenate(self.current_chunk)
-
-                # Only queue if we have enough actual speech
                 speech_duration = len(chunk_audio) / self.sample_rate
                 if speech_duration >= MIN_VOICE_DURATION:
                     self.audio_queue.put(chunk_audio)
@@ -105,15 +82,12 @@ class AudioRecorder:
             self.chunk_start_time = None
 
     def _find_working_device(self):
-        """Find a working input device, preferring the default."""
-        # First try to refresh the device list
         try:
             sd._terminate()
             sd._initialize()
         except:
             pass
 
-        # Try default device first
         try:
             default_device = sd.default.device[0]
             if default_device is not None:
@@ -123,12 +97,10 @@ class AudioRecorder:
         except:
             pass
 
-        # Search for any working input device
         try:
             devices = sd.query_devices()
             for i, device in enumerate(devices):
                 if device['max_input_channels'] > 0:
-                    # Test if device works
                     try:
                         test_stream = sd.InputStream(
                             device=i,
@@ -147,7 +119,6 @@ class AudioRecorder:
         return None
 
     def _get_supported_sample_rate(self, device_id):
-        """Find a supported sample rate for the device."""
         preferred_rates = [16000, 44100, 48000, 22050, 8000]
 
         for rate in preferred_rates:
@@ -157,7 +128,6 @@ class AudioRecorder:
             except:
                 continue
 
-        # Fall back to device default
         try:
             device_info = sd.query_devices(device_id)
             return int(device_info['default_samplerate'])
@@ -165,7 +135,6 @@ class AudioRecorder:
             return 16000
 
     def start_recording(self, on_chunk_ready=None):
-        """Start recording audio with optional real-time callback."""
         if self.recording:
             return False
 
@@ -175,25 +144,21 @@ class AudioRecorder:
         self.on_chunk_ready = on_chunk_ready
         self.last_error = None
 
-        # Clear the queue
         while not self.audio_queue.empty():
             try:
                 self.audio_queue.get_nowait()
             except:
                 break
 
-        # Try to open audio stream with retries
         for attempt in range(MAX_DEVICE_RETRIES):
             try:
-                # Find a working device
                 device_id = self._find_working_device()
                 if device_id is None:
                     raise Exception("No audio input device found")
 
-                # Get supported sample rate
                 actual_sample_rate = self._get_supported_sample_rate(device_id)
                 if actual_sample_rate != self.sample_rate:
-                    print(f"Using sample rate {actual_sample_rate} (device doesn't support {self.sample_rate})")
+                    print(f"Using sample rate {actual_sample_rate}")
                     self.sample_rate = actual_sample_rate
 
                 self.stream = sd.InputStream(
@@ -202,7 +167,7 @@ class AudioRecorder:
                     channels=self.channels,
                     dtype=np.float32,
                     callback=self._audio_callback,
-                    blocksize=int(self.sample_rate * 0.1)  # 100ms blocks
+                    blocksize=int(self.sample_rate * 0.05)
                 )
                 self.stream.start()
                 self.recording = True
@@ -214,7 +179,6 @@ class AudioRecorder:
                 self.last_error = str(e)
                 print(f"PortAudio error (attempt {attempt + 1}/{MAX_DEVICE_RETRIES}): {e}")
 
-                # Try to recover by reinitializing PortAudio
                 try:
                     sd._terminate()
                     time.sleep(DEVICE_RETRY_DELAY)
@@ -235,14 +199,12 @@ class AudioRecorder:
         return False
 
     def get_next_chunk(self, timeout=0.1):
-        """Get next audio chunk for real-time transcription."""
         try:
             return self.audio_queue.get(timeout=timeout)
         except queue.Empty:
             return None
 
     def stop_recording(self) -> tuple:
-        """Stop recording and save the audio."""
         if not self.recording:
             return None, 0
 
@@ -254,7 +216,6 @@ class AudioRecorder:
             self.stream.close()
             self.stream = None
 
-        # Process any remaining chunk
         if len(self.current_chunk) > 0:
             chunk_audio = np.concatenate(self.current_chunk)
             if len(chunk_audio) / self.sample_rate >= MIN_VOICE_DURATION:
@@ -263,13 +224,9 @@ class AudioRecorder:
         if not self.audio_data:
             return None, 0
 
-        # Concatenate all audio
         audio_array = np.concatenate(self.audio_data, axis=0)
-
-        # Apply high-pass filter to reduce low-frequency noise
         audio_array = self._apply_noise_reduction(audio_array.flatten())
 
-        # Save as WAV
         os.makedirs(AUDIO_TEMP_PATH, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filepath = os.path.join(AUDIO_TEMP_PATH, f"recording_{timestamp}.wav")
@@ -285,8 +242,6 @@ class AudioRecorder:
         return filepath, duration
 
     def _apply_noise_reduction(self, audio):
-        """Apply simple noise reduction to enhance teacher voice."""
-        # High-pass filter at 100Hz to remove low rumble
         nyquist = self.sample_rate / 2
         low_cutoff = 100 / nyquist
 
@@ -294,7 +249,6 @@ class AudioRecorder:
             b, a = signal.butter(4, low_cutoff, btype='high')
             audio = signal.filtfilt(b, a, audio)
 
-        # Normalize volume
         max_val = np.max(np.abs(audio))
         if max_val > 0:
             audio = audio / max_val * 0.9
@@ -310,12 +264,10 @@ class AudioRecorder:
         return 0
 
     def get_last_error(self) -> str:
-        """Get the last error message."""
         return self.last_error
 
 
 def refresh_audio_devices():
-    """Refresh audio device list by reinitializing PortAudio."""
     try:
         sd._terminate()
         time.sleep(0.2)
@@ -327,7 +279,6 @@ def refresh_audio_devices():
 
 
 def list_audio_devices():
-    """List available audio input devices."""
     try:
         devices = sd.query_devices()
     except:
@@ -337,7 +288,6 @@ def list_audio_devices():
     input_devices = []
     for i, device in enumerate(devices):
         if device['max_input_channels'] > 0:
-            # Check if device is actually usable
             usable = True
             try:
                 sd.check_input_settings(device=i, channels=1)
@@ -355,7 +305,6 @@ def list_audio_devices():
 
 
 def get_default_input_device():
-    """Get the default input device."""
     try:
         device_id = sd.default.device[0]
         device = sd.query_devices(device_id)
@@ -369,7 +318,6 @@ def get_default_input_device():
         return None
 
 
-# Global recorder instance
 _recorder = None
 
 def get_recorder() -> AudioRecorder:
