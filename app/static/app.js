@@ -13,7 +13,8 @@ let state = {
     contextMenuTarget: null,
     systemStatus: null,
     waveformAnimationId: null,
-    currentLanguage: 'de'
+    currentLanguage: 'de',
+    processingJobs: {}
 };
 
 const elements = {
@@ -83,17 +84,18 @@ socket.on('recording_stopped', async (data) => {
     elements.recordBtn.classList.remove('recording');
     elements.recordLabel.textContent = 'Press to record';
     elements.recordingDuration.textContent = '00:00';
-    elements.liveTranscription.classList.remove('active');
 
-    if (data.success) {
-        elements.liveTranscriptionContent.innerHTML = `<p style="color: var(--success)">${escapeHtml(data.final_text)}</p>`;
-        showToast('Note saved successfully!', 'success');
-        await loadNotes();
-        selectNote(data.note.id);
-        setTimeout(() => {
-            elements.liveTranscriptionContent.innerHTML = '<p class="placeholder">Start recording to see live transcription...</p>';
-        }, 2000);
-    } else {
+    if (data.success && data.job_id) {
+        state.processingJobs[data.job_id] = {
+            status: 'processing',
+            progress: 0,
+            preview_text: data.preview_text
+        };
+
+        showProcessingIndicator(data.job_id, data.preview_text);
+        showToast('Recording saved! Processing in background...', 'success');
+    } else if (!data.success) {
+        elements.liveTranscription.classList.remove('active');
         elements.liveTranscriptionContent.innerHTML = `<p style="color: var(--danger)">${data.message || 'No speech detected'}</p>`;
         setTimeout(() => {
             elements.liveTranscriptionContent.innerHTML = '<p class="placeholder">Start recording to see live transcription...</p>';
@@ -101,9 +103,82 @@ socket.on('recording_stopped', async (data) => {
     }
 });
 
+socket.on('processing_progress', (data) => {
+    if (state.processingJobs[data.job_id]) {
+        state.processingJobs[data.job_id].progress = data.progress;
+        state.processingJobs[data.job_id].status_text = data.status;
+        updateProcessingIndicator(data.job_id, data.progress, data.status, data.estimated_remaining);
+    }
+});
+
+socket.on('processing_complete', async (data) => {
+    if (state.processingJobs[data.job_id]) {
+        delete state.processingJobs[data.job_id];
+    }
+
+    removeProcessingIndicator(data.job_id);
+
+    if (data.success) {
+        showToast('Note processed and saved!', 'success');
+        await loadNotes();
+
+        if (data.note) {
+            selectNote(data.note.id);
+        }
+    } else {
+        showToast('Processing failed: ' + (data.message || 'Unknown error'), 'error');
+    }
+
+    if (Object.keys(state.processingJobs).length === 0) {
+        elements.liveTranscription.classList.remove('active');
+        elements.liveTranscriptionContent.innerHTML = '<p class="placeholder">Start recording to see live transcription...</p>';
+    }
+});
+
 socket.on('error', (data) => {
     showToast('Error: ' + data.message, 'error');
 });
+
+function showProcessingIndicator(jobId, previewText) {
+    elements.liveTranscription.classList.add('active');
+
+    const truncatedText = previewText.length > 100 ? previewText.substring(0, 100) + '...' : previewText;
+
+    elements.liveTranscriptionContent.innerHTML = `
+        <div class="processing-job" data-job-id="${jobId}">
+            <div class="processing-header">
+                <span class="processing-status">Processing...</span>
+                <span class="processing-time"></span>
+            </div>
+            <div class="processing-bar-container">
+                <div class="processing-bar" style="width: 0%"></div>
+            </div>
+            <div class="processing-preview">${escapeHtml(truncatedText)}</div>
+        </div>
+    `;
+}
+
+function updateProcessingIndicator(jobId, progress, statusText, estimatedRemaining) {
+    const jobEl = document.querySelector(`.processing-job[data-job-id="${jobId}"]`);
+    if (!jobEl) return;
+
+    const bar = jobEl.querySelector('.processing-bar');
+    const status = jobEl.querySelector('.processing-status');
+    const time = jobEl.querySelector('.processing-time');
+
+    if (bar) bar.style.width = `${progress}%`;
+    if (status) status.textContent = statusText || 'Processing...';
+    if (time && estimatedRemaining !== undefined) {
+        time.textContent = estimatedRemaining > 0 ? `~${Math.ceil(estimatedRemaining)}s remaining` : 'Almost done...';
+    }
+}
+
+function removeProcessingIndicator(jobId) {
+    const jobEl = document.querySelector(`.processing-job[data-job-id="${jobId}"]`);
+    if (jobEl) {
+        jobEl.remove();
+    }
+}
 
 function startWaveformAnimation() {
     const canvas = elements.waveformCanvas;
@@ -482,7 +557,7 @@ function setLanguage(lang) {
 }
 
 function stopRecording() {
-    elements.recordLabel.textContent = 'Processing...';
+    elements.recordLabel.textContent = 'Saving...';
     socket.emit('stop_realtime', { folder_id: state.currentFolder });
 }
 
@@ -736,8 +811,8 @@ function updateStatusBar() {
     const aiStatus = document.getElementById('aiStatus');
     if (aiStatus && status.ai_correction) {
         const dot = aiStatus.querySelector('.status-dot');
-        dot.className = status.ai_correction.mlx_available ? 'status-dot online' : 'status-dot warning';
-        aiStatus.querySelector('span:last-child').textContent = status.ai_correction.mlx_available ? 'AI (MLX)' : 'LanguageTool';
+        dot.className = 'status-dot online';
+        aiStatus.querySelector('span:last-child').textContent = 'AI Correction';
     }
 
     const speakerStatus = document.getElementById('speakerStatus');
