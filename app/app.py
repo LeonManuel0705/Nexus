@@ -3,7 +3,6 @@ from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import os
 import threading
-import uuid
 from datetime import datetime
 from io import BytesIO
 import json
@@ -23,11 +22,14 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 realtime_active = False
 realtime_thread = None
+correction_thread = None
 current_transcription = []
+corrected_segments = []
+last_correction_index = 0
+correction_lock = threading.Lock()
 current_language = "de"
 
-processing_jobs = {}
-processing_lock = threading.Lock()
+CORRECTION_DELAY_SECONDS = 10
 
 threading.Thread(target=preload_model, daemon=True).start()
 
@@ -41,10 +43,48 @@ def serve_static(path):
     return send_from_directory('static', path)
 
 
+def background_correction_worker():
+    global realtime_active, current_transcription, corrected_segments, last_correction_index, current_language
+
+    corrector = get_text_corrector(current_language)
+
+    while realtime_active:
+        time.sleep(2)
+
+        if not realtime_active:
+            break
+
+        with correction_lock:
+            total_segments = len(current_transcription)
+            safe_index = max(0, total_segments - 3)
+
+            if safe_index > last_correction_index:
+                segments_to_correct = current_transcription[last_correction_index:safe_index]
+
+                if segments_to_correct:
+                    text_to_correct = ' '.join(segments_to_correct)
+                    corrected_text = corrector.correct_full(text_to_correct)
+
+                    corrected_segments.append(corrected_text)
+                    last_correction_index = safe_index
+
+                    full_corrected = ' '.join(corrected_segments)
+                    remaining = ' '.join(current_transcription[safe_index:])
+                    if remaining:
+                        full_corrected += ' ' + remaining
+
+                    socketio.emit('correction_update', {
+                        'corrected_text': full_corrected,
+                        'segments_corrected': safe_index,
+                        'total_segments': total_segments
+                    })
+
+
 def realtime_transcription_worker():
     global realtime_active, current_transcription, current_language
 
     recorder = get_recorder()
+    corrector = get_text_corrector(current_language)
 
     while realtime_active and recorder.is_recording():
         chunk = recorder.get_next_chunk(timeout=0.5)
@@ -59,10 +99,10 @@ def realtime_transcription_worker():
                 )
 
                 if corrected_text and corrected_text.strip():
-                    current_transcription.append(corrected_text.strip())
-                    full_text = ' '.join(current_transcription)
+                    with correction_lock:
+                        current_transcription.append(corrected_text.strip())
+                        full_text = ' '.join(current_transcription)
 
-                    corrector = get_text_corrector(current_language)
                     full_corrected = corrector.correct_instant(full_text)
 
                     socketio.emit('transcription_update', {
@@ -80,107 +120,10 @@ def realtime_transcription_worker():
                 traceback.print_exc()
 
 
-def background_processing_worker(job_id, transcription_text, folder_id, language, duration, audio_path):
-    global processing_jobs
-
-    try:
-        with processing_lock:
-            processing_jobs[job_id]['status'] = 'processing'
-            processing_jobs[job_id]['progress'] = 10
-
-        socketio.emit('processing_progress', {
-            'job_id': job_id,
-            'progress': 10,
-            'status': 'Applying corrections...',
-            'estimated_remaining': 2
-        })
-
-        time.sleep(0.3)
-
-        corrector = get_text_corrector(language)
-
-        with processing_lock:
-            processing_jobs[job_id]['progress'] = 40
-
-        socketio.emit('processing_progress', {
-            'job_id': job_id,
-            'progress': 40,
-            'status': 'Finalizing text...',
-            'estimated_remaining': 1
-        })
-
-        final_text = corrector.correct_full(transcription_text)
-
-        with processing_lock:
-            processing_jobs[job_id]['progress'] = 70
-
-        socketio.emit('processing_progress', {
-            'job_id': job_id,
-            'progress': 70,
-            'status': 'Saving note...',
-            'estimated_remaining': 0.5
-        })
-
-        if audio_path:
-            cleanup_audio_file(audio_path)
-
-        if final_text.strip():
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-            title = f"Voice Note - {timestamp}"
-
-            note_id = db.create_note(
-                title=title,
-                content=final_text,
-                folder_id=folder_id,
-                language=language,
-                audio_duration=duration
-            )
-
-            note = db.get_note(note_id)
-
-            with processing_lock:
-                processing_jobs[job_id]['status'] = 'completed'
-                processing_jobs[job_id]['progress'] = 100
-                processing_jobs[job_id]['note'] = note
-                processing_jobs[job_id]['final_text'] = final_text
-
-            socketio.emit('processing_complete', {
-                'job_id': job_id,
-                'success': True,
-                'note': note,
-                'final_text': final_text,
-                'duration': duration
-            })
-        else:
-            with processing_lock:
-                processing_jobs[job_id]['status'] = 'failed'
-                processing_jobs[job_id]['error'] = 'No speech detected'
-
-            socketio.emit('processing_complete', {
-                'job_id': job_id,
-                'success': False,
-                'message': 'No speech detected'
-            })
-
-    except Exception as e:
-        print(f"Background processing error: {e}")
-        import traceback
-        traceback.print_exc()
-
-        with processing_lock:
-            processing_jobs[job_id]['status'] = 'failed'
-            processing_jobs[job_id]['error'] = str(e)
-
-        socketio.emit('processing_complete', {
-            'job_id': job_id,
-            'success': False,
-            'message': str(e)
-        })
-
-
 @socketio.on('start_realtime')
 def handle_start_realtime(data):
-    global realtime_active, realtime_thread, current_transcription, current_language
+    global realtime_active, realtime_thread, correction_thread
+    global current_transcription, corrected_segments, last_correction_index, current_language
 
     folder_id = data.get('folder_id')
     current_language = data.get('language', 'de')
@@ -190,7 +133,11 @@ def handle_start_realtime(data):
         emit('error', {'message': 'Already recording'})
         return
 
-    current_transcription = []
+    with correction_lock:
+        current_transcription = []
+        corrected_segments = []
+        last_correction_index = 0
+
     realtime_active = True
     reset_session()
 
@@ -205,6 +152,9 @@ def handle_start_realtime(data):
     realtime_thread = threading.Thread(target=realtime_transcription_worker, daemon=True)
     realtime_thread.start()
 
+    correction_thread = threading.Thread(target=background_correction_worker, daemon=True)
+    correction_thread.start()
+
     emit('recording_started', {
         'message': 'Recording started',
         'language': current_language,
@@ -214,7 +164,7 @@ def handle_start_realtime(data):
 
 @socketio.on('stop_realtime')
 def handle_stop_realtime(data):
-    global realtime_active, current_transcription, current_language, processing_jobs
+    global realtime_active, current_transcription, corrected_segments, last_correction_index, current_language
 
     folder_id = data.get('folder_id')
     recorder = get_recorder()
@@ -226,57 +176,51 @@ def handle_stop_realtime(data):
     realtime_active = False
     audio_path, duration = recorder.stop_recording()
 
-    transcription_text = ' '.join(current_transcription)
+    with correction_lock:
+        if last_correction_index < len(current_transcription):
+            remaining_segments = current_transcription[last_correction_index:]
+            if remaining_segments:
+                corrector = get_text_corrector(current_language)
+                remaining_text = ' '.join(remaining_segments)
+                corrected_remaining = corrector.correct_full(remaining_text)
+                corrected_segments.append(corrected_remaining)
 
-    job_id = str(uuid.uuid4())[:8]
+        final_text = ' '.join(corrected_segments)
 
-    with processing_lock:
-        processing_jobs[job_id] = {
-            'status': 'queued',
-            'progress': 0,
-            'transcription_text': transcription_text,
-            'folder_id': folder_id,
-            'language': current_language,
-            'duration': duration,
-            'created_at': datetime.now().isoformat()
-        }
+    if not final_text.strip():
+        final_text = ' '.join(current_transcription)
+        if final_text.strip():
+            corrector = get_text_corrector(current_language)
+            final_text = corrector.correct_full(final_text)
 
-    emit('recording_stopped', {
-        'success': True,
-        'job_id': job_id,
-        'preview_text': transcription_text,
-        'duration': duration,
-        'message': 'Processing in background...'
-    })
+    if audio_path:
+        cleanup_audio_file(audio_path)
 
-    processing_thread = threading.Thread(
-        target=background_processing_worker,
-        args=(job_id, transcription_text, folder_id, current_language, duration, audio_path),
-        daemon=True
-    )
-    processing_thread.start()
+    if final_text.strip():
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        title = f"Voice Note - {timestamp}"
 
+        note_id = db.create_note(
+            title=title,
+            content=final_text,
+            folder_id=folder_id,
+            language=current_language,
+            audio_duration=duration
+        )
 
-@socketio.on('get_processing_status')
-def handle_get_processing_status(data):
-    job_id = data.get('job_id')
+        note = db.get_note(note_id)
 
-    with processing_lock:
-        if job_id in processing_jobs:
-            job = processing_jobs[job_id]
-            emit('processing_status', {
-                'job_id': job_id,
-                'status': job['status'],
-                'progress': job['progress'],
-                'note': job.get('note'),
-                'error': job.get('error')
-            })
-        else:
-            emit('processing_status', {
-                'job_id': job_id,
-                'status': 'not_found',
-                'error': 'Job not found'
-            })
+        emit('recording_stopped', {
+            'success': True,
+            'note': note,
+            'final_text': final_text,
+            'duration': duration
+        })
+    else:
+        emit('recording_stopped', {
+            'success': False,
+            'message': 'No speech detected'
+        })
 
 
 @socketio.on('set_language')
@@ -284,22 +228,6 @@ def handle_set_language(data):
     global current_language
     current_language = data.get('language', 'de')
     emit('language_changed', {'language': current_language})
-
-
-@app.route('/api/processing/jobs', methods=['GET'])
-def get_processing_jobs():
-    with processing_lock:
-        active_jobs = {
-            job_id: {
-                'status': job['status'],
-                'progress': job['progress'],
-                'duration': job.get('duration', 0),
-                'created_at': job.get('created_at')
-            }
-            for job_id, job in processing_jobs.items()
-            if job['status'] in ['queued', 'processing']
-        }
-    return jsonify({'jobs': active_jobs})
 
 
 @app.route('/api/recording/start', methods=['POST'])
@@ -314,7 +242,7 @@ def start_recording():
 
 @app.route('/api/recording/stop', methods=['POST'])
 def stop_recording():
-    global current_language
+    global current_language, current_transcription
     recorder = get_recorder()
     if not recorder.is_recording():
         return jsonify({'success': False, 'error': 'Not recording'}), 400
@@ -351,8 +279,7 @@ def stop_recording():
         'transcription': {
             'text': final_text,
             'language': language,
-            'duration': duration,
-            'used_ai': True
+            'duration': duration
         }
     })
 
@@ -609,7 +536,7 @@ def get_system_status():
         'speaker_diarization': correction['speaker_diarization'],
         'whisper': {
             'realtime_model': 'small',
-            'processing': 'instant'
+            'processing': 'live'
         }
     })
 

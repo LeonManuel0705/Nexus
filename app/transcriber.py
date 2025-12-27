@@ -161,10 +161,28 @@ class TextCorrector:
             }
         }
 
-        self.sentence_starters = {
-            "de": ['Der', 'Die', 'Das', 'Ein', 'Eine', 'Wir', 'Sie', 'Es', 'Ich', 'Man', 'Also', 'Wenn', 'Als', 'Nach', 'Bei', 'Für', 'Mit', 'Durch', 'Über', 'Unter'],
-            "en": ['The', 'A', 'An', 'We', 'They', 'It', 'I', 'You', 'This', 'That', 'When', 'If', 'As', 'For', 'With', 'From', 'To', 'In', 'On', 'At']
+        self.lowercase_words = {
+            "de": ['und', 'oder', 'aber', 'denn', 'weil', 'dass', 'wenn', 'als', 'ob', 'damit',
+                   'der', 'die', 'das', 'den', 'dem', 'des', 'ein', 'eine', 'einer', 'einem',
+                   'zu', 'von', 'mit', 'bei', 'nach', 'aus', 'für', 'über', 'unter', 'zwischen',
+                   'ist', 'sind', 'war', 'waren', 'hat', 'haben', 'wird', 'werden', 'kann', 'können',
+                   'ich', 'du', 'er', 'sie', 'es', 'wir', 'ihr', 'man', 'sich', 'nicht', 'auch'],
+            "en": ['and', 'or', 'but', 'the', 'a', 'an', 'is', 'are', 'was', 'were', 'has', 'have',
+                   'to', 'of', 'in', 'on', 'at', 'for', 'with', 'from', 'by', 'about', 'into',
+                   'i', 'you', 'he', 'she', 'it', 'we', 'they', 'this', 'that', 'not', 'also']
         }
+
+    def _is_likely_mid_sentence(self, before_text: str, after_word: str) -> bool:
+        lang = self.language[:2]
+        lowercase_words = self.lowercase_words.get(lang, [])
+
+        if after_word.lower() in lowercase_words:
+            return True
+
+        if before_text and before_text[-1] == ',':
+            return True
+
+        return False
 
     def correct_instant(self, text: str) -> str:
         if not text or not text.strip():
@@ -185,38 +203,65 @@ class TextCorrector:
         if text and not text[0].isupper():
             text = text[0].upper() + text[1:]
 
-        sentences = re.split(r'([.!?]\s+)', text)
-        result = []
-        for i, part in enumerate(sentences):
-            if i > 0 and re.match(r'^[.!?]\s+$', sentences[i-1] if i > 0 else ''):
-                if part and part[0].islower():
-                    part = part[0].upper() + part[1:]
-            result.append(part)
-        text = ''.join(result)
-
         return text
 
     def correct_full(self, text: str, context: Optional[str] = None) -> str:
-        text = self.correct_instant(text)
+        if not text or not text.strip():
+            return text
 
-        sentences = re.split(r'(?<=[.!?])\s+', text)
-        corrected_sentences = []
+        lang = self.language[:2]
 
-        for sentence in sentences:
-            if not sentence.strip():
-                continue
+        for pattern, replacement in self.filler_patterns.get(lang, []):
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
 
-            sentence = sentence.strip()
+        for pattern, replacement in self.common_errors.get(lang, {}).items():
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
 
-            if sentence and sentence[0].islower():
-                sentence = sentence[0].upper() + sentence[1:]
+        text = re.sub(r'\s+', ' ', text).strip()
+        text = re.sub(r'\s+([.,!?;:])', r'\1', text)
+        text = re.sub(r'([.,!?;:])\s*([.,!?;:])+', r'\1', text)
 
-            if sentence and sentence[-1] not in '.!?':
-                sentence += '.'
+        result = []
+        i = 0
+        while i < len(text):
+            if text[i] == '.':
+                if i + 2 < len(text) and text[i + 1] == ' ':
+                    next_word_match = re.match(r'\s+(\w+)', text[i + 1:])
+                    if next_word_match:
+                        next_word = next_word_match.group(1)
+                        before_text = text[:i]
 
-            corrected_sentences.append(sentence)
+                        if self._is_likely_mid_sentence(before_text, next_word):
+                            result.append(',')
+                            i += 1
+                            continue
 
-        return ' '.join(corrected_sentences)
+                result.append(text[i])
+            else:
+                result.append(text[i])
+            i += 1
+
+        text = ''.join(result)
+
+        text = re.sub(r',\s*,+', ',', text)
+
+        if text and text[0].islower():
+            text = text[0].upper() + text[1:]
+
+        sentences = re.split(r'([.!?]\s+)', text)
+        final_result = []
+        for j, part in enumerate(sentences):
+            if j > 0 and j - 1 < len(sentences) and re.match(r'^[.!?]\s+$', sentences[j - 1]):
+                if part and len(part) > 0 and part[0].islower():
+                    part = part[0].upper() + part[1:]
+            final_result.append(part)
+
+        text = ''.join(final_result)
+
+        if text and text[-1] not in '.!?':
+            text += '.'
+
+        return text
 
 
 _transcriber: Optional[RealtimeTranscriber] = None
