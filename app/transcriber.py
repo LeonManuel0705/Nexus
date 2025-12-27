@@ -205,6 +205,50 @@ class TextCorrector:
 
         self.domain_endings = ['.com', '.de', '.org', '.net', '.io', '.edu', '.gov', '.co', '.info']
 
+        self.english_tech_corrections = {
+            'rekarding': 'recording',
+            'rekord': 'record',
+            'rekords': 'records',
+            'rekorder': 'recorder',
+            'seyf': 'save',
+            'seif': 'save',
+            'lokal': 'local',
+            'lokale': 'local',
+            'lokalhost': 'localhost',
+            'lokel': 'local',
+            'lokälhost': 'localhost',
+            'serfer': 'server',
+            'datei': 'file',
+            'uploat': 'upload',
+            'uploaden': 'upload',
+            'downloat': 'download',
+            'downloaden': 'download',
+            'klick': 'click',
+            'klicken': 'click',
+        }
+
+        self.math_operators = {
+            r'\bhoch\b': '^',
+            r'\bquadrat\b': '²',
+            r'\bkubik\b': '³',
+            r'\bmal\b': '×',
+            r'\bgeteilt\s+durch\b': '÷',
+            r'\bdurch\b': '÷',
+            r'\bist\s+gleich\b': '=',
+            r'\bgleich\b': '=',
+            r'\bungleich\b': '≠',
+            r'\bgrößer\s+als\b': '>',
+            r'\bgrößer\s+gleich\b': '≥',
+            r'\bkleiner\s+als\b': '<',
+            r'\bkleiner\s+gleich\b': '≤',
+            r'\bwurzel\b': '√',
+            r'\bplus\s+minus\b': '±',
+            r'\bunendlich\b': '∞',
+            r'\bpi\b': 'π',
+            r'\bsumme\b': 'Σ',
+            r'\bintegral\b': '∫',
+        }
+
     def _convert_numbers(self, text: str) -> str:
         lang = self.language[:2]
         number_words = self.number_words_de if lang == 'de' else self.number_words_en
@@ -252,12 +296,56 @@ class TextCorrector:
 
         text = re.sub(r'\b(www)\s+(punkt|dot)\s*', r'www.', text, flags=re.IGNORECASE)
 
-        text = re.sub(r'\s+(punkt|dot)\s+(com|de|org|net|io|edu|gov|co|info)\b',
+        text = re.sub(r'\blocalhost\s+(doppelpunkt|colon)\s*(\d+)',
+                      r'localhost:\2', text, flags=re.IGNORECASE)
+        text = re.sub(r'\blocal\s+host\s+(doppelpunkt|colon)\s*(\d+)',
+                      r'localhost:\2', text, flags=re.IGNORECASE)
+
+        text = re.sub(r'\s+(punkt|dot)\s+(com|de|org|net|io|edu|gov|co|info|local|localhost)\b',
                       r'.\2', text, flags=re.IGNORECASE)
 
         text = re.sub(r'\s*(slash|schrägstrich)\s*', '/', text, flags=re.IGNORECASE)
 
         text = re.sub(r'(https?://\S+)', lambda m: m.group(1).lower(), text)
+        text = re.sub(r'\blocalhost:\d+\b', lambda m: m.group(0).lower(), text)
+
+        return text
+
+    def _correct_tech_terms(self, text: str) -> str:
+        words = text.split()
+        result = []
+
+        for word in words:
+            word_lower = word.lower().rstrip('.,!?;:')
+            punctuation = ''
+            if word and word[-1] in '.,!?;:':
+                punctuation = word[-1]
+                word_base = word[:-1]
+            else:
+                word_base = word
+
+            if word_lower in self.english_tech_corrections:
+                corrected = self.english_tech_corrections[word_lower]
+                if word_base[0].isupper():
+                    corrected = corrected.capitalize()
+                result.append(corrected + punctuation)
+            else:
+                result.append(word)
+
+        return ' '.join(result)
+
+    def _format_math(self, text: str) -> str:
+        for pattern, replacement in self.math_operators.items():
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+
+        text = re.sub(r'(\d+)\s*\^\s*(\d+)', r'\1^\2', text)
+        text = re.sub(r'([a-zA-Z])\s*\^\s*(\d+)', r'\1^\2', text)
+
+        text = re.sub(r'(\d+)\s*[×x]\s*(\d+)', r'\1 × \2', text)
+        text = re.sub(r'(\d+)\s*÷\s*(\d+)', r'\1 ÷ \2', text)
+        text = re.sub(r'(\d+)\s*\+\s*(\d+)', r'\1 + \2', text)
+        text = re.sub(r'(\d+)\s*-\s*(\d+)', r'\1 - \2', text)
+        text = re.sub(r'(\d+)\s*=\s*(\d+)', r'\1 = \2', text)
 
         return text
 
@@ -314,9 +402,11 @@ class TextCorrector:
         for pattern, replacement in self.common_errors.get(lang, {}).items():
             text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
 
+        text = self._correct_tech_terms(text)
         text = self._convert_numbers(text)
         text = self._detect_and_format_urls(text)
         text = self._format_special_chars(text)
+        text = self._format_math(text)
 
         text = re.sub(r'\s+', ' ', text).strip()
         text = re.sub(r'\s+([.,!?;:])', r'\1', text)
@@ -339,9 +429,11 @@ class TextCorrector:
         for pattern, replacement in self.common_errors.get(lang, {}).items():
             text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
 
+        text = self._correct_tech_terms(text)
         text = self._convert_numbers(text)
         text = self._detect_and_format_urls(text)
         text = self._format_special_chars(text)
+        text = self._format_math(text)
 
         text = re.sub(r'\s+', ' ', text).strip()
         text = re.sub(r'\s+([.,!?;:])', r'\1', text)
