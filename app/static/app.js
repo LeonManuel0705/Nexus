@@ -1,11 +1,6 @@
-// Voice Notes App - Frontend JavaScript with Real-time Transcription
-
 const API_BASE = '';
-
-// Socket.IO connection
 const socket = io();
 
-// State
 let state = {
     folders: [],
     notes: [],
@@ -16,17 +11,17 @@ let state = {
     recordingInterval: null,
     searchQuery: '',
     contextMenuTarget: null,
-    systemStatus: null
+    systemStatus: null,
+    waveformAnimationId: null
 };
 
-// DOM Elements
 const elements = {
     folderTree: document.getElementById('folderTree'),
     tagsList: document.getElementById('tagsList'),
     notesList: document.getElementById('notesList'),
     breadcrumb: document.getElementById('breadcrumb'),
     recordBtn: document.getElementById('recordBtn'),
-    recordingStatus: document.getElementById('recordingStatus'),
+    recordLabel: document.getElementById('recordLabel'),
     recordingDuration: document.getElementById('recordingDuration'),
     searchInput: document.getElementById('searchInput'),
     detailPanel: document.getElementById('detailPanel'),
@@ -44,22 +39,26 @@ const elements = {
     exportModal: document.getElementById('exportModal'),
     contextMenu: document.getElementById('contextMenu'),
     liveTranscription: document.getElementById('liveTranscription'),
-    liveTranscriptionContent: document.getElementById('liveTranscriptionContent')
+    liveTranscriptionContent: document.getElementById('liveTranscriptionContent'),
+    waveformCanvas: document.getElementById('waveformCanvas'),
+    noteCount: document.getElementById('noteCount'),
+    wordCount: document.getElementById('wordCount'),
+    charCount: document.getElementById('charCount'),
+    detailWordCount: document.getElementById('detailWordCount'),
+    detailCharCount: document.getElementById('detailCharCount'),
+    themeToggle: document.getElementById('themeToggle'),
+    toastContainer: document.getElementById('toastContainer')
 };
 
-// Socket.IO Event Handlers
-socket.on('connect', () => {
-    console.log('Connected to server');
-});
+socket.on('connect', () => console.log('Connected to server'));
 
 socket.on('recording_started', (data) => {
-    console.log('Recording started:', data);
     elements.liveTranscription.classList.add('active');
-    elements.liveTranscriptionContent.innerHTML = '<p class="listening">Listening for teacher...</p>';
+    elements.liveTranscriptionContent.innerHTML = '<p class="listening">Listening...</p>';
+    startWaveformAnimation();
 });
 
 socket.on('transcription_update', (data) => {
-    console.log('Transcription update:', data);
     const newSpan = document.createElement('span');
     newSpan.className = 'new-text';
     newSpan.textContent = data.text + ' ';
@@ -69,30 +68,32 @@ socket.on('transcription_update', (data) => {
 
     elements.liveTranscriptionContent.appendChild(newSpan);
     elements.liveTranscriptionContent.scrollTop = elements.liveTranscriptionContent.scrollHeight;
-    setTimeout(() => newSpan.classList.remove('new-text'), 500);
+
+    updateTranscriptionStats(data.full_text);
+
+    setTimeout(() => newSpan.classList.remove('new-text'), 800);
 });
 
 socket.on('recording_stopped', async (data) => {
-    console.log('Recording stopped:', data);
-
     state.isRecording = false;
     clearInterval(state.recordingInterval);
+    stopWaveformAnimation();
 
     elements.recordBtn.classList.remove('recording');
-    elements.recordBtn.querySelector('.record-text').textContent = 'Click to Record';
-    elements.recordingStatus.querySelector('.status-text').textContent = 'Ready';
+    elements.recordLabel.textContent = 'Press to record';
     elements.recordingDuration.textContent = '00:00';
     elements.liveTranscription.classList.remove('active');
 
     if (data.success) {
-        elements.liveTranscriptionContent.innerHTML = `<p class="final-text">${escapeHtml(data.final_text)}</p>`;
+        elements.liveTranscriptionContent.innerHTML = `<p style="color: var(--success)">${escapeHtml(data.final_text)}</p>`;
+        showToast('Note saved successfully!', 'success');
         await loadNotes();
         selectNote(data.note.id);
         setTimeout(() => {
             elements.liveTranscriptionContent.innerHTML = '<p class="placeholder">Start recording to see live transcription...</p>';
         }, 2000);
     } else {
-        elements.liveTranscriptionContent.innerHTML = `<p class="error">${data.message || 'No speech detected'}</p>`;
+        elements.liveTranscriptionContent.innerHTML = `<p style="color: var(--danger)">${data.message || 'No speech detected'}</p>`;
         setTimeout(() => {
             elements.liveTranscriptionContent.innerHTML = '<p class="placeholder">Start recording to see live transcription...</p>';
         }, 3000);
@@ -100,23 +101,78 @@ socket.on('recording_stopped', async (data) => {
 });
 
 socket.on('error', (data) => {
-    console.error('Socket error:', data);
-    alert('Error: ' + data.message);
+    showToast('Error: ' + data.message, 'error');
 });
 
-// API Functions
+function startWaveformAnimation() {
+    const canvas = elements.waveformCanvas;
+    const ctx = canvas.getContext('2d');
+    const bars = 60;
+
+    function resize() {
+        canvas.width = canvas.offsetWidth * 2;
+        canvas.height = canvas.offsetHeight * 2;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    function animate() {
+        if (!state.isRecording) return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent');
+
+        const barWidth = canvas.width / bars;
+        const centerY = canvas.height / 2;
+
+        for (let i = 0; i < bars; i++) {
+            const height = Math.random() * canvas.height * 0.6 + 10;
+            ctx.fillRect(
+                i * barWidth + 2,
+                centerY - height / 2,
+                barWidth - 4,
+                height
+            );
+        }
+
+        state.waveformAnimationId = requestAnimationFrame(animate);
+    }
+    animate();
+}
+
+function stopWaveformAnimation() {
+    if (state.waveformAnimationId) {
+        cancelAnimationFrame(state.waveformAnimationId);
+        state.waveformAnimationId = null;
+    }
+    const canvas = elements.waveformCanvas;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function updateTranscriptionStats(text) {
+    const words = text.trim().split(/\s+/).filter(w => w).length;
+    const chars = text.length;
+    elements.wordCount.textContent = `${words} words`;
+    elements.charCount.textContent = `${chars} characters`;
+}
+
+function updateDetailStats() {
+    const text = elements.noteContent.value;
+    const words = text.trim().split(/\s+/).filter(w => w).length;
+    const chars = text.length;
+    elements.detailWordCount.textContent = `${words} words`;
+    elements.detailCharCount.textContent = `${chars} characters`;
+}
+
 async function api(endpoint, options = {}) {
     const response = await fetch(`${API_BASE}${endpoint}`, {
         ...options,
-        headers: {
-            'Content-Type': 'application/json',
-            ...options.headers
-        }
+        headers: { 'Content-Type': 'application/json', ...options.headers }
     });
     return response.json();
 }
 
-// Folder Functions
 async function loadFolders() {
     const data = await api('/api/folders?all=true');
     state.folders = data.folders;
@@ -137,8 +193,7 @@ function renderFolderTree() {
     const hierarchy = buildFolderHierarchy(state.folders);
 
     let html = `
-        <div class="folder-item all-notes-item ${state.currentFolder === null ? 'active' : ''}"
-             data-folder-id="null">
+        <div class="folder-item all-notes-item ${state.currentFolder === null ? 'active' : ''}" data-folder-id="null">
             <span class="folder-icon">📁</span>
             <span class="folder-name">All Notes</span>
         </div>
@@ -147,7 +202,6 @@ function renderFolderTree() {
     html += renderFolderItems(hierarchy, 0);
     elements.folderTree.innerHTML = html;
 
-    // Add click handlers
     document.querySelectorAll('.folder-item').forEach(item => {
         item.addEventListener('click', (e) => {
             const folderId = item.dataset.folderId;
@@ -168,9 +222,7 @@ function renderFolderItems(folders, level) {
     for (const folder of folders) {
         const isActive = state.currentFolder === folder.id;
         html += `
-            <div class="folder-item ${isActive ? 'active' : ''}"
-                 data-folder-id="${folder.id}"
-                 style="padding-left: ${20 + level * 15}px">
+            <div class="folder-item ${isActive ? 'active' : ''}" data-folder-id="${folder.id}" style="padding-left: ${20 + level * 15}px">
                 <span class="folder-icon">${folder.children.length > 0 ? '📂' : '📁'}</span>
                 <span class="folder-name">${escapeHtml(folder.name)}</span>
             </div>
@@ -211,33 +263,27 @@ function getFolderPath(folderId) {
 }
 
 async function createFolder(name, parentId = null) {
-    await api('/api/folders', {
-        method: 'POST',
-        body: JSON.stringify({ name, parent_id: parentId })
-    });
+    await api('/api/folders', { method: 'POST', body: JSON.stringify({ name, parent_id: parentId }) });
     await loadFolders();
+    showToast('Folder created', 'success');
 }
 
 async function renameFolder(folderId, newName) {
-    await api(`/api/folders/${folderId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ name: newName })
-    });
+    await api(`/api/folders/${folderId}`, { method: 'PUT', body: JSON.stringify({ name: newName }) });
     await loadFolders();
+    showToast('Folder renamed', 'success');
 }
 
 async function deleteFolder(folderId) {
-    if (confirm('Are you sure you want to delete this folder and all its contents?')) {
+    if (confirm('Delete this folder and all its contents?')) {
         await api(`/api/folders/${folderId}`, { method: 'DELETE' });
-        if (state.currentFolder === folderId) {
-            state.currentFolder = null;
-        }
+        if (state.currentFolder === folderId) state.currentFolder = null;
         await loadFolders();
         await loadNotes();
+        showToast('Folder deleted', 'success');
     }
 }
 
-// Notes Functions
 async function loadNotes() {
     let data;
     if (state.searchQuery) {
@@ -249,6 +295,7 @@ async function loadNotes() {
     }
     state.notes = data.notes;
     renderNotes();
+    elements.noteCount.textContent = `${state.notes.length} note${state.notes.length !== 1 ? 's' : ''}`;
 }
 
 function renderNotes() {
@@ -256,15 +303,14 @@ function renderNotes() {
         elements.notesList.innerHTML = `
             <div class="empty-state">
                 <h3>No notes yet</h3>
-                <p>Click the record button to create your first voice note</p>
+                <p>Press the record button to create your first voice note</p>
             </div>
         `;
         return;
     }
 
     elements.notesList.innerHTML = state.notes.map(note => `
-        <div class="note-card ${state.currentNote?.id === note.id ? 'active' : ''}"
-             data-note-id="${note.id}">
+        <div class="note-card ${state.currentNote?.id === note.id ? 'active' : ''}" data-note-id="${note.id}">
             <div class="note-card-header">
                 <span class="note-card-title">${escapeHtml(note.title)}</span>
                 <span class="note-card-date">${formatDate(note.created_at)}</span>
@@ -282,12 +328,8 @@ function renderNotes() {
         </div>
     `).join('');
 
-    // Add click handlers
     document.querySelectorAll('.note-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const noteId = parseInt(card.dataset.noteId);
-            selectNote(noteId);
-        });
+        card.addEventListener('click', () => selectNote(parseInt(card.dataset.noteId)));
     });
 }
 
@@ -305,12 +347,19 @@ function showNoteDetail() {
     elements.noteTitle.value = note.title;
     elements.noteContent.value = note.content;
     elements.noteDate.textContent = formatDate(note.created_at);
-    elements.noteLanguage.textContent = note.language ? `Language: ${note.language.toUpperCase()}` : '';
-    elements.noteDuration.textContent = note.audio_duration ? `Duration: ${formatDuration(note.audio_duration)}` : '';
+    elements.noteLanguage.textContent = note.language ? note.language.toUpperCase() : '';
+    elements.noteDuration.textContent = note.audio_duration ? formatDuration(note.audio_duration) : '';
     elements.noteFolderSelect.value = note.folder_id || '';
 
     renderNoteTags();
+    updateDetailStats();
     elements.detailPanel.classList.remove('hidden');
+}
+
+function hideNoteDetail() {
+    elements.detailPanel.classList.add('hidden');
+    state.currentNote = null;
+    renderNotes();
 }
 
 function renderNoteTags() {
@@ -320,11 +369,10 @@ function renderNoteTags() {
     elements.noteTags.innerHTML = note.tags.map(tag => `
         <span class="tag">
             ${escapeHtml(tag)}
-            <span class="remove-tag" data-tag="${escapeHtml(tag)}">&times;</span>
+            <span class="remove-tag" data-tag="${escapeHtml(tag)}">×</span>
         </span>
     `).join('');
 
-    // Add remove handlers
     document.querySelectorAll('.remove-tag').forEach(btn => {
         btn.addEventListener('click', async () => {
             await removeTag(state.currentNote.id, btn.dataset.tag);
@@ -347,20 +395,21 @@ async function saveNote() {
     await loadNotes();
     const data = await api(`/api/notes/${state.currentNote.id}`);
     state.currentNote = data.note;
+    showToast('Note saved', 'success');
 }
 
 async function deleteNote() {
     if (!state.currentNote) return;
 
-    if (confirm('Are you sure you want to delete this note?')) {
+    if (confirm('Delete this note?')) {
         await api(`/api/notes/${state.currentNote.id}`, { method: 'DELETE' });
         state.currentNote = null;
         elements.detailPanel.classList.add('hidden');
         await loadNotes();
+        showToast('Note deleted', 'success');
     }
 }
 
-// Tags Functions
 async function loadTags() {
     const data = await api('/api/tags');
     state.tags = data.tags;
@@ -387,11 +436,7 @@ function renderTags() {
 }
 
 async function addTag(noteId, tagName) {
-    await api(`/api/notes/${noteId}/tags`, {
-        method: 'POST',
-        body: JSON.stringify({ tag: tagName })
-    });
-
+    await api(`/api/notes/${noteId}/tags`, { method: 'POST', body: JSON.stringify({ tag: tagName }) });
     const data = await api(`/api/notes/${noteId}`);
     state.currentNote = data.note;
     renderNoteTags();
@@ -399,35 +444,24 @@ async function addTag(noteId, tagName) {
 }
 
 async function removeTag(noteId, tagName) {
-    await api(`/api/notes/${noteId}/tags/${encodeURIComponent(tagName)}`, {
-        method: 'DELETE'
-    });
-
+    await api(`/api/notes/${noteId}/tags/${encodeURIComponent(tagName)}`, { method: 'DELETE' });
     const data = await api(`/api/notes/${noteId}`);
     state.currentNote = data.note;
     renderNoteTags();
     await loadTags();
 }
 
-// Recording Functions - Using WebSocket for real-time transcription
 function toggleRecording() {
-    if (state.isRecording) {
-        stopRecording();
-    } else {
-        startRecording();
-    }
+    state.isRecording ? stopRecording() : startRecording();
 }
 
 function startRecording() {
-    // Use WebSocket for real-time transcription
     socket.emit('start_realtime', { folder_id: state.currentFolder });
 
     state.isRecording = true;
     elements.recordBtn.classList.add('recording');
-    elements.recordBtn.querySelector('.record-text').textContent = 'Click to Stop';
-    elements.recordingStatus.querySelector('.status-text').textContent = 'Recording...';
+    elements.recordLabel.textContent = 'Recording...';
 
-    // Start duration timer
     let seconds = 0;
     state.recordingInterval = setInterval(() => {
         seconds++;
@@ -436,14 +470,10 @@ function startRecording() {
 }
 
 function stopRecording() {
-    elements.recordBtn.querySelector('.record-text').textContent = 'Processing...';
-    elements.recordingStatus.querySelector('.status-text').textContent = 'Finalizing...';
-
-    // Stop via WebSocket
+    elements.recordLabel.textContent = 'Processing...';
     socket.emit('stop_realtime', { folder_id: state.currentFolder });
 }
 
-// Export Functions
 function showExportModal(type, id) {
     elements.exportModal.classList.add('active');
     elements.exportModal.dataset.type = type;
@@ -453,19 +483,11 @@ function showExportModal(type, id) {
 function exportFile(format) {
     const type = elements.exportModal.dataset.type;
     const id = elements.exportModal.dataset.id;
-
-    let url;
-    if (type === 'note') {
-        url = `/api/notes/${id}/export?format=${format}`;
-    } else {
-        url = `/api/folders/${id}/export?format=${format}`;
-    }
-
+    const url = type === 'note' ? `/api/notes/${id}/export?format=${format}` : `/api/folders/${id}/export?format=${format}`;
     window.open(url, '_blank');
     elements.exportModal.classList.remove('active');
 }
 
-// Context Menu
 function showContextMenu(e, folderId) {
     state.contextMenuTarget = folderId;
     elements.contextMenu.style.left = e.pageX + 'px';
@@ -478,13 +500,10 @@ function hideContextMenu() {
     state.contextMenuTarget = null;
 }
 
-// Folder Select Update
 function updateFolderSelect() {
     const hierarchy = buildFolderHierarchy(state.folders);
-
     let options = '<option value="">No folder</option>';
     options += buildFolderOptions(hierarchy, 0);
-
     elements.noteFolderSelect.innerHTML = options;
 }
 
@@ -500,7 +519,6 @@ function buildFolderOptions(folders, level) {
     return options;
 }
 
-// Search
 let searchTimeout;
 function handleSearch(query) {
     clearTimeout(searchTimeout);
@@ -515,7 +533,26 @@ function handleSearch(query) {
     }, 300);
 }
 
-// Utility Functions
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    elements.toastContainer.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+function toggleTheme() {
+    const current = document.body.getAttribute('data-theme');
+    const newTheme = current === 'light' ? 'dark' : 'light';
+    document.body.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+}
+
+function loadTheme() {
+    const saved = localStorage.getItem('theme') || 'dark';
+    document.body.setAttribute('data-theme', saved);
+}
+
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
@@ -524,12 +561,7 @@ function escapeHtml(text) {
 
 function formatDate(dateStr) {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function formatDuration(seconds) {
@@ -538,15 +570,12 @@ function formatDuration(seconds) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
-// Event Listeners
 function initEventListeners() {
-    // Recording
     elements.recordBtn.addEventListener('click', toggleRecording);
-
-    // Search
     elements.searchInput.addEventListener('input', (e) => handleSearch(e.target.value));
+    elements.themeToggle.addEventListener('click', toggleTheme);
+    elements.noteContent.addEventListener('input', updateDetailStats);
 
-    // Add folder
     document.getElementById('addFolderBtn').addEventListener('click', () => {
         elements.folderModalTitle.textContent = 'New Folder';
         elements.folderNameInput.value = '';
@@ -556,7 +585,6 @@ function initEventListeners() {
         elements.folderNameInput.focus();
     });
 
-    // Folder modal
     document.getElementById('cancelFolderBtn').addEventListener('click', () => {
         elements.folderModal.classList.remove('active');
     });
@@ -578,28 +606,20 @@ function initEventListeners() {
     });
 
     elements.folderNameInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            document.getElementById('saveFolderBtn').click();
-        }
+        if (e.key === 'Enter') document.getElementById('saveFolderBtn').click();
     });
 
-    // Note detail
     document.getElementById('saveNoteBtn').addEventListener('click', saveNote);
     document.getElementById('deleteNoteBtn').addEventListener('click', deleteNote);
+    document.getElementById('closeDetailBtn').addEventListener('click', hideNoteDetail);
     document.getElementById('exportNoteBtn').addEventListener('click', () => {
-        if (state.currentNote) {
-            showExportModal('note', state.currentNote.id);
-        }
+        if (state.currentNote) showExportModal('note', state.currentNote.id);
     });
 
-    // Folder export
     document.getElementById('exportFolderBtn').addEventListener('click', () => {
-        if (state.currentFolder) {
-            showExportModal('folder', state.currentFolder);
-        }
+        if (state.currentFolder) showExportModal('folder', state.currentFolder);
     });
 
-    // Tags
     document.getElementById('addTagBtn').addEventListener('click', async () => {
         const tag = elements.newTagInput.value.trim();
         if (tag && state.currentNote) {
@@ -609,12 +629,9 @@ function initEventListeners() {
     });
 
     elements.newTagInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            document.getElementById('addTagBtn').click();
-        }
+        if (e.key === 'Enter') document.getElementById('addTagBtn').click();
     });
 
-    // Export modal
     document.getElementById('cancelExportBtn').addEventListener('click', () => {
         elements.exportModal.classList.remove('active');
     });
@@ -623,7 +640,6 @@ function initEventListeners() {
         btn.addEventListener('click', () => exportFile(btn.dataset.format));
     });
 
-    // Context menu
     document.addEventListener('click', hideContextMenu);
 
     elements.contextMenu.querySelectorAll('.context-menu-item').forEach(item => {
@@ -654,21 +670,33 @@ function initEventListeners() {
         });
     });
 
-    // Close modals on outside click
-    elements.folderModal.addEventListener('click', (e) => {
-        if (e.target === elements.folderModal) {
-            elements.folderModal.classList.remove('active');
-        }
+    document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+        backdrop.addEventListener('click', () => {
+            backdrop.parentElement.classList.remove('active');
+        });
     });
 
-    elements.exportModal.addEventListener('click', (e) => {
-        if (e.target === elements.exportModal) {
+    document.addEventListener('keydown', (e) => {
+        if (e.key === ' ' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+            e.preventDefault();
+            toggleRecording();
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            if (state.currentNote) saveNote();
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            elements.searchInput.focus();
+        }
+        if (e.key === 'Escape') {
+            elements.folderModal.classList.remove('active');
             elements.exportModal.classList.remove('active');
+            hideContextMenu();
         }
     });
 }
 
-// System Status
 async function loadSystemStatus() {
     try {
         const data = await api('/api/settings/status');
@@ -683,62 +711,37 @@ function updateStatusBar() {
     const status = state.systemStatus;
     if (!status) return;
 
-    // Offline status
     const offlineStatus = document.getElementById('offlineStatus');
     if (offlineStatus) {
         const dot = offlineStatus.querySelector('.status-dot');
         dot.className = 'status-dot online';
-        offlineStatus.querySelector('span:last-child').textContent = 'Offline Ready';
     }
 
-    // AI status
     const aiStatus = document.getElementById('aiStatus');
     if (aiStatus && status.ai_correction) {
         const dot = aiStatus.querySelector('.status-dot');
-        if (status.ai_correction.mlx_available) {
-            dot.className = 'status-dot online';
-            aiStatus.querySelector('span:last-child').textContent = 'AI (MLX)';
-        } else {
-            dot.className = 'status-dot warning';
-            aiStatus.querySelector('span:last-child').textContent = 'LanguageTool';
-        }
+        dot.className = status.ai_correction.mlx_available ? 'status-dot online' : 'status-dot warning';
+        aiStatus.querySelector('span:last-child').textContent = status.ai_correction.mlx_available ? 'AI (MLX)' : 'LanguageTool';
     }
 
-    // Speaker detection status
     const speakerStatus = document.getElementById('speakerStatus');
-    if (speakerStatus && status.speaker_diarization) {
+    if (speakerStatus) {
         const dot = speakerStatus.querySelector('.status-dot');
         dot.className = 'status-dot online';
-        speakerStatus.querySelector('span:last-child').textContent = 'Speaker Detection';
-    }
-
-    // AI badge visibility
-    const aiBadge = document.getElementById('aiBadge');
-    if (aiBadge && status.ai_correction) {
-        if (status.ai_correction.mlx_available) {
-            aiBadge.textContent = 'AI Corrected';
-            aiBadge.style.display = 'inline-flex';
-        } else {
-            aiBadge.textContent = 'Spell Checked';
-            aiBadge.style.background = 'var(--bg-tertiary)';
-        }
     }
 }
 
-// Backup functionality
 function downloadBackup() {
     window.open('/api/export/database', '_blank');
+    showToast('Backup download started', 'success');
 }
 
-// Initialize
 async function init() {
+    loadTheme();
     initEventListeners();
 
-    // Setup backup button
     const backupBtn = document.getElementById('backupBtn');
-    if (backupBtn) {
-        backupBtn.addEventListener('click', downloadBackup);
-    }
+    if (backupBtn) backupBtn.addEventListener('click', downloadBackup);
 
     await loadFolders();
     await loadNotes();

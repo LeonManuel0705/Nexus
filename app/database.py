@@ -6,18 +6,15 @@ from typing import List, Optional, Dict, Any
 DATABASE_PATH = os.path.expanduser("~/Documents/voice-notes/data/notes.db")
 
 def get_connection():
-    """Get a database connection."""
     os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    """Initialize the database with required tables."""
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Folders table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS folders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,7 +25,6 @@ def init_db():
         )
     ''')
 
-    # Notes table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS notes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,7 +39,6 @@ def init_db():
         )
     ''')
 
-    # Tags table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS tags (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,7 +46,6 @@ def init_db():
         )
     ''')
 
-    # Note-Tags relationship table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS note_tags (
             note_id INTEGER,
@@ -62,14 +56,12 @@ def init_db():
         )
     ''')
 
-    # Create full-text search virtual table for notes
     cursor.execute('''
         CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
             title, content, content='notes', content_rowid='id'
         )
     ''')
 
-    # Triggers to keep FTS index in sync
     cursor.execute('''
         CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes BEGIN
             INSERT INTO notes_fts(rowid, title, content) VALUES (new.id, new.title, new.content);
@@ -92,9 +84,8 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Folder operations
+
 def create_folder(name: str, parent_id: Optional[int] = None) -> int:
-    """Create a new folder."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -107,7 +98,6 @@ def create_folder(name: str, parent_id: Optional[int] = None) -> int:
     return folder_id
 
 def get_folders(parent_id: Optional[int] = None) -> List[Dict[str, Any]]:
-    """Get all folders, optionally filtered by parent."""
     conn = get_connection()
     cursor = conn.cursor()
     if parent_id is None:
@@ -119,7 +109,6 @@ def get_folders(parent_id: Optional[int] = None) -> List[Dict[str, Any]]:
     return folders
 
 def get_all_folders() -> List[Dict[str, Any]]:
-    """Get all folders with their hierarchy."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM folders ORDER BY name')
@@ -128,7 +117,6 @@ def get_all_folders() -> List[Dict[str, Any]]:
     return folders
 
 def get_folder(folder_id: int) -> Optional[Dict[str, Any]]:
-    """Get a specific folder."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM folders WHERE id = ?', (folder_id,))
@@ -137,7 +125,6 @@ def get_folder(folder_id: int) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 def delete_folder(folder_id: int) -> bool:
-    """Delete a folder and all its contents."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM folders WHERE id = ?', (folder_id,))
@@ -147,7 +134,6 @@ def delete_folder(folder_id: int) -> bool:
     return affected > 0
 
 def rename_folder(folder_id: int, new_name: str) -> bool:
-    """Rename a folder."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('UPDATE folders SET name = ? WHERE id = ?', (new_name, folder_id))
@@ -156,10 +142,9 @@ def rename_folder(folder_id: int, new_name: str) -> bool:
     conn.close()
     return affected > 0
 
-# Note operations
+
 def create_note(title: str, content: str, folder_id: Optional[int] = None,
                 language: Optional[str] = None, audio_duration: Optional[float] = None) -> int:
-    """Create a new note."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -173,7 +158,6 @@ def create_note(title: str, content: str, folder_id: Optional[int] = None,
     return note_id
 
 def get_notes(folder_id: Optional[int] = None) -> List[Dict[str, Any]]:
-    """Get all notes, optionally filtered by folder."""
     conn = get_connection()
     cursor = conn.cursor()
     if folder_id is None:
@@ -183,14 +167,12 @@ def get_notes(folder_id: Optional[int] = None) -> List[Dict[str, Any]]:
     notes = [dict(row) for row in cursor.fetchall()]
     conn.close()
 
-    # Get tags for each note
     for note in notes:
         note['tags'] = get_note_tags(note['id'])
 
     return notes
 
 def get_note(note_id: int) -> Optional[Dict[str, Any]]:
-    """Get a specific note."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM notes WHERE id = ?', (note_id,))
@@ -204,7 +186,6 @@ def get_note(note_id: int) -> Optional[Dict[str, Any]]:
 
 def update_note(note_id: int, title: Optional[str] = None, content: Optional[str] = None,
                 folder_id: Optional[int] = None) -> bool:
-    """Update a note."""
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -235,7 +216,6 @@ def update_note(note_id: int, title: Optional[str] = None, content: Optional[str
     return affected > 0
 
 def delete_note(note_id: int) -> bool:
-    """Delete a note."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM notes WHERE id = ?', (note_id,))
@@ -245,10 +225,8 @@ def delete_note(note_id: int) -> bool:
     return affected > 0
 
 def search_notes(query: str) -> List[Dict[str, Any]]:
-    """Search notes using full-text search."""
     conn = get_connection()
     cursor = conn.cursor()
-    # Use FTS5 for searching
     cursor.execute('''
         SELECT notes.* FROM notes
         JOIN notes_fts ON notes.id = notes_fts.rowid
@@ -263,9 +241,8 @@ def search_notes(query: str) -> List[Dict[str, Any]]:
 
     return notes
 
-# Tag operations
+
 def create_tag(name: str) -> int:
-    """Create a new tag or return existing."""
     conn = get_connection()
     cursor = conn.cursor()
     try:
@@ -279,7 +256,6 @@ def create_tag(name: str) -> int:
     return tag_id
 
 def get_all_tags() -> List[Dict[str, Any]]:
-    """Get all tags."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM tags ORDER BY name')
@@ -288,7 +264,6 @@ def get_all_tags() -> List[Dict[str, Any]]:
     return tags
 
 def add_tag_to_note(note_id: int, tag_name: str) -> bool:
-    """Add a tag to a note."""
     tag_id = create_tag(tag_name)
     conn = get_connection()
     cursor = conn.cursor()
@@ -302,7 +277,6 @@ def add_tag_to_note(note_id: int, tag_name: str) -> bool:
     return result
 
 def remove_tag_from_note(note_id: int, tag_name: str) -> bool:
-    """Remove a tag from a note."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -316,7 +290,6 @@ def remove_tag_from_note(note_id: int, tag_name: str) -> bool:
     return affected > 0
 
 def get_note_tags(note_id: int) -> List[str]:
-    """Get all tags for a note."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -330,7 +303,6 @@ def get_note_tags(note_id: int) -> List[str]:
     return tags
 
 def get_notes_by_tag(tag_name: str) -> List[Dict[str, Any]]:
-    """Get all notes with a specific tag."""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -348,5 +320,5 @@ def get_notes_by_tag(tag_name: str) -> List[Dict[str, Any]]:
 
     return notes
 
-# Initialize database on import
+
 init_db()

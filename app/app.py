@@ -19,18 +19,16 @@ app = Flask(__name__, static_folder='static')
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
-# Real-time transcription state
 realtime_active = False
 realtime_thread = None
 current_transcription = []
-current_subject = None  # Track current folder/subject for context
+current_subject = None
 
 def preload_whisper():
-    preload_model("small")
+    preload_model("tiny")
 
 threading.Thread(target=preload_whisper, daemon=True).start()
 
-# ============== Static Files ==============
 
 @app.route('/')
 def index():
@@ -40,25 +38,21 @@ def index():
 def serve_static(path):
     return send_from_directory('static', path)
 
-# ============== Real-time Transcription ==============
 
 def realtime_transcription_worker():
-    """Background worker for real-time transcription with AI correction."""
     global realtime_active, current_transcription, current_subject
 
     recorder = get_recorder()
 
     while realtime_active and recorder.is_recording():
-        chunk = recorder.get_next_chunk(timeout=0.5)
+        chunk = recorder.get_next_chunk(timeout=0.3)
 
         if chunk is not None:
             try:
-                # Transcribe with speaker filtering and AI correction
-                # Text is only returned AFTER correction is applied
                 text = transcribe_audio_chunk(
                     chunk,
                     filter_non_teacher=True,
-                    apply_correction=True,
+                    apply_correction=False,
                     subject=current_subject
                 )
 
@@ -68,14 +62,13 @@ def realtime_transcription_worker():
                         'text': text.strip(),
                         'full_text': ' '.join(current_transcription),
                         'is_final': False,
-                        'is_corrected': True  # Always corrected now
+                        'is_corrected': False
                     })
             except Exception as e:
                 print(f"Transcription error: {e}")
 
 @socketio.on('start_realtime')
 def handle_start_realtime(data):
-    """Start real-time recording and transcription."""
     global realtime_active, realtime_thread, current_transcription, current_subject
 
     folder_id = data.get('folder_id')
@@ -85,12 +78,10 @@ def handle_start_realtime(data):
         emit('error', {'message': 'Already recording'})
         return
 
-    # Reset for new session
     current_transcription = []
     realtime_active = True
-    reset_session()  # Reset speaker tracking
+    reset_session()
 
-    # Get subject from folder for context-aware correction
     current_subject = None
     if folder_id:
         folder = db.get_folder(folder_id)
@@ -109,7 +100,6 @@ def handle_start_realtime(data):
 
 @socketio.on('stop_realtime')
 def handle_stop_realtime(data):
-    """Stop real-time recording and save the note."""
     global realtime_active, current_transcription, current_subject
 
     folder_id = data.get('folder_id')
@@ -122,7 +112,6 @@ def handle_stop_realtime(data):
     realtime_active = False
     audio_path, duration = recorder.stop_recording()
 
-    # Do final transcription of full audio for accuracy
     result = None
     if audio_path:
         result = transcribe_audio(audio_path, subject=current_subject)
@@ -135,7 +124,6 @@ def handle_stop_realtime(data):
     else:
         final_text = ' '.join(current_transcription)
 
-    # Save the note
     if final_text.strip():
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
         title = f"Voice Note - {timestamp}"
@@ -163,7 +151,6 @@ def handle_stop_realtime(data):
             'message': 'No speech detected'
         })
 
-# ============== Recording API (non-realtime fallback) ==============
 
 @app.route('/api/recording/start', methods=['POST'])
 def start_recording():
@@ -184,7 +171,6 @@ def stop_recording():
     data = request.get_json() or {}
     folder_id = data.get('folder_id')
 
-    # Get subject for context
     subject = None
     if folder_id:
         folder = db.get_folder(folder_id)
@@ -240,7 +226,6 @@ def audio_devices():
     default = get_default_input_device()
     return jsonify({'devices': devices, 'default': default})
 
-# ============== Folders API ==============
 
 @app.route('/api/folders', methods=['GET'])
 def get_folders():
@@ -293,7 +278,6 @@ def get_subfolders(folder_id):
     subfolders = db.get_folders(folder_id)
     return jsonify({'folders': subfolders})
 
-# ============== Notes API ==============
 
 @app.route('/api/notes', methods=['GET'])
 def get_notes():
@@ -342,7 +326,6 @@ def search_notes():
     notes = db.search_notes(query)
     return jsonify({'notes': notes})
 
-# ============== Tags API ==============
 
 @app.route('/api/tags', methods=['GET'])
 def get_tags():
@@ -370,7 +353,6 @@ def get_notes_by_tag(tag_name):
     notes = db.get_notes_by_tag(tag_name)
     return jsonify({'notes': notes})
 
-# ============== Export API ==============
 
 @app.route('/api/notes/<int:note_id>/export', methods=['GET'])
 def export_note(note_id):
@@ -438,13 +420,11 @@ def export_folder(folder_id):
 
     return send_file(buffer, as_attachment=True, download_name=filename, mimetype=mimetype)
 
-# ============== Full Database Export ==============
 
 @app.route('/api/export/database', methods=['GET'])
 def export_database():
-    """Export the entire database as JSON for backup."""
     folders = db.get_all_folders()
-    notes = db.get_notes()  # All notes
+    notes = db.get_notes()
     tags = db.get_all_tags()
 
     export_data = {
@@ -464,7 +444,6 @@ def export_database():
 
     return send_file(buffer, as_attachment=True, download_name=filename, mimetype='application/json')
 
-# ============== Settings API ==============
 
 @app.route('/api/settings/models', methods=['GET'])
 def get_models():
@@ -478,7 +457,6 @@ def get_ollama():
 
 @app.route('/api/settings/status', methods=['GET'])
 def get_system_status():
-    """Get full system status for offline indicator."""
     correction = get_correction_status()
 
     return jsonify({
@@ -486,8 +464,8 @@ def get_system_status():
         'ai_correction': correction['ai_correction'],
         'speaker_diarization': correction['speaker_diarization'],
         'whisper': {
-            'fast_model': 'base',
-            'accurate_model': 'small'
+            'fast_model': 'tiny',
+            'accurate_model': 'base'
         }
     })
 
