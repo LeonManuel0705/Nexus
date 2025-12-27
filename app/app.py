@@ -12,7 +12,7 @@ from recorder import get_recorder, list_audio_devices, get_default_input_device
 from transcriber import (
     transcribe_audio, cleanup_audio_file, get_available_models,
     preload_model, transcribe_audio_chunk, get_ollama_status,
-    get_correction_status, reset_session
+    get_correction_status, reset_session, get_text_corrector
 )
 
 app = Flask(__name__, static_folder='static')
@@ -22,12 +22,9 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 realtime_active = False
 realtime_thread = None
 current_transcription = []
-current_subject = None
+current_language = "de"
 
-def preload_whisper():
-    preload_model("tiny")
-
-threading.Thread(target=preload_whisper, daemon=True).start()
+threading.Thread(target=preload_model, daemon=True).start()
 
 
 @app.route('/')
@@ -40,38 +37,50 @@ def serve_static(path):
 
 
 def realtime_transcription_worker():
-    global realtime_active, current_transcription, current_subject
+    global realtime_active, current_transcription, current_language
 
     recorder = get_recorder()
 
     while realtime_active and recorder.is_recording():
-        chunk = recorder.get_next_chunk(timeout=0.3)
+        chunk = recorder.get_next_chunk(timeout=0.5)
 
         if chunk is not None:
             try:
-                text = transcribe_audio_chunk(
+                raw_text, corrected_text, confidence = transcribe_audio_chunk(
                     chunk,
-                    filter_non_teacher=True,
-                    apply_correction=False,
-                    subject=current_subject
+                    sample_rate=recorder.sample_rate,
+                    language=current_language,
+                    apply_instant_correction=True
                 )
 
-                if text and text.strip():
-                    current_transcription.append(text.strip())
+                if corrected_text and corrected_text.strip():
+                    current_transcription.append(corrected_text.strip())
+                    full_text = ' '.join(current_transcription)
+
+                    corrector = get_text_corrector(current_language)
+                    full_corrected = corrector.correct_instant(full_text)
+
                     socketio.emit('transcription_update', {
-                        'text': text.strip(),
-                        'full_text': ' '.join(current_transcription),
+                        'text': corrected_text.strip(),
+                        'raw_text': raw_text.strip() if raw_text else '',
+                        'full_text': full_corrected,
+                        'confidence': confidence,
                         'is_final': False,
-                        'is_corrected': False
+                        'is_corrected': True
                     })
+
             except Exception as e:
                 print(f"Transcription error: {e}")
+                import traceback
+                traceback.print_exc()
+
 
 @socketio.on('start_realtime')
 def handle_start_realtime(data):
-    global realtime_active, realtime_thread, current_transcription, current_subject
+    global realtime_active, realtime_thread, current_transcription, current_language
 
     folder_id = data.get('folder_id')
+    current_language = data.get('language', 'de')
     recorder = get_recorder()
 
     if recorder.is_recording():
@@ -82,11 +91,11 @@ def handle_start_realtime(data):
     realtime_active = True
     reset_session()
 
-    current_subject = None
+    subject = None
     if folder_id:
         folder = db.get_folder(folder_id)
         if folder:
-            current_subject = folder.get('name')
+            subject = folder.get('name')
 
     recorder.start_recording()
 
@@ -95,12 +104,14 @@ def handle_start_realtime(data):
 
     emit('recording_started', {
         'message': 'Recording started',
-        'subject': current_subject
+        'language': current_language,
+        'subject': subject
     })
+
 
 @socketio.on('stop_realtime')
 def handle_stop_realtime(data):
-    global realtime_active, current_transcription, current_subject
+    global realtime_active, current_transcription, current_language
 
     folder_id = data.get('folder_id')
     recorder = get_recorder()
@@ -114,15 +125,17 @@ def handle_stop_realtime(data):
 
     result = None
     if audio_path:
-        result = transcribe_audio(audio_path, subject=current_subject)
+        result = transcribe_audio(audio_path, language=current_language)
         cleanup_audio_file(audio_path)
 
         if result['success']:
             final_text = result['text']
         else:
-            final_text = ' '.join(current_transcription)
+            corrector = get_text_corrector(current_language)
+            final_text = corrector.correct_full(' '.join(current_transcription))
     else:
-        final_text = ' '.join(current_transcription)
+        corrector = get_text_corrector(current_language)
+        final_text = corrector.correct_full(' '.join(current_transcription))
 
     if final_text.strip():
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -132,7 +145,7 @@ def handle_stop_realtime(data):
             title=title,
             content=final_text,
             folder_id=folder_id,
-            language=result.get('language', 'de') if result else 'de',
+            language=current_language,
             audio_duration=duration
         )
 
@@ -143,13 +156,20 @@ def handle_stop_realtime(data):
             'note': note,
             'final_text': final_text,
             'duration': duration,
-            'used_ai': result.get('used_ai_correction', False) if result else False
+            'used_ai': True
         })
     else:
         emit('recording_stopped', {
             'success': False,
             'message': 'No speech detected'
         })
+
+
+@socketio.on('set_language')
+def handle_set_language(data):
+    global current_language
+    current_language = data.get('language', 'de')
+    emit('language_changed', {'language': current_language})
 
 
 @app.route('/api/recording/start', methods=['POST'])
@@ -164,25 +184,21 @@ def start_recording():
 
 @app.route('/api/recording/stop', methods=['POST'])
 def stop_recording():
+    global current_language
     recorder = get_recorder()
     if not recorder.is_recording():
         return jsonify({'success': False, 'error': 'Not recording'}), 400
 
     data = request.get_json() or {}
     folder_id = data.get('folder_id')
-
-    subject = None
-    if folder_id:
-        folder = db.get_folder(folder_id)
-        if folder:
-            subject = folder.get('name')
+    language = data.get('language', current_language)
 
     audio_path, duration = recorder.stop_recording()
 
     if not audio_path:
         return jsonify({'success': False, 'error': 'No audio recorded'}), 400
 
-    result = transcribe_audio(audio_path, subject=subject)
+    result = transcribe_audio(audio_path, language=language)
     cleanup_audio_file(audio_path)
 
     if not result['success']:
@@ -464,14 +480,14 @@ def get_system_status():
         'ai_correction': correction['ai_correction'],
         'speaker_diarization': correction['speaker_diarization'],
         'whisper': {
-            'fast_model': 'tiny',
-            'accurate_model': 'base'
+            'realtime_model': 'small',
+            'accurate_model': 'medium'
         }
     })
 
 if __name__ == '__main__':
     print("\n" + "=" * 50)
-    print("  Voice Notes App - Offline AI Transcription")
+    print("  Voice Notes - Real-time Transcription")
     print("  Open http://localhost:5050 in your browser")
     print("=" * 50 + "\n")
     socketio.run(app, host='127.0.0.1', port=5050, debug=False, allow_unsafe_werkzeug=True)

@@ -10,11 +10,9 @@ from scipy import signal
 
 AUDIO_TEMP_PATH = os.path.expanduser("~/Documents/voice-notes/audio_temp")
 
-CHUNK_DURATION = 1.5
-MIN_VOICE_DURATION = 0.3
-VOLUME_THRESHOLD = 0.015
-DOMINANT_SPEAKER_RATIO = 1.3
-
+CHUNK_DURATION = 3.0
+MIN_SPEECH_ENERGY = 0.005
+SILENCE_THRESHOLD = 0.8
 MAX_DEVICE_RETRIES = 3
 DEVICE_RETRY_DELAY = 0.5
 
@@ -31,29 +29,17 @@ class AudioRecorder:
         self.device_id = None
 
         self.audio_queue = queue.Queue()
-        self.current_chunk = []
-        self.chunk_start_time = None
-        self.on_chunk_ready = None
+        self.pending_audio = []
+        self.chunk_samples = 0
+        self.speech_detected = False
+        self.silence_samples = 0
 
-        self.background_volume = 0.01
-        self.speech_volumes = []
-
-    def _calculate_volume(self, audio):
+    def _calculate_energy(self, audio):
         return np.sqrt(np.mean(audio ** 2))
 
-    def _is_teacher_speaking(self, audio):
-        volume = self._calculate_volume(audio)
-
-        if volume < self.background_volume:
-            self.background_volume = 0.95 * self.background_volume + 0.05 * volume
-
-        if volume < VOLUME_THRESHOLD:
-            return False
-
-        if volume < self.background_volume * DOMINANT_SPEAKER_RATIO:
-            return False
-
-        return True
+    def _has_speech(self, audio):
+        energy = self._calculate_energy(audio)
+        return energy > MIN_SPEECH_ENERGY
 
     def _audio_callback(self, indata, frames, time_info, status):
         if status:
@@ -65,21 +51,56 @@ class AudioRecorder:
         audio = indata.copy().flatten()
         self.audio_data.append(indata.copy())
 
-        if self._is_teacher_speaking(audio):
-            self.current_chunk.append(audio)
+        has_speech = self._has_speech(audio)
 
-            if self.chunk_start_time is None:
-                self.chunk_start_time = time.time()
+        if has_speech:
+            self.speech_detected = True
+            self.silence_samples = 0
+        else:
+            self.silence_samples += len(audio)
 
-        if self.chunk_start_time and (time.time() - self.chunk_start_time) >= CHUNK_DURATION:
-            if len(self.current_chunk) > 0:
-                chunk_audio = np.concatenate(self.current_chunk)
-                speech_duration = len(chunk_audio) / self.sample_rate
-                if speech_duration >= MIN_VOICE_DURATION:
-                    self.audio_queue.put(chunk_audio)
+        self.pending_audio.append(audio)
+        self.chunk_samples += len(audio)
 
-            self.current_chunk = []
-            self.chunk_start_time = None
+        chunk_duration = self.chunk_samples / self.sample_rate
+        silence_duration = self.silence_samples / self.sample_rate
+
+        should_emit = False
+
+        if chunk_duration >= CHUNK_DURATION and self.speech_detected:
+            should_emit = True
+
+        if self.speech_detected and silence_duration >= SILENCE_THRESHOLD and chunk_duration >= 1.0:
+            should_emit = True
+
+        if should_emit and self.speech_detected:
+            chunk_audio = np.concatenate(self.pending_audio)
+
+            chunk_audio = self._enhance_audio(chunk_audio)
+
+            self.audio_queue.put(chunk_audio)
+
+            self.pending_audio = []
+            self.chunk_samples = 0
+            self.speech_detected = False
+            self.silence_samples = 0
+
+    def _enhance_audio(self, audio):
+        audio = audio - np.mean(audio)
+
+        nyquist = self.sample_rate / 2
+        low_freq = 80 / nyquist
+        high_freq = 8000 / nyquist
+
+        if low_freq < 1 and high_freq < 1:
+            b, a = signal.butter(4, [low_freq, high_freq], btype='band')
+            audio = signal.filtfilt(b, a, audio)
+
+        max_val = np.max(np.abs(audio))
+        if max_val > 0:
+            audio = audio / max_val * 0.9
+
+        return audio
 
     def _find_working_device(self):
         try:
@@ -139,9 +160,10 @@ class AudioRecorder:
             return False
 
         self.audio_data = []
-        self.current_chunk = []
-        self.chunk_start_time = None
-        self.on_chunk_ready = on_chunk_ready
+        self.pending_audio = []
+        self.chunk_samples = 0
+        self.speech_detected = False
+        self.silence_samples = 0
         self.last_error = None
 
         while not self.audio_queue.empty():
@@ -167,7 +189,7 @@ class AudioRecorder:
                     channels=self.channels,
                     dtype=np.float32,
                     callback=self._audio_callback,
-                    blocksize=int(self.sample_rate * 0.05)
+                    blocksize=int(self.sample_rate * 0.1)
                 )
                 self.stream.start()
                 self.recording = True
@@ -198,7 +220,7 @@ class AudioRecorder:
         print(f"Failed to start recording after {MAX_DEVICE_RETRIES} attempts")
         return False
 
-    def get_next_chunk(self, timeout=0.1):
+    def get_next_chunk(self, timeout=0.5):
         try:
             return self.audio_queue.get(timeout=timeout)
         except queue.Empty:
@@ -216,16 +238,16 @@ class AudioRecorder:
             self.stream.close()
             self.stream = None
 
-        if len(self.current_chunk) > 0:
-            chunk_audio = np.concatenate(self.current_chunk)
-            if len(chunk_audio) / self.sample_rate >= MIN_VOICE_DURATION:
-                self.audio_queue.put(chunk_audio)
+        if len(self.pending_audio) > 0 and self.speech_detected:
+            chunk_audio = np.concatenate(self.pending_audio)
+            chunk_audio = self._enhance_audio(chunk_audio)
+            self.audio_queue.put(chunk_audio)
 
         if not self.audio_data:
             return None, 0
 
         audio_array = np.concatenate(self.audio_data, axis=0)
-        audio_array = self._apply_noise_reduction(audio_array.flatten())
+        audio_array = self._enhance_audio(audio_array.flatten())
 
         os.makedirs(AUDIO_TEMP_PATH, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -240,20 +262,6 @@ class AudioRecorder:
             wf.writeframes(audio_int16.tobytes())
 
         return filepath, duration
-
-    def _apply_noise_reduction(self, audio):
-        nyquist = self.sample_rate / 2
-        low_cutoff = 100 / nyquist
-
-        if low_cutoff < 1:
-            b, a = signal.butter(4, low_cutoff, btype='high')
-            audio = signal.filtfilt(b, a, audio)
-
-        max_val = np.max(np.abs(audio))
-        if max_val > 0:
-            audio = audio / max_val * 0.9
-
-        return audio
 
     def is_recording(self) -> bool:
         return self.recording

@@ -12,7 +12,8 @@ let state = {
     searchQuery: '',
     contextMenuTarget: null,
     systemStatus: null,
-    waveformAnimationId: null
+    waveformAnimationId: null,
+    currentLanguage: 'de'
 };
 
 const elements = {
@@ -456,7 +457,10 @@ function toggleRecording() {
 }
 
 function startRecording() {
-    socket.emit('start_realtime', { folder_id: state.currentFolder });
+    socket.emit('start_realtime', {
+        folder_id: state.currentFolder,
+        language: state.currentLanguage
+    });
 
     state.isRecording = true;
     elements.recordBtn.classList.add('recording');
@@ -467,6 +471,14 @@ function startRecording() {
         seconds++;
         elements.recordingDuration.textContent = formatDuration(seconds);
     }, 1000);
+}
+
+function setLanguage(lang) {
+    state.currentLanguage = lang;
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.lang === lang);
+    });
+    socket.emit('set_language', { language: lang });
 }
 
 function stopRecording() {
@@ -575,6 +587,10 @@ function initEventListeners() {
     elements.searchInput.addEventListener('input', (e) => handleSearch(e.target.value));
     elements.themeToggle.addEventListener('click', toggleTheme);
     elements.noteContent.addEventListener('input', updateDetailStats);
+
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.addEventListener('click', () => setLanguage(btn.dataset.lang));
+    });
 
     document.getElementById('addFolderBtn').addEventListener('click', () => {
         elements.folderModalTitle.textContent = 'New Folder';
