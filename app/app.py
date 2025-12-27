@@ -52,7 +52,89 @@ chunk_errors = []
 
 CORRECTION_DELAY_SECONDS = 10
 
-threading.Thread(target=preload_model, daemon=True).start()
+models_ready = {
+    'whisper': False,
+    'speaker': False,
+    'mlx': False,
+    'languagetool': False
+}
+models_progress = {
+    'whisper': {'status': 'pending', 'progress': 0, 'message': 'Waiting...'},
+    'speaker': {'status': 'pending', 'progress': 0, 'message': 'Waiting...'},
+    'mlx': {'status': 'pending', 'progress': 0, 'message': 'Waiting...'},
+    'languagetool': {'status': 'pending', 'progress': 0, 'message': 'Waiting...'}
+}
+init_complete = False
+init_lock = threading.Lock()
+
+def initialize_all_models():
+    global models_ready, models_progress, init_complete
+
+    def update_progress(model, status, progress, message):
+        with init_lock:
+            models_progress[model] = {'status': status, 'progress': progress, 'message': message}
+            socketio.emit('model_progress', {
+                'model': model,
+                'status': status,
+                'progress': progress,
+                'message': message,
+                'all_progress': models_progress
+            })
+
+    update_progress('whisper', 'loading', 10, 'Loading Whisper model...')
+    try:
+        preload_model()
+        models_ready['whisper'] = True
+        update_progress('whisper', 'ready', 100, 'Whisper ready')
+    except Exception as e:
+        update_progress('whisper', 'error', 0, f'Error: {str(e)[:50]}')
+
+    update_progress('speaker', 'loading', 10, 'Loading speaker recognition...')
+    try:
+        manager = get_profile_manager()
+        manager._load_model()
+        models_ready['speaker'] = True
+        update_progress('speaker', 'ready', 100, 'Speaker model ready')
+    except Exception as e:
+        update_progress('speaker', 'error', 0, f'Error: {str(e)[:50]}')
+
+    update_progress('mlx', 'loading', 10, 'Loading AI corrector (MLX)...')
+    try:
+        from ai_corrector import get_corrector
+        corrector = get_corrector()
+        corrector._load_model()
+        if corrector._mlx_available:
+            models_ready['mlx'] = True
+            update_progress('mlx', 'ready', 100, 'MLX AI corrector ready')
+        else:
+            models_ready['mlx'] = True
+            update_progress('mlx', 'skipped', 100, 'MLX not available (using LanguageTool)')
+    except Exception as e:
+        models_ready['mlx'] = True
+        update_progress('mlx', 'skipped', 100, f'MLX skipped: {str(e)[:30]}')
+
+    update_progress('languagetool', 'loading', 10, 'Loading LanguageTool...')
+    try:
+        from ai_corrector import get_corrector
+        corrector = get_corrector()
+        corrector._get_language_tool('de')
+        models_ready['languagetool'] = True
+        update_progress('languagetool', 'ready', 100, 'LanguageTool ready')
+    except Exception as e:
+        models_ready['languagetool'] = True
+        update_progress('languagetool', 'skipped', 100, f'LanguageTool skipped')
+
+    with init_lock:
+        init_complete = True
+
+    socketio.emit('models_ready', {
+        'ready': True,
+        'models': models_ready,
+        'progress': models_progress
+    })
+    print("All models initialized!")
+
+threading.Thread(target=initialize_all_models, daemon=True).start()
 
 def analyze_audio_quality(audio_data, sample_rate):
     import numpy as np
@@ -1150,6 +1232,15 @@ def mark_chunk_error():
 @app.route('/api/chunk-errors', methods=['GET'])
 def get_chunk_errors():
     return jsonify({'errors': chunk_errors[-50:]})
+
+@app.route('/api/models/init-status', methods=['GET'])
+def get_init_status():
+    with init_lock:
+        return jsonify({
+            'ready': init_complete,
+            'models': models_ready,
+            'progress': models_progress
+        })
 
 @app.route('/api/audio-quality', methods=['POST'])
 def check_audio_quality():

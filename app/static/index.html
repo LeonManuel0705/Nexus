@@ -10,6 +10,53 @@
     <script src="/static/socket.io.min.js"></script>
 </head>
 <body>
+    <div class="init-overlay" id="initOverlay">
+        <div class="init-container">
+            <div class="init-logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    <line x1="12" y1="19" x2="12" y2="23"/>
+                    <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+            </div>
+            <h1 class="init-title">VoiceNotes</h1>
+            <p class="init-subtitle">Initializing models...</p>
+
+            <div class="init-progress-container">
+                <div class="init-progress-bar">
+                    <div class="init-progress-fill" id="initProgressFill"></div>
+                </div>
+                <span class="init-progress-text" id="initProgressText">0%</span>
+            </div>
+
+            <div class="init-models" id="initModels">
+                <div class="init-model" data-model="whisper">
+                    <div class="init-model-status pending"></div>
+                    <span class="init-model-name">Whisper (Speech Recognition)</span>
+                    <span class="init-model-message">Waiting...</span>
+                </div>
+                <div class="init-model" data-model="speaker">
+                    <div class="init-model-status pending"></div>
+                    <span class="init-model-name">Speaker Recognition</span>
+                    <span class="init-model-message">Waiting...</span>
+                </div>
+                <div class="init-model" data-model="mlx">
+                    <div class="init-model-status pending"></div>
+                    <span class="init-model-name">MLX AI Corrector</span>
+                    <span class="init-model-message">Waiting...</span>
+                </div>
+                <div class="init-model" data-model="languagetool">
+                    <div class="init-model-status pending"></div>
+                    <span class="init-model-name">LanguageTool</span>
+                    <span class="init-model-message">Waiting...</span>
+                </div>
+            </div>
+
+            <p class="init-note">Please wait while models are downloaded and loaded.<br>This only happens once.</p>
+        </div>
+    </div>
+
     <div class="app-container">
         <aside class="sidebar">
             <div class="sidebar-header">
