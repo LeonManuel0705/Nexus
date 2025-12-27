@@ -1149,7 +1149,6 @@ def get_report_content(filename):
 
 @app.route('/api/adaptive/params', methods=['GET'])
 def get_adaptive_params():
-    """Get current adaptive parameters."""
     return jsonify({
         'params': get_current_params(),
         'teacher_id': voice_filter_profile_id
@@ -1157,7 +1156,6 @@ def get_adaptive_params():
 
 @app.route('/api/adaptive/teacher-stats/<profile_id>', methods=['GET'])
 def get_adaptive_teacher_stats(profile_id):
-    """Get learning statistics for a specific teacher."""
     manager = get_profile_manager()
     profiles = manager.list_profiles()
 
@@ -1172,14 +1170,12 @@ def get_adaptive_teacher_stats(profile_id):
 
 @app.route('/api/adaptive/log', methods=['GET'])
 def get_adaptive_log():
-    """Get parameter change log."""
     limit = request.args.get('limit', 50, type=int)
     log = get_change_log(limit)
     return jsonify({'log': log})
 
 @app.route('/api/adaptive/reset/<profile_id>', methods=['POST'])
 def reset_adaptive_teacher(profile_id):
-    """Reset learning data for a teacher."""
     manager = get_profile_manager()
     profiles = manager.list_profiles()
 

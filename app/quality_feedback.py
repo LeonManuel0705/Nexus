@@ -196,7 +196,7 @@ class FeedbackCollector:
         analysis = self.analyzer.analyze(transcription)
 
         feedback_data = {
-            'feedback_id': f"fb_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{note_id[:8]}",
+            'feedback_id': f"fb_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(note_id)[:8]}",
             'note_id': note_id,
             'rating': rating,
             'folder_id': folder_id,

@@ -152,22 +152,42 @@ Corrected:"""
             return ""
 
     def _clean_mlx_response(self, response: str) -> str:
-        """Clean up MLX model output - remove repetitions and meta-text."""
         if not response:
             return ""
+
+        lines = response.split('\n')
+        clean_lines = []
+        for line in lines:
+            line = line.strip()
+            skip_patterns = [
+                'here is', 'here\'s', 'the corrected', 'corrected text',
+                'corrected version', 'i have', 'i\'ve', 'note:', 'explanation:',
+                'changes made', 'changes:', 'original:', 'fixed:', 'result:',
+                '---', '===', '***', 'step', 'rule', '1.', '2.', '3.',
+            ]
+            if any(p in line.lower() for p in skip_patterns):
+                continue
+            if line.startswith(('-', '*', '#', '>')):
+                continue
+            if line:
+                clean_lines.append(line)
+
+        response = ' '.join(clean_lines)
+
+        response = re.sub(r'\s*\([^)]*(?:corrected|fixed|changed|removed)[^)]*\)\s*', ' ', response, flags=re.IGNORECASE)
+        response = re.sub(r'\s*\[[^\]]*(?:corrected|fixed|changed|removed)[^\]]*\]\s*', ' ', response, flags=re.IGNORECASE)
 
         markers = [
             '\n\nCorrection:', '\nCorrection:', 'Correction:',
             '\n\nCorrected:', '\nCorrected:', 'Corrected:',
             '\n\nExplanation:', '\nExplanation:', 'Explanation:',
             '\n\nNote:', '\nNote:', 'Note:',
-            '\n\n1.', '\n1.',
-            '\n\nSentence', '\nSentence',
+            'Here is', 'Here\'s', 'The corrected',
         ]
 
         first_cut = len(response)
         for marker in markers:
-            idx = response.find(marker)
+            idx = response.lower().find(marker.lower())
             if idx > 0 and idx < first_cut:
                 first_cut = idx
 
@@ -192,6 +212,8 @@ Corrected:"""
             )
             if last_sentence > len(response) * 0.3:
                 response = response[:last_sentence + 1]
+
+        response = re.sub(r'\s+', ' ', response).strip()
 
         return response
 

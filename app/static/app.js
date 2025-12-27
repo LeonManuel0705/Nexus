@@ -158,7 +158,6 @@ const i18n = {
         downloadComplete: 'Download complete',
         downloadFailed: 'Download failed',
         checkingModels: 'Checking models...',
-        // Feedback system
         rateTranscription: 'Rate Transcription',
         howWasQuality: 'How was the transcription quality?',
         additionalComments: 'Additional comments (optional)',
@@ -168,7 +167,6 @@ const i18n = {
         feedbackError: 'Error submitting feedback',
         qualityScore: 'Quality Score',
         issuesFound: 'Issues Found',
-        // Voice filter modes
         filterModeInclude: 'Include Mode',
         filterModeExclude: 'Exclude Mode',
         filterModeIncludeDesc: 'Only transcribe this voice',
@@ -250,7 +248,6 @@ const i18n = {
         downloadComplete: 'Download abgeschlossen',
         downloadFailed: 'Download fehlgeschlagen',
         checkingModels: 'Modelle prüfen...',
-        // Feedback system
         rateTranscription: 'Transkription bewerten',
         howWasQuality: 'Wie war die Qualität der Transkription?',
         additionalComments: 'Zusätzliche Kommentare (optional)',
@@ -260,7 +257,6 @@ const i18n = {
         feedbackError: 'Fehler beim Senden des Feedbacks',
         qualityScore: 'Qualitätsbewertung',
         issuesFound: 'Probleme gefunden',
-        // Voice filter modes
         filterModeInclude: 'Einschließen-Modus',
         filterModeExclude: 'Ausschließen-Modus',
         filterModeIncludeDesc: 'Nur diese Stimme transkribieren',
@@ -1517,19 +1513,16 @@ function initDashboardListeners() {
     }
 }
 
-// Feedback System Functions
 function showFeedbackModal(noteId, transcription) {
     state.lastRecordingNoteId = noteId;
     state.feedbackRating = 0;
 
-    // Reset UI
     elements.starRating.querySelectorAll('.star').forEach(star => {
         star.classList.remove('active');
     });
     elements.feedbackComments.value = '';
     elements.qualityAnalysis.classList.add('hidden');
 
-    // Analyze transcription quality
     analyzeTranscriptionQuality(transcription);
 
     elements.feedbackModal.classList.add('active');
@@ -1585,7 +1578,6 @@ async function submitFeedback() {
 }
 
 function initFeedbackListeners() {
-    // Star rating
     elements.starRating.querySelectorAll('.star').forEach(star => {
         star.addEventListener('click', () => {
             const rating = parseInt(star.dataset.rating);
@@ -1615,7 +1607,6 @@ function initFeedbackListeners() {
     elements.feedbackModal.querySelector('.modal-backdrop').addEventListener('click', hideFeedbackModal);
 }
 
-// Voice Filter Mode Functions
 async function setVoiceFilterMode(mode) {
     try {
         await api('/api/voice-profiles/set-mode', {
