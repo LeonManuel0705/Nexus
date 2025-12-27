@@ -48,7 +48,24 @@ const i18n = {
         deleteSelectedConfirm: 'Delete selected notes?',
         noNotesYet: 'No notes yet',
         noNotesDesc: 'Press the record button to create your first voice note',
-        listening: 'Listening...'
+        listening: 'Listening...',
+        voiceFilter: 'Voice Filter',
+        voiceFilterDesc: 'Train the system to recognize a specific voice (e.g., teacher) and filter out other speakers.',
+        noProfileActive: 'No voice profile active',
+        recordToCreate: 'Record a voice sample to create a profile',
+        teacherName: 'Teacher/Speaker Name',
+        enrollmentHint: 'Speak naturally for at least 30 seconds. Read aloud or talk about any topic.',
+        finishEnrollment: 'Finish & Save Profile',
+        savedProfiles: 'Saved Profiles',
+        noProfilesSaved: 'No profiles saved yet',
+        close: 'Close',
+        disableFilter: 'Disable Filter',
+        profileActive: 'Voice filter active',
+        filteringVoice: 'Only transcribing matched voice',
+        profileCreated: 'Voice profile created!',
+        profileActivated: 'Voice filter activated',
+        profileDeactivated: 'Voice filter disabled',
+        enrollmentCancelled: 'Enrollment cancelled'
     },
     de: {
         folders: 'Ordner',
@@ -96,7 +113,24 @@ const i18n = {
         deleteSelectedConfirm: 'Ausgewählte Notizen löschen?',
         noNotesYet: 'Noch keine Notizen',
         noNotesDesc: 'Drücken Sie den Aufnahme-Button für Ihre erste Sprachnotiz',
-        listening: 'Hören...'
+        listening: 'Hören...',
+        voiceFilter: 'Stimmenfilter',
+        voiceFilterDesc: 'Trainieren Sie das System, eine bestimmte Stimme (z.B. Lehrer) zu erkennen und andere Sprecher auszufiltern.',
+        noProfileActive: 'Kein Stimmprofil aktiv',
+        recordToCreate: 'Nehmen Sie eine Stimmprobe auf, um ein Profil zu erstellen',
+        teacherName: 'Lehrer-/Sprechername',
+        enrollmentHint: 'Sprechen Sie natürlich für mindestens 30 Sekunden. Lesen Sie laut vor oder sprechen Sie über ein beliebiges Thema.',
+        finishEnrollment: 'Beenden & Profil speichern',
+        savedProfiles: 'Gespeicherte Profile',
+        noProfilesSaved: 'Noch keine Profile gespeichert',
+        close: 'Schließen',
+        disableFilter: 'Filter deaktivieren',
+        profileActive: 'Stimmenfilter aktiv',
+        filteringVoice: 'Nur passende Stimme wird transkribiert',
+        profileCreated: 'Stimmprofil erstellt!',
+        profileActivated: 'Stimmenfilter aktiviert',
+        profileDeactivated: 'Stimmenfilter deaktiviert',
+        enrollmentCancelled: 'Registrierung abgebrochen'
     }
 };
 
@@ -113,7 +147,11 @@ let state = {
     waveformAnimationId: null,
     currentLanguage: 'de',
     uiLanguage: 'en',
-    selectedNotes: new Set()
+    selectedNotes: new Set(),
+    voiceFilterEnabled: false,
+    voiceProfiles: [],
+    currentProfile: null,
+    isEnrolling: false
 };
 
 const elements = {
@@ -153,7 +191,21 @@ const elements = {
     selectAllCheckbox: document.getElementById('selectAllCheckbox'),
     selectionCount: document.getElementById('selectionCount'),
     deleteSelectedBtn: document.getElementById('deleteSelectedBtn'),
-    exportSelectedBtn: document.getElementById('exportSelectedBtn')
+    exportSelectedBtn: document.getElementById('exportSelectedBtn'),
+    voiceFilterBtn: document.getElementById('voiceFilterBtn'),
+    filterStatus: document.getElementById('filterStatus'),
+    voiceProfileModal: document.getElementById('voiceProfileModal'),
+    profileStatus: document.getElementById('profileStatus'),
+    teacherNameInput: document.getElementById('teacherNameInput'),
+    enrollmentProgress: document.getElementById('enrollmentProgress'),
+    enrollmentProgressFill: document.getElementById('enrollmentProgressFill'),
+    enrollmentDuration: document.getElementById('enrollmentDuration'),
+    startEnrollmentBtn: document.getElementById('startEnrollmentBtn'),
+    stopEnrollmentBtn: document.getElementById('stopEnrollmentBtn'),
+    cancelEnrollmentBtn: document.getElementById('cancelEnrollmentBtn'),
+    profilesList: document.getElementById('profilesList'),
+    closeVoiceProfileBtn: document.getElementById('closeVoiceProfileBtn'),
+    disableFilterBtn: document.getElementById('disableFilterBtn')
 };
 
 function t(key) {
@@ -583,12 +635,15 @@ function renderNoteTags() {
 async function saveNote() {
     if (!state.currentNote) return;
 
+    const folderValue = elements.noteFolderSelect.value;
+    const folderId = folderValue && folderValue !== '' ? parseInt(folderValue) : null;
+
     await api(`/api/notes/${state.currentNote.id}`, {
         method: 'PUT',
         body: JSON.stringify({
             title: elements.noteTitle.value,
             content: elements.noteContent.value,
-            folder_id: elements.noteFolderSelect.value ? parseInt(elements.noteFolderSelect.value) : 0
+            folder_id: folderId
         })
     });
 
@@ -951,14 +1006,222 @@ function initEventListeners() {
     });
 }
 
+// ==================== Voice Profile Functions ====================
+
+async function loadVoiceProfiles() {
+    try {
+        const data = await api('/api/voice-profiles');
+        state.voiceProfiles = data.profiles || [];
+        state.currentProfile = data.current_profile;
+        state.voiceFilterEnabled = data.filter_enabled;
+        updateVoiceFilterUI();
+        renderProfilesList();
+    } catch (e) {
+        console.error('Failed to load voice profiles:', e);
+    }
+}
+
+function updateVoiceFilterUI() {
+    if (state.voiceFilterEnabled && state.currentProfile) {
+        elements.voiceFilterBtn.classList.add('active');
+        elements.profileStatus.classList.add('active');
+        elements.profileStatus.querySelector('strong').textContent = state.currentProfile.name;
+        elements.profileStatus.querySelector('span').textContent = t('filteringVoice');
+        elements.disableFilterBtn.classList.remove('hidden');
+    } else {
+        elements.voiceFilterBtn.classList.remove('active');
+        elements.profileStatus.classList.remove('active');
+        elements.profileStatus.querySelector('strong').textContent = t('noProfileActive');
+        elements.profileStatus.querySelector('span').textContent = t('recordToCreate');
+        elements.disableFilterBtn.classList.add('hidden');
+    }
+}
+
+function renderProfilesList() {
+    if (state.voiceProfiles.length === 0) {
+        elements.profilesList.innerHTML = `<p class="no-profiles">${t('noProfilesSaved')}</p>`;
+        return;
+    }
+
+    elements.profilesList.innerHTML = state.voiceProfiles.map(profile => `
+        <div class="profile-item ${state.currentProfile?.profile_id === profile.profile_id ? 'active' : ''}" data-profile-id="${profile.profile_id}">
+            <div class="profile-info">
+                <span class="profile-name">${escapeHtml(profile.name)}</span>
+                <span class="profile-meta">${Math.round(profile.duration)}s recorded</span>
+            </div>
+            <div class="profile-actions">
+                ${state.currentProfile?.profile_id !== profile.profile_id ?
+                    `<button class="btn-activate" data-action="activate">${t('profileActivated').split(' ')[0]}</button>` :
+                    ''
+                }
+                <button class="btn-delete" data-action="delete">×</button>
+            </div>
+        </div>
+    `).join('');
+
+    // Add event listeners
+    elements.profilesList.querySelectorAll('.profile-item').forEach(item => {
+        const profileId = item.dataset.profileId;
+
+        item.querySelector('.btn-activate')?.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await activateProfile(profileId);
+        });
+
+        item.querySelector('.btn-delete')?.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await deleteProfile(profileId);
+        });
+    });
+}
+
+async function activateProfile(profileId) {
+    try {
+        const data = await api(`/api/voice-profiles/${profileId}/activate`, { method: 'POST' });
+        if (data.success) {
+            state.voiceFilterEnabled = true;
+            state.currentProfile = data.profile;
+            updateVoiceFilterUI();
+            renderProfilesList();
+            showToast(t('profileActivated'), 'success');
+        }
+    } catch (e) {
+        console.error('Failed to activate profile:', e);
+    }
+}
+
+async function deactivateFilter() {
+    try {
+        await api('/api/voice-profiles/deactivate', { method: 'POST' });
+        state.voiceFilterEnabled = false;
+        state.currentProfile = null;
+        updateVoiceFilterUI();
+        renderProfilesList();
+        showToast(t('profileDeactivated'), 'success');
+    } catch (e) {
+        console.error('Failed to deactivate filter:', e);
+    }
+}
+
+async function deleteProfile(profileId) {
+    try {
+        await api(`/api/voice-profiles/${profileId}`, { method: 'DELETE' });
+        await loadVoiceProfiles();
+    } catch (e) {
+        console.error('Failed to delete profile:', e);
+    }
+}
+
+function showVoiceProfileModal() {
+    loadVoiceProfiles();
+    elements.voiceProfileModal.classList.add('active');
+}
+
+function hideVoiceProfileModal() {
+    elements.voiceProfileModal.classList.remove('active');
+    if (state.isEnrolling) {
+        socket.emit('cancel_enrollment');
+    }
+}
+
+function startEnrollment() {
+    const name = elements.teacherNameInput.value.trim() || 'Teacher';
+    state.isEnrolling = true;
+
+    // Update UI
+    elements.startEnrollmentBtn.classList.add('hidden');
+    elements.stopEnrollmentBtn.classList.remove('hidden');
+    elements.cancelEnrollmentBtn.classList.remove('hidden');
+    elements.enrollmentProgress.classList.remove('hidden');
+    elements.teacherNameInput.disabled = true;
+
+    socket.emit('start_enrollment', { name });
+}
+
+function stopEnrollment() {
+    socket.emit('stop_enrollment', {});
+}
+
+function cancelEnrollment() {
+    socket.emit('cancel_enrollment');
+    resetEnrollmentUI();
+    showToast(t('enrollmentCancelled'), 'error');
+}
+
+function resetEnrollmentUI() {
+    state.isEnrolling = false;
+    elements.startEnrollmentBtn.classList.remove('hidden');
+    elements.stopEnrollmentBtn.classList.add('hidden');
+    elements.cancelEnrollmentBtn.classList.add('hidden');
+    elements.enrollmentProgress.classList.add('hidden');
+    elements.enrollmentProgressFill.style.width = '0%';
+    elements.enrollmentDuration.textContent = '0s';
+    elements.teacherNameInput.disabled = false;
+    elements.teacherNameInput.value = '';
+}
+
+// Socket events for enrollment
+socket.on('enrollment_started', (data) => {
+    console.log('Enrollment started:', data);
+});
+
+socket.on('enrollment_progress', (data) => {
+    const duration = Math.round(data.duration || 0);
+    const progress = Math.min(100, (duration / 30) * 100);
+
+    elements.enrollmentDuration.textContent = `${duration}s`;
+    elements.enrollmentProgressFill.style.width = `${progress}%`;
+
+    if (data.is_ready) {
+        elements.stopEnrollmentBtn.classList.add('ready');
+    }
+});
+
+socket.on('enrollment_complete', (data) => {
+    resetEnrollmentUI();
+
+    if (data.status === 'success') {
+        state.voiceFilterEnabled = true;
+        state.currentProfile = { profile_id: data.profile_id, name: data.name };
+        updateVoiceFilterUI();
+        loadVoiceProfiles();
+        showToast(t('profileCreated'), 'success');
+    } else {
+        showToast(data.error || 'Enrollment failed', 'error');
+    }
+});
+
+socket.on('enrollment_cancelled', () => {
+    resetEnrollmentUI();
+});
+
+socket.on('voice_filter_status', (data) => {
+    // Could show a visual indicator that voices are being filtered
+    console.log('Voice filter:', data);
+});
+
+// Initialize voice profile event listeners
+function initVoiceProfileListeners() {
+    elements.voiceFilterBtn.addEventListener('click', showVoiceProfileModal);
+    elements.closeVoiceProfileBtn.addEventListener('click', hideVoiceProfileModal);
+    elements.disableFilterBtn.addEventListener('click', deactivateFilter);
+    elements.startEnrollmentBtn.addEventListener('click', startEnrollment);
+    elements.stopEnrollmentBtn.addEventListener('click', stopEnrollment);
+    elements.cancelEnrollmentBtn.addEventListener('click', cancelEnrollment);
+
+    elements.voiceProfileModal.querySelector('.modal-backdrop').addEventListener('click', hideVoiceProfileModal);
+}
+
 async function init() {
     loadTheme();
     const savedUILang = localStorage.getItem('uiLanguage') || 'en';
     setUILanguage(savedUILang);
     initEventListeners();
+    initVoiceProfileListeners();
     await loadFolders();
     await loadNotes();
     await loadTags();
+    await loadVoiceProfiles();
 }
 
 init();

@@ -15,7 +15,10 @@ webrtcvad>=2.0.10
 # Offline text correction
 language-tool-python>=2.7.0
 
-# Speaker diarization (optional - installed by setup script)
+# Word document export
+python-docx>=1.0.0
+
+# Speaker diarization / Voice profiles (optional - installed by setup script)
 # speechbrain>=1.0.0
 # torch>=2.0.0
 

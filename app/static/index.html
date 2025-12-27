@@ -104,9 +104,19 @@
                 <div class="waveform-container" id="waveformContainer">
                     <canvas id="waveformCanvas"></canvas>
                 </div>
-                <div class="language-selector">
-                    <button class="lang-btn active" data-lang="de">Deutsch</button>
-                    <button class="lang-btn" data-lang="en">English</button>
+                <div class="recording-controls-row">
+                    <div class="language-selector">
+                        <button class="lang-btn active" data-lang="de">Deutsch</button>
+                        <button class="lang-btn" data-lang="en">English</button>
+                    </div>
+                    <button class="btn btn-voice-filter" id="voiceFilterBtn" title="Voice Filter">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                            <circle cx="12" cy="7" r="4"/>
+                        </svg>
+                        <span data-i18n="voiceFilter">Voice Filter</span>
+                        <span class="filter-status" id="filterStatus"></span>
+                    </button>
                 </div>
                 <button class="record-btn" id="recordBtn">
                     <div class="record-btn-inner">
@@ -286,6 +296,75 @@
             </div>
             <div class="modal-actions">
                 <button class="btn btn-ghost" id="cancelExportBtn" data-i18n="cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="voiceProfileModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content modal-lg">
+            <h3 data-i18n="voiceFilter">Voice Filter</h3>
+            <p class="modal-description" data-i18n="voiceFilterDesc">Train the system to recognize a specific voice (e.g., teacher) and filter out other speakers.</p>
+
+            <div class="voice-profile-content" id="voiceProfileContent">
+                <div class="profile-status" id="profileStatus">
+                    <div class="status-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 6v6l4 2"/>
+                        </svg>
+                    </div>
+                    <div class="status-text">
+                        <strong data-i18n="noProfileActive">No voice profile active</strong>
+                        <span data-i18n="recordToCreate">Record a voice sample to create a profile</span>
+                    </div>
+                </div>
+
+                <div class="enrollment-section" id="enrollmentSection">
+                    <div class="enrollment-input">
+                        <label data-i18n="teacherName">Teacher/Speaker Name</label>
+                        <input type="text" id="teacherNameInput" placeholder="e.g., Mr. Smith" autocomplete="off">
+                    </div>
+
+                    <div class="enrollment-progress hidden" id="enrollmentProgress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="enrollmentProgressFill"></div>
+                        </div>
+                        <div class="progress-info">
+                            <span id="enrollmentDuration">0s</span> / <span>30s minimum</span>
+                        </div>
+                        <p class="enrollment-hint" data-i18n="enrollmentHint">Speak naturally for at least 30 seconds. Read aloud or talk about any topic.</p>
+                    </div>
+
+                    <div class="enrollment-actions" id="enrollmentActions">
+                        <button class="btn btn-primary" id="startEnrollmentBtn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                            </svg>
+                            <span data-i18n="startRecording">Start Recording</span>
+                        </button>
+                        <button class="btn btn-success hidden" id="stopEnrollmentBtn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="6" y="6" width="12" height="12" rx="2"/>
+                            </svg>
+                            <span data-i18n="finishEnrollment">Finish & Save Profile</span>
+                        </button>
+                        <button class="btn btn-ghost hidden" id="cancelEnrollmentBtn" data-i18n="cancel">Cancel</button>
+                    </div>
+                </div>
+
+                <div class="saved-profiles" id="savedProfiles">
+                    <h4 data-i18n="savedProfiles">Saved Profiles</h4>
+                    <div class="profiles-list" id="profilesList">
+                        <p class="no-profiles" data-i18n="noProfilesSaved">No profiles saved yet</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-ghost" id="closeVoiceProfileBtn" data-i18n="close">Close</button>
+                <button class="btn btn-danger hidden" id="disableFilterBtn" data-i18n="disableFilter">Disable Filter</button>
             </div>
         </div>
     </div>
