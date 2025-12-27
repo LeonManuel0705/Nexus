@@ -1,6 +1,105 @@
 const API_BASE = '';
 const socket = io();
 
+const i18n = {
+    en: {
+        folders: 'Folders',
+        tags: 'Tags',
+        allNotes: 'All Notes',
+        searchNotes: 'Search notes...',
+        pressToRecord: 'Press to record',
+        recording: 'Recording...',
+        saving: 'Saving...',
+        liveTranscription: 'Live Transcription',
+        aiEnhanced: 'AI Enhanced',
+        ultraFast: 'Ultra-Fast',
+        startRecording: 'Start recording to see live transcription...',
+        selectAll: 'Select all',
+        export: 'Export',
+        delete: 'Delete',
+        folder: 'Folder',
+        noFolder: 'No folder',
+        addTag: 'Add tag...',
+        add: 'Add',
+        saveChanges: 'Save Changes',
+        newFolder: 'New Folder',
+        folderName: 'Folder name',
+        cancel: 'Cancel',
+        create: 'Create',
+        exportOptions: 'Export Options',
+        rename: 'Rename',
+        addSubfolder: 'Add Subfolder',
+        backup: 'Backup',
+        untitledNote: 'Untitled Note',
+        transcriptionPlaceholder: 'Your transcription will appear here...',
+        noteSaved: 'Note saved!',
+        noteDeleted: 'Note deleted',
+        folderCreated: 'Folder created',
+        folderRenamed: 'Folder renamed',
+        folderDeleted: 'Folder deleted',
+        noSpeech: 'No speech detected',
+        selected: 'selected',
+        notes: 'notes',
+        note: 'note',
+        words: 'words',
+        characters: 'characters',
+        deleteConfirm: 'Delete this note?',
+        deleteFolderConfirm: 'Delete this folder and all its contents?',
+        deleteSelectedConfirm: 'Delete selected notes?',
+        noNotesYet: 'No notes yet',
+        noNotesDesc: 'Press the record button to create your first voice note',
+        listening: 'Listening...'
+    },
+    de: {
+        folders: 'Ordner',
+        tags: 'Tags',
+        allNotes: 'Alle Notizen',
+        searchNotes: 'Notizen suchen...',
+        pressToRecord: 'Zum Aufnehmen drücken',
+        recording: 'Aufnahme...',
+        saving: 'Speichern...',
+        liveTranscription: 'Live-Transkription',
+        aiEnhanced: 'KI-Optimiert',
+        ultraFast: 'Ultraschnell',
+        startRecording: 'Aufnahme starten für Live-Transkription...',
+        selectAll: 'Alle auswählen',
+        export: 'Exportieren',
+        delete: 'Löschen',
+        folder: 'Ordner',
+        noFolder: 'Kein Ordner',
+        addTag: 'Tag hinzufügen...',
+        add: 'Hinzufügen',
+        saveChanges: 'Änderungen speichern',
+        newFolder: 'Neuer Ordner',
+        folderName: 'Ordnername',
+        cancel: 'Abbrechen',
+        create: 'Erstellen',
+        exportOptions: 'Export-Optionen',
+        rename: 'Umbenennen',
+        addSubfolder: 'Unterordner hinzufügen',
+        backup: 'Sicherung',
+        untitledNote: 'Unbenannte Notiz',
+        transcriptionPlaceholder: 'Ihre Transkription erscheint hier...',
+        noteSaved: 'Notiz gespeichert!',
+        noteDeleted: 'Notiz gelöscht',
+        folderCreated: 'Ordner erstellt',
+        folderRenamed: 'Ordner umbenannt',
+        folderDeleted: 'Ordner gelöscht',
+        noSpeech: 'Keine Sprache erkannt',
+        selected: 'ausgewählt',
+        notes: 'Notizen',
+        note: 'Notiz',
+        words: 'Wörter',
+        characters: 'Zeichen',
+        deleteConfirm: 'Diese Notiz löschen?',
+        deleteFolderConfirm: 'Diesen Ordner und alle Inhalte löschen?',
+        deleteSelectedConfirm: 'Ausgewählte Notizen löschen?',
+        noNotesYet: 'Noch keine Notizen',
+        noNotesDesc: 'Drücken Sie den Aufnahme-Button für Ihre erste Sprachnotiz',
+        listening: 'Hören...'
+    }
+};
+
 let state = {
     folders: [],
     notes: [],
@@ -11,9 +110,10 @@ let state = {
     recordingInterval: null,
     searchQuery: '',
     contextMenuTarget: null,
-    systemStatus: null,
     waveformAnimationId: null,
-    currentLanguage: 'de'
+    currentLanguage: 'de',
+    uiLanguage: 'en',
+    selectedNotes: new Set()
 };
 
 const elements = {
@@ -48,14 +148,45 @@ const elements = {
     detailWordCount: document.getElementById('detailWordCount'),
     detailCharCount: document.getElementById('detailCharCount'),
     themeToggle: document.getElementById('themeToggle'),
-    toastContainer: document.getElementById('toastContainer')
+    toastContainer: document.getElementById('toastContainer'),
+    notesToolbar: document.getElementById('notesToolbar'),
+    selectAllCheckbox: document.getElementById('selectAllCheckbox'),
+    selectionCount: document.getElementById('selectionCount'),
+    deleteSelectedBtn: document.getElementById('deleteSelectedBtn'),
+    exportSelectedBtn: document.getElementById('exportSelectedBtn')
 };
+
+function t(key) {
+    return i18n[state.uiLanguage][key] || i18n['en'][key] || key;
+}
+
+function updateUILanguage() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        el.textContent = t(key);
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        el.placeholder = t(key);
+    });
+    updateSelectionUI();
+    renderNotes();
+}
+
+function setUILanguage(lang) {
+    state.uiLanguage = lang;
+    localStorage.setItem('uiLanguage', lang);
+    document.querySelectorAll('[data-ui-lang]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.uiLang === lang);
+    });
+    updateUILanguage();
+}
 
 socket.on('connect', () => console.log('Connected to server'));
 
 socket.on('recording_started', (data) => {
     elements.liveTranscription.classList.add('active');
-    elements.liveTranscriptionContent.innerHTML = '<p class="listening">Listening...</p>';
+    elements.liveTranscriptionContent.innerHTML = `<p class="listening">${t('listening')}</p>`;
     startWaveformAnimation();
 });
 
@@ -91,22 +222,22 @@ socket.on('recording_stopped', async (data) => {
     stopWaveformAnimation();
 
     elements.recordBtn.classList.remove('recording');
-    elements.recordLabel.textContent = 'Press to record';
+    elements.recordLabel.textContent = t('pressToRecord');
     elements.recordingDuration.textContent = '00:00';
     elements.liveTranscription.classList.remove('active');
 
     if (data.success) {
         elements.liveTranscriptionContent.innerHTML = `<p style="color: var(--success)">${escapeHtml(data.final_text)}</p>`;
-        showToast('Note saved!', 'success');
+        showToast(t('noteSaved'), 'success');
         await loadNotes();
         selectNote(data.note.id);
         setTimeout(() => {
-            elements.liveTranscriptionContent.innerHTML = '<p class="placeholder">Start recording to see live transcription...</p>';
+            elements.liveTranscriptionContent.innerHTML = `<p class="placeholder">${t('startRecording')}</p>`;
         }, 2000);
     } else {
-        elements.liveTranscriptionContent.innerHTML = `<p style="color: var(--danger)">${data.message || 'No speech detected'}</p>`;
+        elements.liveTranscriptionContent.innerHTML = `<p style="color: var(--danger)">${data.message || t('noSpeech')}</p>`;
         setTimeout(() => {
-            elements.liveTranscriptionContent.innerHTML = '<p class="placeholder">Start recording to see live transcription...</p>';
+            elements.liveTranscriptionContent.innerHTML = `<p class="placeholder">${t('startRecording')}</p>`;
         }, 3000);
     }
 });
@@ -148,6 +279,7 @@ function startWaveformAnimation() {
 
         state.waveformAnimationId = requestAnimationFrame(animate);
     }
+
     animate();
 }
 
@@ -156,31 +288,35 @@ function stopWaveformAnimation() {
         cancelAnimationFrame(state.waveformAnimationId);
         state.waveformAnimationId = null;
     }
-    const canvas = elements.waveformCanvas;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const ctx = elements.waveformCanvas.getContext('2d');
+    ctx.clearRect(0, 0, elements.waveformCanvas.width, elements.waveformCanvas.height);
 }
 
 function updateTranscriptionStats(text) {
-    const words = text.trim().split(/\s+/).filter(w => w).length;
+    if (!text) {
+        elements.wordCount.textContent = `0 ${t('words')}`;
+        elements.charCount.textContent = `0 ${t('characters')}`;
+        return;
+    }
+    const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
     const chars = text.length;
-    elements.wordCount.textContent = `${words} words`;
-    elements.charCount.textContent = `${chars} characters`;
+    elements.wordCount.textContent = `${words} ${t('words')}`;
+    elements.charCount.textContent = `${chars} ${t('characters')}`;
 }
 
 function updateDetailStats() {
     const text = elements.noteContent.value;
-    const words = text.trim().split(/\s+/).filter(w => w).length;
+    const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
     const chars = text.length;
-    elements.detailWordCount.textContent = `${words} words`;
-    elements.detailCharCount.textContent = `${chars} characters`;
+    elements.detailWordCount.textContent = `${words} ${t('words')}`;
+    elements.detailCharCount.textContent = `${chars} ${t('characters')}`;
 }
 
-async function api(endpoint, options = {}) {
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-        ...options,
-        headers: { 'Content-Type': 'application/json', ...options.headers }
-    });
+async function api(url, options = {}) {
+    const defaultOptions = {
+        headers: { 'Content-Type': 'application/json' },
+    };
+    const response = await fetch(API_BASE + url, { ...defaultOptions, ...options });
     return response.json();
 }
 
@@ -191,13 +327,20 @@ async function loadFolders() {
     updateFolderSelect();
 }
 
-function buildFolderHierarchy(folders, parentId = null) {
-    return folders
-        .filter(f => f.parent_id === parentId)
-        .map(folder => ({
-            ...folder,
-            children: buildFolderHierarchy(folders, folder.id)
-        }));
+function buildFolderHierarchy(folders) {
+    const map = new Map();
+    folders.forEach(f => map.set(f.id, { ...f, children: [] }));
+
+    const roots = [];
+    map.forEach(folder => {
+        if (folder.parent_id && map.has(folder.parent_id)) {
+            map.get(folder.parent_id).children.push(folder);
+        } else {
+            roots.push(folder);
+        }
+    });
+
+    return roots.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function renderFolderTree() {
@@ -206,7 +349,7 @@ function renderFolderTree() {
     let html = `
         <div class="folder-item all-notes-item ${state.currentFolder === null ? 'active' : ''}" data-folder-id="null">
             <span class="folder-icon">📁</span>
-            <span class="folder-name">All Notes</span>
+            <span class="folder-name">${t('allNotes')}</span>
         </div>
     `;
 
@@ -248,15 +391,17 @@ function renderFolderItems(folders, level) {
 async function selectFolder(folderId) {
     state.currentFolder = folderId;
     state.searchQuery = '';
+    state.selectedNotes.clear();
     elements.searchInput.value = '';
     renderFolderTree();
     updateBreadcrumb();
     await loadNotes();
+    updateSelectionUI();
 }
 
 function updateBreadcrumb() {
     if (state.currentFolder === null) {
-        elements.breadcrumb.innerHTML = '<span>All Notes</span>';
+        elements.breadcrumb.innerHTML = `<span>${t('allNotes')}</span>`;
     } else {
         const path = getFolderPath(state.currentFolder);
         elements.breadcrumb.innerHTML = path.map(f => `<span>${escapeHtml(f.name)}</span>`).join('');
@@ -276,22 +421,22 @@ function getFolderPath(folderId) {
 async function createFolder(name, parentId = null) {
     await api('/api/folders', { method: 'POST', body: JSON.stringify({ name, parent_id: parentId }) });
     await loadFolders();
-    showToast('Folder created', 'success');
+    showToast(t('folderCreated'), 'success');
 }
 
 async function renameFolder(folderId, newName) {
     await api(`/api/folders/${folderId}`, { method: 'PUT', body: JSON.stringify({ name: newName }) });
     await loadFolders();
-    showToast('Folder renamed', 'success');
+    showToast(t('folderRenamed'), 'success');
 }
 
 async function deleteFolder(folderId) {
-    if (confirm('Delete this folder and all its contents?')) {
+    if (confirm(t('deleteFolderConfirm'))) {
         await api(`/api/folders/${folderId}`, { method: 'DELETE' });
         if (state.currentFolder === folderId) state.currentFolder = null;
         await loadFolders();
         await loadNotes();
-        showToast('Folder deleted', 'success');
+        showToast(t('folderDeleted'), 'success');
     }
 }
 
@@ -306,22 +451,27 @@ async function loadNotes() {
     }
     state.notes = data.notes;
     renderNotes();
-    elements.noteCount.textContent = `${state.notes.length} note${state.notes.length !== 1 ? 's' : ''}`;
+    const noteWord = state.notes.length === 1 ? t('note') : t('notes');
+    elements.noteCount.textContent = `${state.notes.length} ${noteWord}`;
 }
 
 function renderNotes() {
     if (state.notes.length === 0) {
         elements.notesList.innerHTML = `
             <div class="empty-state">
-                <h3>No notes yet</h3>
-                <p>Press the record button to create your first voice note</p>
+                <h3>${t('noNotesYet')}</h3>
+                <p>${t('noNotesDesc')}</p>
             </div>
         `;
+        elements.notesToolbar.classList.add('hidden');
         return;
     }
 
+    elements.notesToolbar.classList.remove('hidden');
+
     elements.notesList.innerHTML = state.notes.map(note => `
-        <div class="note-card ${state.currentNote?.id === note.id ? 'active' : ''}" data-note-id="${note.id}">
+        <div class="note-card ${state.currentNote?.id === note.id ? 'active' : ''} ${state.selectedNotes.has(note.id) ? 'selected' : ''}" data-note-id="${note.id}">
+            <input type="checkbox" class="note-checkbox" ${state.selectedNotes.has(note.id) ? 'checked' : ''} data-note-id="${note.id}">
             <div class="note-card-header">
                 <span class="note-card-title">${escapeHtml(note.title)}</span>
                 <span class="note-card-date">${formatDate(note.created_at)}</span>
@@ -340,8 +490,47 @@ function renderNotes() {
     `).join('');
 
     document.querySelectorAll('.note-card').forEach(card => {
-        card.addEventListener('click', () => selectNote(parseInt(card.dataset.noteId)));
+        card.addEventListener('click', (e) => {
+            if (e.target.classList.contains('note-checkbox')) return;
+            selectNote(parseInt(card.dataset.noteId));
+        });
     });
+
+    document.querySelectorAll('.note-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const noteId = parseInt(checkbox.dataset.noteId);
+            if (checkbox.checked) {
+                state.selectedNotes.add(noteId);
+            } else {
+                state.selectedNotes.delete(noteId);
+            }
+            updateSelectionUI();
+            renderNotes();
+        });
+    });
+}
+
+function updateSelectionUI() {
+    const count = state.selectedNotes.size;
+    elements.selectionCount.textContent = `${count} ${t('selected')}`;
+    elements.selectAllCheckbox.checked = count === state.notes.length && count > 0;
+    elements.selectAllCheckbox.indeterminate = count > 0 && count < state.notes.length;
+}
+
+async function deleteSelectedNotes() {
+    if (state.selectedNotes.size === 0) return;
+
+    if (confirm(t('deleteSelectedConfirm'))) {
+        for (const noteId of state.selectedNotes) {
+            await api(`/api/notes/${noteId}`, { method: 'DELETE' });
+        }
+        state.selectedNotes.clear();
+        state.currentNote = null;
+        elements.detailPanel.classList.add('hidden');
+        await loadNotes();
+        showToast(t('noteDeleted'), 'success');
+    }
 }
 
 async function selectNote(noteId) {
@@ -406,18 +595,18 @@ async function saveNote() {
     await loadNotes();
     const data = await api(`/api/notes/${state.currentNote.id}`);
     state.currentNote = data.note;
-    showToast('Note saved', 'success');
+    showToast(t('noteSaved'), 'success');
 }
 
 async function deleteNote() {
     if (!state.currentNote) return;
 
-    if (confirm('Delete this note?')) {
+    if (confirm(t('deleteConfirm'))) {
         await api(`/api/notes/${state.currentNote.id}`, { method: 'DELETE' });
         state.currentNote = null;
         elements.detailPanel.classList.add('hidden');
         await loadNotes();
-        showToast('Note deleted', 'success');
+        showToast(t('noteDeleted'), 'success');
     }
 }
 
@@ -438,10 +627,12 @@ function renderTags() {
             state.notes = data.notes;
             state.currentFolder = null;
             state.searchQuery = '';
+            state.selectedNotes.clear();
             elements.searchInput.value = '';
             elements.breadcrumb.innerHTML = `<span>Tag: ${escapeHtml(item.dataset.tag)}</span>`;
             renderFolderTree();
             renderNotes();
+            updateSelectionUI();
         });
     });
 }
@@ -474,7 +665,7 @@ function startRecording() {
 
     state.isRecording = true;
     elements.recordBtn.classList.add('recording');
-    elements.recordLabel.textContent = 'Recording...';
+    elements.recordLabel.textContent = t('recording');
 
     let seconds = 0;
     state.recordingInterval = setInterval(() => {
@@ -492,7 +683,7 @@ function setLanguage(lang) {
 }
 
 function stopRecording() {
-    elements.recordLabel.textContent = 'Saving...';
+    elements.recordLabel.textContent = t('saving');
     socket.emit('stop_realtime', { folder_id: state.currentFolder });
 }
 
@@ -524,7 +715,7 @@ function hideContextMenu() {
 
 function updateFolderSelect() {
     const hierarchy = buildFolderHierarchy(state.folders);
-    let options = '<option value="">No folder</option>';
+    let options = `<option value="">${t('noFolder')}</option>`;
     options += buildFolderOptions(hierarchy, 0);
     elements.noteFolderSelect.innerHTML = options;
 }
@@ -546,12 +737,14 @@ function handleSearch(query) {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(async () => {
         state.searchQuery = query;
+        state.selectedNotes.clear();
         if (query) {
             state.currentFolder = null;
             elements.breadcrumb.innerHTML = `<span>Search: "${escapeHtml(query)}"</span>`;
             renderFolderTree();
         }
         await loadNotes();
+        updateSelectionUI();
     }, 300);
 }
 
@@ -565,13 +758,13 @@ function showToast(message, type = 'success') {
 
 function toggleTheme() {
     const current = document.body.getAttribute('data-theme');
-    const newTheme = current === 'light' ? 'dark' : 'light';
+    const newTheme = current === 'dark' ? 'light' : 'dark';
     document.body.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme);
 }
 
 function loadTheme() {
-    const saved = localStorage.getItem('theme') || 'dark';
+    const saved = localStorage.getItem('theme') || 'light';
     document.body.setAttribute('data-theme', saved);
 }
 
@@ -583,7 +776,8 @@ function escapeHtml(text) {
 
 function formatDate(dateStr) {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const locale = state.uiLanguage === 'de' ? 'de-DE' : 'en-US';
+    return date.toLocaleDateString(locale, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function formatDuration(seconds) {
@@ -602,8 +796,31 @@ function initEventListeners() {
         btn.addEventListener('click', () => setLanguage(btn.dataset.lang));
     });
 
+    document.querySelectorAll('[data-ui-lang]').forEach(btn => {
+        btn.addEventListener('click', () => setUILanguage(btn.dataset.uiLang));
+    });
+
+    elements.selectAllCheckbox.addEventListener('change', () => {
+        if (elements.selectAllCheckbox.checked) {
+            state.notes.forEach(note => state.selectedNotes.add(note.id));
+        } else {
+            state.selectedNotes.clear();
+        }
+        updateSelectionUI();
+        renderNotes();
+    });
+
+    elements.deleteSelectedBtn.addEventListener('click', deleteSelectedNotes);
+
+    elements.exportSelectedBtn.addEventListener('click', () => {
+        if (state.selectedNotes.size > 0) {
+            const firstNoteId = Array.from(state.selectedNotes)[0];
+            showExportModal('note', firstNoteId);
+        }
+    });
+
     document.getElementById('addFolderBtn').addEventListener('click', () => {
-        elements.folderModalTitle.textContent = 'New Folder';
+        elements.folderModalTitle.textContent = t('newFolder');
         elements.folderNameInput.value = '';
         elements.folderModal.dataset.mode = 'create';
         elements.folderModal.dataset.parentId = state.currentFolder || '';
@@ -647,9 +864,9 @@ function initEventListeners() {
     });
 
     document.getElementById('addTagBtn').addEventListener('click', async () => {
-        const tag = elements.newTagInput.value.trim();
-        if (tag && state.currentNote) {
-            await addTag(state.currentNote.id, tag);
+        const tagName = elements.newTagInput.value.trim();
+        if (tagName && state.currentNote) {
+            await addTag(state.currentNote.id, tagName);
             elements.newTagInput.value = '';
         }
     });
@@ -658,121 +875,90 @@ function initEventListeners() {
         if (e.key === 'Enter') document.getElementById('addTagBtn').click();
     });
 
+    document.querySelectorAll('.export-option').forEach(btn => {
+        btn.addEventListener('click', () => exportFile(btn.dataset.format));
+    });
+
     document.getElementById('cancelExportBtn').addEventListener('click', () => {
         elements.exportModal.classList.remove('active');
     });
 
-    elements.exportModal.querySelectorAll('[data-format]').forEach(btn => {
-        btn.addEventListener('click', () => exportFile(btn.dataset.format));
+    document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+        backdrop.addEventListener('click', () => {
+            backdrop.closest('.modal').classList.remove('active');
+        });
     });
 
-    document.addEventListener('click', hideContextMenu);
-
-    elements.contextMenu.querySelectorAll('.context-menu-item').forEach(item => {
+    document.querySelectorAll('.context-menu-item').forEach(item => {
         item.addEventListener('click', async () => {
             const action = item.dataset.action;
-            const folderId = state.contextMenuTarget;
+            const folderId = parseInt(state.contextMenuTarget);
 
             if (action === 'rename') {
-                const folder = state.folders.find(f => f.id === parseInt(folderId));
-                elements.folderModalTitle.textContent = 'Rename Folder';
+                const folder = state.folders.find(f => f.id === folderId);
+                elements.folderModalTitle.textContent = t('rename');
                 elements.folderNameInput.value = folder.name;
                 elements.folderModal.dataset.mode = 'rename';
                 elements.folderModal.dataset.folderId = folderId;
                 elements.folderModal.classList.add('active');
                 elements.folderNameInput.focus();
             } else if (action === 'subfolder') {
-                elements.folderModalTitle.textContent = 'New Subfolder';
+                elements.folderModalTitle.textContent = t('newFolder');
                 elements.folderNameInput.value = '';
                 elements.folderModal.dataset.mode = 'create';
                 elements.folderModal.dataset.parentId = folderId;
                 elements.folderModal.classList.add('active');
                 elements.folderNameInput.focus();
             } else if (action === 'delete') {
-                await deleteFolder(parseInt(folderId));
+                await deleteFolder(folderId);
             }
 
             hideContextMenu();
         });
     });
 
-    document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
-        backdrop.addEventListener('click', () => {
-            backdrop.parentElement.classList.remove('active');
-        });
+    document.getElementById('backupBtn').addEventListener('click', () => {
+        window.open('/api/export/database', '_blank');
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!elements.contextMenu.contains(e.target)) {
+            hideContextMenu();
+        }
     });
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === ' ' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-            e.preventDefault();
-            toggleRecording();
+        if (e.key === 'Escape') {
+            hideContextMenu();
+            elements.folderModal.classList.remove('active');
+            elements.exportModal.classList.remove('active');
         }
-        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-            e.preventDefault();
-            if (state.currentNote) saveNote();
-        }
+
         if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
             e.preventDefault();
             elements.searchInput.focus();
         }
-        if (e.key === 'Escape') {
-            elements.folderModal.classList.remove('active');
-            elements.exportModal.classList.remove('active');
-            hideContextMenu();
+
+        if (e.code === 'Space' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+            e.preventDefault();
+            toggleRecording();
+        }
+
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            if (state.currentNote) saveNote();
         }
     });
 }
 
-async function loadSystemStatus() {
-    try {
-        const data = await api('/api/settings/status');
-        state.systemStatus = data;
-        updateStatusBar();
-    } catch (e) {
-        console.error('Failed to load system status:', e);
-    }
-}
-
-function updateStatusBar() {
-    const status = state.systemStatus;
-    if (!status) return;
-
-    const offlineStatus = document.getElementById('offlineStatus');
-    if (offlineStatus) {
-        const dot = offlineStatus.querySelector('.status-dot');
-        dot.className = 'status-dot online';
-    }
-
-    const aiStatus = document.getElementById('aiStatus');
-    if (aiStatus && status.ai_correction) {
-        const dot = aiStatus.querySelector('.status-dot');
-        dot.className = 'status-dot online';
-        aiStatus.querySelector('span:last-child').textContent = 'Live Correction';
-    }
-
-    const speakerStatus = document.getElementById('speakerStatus');
-    if (speakerStatus) {
-        const dot = speakerStatus.querySelector('.status-dot');
-        dot.className = 'status-dot online';
-    }
-}
-
-function downloadBackup() {
-    window.open('/api/export/database', '_blank');
-    showToast('Backup download started', 'success');
-}
-
 async function init() {
     loadTheme();
+    const savedUILang = localStorage.getItem('uiLanguage') || 'en';
+    setUILanguage(savedUILang);
     initEventListeners();
-
-    const backupBtn = document.getElementById('backupBtn');
-    if (backupBtn) backupBtn.addEventListener('click', downloadBackup);
-
     await loadFolders();
     await loadNotes();
     await loadTags();
-    await loadSystemStatus();
 }
 
 init();
