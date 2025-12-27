@@ -19,6 +19,7 @@ from transcriber import (
     preload_model, transcribe_audio_chunk, get_ollama_status,
     get_correction_status, reset_session, get_text_corrector
 )
+from voice_profile import get_profile_manager, verify_teacher_audio
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
@@ -32,6 +33,11 @@ corrected_segments = []
 last_correction_index = 0
 correction_lock = threading.Lock()
 current_language = "de"
+
+# Voice filtering settings
+voice_filter_enabled = False
+voice_filter_profile_id = None
+enrollment_active = False
 
 CORRECTION_DELAY_SECONDS = 10
 
@@ -278,11 +284,32 @@ def realtime_transcription_worker():
     recorder = get_recorder()
     corrector = get_text_corrector(current_language)
 
+    # Get voice filter if enabled
+    voice_manager = get_profile_manager() if voice_filter_enabled else None
+    skipped_chunks = 0
+
     while realtime_active and recorder.is_recording():
         chunk = recorder.get_next_chunk(timeout=0.5)
 
         if chunk is not None:
             try:
+                # Voice filtering: skip if not teacher's voice
+                if voice_filter_enabled and voice_manager is not None:
+                    is_teacher, confidence = voice_manager.verify_audio(chunk)
+
+                    if not is_teacher or confidence < 0.4:
+                        skipped_chunks += 1
+                        # Notify UI occasionally that we're filtering
+                        if skipped_chunks % 5 == 0:
+                            socketio.emit('voice_filter_status', {
+                                'filtering': True,
+                                'skipped': skipped_chunks,
+                                'last_confidence': confidence
+                            })
+                        continue
+
+                    skipped_chunks = 0  # Reset on successful match
+
                 raw_text, corrected_text, confidence = transcribe_audio_chunk(
                     chunk,
                     sample_rate=recorder.sample_rate,
@@ -303,7 +330,8 @@ def realtime_transcription_worker():
                         'full_text': full_corrected,
                         'confidence': confidence,
                         'is_final': False,
-                        'is_corrected': True
+                        'is_corrected': True,
+                        'voice_verified': voice_filter_enabled
                     })
 
             except Exception as e:
@@ -561,12 +589,14 @@ def update_note(note_id):
     if not data:
         return jsonify({'error': 'No data provided'}), 400
 
-    success = db.update_note(
-        note_id,
-        title=data.get('title'),
-        content=data.get('content'),
-        folder_id=data.get('folder_id')
-    )
+    kwargs = {
+        'title': data.get('title'),
+        'content': data.get('content')
+    }
+    if 'folder_id' in data:
+        kwargs['folder_id'] = data['folder_id']
+
+    success = db.update_note(note_id, **kwargs)
 
     if not success:
         return jsonify({'error': 'Note not found or no changes'}), 404
@@ -751,6 +781,148 @@ def get_system_status():
             'processing': 'live'
         }
     })
+
+
+# ==================== Voice Profile API ====================
+
+@app.route('/api/voice-profiles', methods=['GET'])
+def list_voice_profiles():
+    """List all saved voice profiles."""
+    manager = get_profile_manager()
+    profiles = manager.list_profiles()
+    current = manager.get_current_profile()
+    return jsonify({
+        'profiles': profiles,
+        'current_profile': current,
+        'filter_enabled': voice_filter_enabled
+    })
+
+@app.route('/api/voice-profiles/current', methods=['GET'])
+def get_current_voice_profile():
+    """Get the currently active voice profile."""
+    manager = get_profile_manager()
+    current = manager.get_current_profile()
+    return jsonify({
+        'profile': current,
+        'filter_enabled': voice_filter_enabled
+    })
+
+@app.route('/api/voice-profiles/<profile_id>', methods=['DELETE'])
+def delete_voice_profile(profile_id):
+    """Delete a voice profile."""
+    manager = get_profile_manager()
+    success = manager.delete_profile(profile_id)
+    if success:
+        return jsonify({'success': True})
+    return jsonify({'error': 'Profile not found'}), 404
+
+@app.route('/api/voice-profiles/<profile_id>/activate', methods=['POST'])
+def activate_voice_profile(profile_id):
+    """Activate a voice profile for filtering."""
+    global voice_filter_enabled, voice_filter_profile_id
+
+    manager = get_profile_manager()
+    if manager.load_profile(profile_id):
+        voice_filter_profile_id = profile_id
+        voice_filter_enabled = True
+        return jsonify({
+            'success': True,
+            'profile': manager.get_current_profile()
+        })
+    return jsonify({'error': 'Profile not found'}), 404
+
+@app.route('/api/voice-profiles/deactivate', methods=['POST'])
+def deactivate_voice_filter():
+    """Disable voice filtering."""
+    global voice_filter_enabled, voice_filter_profile_id
+
+    voice_filter_enabled = False
+    voice_filter_profile_id = None
+    return jsonify({'success': True})
+
+@app.route('/api/voice-profiles/filter-status', methods=['GET'])
+def get_voice_filter_status():
+    """Get the current voice filter status."""
+    manager = get_profile_manager()
+    return jsonify({
+        'enabled': voice_filter_enabled,
+        'profile_id': voice_filter_profile_id,
+        'profile': manager.get_current_profile() if voice_filter_enabled else None
+    })
+
+
+# ==================== Voice Enrollment Socket Events ====================
+
+@socketio.on('start_enrollment')
+def handle_start_enrollment(data):
+    """Start voice enrollment for a new teacher."""
+    global enrollment_active
+
+    teacher_name = data.get('name', 'Teacher')
+    manager = get_profile_manager()
+
+    profile_id = manager.start_enrollment(teacher_name)
+    enrollment_active = True
+
+    emit('enrollment_started', {
+        'profile_id': profile_id,
+        'name': teacher_name,
+        'min_duration': 30
+    })
+
+    # Start recording for enrollment
+    recorder = get_recorder()
+    if not recorder.is_recording():
+        recorder.start_recording()
+
+        def enrollment_worker():
+            while enrollment_active and recorder.is_recording():
+                chunk = recorder.get_next_chunk(timeout=0.5)
+                if chunk is not None:
+                    result = manager.add_enrollment_audio(chunk)
+                    socketio.emit('enrollment_progress', result)
+
+        threading.Thread(target=enrollment_worker, daemon=True).start()
+
+@socketio.on('stop_enrollment')
+def handle_stop_enrollment(data):
+    """Stop and finalize voice enrollment."""
+    global enrollment_active, voice_filter_enabled, voice_filter_profile_id
+
+    enrollment_active = False
+    recorder = get_recorder()
+
+    if recorder.is_recording():
+        recorder.stop_recording()
+
+    manager = get_profile_manager()
+    result = manager.finish_enrollment()
+
+    if result.get('status') == 'success':
+        # Auto-activate the new profile
+        voice_filter_profile_id = result['profile_id']
+        manager.load_profile(result['profile_id'])
+        voice_filter_enabled = True
+        result['filter_activated'] = True
+
+    emit('enrollment_complete', result)
+
+@socketio.on('cancel_enrollment')
+def handle_cancel_enrollment():
+    """Cancel ongoing enrollment."""
+    global enrollment_active
+
+    enrollment_active = False
+    recorder = get_recorder()
+
+    if recorder.is_recording():
+        recorder.stop_recording()
+
+    manager = get_profile_manager()
+    manager.cancel_enrollment()
+
+    emit('enrollment_cancelled', {'success': True})
+
 
 if __name__ == '__main__':
     print("\n" + "=" * 50)

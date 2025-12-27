@@ -185,7 +185,7 @@ def get_note(note_id: int) -> Optional[Dict[str, Any]]:
     return None
 
 def update_note(note_id: int, title: Optional[str] = None, content: Optional[str] = None,
-                folder_id: Optional[int] = None) -> bool:
+                folder_id = "NOT_SET") -> bool:
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -198,9 +198,9 @@ def update_note(note_id: int, title: Optional[str] = None, content: Optional[str
     if content is not None:
         updates.append('content = ?')
         params.append(content)
-    if folder_id is not None:
+    if folder_id != "NOT_SET":
         updates.append('folder_id = ?')
-        params.append(folder_id if folder_id != 0 else None)
+        params.append(folder_id if folder_id and folder_id != 0 else None)
 
     if not updates:
         return False
