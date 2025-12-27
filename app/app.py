@@ -25,6 +25,11 @@ from quality_feedback import (
     get_feedback_collector, analyze_transcription, save_feedback,
     apply_logic_correction, get_analyzer
 )
+from adaptive_system import (
+    get_adaptive_system, set_teacher as adaptive_set_teacher,
+    record_feedback as adaptive_record_feedback, get_param,
+    get_current_params, get_teacher_stats, get_change_log
+)
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
@@ -874,9 +879,20 @@ def activate_voice_profile(profile_id):
     if manager.load_profile(profile_id):
         voice_filter_profile_id = profile_id
         voice_filter_enabled = True
+
+        # Load optimal parameters for this teacher from adaptive system
+        profile = manager.get_current_profile()
+        if profile:
+            adaptive_result = adaptive_set_teacher(profile.get('name', 'Unknown'), profile_id)
+            return jsonify({
+                'success': True,
+                'profile': profile,
+                'adaptive': adaptive_result
+            })
+
         return jsonify({
             'success': True,
-            'profile': manager.get_current_profile()
+            'profile': profile
         })
     return jsonify({'error': 'Profile not found'}), 404
 
@@ -926,7 +942,8 @@ def submit_feedback():
     if not note_id:
         return jsonify({'error': 'note_id required'}), 400
 
-    result = save_feedback(
+    # Save feedback to quality system
+    feedback_result = save_feedback(
         note_id=note_id,
         transcription=transcription,
         rating=rating,
@@ -937,7 +954,19 @@ def submit_feedback():
         language=language
     )
 
-    return jsonify(result)
+    # Feed to adaptive learning system
+    adaptive_result = adaptive_record_feedback(
+        rating=rating,
+        teacher_id=voice_filter_profile_id,
+        teacher_name=teacher_name,
+        quality_score=feedback_result.get('analysis', {}).get('quality_score'),
+        issues=feedback_result.get('analysis', {}).get('issues', [])
+    )
+
+    return jsonify({
+        'feedback': feedback_result,
+        'adaptive': adaptive_result
+    })
 
 @app.route('/api/feedback/analyze', methods=['POST'])
 def analyze_text():
@@ -974,6 +1003,54 @@ def get_report_content(filename):
         content = f.read()
 
     return jsonify({'filename': filename, 'content': content})
+
+
+# Adaptive Learning System API
+@app.route('/api/adaptive/params', methods=['GET'])
+def get_adaptive_params():
+    """Get current adaptive parameters."""
+    return jsonify({
+        'params': get_current_params(),
+        'teacher_id': voice_filter_profile_id
+    })
+
+@app.route('/api/adaptive/teacher-stats/<profile_id>', methods=['GET'])
+def get_adaptive_teacher_stats(profile_id):
+    """Get learning statistics for a specific teacher."""
+    manager = get_profile_manager()
+    profiles = manager.list_profiles()
+
+    teacher_name = "Unknown"
+    for p in profiles:
+        if p.get('profile_id') == profile_id:
+            teacher_name = p.get('name', 'Unknown')
+            break
+
+    stats = get_teacher_stats(profile_id, teacher_name)
+    return jsonify(stats)
+
+@app.route('/api/adaptive/log', methods=['GET'])
+def get_adaptive_log():
+    """Get parameter change log."""
+    limit = request.args.get('limit', 50, type=int)
+    log = get_change_log(limit)
+    return jsonify({'log': log})
+
+@app.route('/api/adaptive/reset/<profile_id>', methods=['POST'])
+def reset_adaptive_teacher(profile_id):
+    """Reset learning data for a teacher."""
+    manager = get_profile_manager()
+    profiles = manager.list_profiles()
+
+    teacher_name = "Unknown"
+    for p in profiles:
+        if p.get('profile_id') == profile_id:
+            teacher_name = p.get('name', 'Unknown')
+            break
+
+    system = get_adaptive_system()
+    result = system.reset_teacher(profile_id, teacher_name)
+    return jsonify(result)
 
 
 @socketio.on('start_enrollment')

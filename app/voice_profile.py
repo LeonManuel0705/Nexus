@@ -8,10 +8,19 @@ import hashlib
 
 PROFILES_DIR = Path(__file__).parent.parent / "voice_profiles"
 EMBEDDING_DIM = 192
-VERIFICATION_THRESHOLD = 0.25  # Cosine similarity threshold (0.25 = ~75 degrees)
+DEFAULT_VERIFICATION_THRESHOLD = 0.30  # Default cosine similarity threshold
 HIGH_CONFIDENCE_THRESHOLD = 0.50
 MIN_ENROLLMENT_DURATION = 30.0
 SAMPLE_RATE = 16000
+
+
+def get_verification_threshold() -> float:
+    """Get the current verification threshold from adaptive system."""
+    try:
+        from adaptive_system import get_param
+        return get_param("voice_threshold")
+    except:
+        return DEFAULT_VERIFICATION_THRESHOLD
 
 # Use the larger, more accurate WavLM-based model
 # Options: "speechbrain/spkrec-ecapa-voxceleb" (faster, less accurate)
@@ -52,17 +61,20 @@ class VoiceProfile:
         if avg is None:
             return False, 0.0
 
+        # Get threshold from adaptive system
+        threshold = get_verification_threshold()
+
         # Normalize embeddings for cosine similarity
         avg_norm = avg / (np.linalg.norm(avg) + 1e-8)
         emb_norm = embedding / (np.linalg.norm(embedding) + 1e-8)
 
         similarity = np.dot(avg_norm, emb_norm)
 
-        is_match = similarity >= VERIFICATION_THRESHOLD
+        is_match = similarity >= threshold
         # Map similarity to confidence: threshold -> 0.0, 1.0 -> 1.0
-        confidence = min(1.0, max(0.0, (similarity - VERIFICATION_THRESHOLD) / (1.0 - VERIFICATION_THRESHOLD)))
+        confidence = min(1.0, max(0.0, (similarity - threshold) / (1.0 - threshold)))
 
-        print(f"[VoiceFilter] Similarity: {similarity:.3f}, Threshold: {VERIFICATION_THRESHOLD}, Match: {is_match}, Confidence: {confidence:.3f}")
+        print(f"[VoiceFilter] Similarity: {similarity:.3f}, Threshold: {threshold}, Match: {is_match}, Confidence: {confidence:.3f}")
 
         return is_match, confidence
 
@@ -70,6 +82,9 @@ class VoiceProfile:
         """Compare against multiple stored embeddings for more robust matching."""
         if not self.embeddings:
             return False, 0.0
+
+        # Get threshold from adaptive system
+        threshold = get_verification_threshold()
 
         # Compare against the most recent embeddings
         recent_embeddings = self.embeddings[-top_k:] if len(self.embeddings) > top_k else self.embeddings
@@ -89,10 +104,10 @@ class VoiceProfile:
         # Use a combination: mostly max, but penalize if average is low
         combined_similarity = 0.7 * max_similarity + 0.3 * avg_similarity
 
-        is_match = combined_similarity >= VERIFICATION_THRESHOLD
-        confidence = min(1.0, max(0.0, (combined_similarity - VERIFICATION_THRESHOLD) / (1.0 - VERIFICATION_THRESHOLD)))
+        is_match = combined_similarity >= threshold
+        confidence = min(1.0, max(0.0, (combined_similarity - threshold) / (1.0 - threshold)))
 
-        print(f"[VoiceFilter] Max: {max_similarity:.3f}, Avg: {avg_similarity:.3f}, Combined: {combined_similarity:.3f}, Match: {is_match}")
+        print(f"[VoiceFilter] Max: {max_similarity:.3f}, Avg: {avg_similarity:.3f}, Combined: {combined_similarity:.3f}, Threshold: {threshold}, Match: {is_match}")
 
         return is_match, confidence
 
