@@ -1774,3 +1774,112 @@ body {
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+
+/* Feedback Modal Styles */
+.feedback-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.star-rating {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    font-size: 32px;
+}
+
+.star-rating .star {
+    cursor: pointer;
+    color: var(--border);
+    transition: color 0.2s, transform 0.2s;
+}
+
+.star-rating .star:hover,
+.star-rating .star.active {
+    color: #fbbf24;
+    transform: scale(1.1);
+}
+
+.star-rating .star.hover {
+    color: #fbbf24;
+}
+
+.quality-analysis {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    padding: 12px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius);
+    font-size: 14px;
+}
+
+.quality-analysis strong {
+    color: var(--accent);
+}
+
+#feedbackComments {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: inherit;
+    font-size: 14px;
+    resize: vertical;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+#feedbackComments:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* Voice Filter Mode Toggle */
+.filter-mode-toggle {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.filter-mode-btn {
+    flex: 1;
+    padding: 10px 12px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-primary);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.filter-mode-btn:hover {
+    border-color: var(--accent);
+    background: var(--accent-subtle);
+}
+
+.filter-mode-btn.active {
+    border-color: var(--accent);
+    background: var(--accent-light);
+}
+
+.filter-mode-btn.active.exclude {
+    border-color: var(--warning);
+    background: var(--warning-light);
+}
+
+.filter-mode-btn .mode-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.filter-mode-btn .mode-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+

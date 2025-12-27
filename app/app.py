@@ -21,6 +21,10 @@ from transcriber import (
     apply_ai_correction
 )
 from voice_profile import get_profile_manager, verify_teacher_audio
+from quality_feedback import (
+    get_feedback_collector, analyze_transcription, save_feedback,
+    apply_logic_correction, get_analyzer
+)
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
@@ -37,6 +41,7 @@ current_language = "de"
 
 voice_filter_enabled = False
 voice_filter_profile_id = None
+voice_filter_mode = "include"  # "include" = only transcribe matching voice, "exclude" = filter OUT matching voice
 enrollment_active = False
 
 CORRECTION_DELAY_SECONDS = 10
@@ -280,7 +285,7 @@ def background_correction_worker():
 
 
 def realtime_transcription_worker():
-    global realtime_active, current_transcription, current_language
+    global realtime_active, current_transcription, current_language, voice_filter_mode
 
     recorder = get_recorder()
     corrector = get_text_corrector(current_language)
@@ -294,17 +299,37 @@ def realtime_transcription_worker():
         if chunk is not None:
             try:
                 if voice_filter_enabled and voice_manager is not None:
-                    is_teacher, confidence = voice_manager.verify_audio(chunk)
+                    is_match, confidence = voice_manager.verify_audio(chunk)
 
-                    if not is_teacher or confidence < 0.4:
-                        skipped_chunks += 1
-                        if skipped_chunks % 5 == 0:
-                            socketio.emit('voice_filter_status', {
-                                'filtering': True,
-                                'skipped': skipped_chunks,
-                                'last_confidence': confidence
-                            })
-                        continue
+                    # Handle both include and exclude modes
+                    if voice_filter_mode == "include":
+                        # Include mode: only transcribe matching voice (e.g., teacher)
+                        if not is_match:
+                            skipped_chunks += 1
+                            print(f"[VoiceFilter:Include] Skipping chunk - voice not matched (confidence: {confidence:.3f})")
+                            if skipped_chunks % 5 == 0:
+                                socketio.emit('voice_filter_status', {
+                                    'filtering': True,
+                                    'mode': 'include',
+                                    'skipped': skipped_chunks,
+                                    'last_confidence': confidence
+                                })
+                            continue
+                        print(f"[VoiceFilter:Include] Voice matched! Transcribing... (confidence: {confidence:.3f})")
+                    else:
+                        # Exclude mode: filter OUT matching voice (e.g., your own voice)
+                        if is_match:
+                            skipped_chunks += 1
+                            print(f"[VoiceFilter:Exclude] Skipping chunk - voice matched/excluded (confidence: {confidence:.3f})")
+                            if skipped_chunks % 5 == 0:
+                                socketio.emit('voice_filter_status', {
+                                    'filtering': True,
+                                    'mode': 'exclude',
+                                    'skipped': skipped_chunks,
+                                    'last_confidence': confidence
+                                })
+                            continue
+                        print(f"[VoiceFilter:Exclude] Voice not matched, transcribing... (confidence: {confidence:.3f})")
 
                     skipped_chunks = 0
 
@@ -316,20 +341,26 @@ def realtime_transcription_worker():
                 )
 
                 if corrected_text and corrected_text.strip():
+                    # Apply logic correction for better sentence structure
+                    logic_corrected, changes = apply_logic_correction(corrected_text.strip(), current_language)
+
                     with correction_lock:
-                        current_transcription.append(corrected_text.strip())
+                        current_transcription.append(logic_corrected)
                         full_text = ' '.join(current_transcription)
 
                     full_corrected = corrector.correct_instant(full_text)
+                    # Also apply logic correction to full text
+                    full_corrected, _ = apply_logic_correction(full_corrected, current_language)
 
                     socketio.emit('transcription_update', {
-                        'text': corrected_text.strip(),
+                        'text': logic_corrected,
                         'raw_text': raw_text.strip() if raw_text else '',
                         'full_text': full_corrected,
                         'confidence': confidence,
                         'is_final': False,
                         'is_corrected': True,
-                        'voice_verified': voice_filter_enabled
+                        'voice_verified': voice_filter_enabled,
+                        'logic_corrections': len(changes)
                     })
 
             except Exception as e:
@@ -863,8 +894,86 @@ def get_voice_filter_status():
     return jsonify({
         'enabled': voice_filter_enabled,
         'profile_id': voice_filter_profile_id,
+        'mode': voice_filter_mode,
         'profile': manager.get_current_profile() if voice_filter_enabled else None
     })
+
+@app.route('/api/voice-profiles/set-mode', methods=['POST'])
+def set_voice_filter_mode():
+    global voice_filter_mode
+    data = request.get_json()
+    mode = data.get('mode', 'include')
+    if mode in ['include', 'exclude']:
+        voice_filter_mode = mode
+        return jsonify({'success': True, 'mode': mode})
+    return jsonify({'error': 'Invalid mode. Use "include" or "exclude"'}), 400
+
+
+# Quality Feedback API
+@app.route('/api/feedback', methods=['POST'])
+def submit_feedback():
+    data = request.get_json()
+
+    note_id = data.get('note_id')
+    transcription = data.get('transcription', '')
+    rating = data.get('rating', 3)
+    folder_id = data.get('folder_id')
+    teacher_name = data.get('teacher_name')
+    subject = data.get('subject')
+    user_comments = data.get('user_comments')
+    language = data.get('language', 'de')
+
+    if not note_id:
+        return jsonify({'error': 'note_id required'}), 400
+
+    result = save_feedback(
+        note_id=note_id,
+        transcription=transcription,
+        rating=rating,
+        folder_id=folder_id,
+        teacher_name=teacher_name,
+        subject=subject,
+        user_comments=user_comments,
+        language=language
+    )
+
+    return jsonify(result)
+
+@app.route('/api/feedback/analyze', methods=['POST'])
+def analyze_text():
+    data = request.get_json()
+    text = data.get('text', '')
+    language = data.get('language', 'de')
+
+    if not text:
+        return jsonify({'error': 'text required'}), 400
+
+    result = analyze_transcription(text, language)
+    return jsonify(result)
+
+@app.route('/api/feedback/stats', methods=['GET'])
+def get_feedback_stats():
+    collector = get_feedback_collector()
+    return jsonify(collector.get_feedback_stats())
+
+@app.route('/api/feedback/reports', methods=['GET'])
+def get_error_reports():
+    collector = get_feedback_collector()
+    return jsonify({'reports': collector.get_pending_reports()})
+
+@app.route('/api/feedback/report/<filename>', methods=['GET'])
+def get_report_content(filename):
+    from pathlib import Path
+    reports_dir = Path(__file__).parent.parent / "error_reports"
+    report_path = reports_dir / filename
+
+    if not report_path.exists():
+        return jsonify({'error': 'Report not found'}), 404
+
+    with open(report_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    return jsonify({'filename': filename, 'content': content})
 
 
 @socketio.on('start_enrollment')
@@ -884,17 +993,43 @@ def handle_start_enrollment(data):
     })
 
     recorder = get_recorder()
-    if not recorder.is_recording():
-        recorder.start_recording()
+    print(f"[Enrollment] Checking recorder state: is_recording={recorder.is_recording()}")
 
-        def enrollment_worker():
-            while enrollment_active and recorder.is_recording():
-                chunk = recorder.get_next_chunk(timeout=0.5)
-                if chunk is not None:
-                    result = manager.add_enrollment_audio(chunk)
-                    socketio.emit('enrollment_progress', result)
+    if recorder.is_recording():
+        print("[Enrollment] ERROR: Already recording")
+        emit('enrollment_error', {'error': 'Recording already in progress. Please stop the current recording first.'})
+        manager.cancel_enrollment()
+        enrollment_active = False
+        return
 
-        threading.Thread(target=enrollment_worker, daemon=True).start()
+    print("[Enrollment] Starting recording...")
+    recording_started = recorder.start_recording()
+    print(f"[Enrollment] Recording started: {recording_started}")
+
+    if not recording_started:
+        print(f"[Enrollment] ERROR: Failed to start - {recorder.last_error}")
+        emit('enrollment_error', {'error': f'Failed to start recording: {recorder.last_error or "No audio input device found"}'})
+        manager.cancel_enrollment()
+        enrollment_active = False
+        return
+
+    print(f"[Enrollment] Recording active: {recorder.is_recording()}")
+
+    def enrollment_worker():
+        print("Enrollment worker started")
+        chunks_processed = 0
+        while enrollment_active and recorder.is_recording():
+            chunk = recorder.get_enrollment_chunk(timeout=0.5)
+            if chunk is not None:
+                chunks_processed += 1
+                print(f"Enrollment chunk {chunks_processed}: {len(chunk)} samples, {len(chunk)/16000:.1f}s")
+                result = manager.add_enrollment_audio(chunk)
+                print(f"Enrollment progress: {result}")
+                socketio.emit('enrollment_progress', result)
+        print(f"Enrollment worker stopped after {chunks_processed} chunks")
+
+    threading.Thread(target=enrollment_worker, daemon=True).start()
+    print("Enrollment worker thread started")
 
 @socketio.on('stop_enrollment')
 def handle_stop_enrollment(data):

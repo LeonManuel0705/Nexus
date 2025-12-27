@@ -120,15 +120,27 @@ Corrected:"""
     def _generate_with_mlx(self, prompt: str) -> str:
         try:
             from mlx_lm import generate
+            import inspect
 
-            response = generate(
-                self._model,
-                self._tokenizer,
-                prompt=prompt,
-                max_tokens=MAX_TOKENS,
-                temperature=TEMPERATURE,
-                verbose=False
-            )
+            # Check which parameters the generate function accepts
+            sig = inspect.signature(generate)
+            params = sig.parameters
+
+            # Build kwargs based on available parameters
+            kwargs = {
+                'model': self._model,
+                'tokenizer': self._tokenizer,
+                'prompt': prompt,
+                'max_tokens': MAX_TOKENS,
+                'verbose': False
+            }
+
+            # Only add temperature if supported
+            if 'temperature' in params or 'temp' in params:
+                temp_key = 'temp' if 'temp' in params else 'temperature'
+                kwargs[temp_key] = TEMPERATURE
+
+            response = generate(**kwargs)
 
             response = response.strip()
 

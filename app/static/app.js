@@ -77,7 +77,22 @@ const i18n = {
         allModelsReady: 'All systems ready!',
         downloadComplete: 'Download complete',
         downloadFailed: 'Download failed',
-        checkingModels: 'Checking models...'
+        checkingModels: 'Checking models...',
+        // Feedback system
+        rateTranscription: 'Rate Transcription',
+        howWasQuality: 'How was the transcription quality?',
+        additionalComments: 'Additional comments (optional)',
+        submitFeedback: 'Submit Feedback',
+        skip: 'Skip',
+        feedbackThanks: 'Thanks for your feedback!',
+        feedbackError: 'Error submitting feedback',
+        qualityScore: 'Quality Score',
+        issuesFound: 'Issues Found',
+        // Voice filter modes
+        filterModeInclude: 'Include Mode',
+        filterModeExclude: 'Exclude Mode',
+        filterModeIncludeDesc: 'Only transcribe this voice',
+        filterModeExcludeDesc: 'Filter OUT this voice'
     },
     de: {
         folders: 'Ordner',
@@ -85,12 +100,12 @@ const i18n = {
         allNotes: 'Alle Notizen',
         searchNotes: 'Notizen suchen...',
         pressToRecord: 'Zum Aufnehmen drücken',
-        recording: 'Aufnahme...',
+        recording: 'Nimmt auf...',
         saving: 'Speichern...',
         liveTranscription: 'Live-Transkription',
         aiEnhanced: 'KI-Optimiert',
         ultraFast: 'Ultraschnell',
-        startRecording: 'Aufnahme starten für Live-Transkription...',
+        startRecording: 'Starte die Aufnahme für Live-Transkription...',
         selectAll: 'Alle auswählen',
         export: 'Exportieren',
         delete: 'Löschen',
@@ -108,7 +123,7 @@ const i18n = {
         addSubfolder: 'Unterordner hinzufügen',
         backup: 'Sicherung',
         untitledNote: 'Unbenannte Notiz',
-        transcriptionPlaceholder: 'Ihre Transkription erscheint hier...',
+        transcriptionPlaceholder: 'Deine Transkription erscheint hier...',
         noteSaved: 'Notiz gespeichert!',
         noteDeleted: 'Notiz gelöscht',
         folderCreated: 'Ordner erstellt',
@@ -124,14 +139,14 @@ const i18n = {
         deleteFolderConfirm: 'Diesen Ordner und alle Inhalte löschen?',
         deleteSelectedConfirm: 'Ausgewählte Notizen löschen?',
         noNotesYet: 'Noch keine Notizen',
-        noNotesDesc: 'Drücken Sie den Aufnahme-Button für Ihre erste Sprachnotiz',
-        listening: 'Hören...',
+        noNotesDesc: 'Drück den Aufnahme-Button für deine erste Sprachnotiz',
+        listening: 'Hört zu...',
         voiceFilter: 'Stimmenfilter',
-        voiceFilterDesc: 'Trainieren Sie das System, eine bestimmte Stimme (z.B. Lehrer) zu erkennen und andere Sprecher auszufiltern.',
+        voiceFilterDesc: 'Trainiere das System, eine bestimmte Stimme (z.B. Lehrer) zu erkennen und andere Sprecher auszufiltern.',
         noProfileActive: 'Kein Stimmprofil aktiv',
-        recordToCreate: 'Nehmen Sie eine Stimmprobe auf, um ein Profil zu erstellen',
+        recordToCreate: 'Nimm eine Stimmprobe auf, um ein Profil zu erstellen',
         teacherName: 'Lehrer-/Sprechername',
-        enrollmentHint: 'Sprechen Sie natürlich für mindestens 30 Sekunden. Lesen Sie laut vor oder sprechen Sie über ein beliebiges Thema.',
+        enrollmentHint: 'Sprich natürlich für mindestens 30 Sekunden. Lies laut vor oder sprich über ein beliebiges Thema.',
         finishEnrollment: 'Beenden & Profil speichern',
         savedProfiles: 'Gespeicherte Profile',
         noProfilesSaved: 'Noch keine Profile gespeichert',
@@ -154,7 +169,22 @@ const i18n = {
         allModelsReady: 'Alle Systeme bereit!',
         downloadComplete: 'Download abgeschlossen',
         downloadFailed: 'Download fehlgeschlagen',
-        checkingModels: 'Modelle prüfen...'
+        checkingModels: 'Modelle prüfen...',
+        // Feedback system
+        rateTranscription: 'Transkription bewerten',
+        howWasQuality: 'Wie war die Qualität der Transkription?',
+        additionalComments: 'Zusätzliche Kommentare (optional)',
+        submitFeedback: 'Feedback absenden',
+        skip: 'Überspringen',
+        feedbackThanks: 'Danke für dein Feedback!',
+        feedbackError: 'Fehler beim Senden des Feedbacks',
+        qualityScore: 'Qualitätsbewertung',
+        issuesFound: 'Probleme gefunden',
+        // Voice filter modes
+        filterModeInclude: 'Einschließen-Modus',
+        filterModeExclude: 'Ausschließen-Modus',
+        filterModeIncludeDesc: 'Nur diese Stimme transkribieren',
+        filterModeExcludeDesc: 'Diese Stimme AUSFILTERN'
     }
 };
 
@@ -179,7 +209,10 @@ let state = {
     modelsChecked: false,
     modelsReady: false,
     pendingDownloads: [],
-    downloadProgressInterval: null
+    downloadProgressInterval: null,
+    voiceFilterMode: 'include',
+    lastRecordingNoteId: null,
+    feedbackRating: 0
 };
 
 const elements = {
@@ -240,7 +273,15 @@ const elements = {
     downloadList: document.getElementById('downloadList'),
     cancelModelCheckBtn: document.getElementById('cancelModelCheckBtn'),
     installModelsBtn: document.getElementById('installModelsBtn'),
-    startRecordingBtn: document.getElementById('startRecordingBtn')
+    startRecordingBtn: document.getElementById('startRecordingBtn'),
+    feedbackModal: document.getElementById('feedbackModal'),
+    starRating: document.getElementById('starRating'),
+    qualityAnalysis: document.getElementById('qualityAnalysis'),
+    qualityScoreValue: document.getElementById('qualityScoreValue'),
+    issuesCountValue: document.getElementById('issuesCountValue'),
+    feedbackComments: document.getElementById('feedbackComments'),
+    skipFeedbackBtn: document.getElementById('skipFeedbackBtn'),
+    submitFeedbackBtn: document.getElementById('submitFeedbackBtn')
 };
 
 function t(key) {
@@ -1229,9 +1270,127 @@ socket.on('enrollment_cancelled', () => {
     resetEnrollmentUI();
 });
 
+socket.on('enrollment_error', (data) => {
+    resetEnrollmentUI();
+    showToast(data.error || 'Failed to start enrollment recording', 'error');
+});
+
 socket.on('voice_filter_status', (data) => {
     console.log('Voice filter:', data);
 });
+
+// Feedback System Functions
+function showFeedbackModal(noteId, transcription) {
+    state.lastRecordingNoteId = noteId;
+    state.feedbackRating = 0;
+
+    // Reset UI
+    elements.starRating.querySelectorAll('.star').forEach(star => {
+        star.classList.remove('active');
+    });
+    elements.feedbackComments.value = '';
+    elements.qualityAnalysis.classList.add('hidden');
+
+    // Analyze transcription quality
+    analyzeTranscriptionQuality(transcription);
+
+    elements.feedbackModal.classList.add('active');
+}
+
+function hideFeedbackModal() {
+    elements.feedbackModal.classList.remove('active');
+}
+
+async function analyzeTranscriptionQuality(text) {
+    try {
+        const result = await api('/api/feedback/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, language: state.currentLanguage })
+        });
+
+        elements.qualityScoreValue.textContent = result.quality_score || '--';
+        elements.issuesCountValue.textContent = result.issue_count || '0';
+        elements.qualityAnalysis.classList.remove('hidden');
+    } catch (e) {
+        console.error('Failed to analyze quality:', e);
+    }
+}
+
+async function submitFeedback() {
+    if (state.feedbackRating === 0) {
+        showToast('Please select a rating', 'error');
+        return;
+    }
+
+    try {
+        const currentNote = state.currentNote;
+        await api('/api/feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                note_id: state.lastRecordingNoteId || (currentNote ? currentNote.id : 'unknown'),
+                transcription: currentNote ? currentNote.content : '',
+                rating: state.feedbackRating,
+                folder_id: state.currentFolder,
+                user_comments: elements.feedbackComments.value,
+                language: state.currentLanguage
+            })
+        });
+
+        showToast(t('feedbackThanks'), 'success');
+        hideFeedbackModal();
+    } catch (e) {
+        console.error('Failed to submit feedback:', e);
+        showToast(t('feedbackError'), 'error');
+    }
+}
+
+function initFeedbackListeners() {
+    // Star rating
+    elements.starRating.querySelectorAll('.star').forEach(star => {
+        star.addEventListener('click', () => {
+            const rating = parseInt(star.dataset.rating);
+            state.feedbackRating = rating;
+
+            elements.starRating.querySelectorAll('.star').forEach((s, i) => {
+                s.classList.toggle('active', i < rating);
+            });
+        });
+
+        star.addEventListener('mouseenter', () => {
+            const rating = parseInt(star.dataset.rating);
+            elements.starRating.querySelectorAll('.star').forEach((s, i) => {
+                s.classList.toggle('hover', i < rating);
+            });
+        });
+
+        star.addEventListener('mouseleave', () => {
+            elements.starRating.querySelectorAll('.star').forEach(s => {
+                s.classList.remove('hover');
+            });
+        });
+    });
+
+    elements.skipFeedbackBtn.addEventListener('click', hideFeedbackModal);
+    elements.submitFeedbackBtn.addEventListener('click', submitFeedback);
+    elements.feedbackModal.querySelector('.modal-backdrop').addEventListener('click', hideFeedbackModal);
+}
+
+// Voice Filter Mode Functions
+async function setVoiceFilterMode(mode) {
+    try {
+        await api('/api/voice-profiles/set-mode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode })
+        });
+        state.voiceFilterMode = mode;
+        updateVoiceFilterUI();
+    } catch (e) {
+        console.error('Failed to set voice filter mode:', e);
+    }
+}
 
 function initVoiceProfileListeners() {
     elements.voiceFilterBtn.addEventListener('click', showVoiceProfileModal);
@@ -1437,6 +1596,7 @@ async function init() {
     initEventListeners();
     initVoiceProfileListeners();
     initModelCheckListeners();
+    initFeedbackListeners();
     await loadFolders();
     await loadNotes();
     await loadTags();

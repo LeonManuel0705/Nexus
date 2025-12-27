@@ -369,6 +369,39 @@
         </div>
     </div>
 
+    <!-- Feedback Modal -->
+    <div class="modal" id="feedbackModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <h3 data-i18n="rateTranscription">Rate Transcription</h3>
+            <p class="modal-description" data-i18n="howWasQuality">How was the transcription quality?</p>
+
+            <div class="feedback-content">
+                <div class="star-rating" id="starRating">
+                    <span class="star" data-rating="1">★</span>
+                    <span class="star" data-rating="2">★</span>
+                    <span class="star" data-rating="3">★</span>
+                    <span class="star" data-rating="4">★</span>
+                    <span class="star" data-rating="5">★</span>
+                </div>
+                <div class="quality-analysis hidden" id="qualityAnalysis">
+                    <div class="quality-score">
+                        <span data-i18n="qualityScore">Quality Score</span>: <strong id="qualityScoreValue">--</strong>/100
+                    </div>
+                    <div class="issues-count">
+                        <span data-i18n="issuesFound">Issues Found</span>: <strong id="issuesCountValue">--</strong>
+                    </div>
+                </div>
+                <textarea id="feedbackComments" placeholder="Additional comments (optional)" rows="3"></textarea>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-ghost" id="skipFeedbackBtn" data-i18n="skip">Skip</button>
+                <button class="btn btn-primary" id="submitFeedbackBtn" data-i18n="submitFeedback">Submit Feedback</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal" id="modelCheckModal">
         <div class="modal-backdrop"></div>
         <div class="modal-content modal-lg">
