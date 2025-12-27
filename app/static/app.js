@@ -810,6 +810,10 @@ function actuallyStartRecording() {
     elements.recordBtn.classList.add('recording');
     elements.recordLabel.textContent = t('recording');
 
+    if (state.voiceFilterEnabled) {
+        showVoiceDashboard();
+    }
+
     let seconds = 0;
     state.recordingInterval = setInterval(() => {
         seconds++;
@@ -1169,6 +1173,13 @@ async function activateProfile(profileId) {
             updateVoiceFilterUI();
             renderProfilesList();
             showToast(t('profileActivated'), 'success');
+
+            if (data.adaptive && data.adaptive.loaded) {
+                const threshold = data.adaptive.params?.voice_threshold || 0.30;
+                const slider = document.getElementById('thresholdSlider');
+                if (slider) slider.value = threshold;
+                document.getElementById('thresholdValue').textContent = threshold.toFixed(2);
+            }
         }
     } catch (e) {
         console.error('Failed to activate profile:', e);
@@ -1182,6 +1193,7 @@ async function deactivateFilter() {
         state.currentProfile = null;
         updateVoiceFilterUI();
         renderProfilesList();
+        hideVoiceDashboard();
         showToast(t('profileDeactivated'), 'success');
     } catch (e) {
         console.error('Failed to deactivate filter:', e);
@@ -1286,6 +1298,134 @@ socket.on('enrollment_error', (data) => {
 socket.on('voice_filter_status', (data) => {
     console.log('Voice filter:', data);
 });
+
+socket.on('voice_filter_dashboard', (data) => {
+    updateVoiceDashboard(data);
+});
+
+function updateVoiceDashboard(data) {
+    const dashboard = document.getElementById('voiceDashboard');
+    if (!dashboard || dashboard.classList.contains('hidden')) return;
+
+    document.getElementById('dashSimilarity').textContent = (data.similarity * 100).toFixed(0) + '%';
+    document.getElementById('dashAccepted').textContent = data.accepted;
+    document.getElementById('dashRejected').textContent = data.rejected;
+
+    if (data.audio_quality) {
+        document.getElementById('dashQuality').textContent = data.audio_quality.score;
+        document.getElementById('dashSnr').textContent = data.audio_quality.snr + 'dB';
+
+        const issuesEl = document.getElementById('qualityIssues');
+        if (data.audio_quality.issues && data.audio_quality.issues.length > 0) {
+            issuesEl.textContent = data.audio_quality.issues.join(', ');
+        } else {
+            issuesEl.textContent = '';
+        }
+    }
+
+    const similarityFill = document.getElementById('similarityFill');
+    similarityFill.style.width = (data.similarity * 100) + '%';
+    similarityFill.className = 'similarity-fill ' + (data.is_match ? 'match' : 'no-match');
+
+    const thresholdMarker = document.getElementById('thresholdMarker');
+    thresholdMarker.style.left = (data.threshold * 100) + '%';
+
+    if (data.similarity_history && data.similarity_history.length > 0) {
+        drawHistogram(data.similarity_history, data.threshold);
+    }
+}
+
+function drawHistogram(history, threshold) {
+    const canvas = document.getElementById('histogramCanvas');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    ctx.clearRect(0, 0, width, height);
+
+    const barWidth = width / history.length;
+    const thresholdY = height - (threshold * height);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, thresholdY);
+    ctx.lineTo(width, thresholdY);
+    ctx.stroke();
+
+    history.forEach((value, index) => {
+        const barHeight = value * height;
+        const x = index * barWidth;
+        const y = height - barHeight;
+
+        ctx.fillStyle = value >= threshold ? '#10b981' : '#ef4444';
+        ctx.fillRect(x, y, barWidth - 1, barHeight);
+    });
+}
+
+function showVoiceDashboard() {
+    const dashboard = document.getElementById('voiceDashboard');
+    if (dashboard) {
+        dashboard.classList.remove('hidden');
+    }
+}
+
+function hideVoiceDashboard() {
+    const dashboard = document.getElementById('voiceDashboard');
+    if (dashboard) {
+        dashboard.classList.add('hidden');
+    }
+}
+
+async function setThresholdLive(value) {
+    try {
+        await api('/api/adaptive/threshold', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ threshold: parseFloat(value) })
+        });
+        document.getElementById('thresholdValue').textContent = value;
+    } catch (e) {
+        console.error('Failed to set threshold:', e);
+    }
+}
+
+async function markChunkError(chunkIndex, text, errorType) {
+    try {
+        await api('/api/chunk-error', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chunk_index: chunkIndex,
+                text: text,
+                error_type: errorType,
+                note_id: state.currentNote ? state.currentNote.id : null
+            })
+        });
+        showToast('Error marked', 'success');
+    } catch (e) {
+        console.error('Failed to mark error:', e);
+    }
+}
+
+function initDashboardListeners() {
+    const closeDashboard = document.getElementById('closeDashboard');
+    if (closeDashboard) {
+        closeDashboard.addEventListener('click', hideVoiceDashboard);
+    }
+
+    const thresholdSlider = document.getElementById('thresholdSlider');
+    if (thresholdSlider) {
+        thresholdSlider.addEventListener('input', (e) => {
+            document.getElementById('thresholdValue').textContent = e.target.value;
+        });
+        thresholdSlider.addEventListener('change', (e) => {
+            setThresholdLive(e.target.value);
+        });
+    }
+}
 
 // Feedback System Functions
 function showFeedbackModal(noteId, transcription) {
@@ -1605,6 +1745,7 @@ async function init() {
     initVoiceProfileListeners();
     initModelCheckListeners();
     initFeedbackListeners();
+    initDashboardListeners();
     await loadFolders();
     await loadNotes();
     await loadTags();

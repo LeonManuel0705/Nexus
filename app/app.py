@@ -46,13 +46,70 @@ current_language = "de"
 
 voice_filter_enabled = False
 voice_filter_profile_id = None
-voice_filter_mode = "include"  # "include" = only transcribe matching voice, "exclude" = filter OUT matching voice
+voice_filter_mode = "include"
 enrollment_active = False
+chunk_errors = []
 
 CORRECTION_DELAY_SECONDS = 10
 
 threading.Thread(target=preload_model, daemon=True).start()
 
+def analyze_audio_quality(audio_data, sample_rate):
+    import numpy as np
+
+    if len(audio_data) == 0:
+        return {'score': 0, 'issues': ['no_audio'], 'energy': 0, 'snr': 0}
+
+    energy = float(np.sqrt(np.mean(audio_data ** 2)))
+
+    if energy < 0.001:
+        return {'score': 10, 'issues': ['too_quiet'], 'energy': energy, 'snr': 0}
+
+    issues = []
+    score = 100
+
+    if energy < 0.01:
+        issues.append('low_volume')
+        score -= 20
+    elif energy > 0.8:
+        issues.append('clipping')
+        score -= 30
+
+    zero_crossings = np.sum(np.abs(np.diff(np.signbit(audio_data))))
+    zcr = zero_crossings / len(audio_data)
+
+    if zcr > 0.3:
+        issues.append('high_noise')
+        score -= 25
+
+    fft = np.fft.rfft(audio_data)
+    freqs = np.fft.rfftfreq(len(audio_data), 1/sample_rate)
+    magnitude = np.abs(fft)
+
+    speech_band = (freqs >= 300) & (freqs <= 3400)
+    noise_band = (freqs < 300) | (freqs > 3400)
+
+    speech_energy = np.sum(magnitude[speech_band] ** 2) if np.any(speech_band) else 0
+    noise_energy = np.sum(magnitude[noise_band] ** 2) if np.any(noise_band) else 1
+
+    snr = 10 * np.log10(speech_energy / noise_energy + 1e-10) if noise_energy > 0 else 0
+
+    if snr < 5:
+        issues.append('poor_snr')
+        score -= 20
+    elif snr < 10:
+        issues.append('moderate_snr')
+        score -= 10
+
+    score = max(0, min(100, score))
+
+    return {
+        'score': score,
+        'issues': issues,
+        'energy': round(energy, 4),
+        'snr': round(float(snr), 2),
+        'zcr': round(float(zcr), 4)
+    }
 
 def create_word_document(note):
     doc = Document()
@@ -143,7 +200,6 @@ def create_word_document(note):
     footer2_run.font.italic = True
 
     return doc
-
 
 def create_folder_word_document(folder, notes):
     doc = Document()
@@ -241,7 +297,6 @@ def create_folder_word_document(folder, notes):
 
     return doc
 
-
 @app.route('/')
 def index():
     return send_from_directory('static', 'index.html')
@@ -249,7 +304,6 @@ def index():
 @app.route('/static/<path:path>')
 def serve_static(path):
     return send_from_directory('static', path)
-
 
 def background_correction_worker():
     global realtime_active, current_transcription, corrected_segments, last_correction_index, current_language
@@ -288,7 +342,6 @@ def background_correction_worker():
                         'total_segments': total_segments
                     })
 
-
 def realtime_transcription_worker():
     global realtime_active, current_transcription, current_language, voice_filter_mode
 
@@ -297,46 +350,65 @@ def realtime_transcription_worker():
 
     voice_manager = get_profile_manager() if voice_filter_enabled else None
     skipped_chunks = 0
+    accepted_chunks = 0
+    similarity_history = []
+    audio_quality_scores = []
 
     while realtime_active and recorder.is_recording():
         chunk = recorder.get_next_chunk(timeout=0.5)
 
         if chunk is not None:
             try:
+                audio_quality = analyze_audio_quality(chunk, recorder.sample_rate)
+                audio_quality_scores.append(audio_quality['score'])
+
                 if voice_filter_enabled and voice_manager is not None:
                     is_match, confidence = voice_manager.verify_audio(chunk)
+                    similarity = voice_manager._current_profile.verify_multi(
+                        voice_manager._extract_embedding(chunk), top_k=5
+                    )[1] if voice_manager._current_profile else 0
 
-                    # Handle both include and exclude modes
+                    similarity_history.append(confidence)
+                    if len(similarity_history) > 100:
+                        similarity_history.pop(0)
+
+                    dashboard_data = {
+                        'similarity': confidence,
+                        'threshold': get_param('voice_threshold'),
+                        'is_match': is_match,
+                        'mode': voice_filter_mode,
+                        'accepted': accepted_chunks,
+                        'rejected': skipped_chunks,
+                        'audio_quality': audio_quality,
+                        'similarity_history': similarity_history[-20:],
+                        'avg_quality': sum(audio_quality_scores[-20:]) / len(audio_quality_scores[-20:]) if audio_quality_scores else 0
+                    }
+                    socketio.emit('voice_filter_dashboard', dashboard_data)
+
                     if voice_filter_mode == "include":
-                        # Include mode: only transcribe matching voice (e.g., teacher)
                         if not is_match:
                             skipped_chunks += 1
-                            print(f"[VoiceFilter:Include] Skipping chunk - voice not matched (confidence: {confidence:.3f})")
-                            if skipped_chunks % 5 == 0:
-                                socketio.emit('voice_filter_status', {
-                                    'filtering': True,
-                                    'mode': 'include',
-                                    'skipped': skipped_chunks,
-                                    'last_confidence': confidence
-                                })
+                            socketio.emit('voice_filter_status', {
+                                'filtering': True,
+                                'mode': 'include',
+                                'skipped': skipped_chunks,
+                                'accepted': accepted_chunks,
+                                'last_confidence': confidence
+                            })
                             continue
-                        print(f"[VoiceFilter:Include] Voice matched! Transcribing... (confidence: {confidence:.3f})")
+                        accepted_chunks += 1
                     else:
-                        # Exclude mode: filter OUT matching voice (e.g., your own voice)
                         if is_match:
                             skipped_chunks += 1
-                            print(f"[VoiceFilter:Exclude] Skipping chunk - voice matched/excluded (confidence: {confidence:.3f})")
-                            if skipped_chunks % 5 == 0:
-                                socketio.emit('voice_filter_status', {
-                                    'filtering': True,
-                                    'mode': 'exclude',
-                                    'skipped': skipped_chunks,
-                                    'last_confidence': confidence
-                                })
+                            socketio.emit('voice_filter_status', {
+                                'filtering': True,
+                                'mode': 'exclude',
+                                'skipped': skipped_chunks,
+                                'accepted': accepted_chunks,
+                                'last_confidence': confidence
+                            })
                             continue
-                        print(f"[VoiceFilter:Exclude] Voice not matched, transcribing... (confidence: {confidence:.3f})")
-
-                    skipped_chunks = 0
+                        accepted_chunks += 1
 
                 raw_text, corrected_text, confidence = transcribe_audio_chunk(
                     chunk,
@@ -346,7 +418,6 @@ def realtime_transcription_worker():
                 )
 
                 if corrected_text and corrected_text.strip():
-                    # Apply logic correction for better sentence structure
                     logic_corrected, changes = apply_logic_correction(corrected_text.strip(), current_language)
 
                     with correction_lock:
@@ -354,7 +425,6 @@ def realtime_transcription_worker():
                         full_text = ' '.join(current_transcription)
 
                     full_corrected = corrector.correct_instant(full_text)
-                    # Also apply logic correction to full text
                     full_corrected, _ = apply_logic_correction(full_corrected, current_language)
 
                     socketio.emit('transcription_update', {
@@ -372,7 +442,6 @@ def realtime_transcription_worker():
                 print(f"Transcription error: {e}")
                 import traceback
                 traceback.print_exc()
-
 
 @socketio.on('start_realtime')
 def handle_start_realtime(data):
@@ -414,7 +483,6 @@ def handle_start_realtime(data):
         'language': current_language,
         'subject': subject
     })
-
 
 @socketio.on('stop_realtime')
 def handle_stop_realtime(data):
@@ -478,13 +546,11 @@ def handle_stop_realtime(data):
             'message': 'No speech detected'
         })
 
-
 @socketio.on('set_language')
 def handle_set_language(data):
     global current_language
     current_language = data.get('language', 'de')
     emit('language_changed', {'language': current_language})
-
 
 @app.route('/api/recording/start', methods=['POST'])
 def start_recording():
@@ -553,7 +619,6 @@ def audio_devices():
     default = get_default_input_device()
     return jsonify({'devices': devices, 'default': default})
 
-
 @app.route('/api/folders', methods=['GET'])
 def get_folders():
     parent_id = request.args.get('parent_id', type=int)
@@ -605,7 +670,6 @@ def get_subfolders(folder_id):
     subfolders = db.get_folders(folder_id)
     return jsonify({'folders': subfolders})
 
-
 @app.route('/api/notes', methods=['GET'])
 def get_notes():
     folder_id = request.args.get('folder_id', type=int)
@@ -655,7 +719,6 @@ def search_notes():
     notes = db.search_notes(query)
     return jsonify({'notes': notes})
 
-
 @app.route('/api/tags', methods=['GET'])
 def get_tags():
     tags = db.get_all_tags()
@@ -681,7 +744,6 @@ def remove_tag(note_id, tag_name):
 def get_notes_by_tag(tag_name):
     notes = db.get_notes_by_tag(tag_name)
     return jsonify({'notes': notes})
-
 
 @app.route('/api/notes/<int:note_id>/export', methods=['GET'])
 def export_note(note_id):
@@ -769,7 +831,6 @@ def export_folder(folder_id):
 
     return send_file(buffer, as_attachment=True, download_name=filename, mimetype=mimetype)
 
-
 @app.route('/api/export/database', methods=['GET'])
 def export_database():
     folders = db.get_all_folders()
@@ -792,7 +853,6 @@ def export_database():
     filename = f"voicenotes_backup_{timestamp}.json"
 
     return send_file(buffer, as_attachment=True, download_name=filename, mimetype='application/json')
-
 
 @app.route('/api/settings/models', methods=['GET'])
 def get_models():
@@ -818,12 +878,10 @@ def get_system_status():
         }
     })
 
-
 @app.route('/api/models/check', methods=['GET'])
 def check_models():
     from model_manager import check_all_models
     return jsonify(check_all_models())
-
 
 @app.route('/api/models/download/<model_name>', methods=['POST'])
 def start_model_download(model_name):
@@ -836,12 +894,10 @@ def start_model_download(model_name):
     download_model_async(model_name)
     return jsonify({'status': 'started', 'model': model_name})
 
-
 @app.route('/api/models/progress', methods=['GET'])
 def get_model_progress():
     from model_manager import get_download_progress
     return jsonify({'downloads': get_download_progress()})
-
 
 @app.route('/api/voice-profiles', methods=['GET'])
 def list_voice_profiles():
@@ -880,7 +936,6 @@ def activate_voice_profile(profile_id):
         voice_filter_profile_id = profile_id
         voice_filter_enabled = True
 
-        # Load optimal parameters for this teacher from adaptive system
         profile = manager.get_current_profile()
         if profile:
             adaptive_result = adaptive_set_teacher(profile.get('name', 'Unknown'), profile_id)
@@ -924,8 +979,6 @@ def set_voice_filter_mode():
         return jsonify({'success': True, 'mode': mode})
     return jsonify({'error': 'Invalid mode. Use "include" or "exclude"'}), 400
 
-
-# Quality Feedback API
 @app.route('/api/feedback', methods=['POST'])
 def submit_feedback():
     data = request.get_json()
@@ -942,7 +995,6 @@ def submit_feedback():
     if not note_id:
         return jsonify({'error': 'note_id required'}), 400
 
-    # Save feedback to quality system
     feedback_result = save_feedback(
         note_id=note_id,
         transcription=transcription,
@@ -954,7 +1006,6 @@ def submit_feedback():
         language=language
     )
 
-    # Feed to adaptive learning system
     adaptive_result = adaptive_record_feedback(
         rating=rating,
         teacher_id=voice_filter_profile_id,
@@ -1004,8 +1055,6 @@ def get_report_content(filename):
 
     return jsonify({'filename': filename, 'content': content})
 
-
-# Adaptive Learning System API
 @app.route('/api/adaptive/params', methods=['GET'])
 def get_adaptive_params():
     """Get current adaptive parameters."""
@@ -1052,6 +1101,71 @@ def reset_adaptive_teacher(profile_id):
     result = system.reset_teacher(profile_id, teacher_name)
     return jsonify(result)
 
+@app.route('/api/adaptive/threshold', methods=['POST'])
+def set_threshold_live():
+    data = request.get_json()
+    new_threshold = data.get('threshold')
+
+    if new_threshold is None or not (0.1 <= new_threshold <= 0.8):
+        return jsonify({'error': 'Threshold must be between 0.1 and 0.8'}), 400
+
+    system = get_adaptive_system()
+    old_value = system.get_param('voice_threshold')
+    system._current_params['voice_threshold'] = new_threshold
+    system._log_change('voice_threshold', old_value, new_threshold, 'Manual adjustment via dashboard')
+
+    return jsonify({
+        'success': True,
+        'old_threshold': old_value,
+        'new_threshold': new_threshold
+    })
+
+@app.route('/api/chunk-error', methods=['POST'])
+def mark_chunk_error():
+    global chunk_errors
+    data = request.get_json()
+
+    error_entry = {
+        'timestamp': datetime.now().isoformat(),
+        'chunk_index': data.get('chunk_index'),
+        'text': data.get('text', ''),
+        'error_type': data.get('error_type', 'transcription_error'),
+        'note_id': data.get('note_id'),
+        'teacher_id': voice_filter_profile_id
+    }
+
+    chunk_errors.append(error_entry)
+    if len(chunk_errors) > 100:
+        chunk_errors = chunk_errors[-100:]
+
+    system = get_adaptive_system()
+    system.record_feedback(
+        rating=1,
+        teacher_id=voice_filter_profile_id,
+        issues=[{'type': error_entry['error_type']}]
+    )
+
+    return jsonify({'success': True, 'error_logged': error_entry})
+
+@app.route('/api/chunk-errors', methods=['GET'])
+def get_chunk_errors():
+    return jsonify({'errors': chunk_errors[-50:]})
+
+@app.route('/api/audio-quality', methods=['POST'])
+def check_audio_quality():
+    data = request.get_json()
+    if 'audio' not in data:
+        return jsonify({'error': 'audio data required'}), 400
+
+    import numpy as np
+    import base64
+
+    audio_bytes = base64.b64decode(data['audio'])
+    audio_array = np.frombuffer(audio_bytes, dtype=np.float32)
+    sample_rate = data.get('sample_rate', 16000)
+
+    quality = analyze_audio_quality(audio_array, sample_rate)
+    return jsonify(quality)
 
 @socketio.on('start_enrollment')
 def handle_start_enrollment(data):
@@ -1143,7 +1257,6 @@ def handle_cancel_enrollment():
     manager.cancel_enrollment()
 
     emit('enrollment_cancelled', {'success': True})
-
 
 if __name__ == '__main__':
     print("\n" + "=" * 50)

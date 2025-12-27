@@ -1,8 +1,3 @@
-"""
-Adaptive Parameter System for Voice Notes
-Self-learning system that optimizes parameters per teacher based on user feedback.
-"""
-
 import json
 import os
 from datetime import datetime
@@ -10,67 +5,24 @@ from typing import Optional, Dict, List, Tuple
 from pathlib import Path
 import statistics
 
-# Directories for storing learning data
 LEARNING_DIR = Path(__file__).parent.parent / "learning_data"
 PARAMS_LOG_FILE = LEARNING_DIR / "parameter_changes.jsonl"
 FEEDBACK_CORRELATION_FILE = LEARNING_DIR / "feedback_correlation.json"
 TEACHER_PROFILES_FILE = LEARNING_DIR / "teacher_optimal_params.json"
 
-# Ensure directory exists
 LEARNING_DIR.mkdir(parents=True, exist_ok=True)
 
-# Default parameters and their tunable ranges
 DEFAULT_PARAMS = {
-    "voice_threshold": {
-        "value": 0.30,
-        "min": 0.15,
-        "max": 0.60,
-        "step": 0.05,
-        "description": "Voice similarity threshold for speaker recognition"
-    },
-    "vad_threshold": {
-        "value": 0.35,
-        "min": 0.20,
-        "max": 0.60,
-        "step": 0.05,
-        "description": "Voice activity detection sensitivity"
-    },
-    "min_speech_duration_ms": {
-        "value": 200,
-        "min": 100,
-        "max": 500,
-        "step": 50,
-        "description": "Minimum speech duration to detect"
-    },
-    "no_speech_threshold": {
-        "value": 0.6,
-        "min": 0.3,
-        "max": 0.8,
-        "step": 0.1,
-        "description": "Threshold for detecting silence"
-    },
-    "beam_size": {
-        "value": 5,
-        "min": 1,
-        "max": 10,
-        "step": 1,
-        "description": "Transcription beam search size"
-    },
-    "temperature": {
-        "value": 0.0,
-        "min": 0.0,
-        "max": 0.4,
-        "step": 0.1,
-        "description": "Transcription temperature (0 = deterministic)"
-    }
+    "voice_threshold": {"value": 0.30, "min": 0.15, "max": 0.60, "step": 0.05},
+    "vad_threshold": {"value": 0.35, "min": 0.20, "max": 0.60, "step": 0.05},
+    "min_speech_duration_ms": {"value": 200, "min": 100, "max": 500, "step": 50},
+    "no_speech_threshold": {"value": 0.6, "min": 0.3, "max": 0.8, "step": 0.1},
+    "beam_size": {"value": 5, "min": 1, "max": 10, "step": 1},
+    "temperature": {"value": 0.0, "min": 0.0, "max": 0.4, "step": 0.1}
 }
 
 
 class AdaptiveParameterSystem:
-    """
-    Self-learning parameter optimization system.
-    Tracks feedback per teacher and adjusts parameters for optimal results.
-    """
 
     def __init__(self):
         self._current_params = self._load_defaults()
@@ -80,11 +32,9 @@ class AdaptiveParameterSystem:
         self._feedback_history: Dict = self._load_feedback_correlation()
 
     def _load_defaults(self) -> Dict[str, float]:
-        """Load default parameter values."""
         return {k: v["value"] for k, v in DEFAULT_PARAMS.items()}
 
     def _load_teacher_data(self) -> Dict:
-        """Load learned optimal parameters per teacher."""
         if TEACHER_PROFILES_FILE.exists():
             try:
                 with open(TEACHER_PROFILES_FILE, 'r') as f:
@@ -94,12 +44,10 @@ class AdaptiveParameterSystem:
         return {}
 
     def _save_teacher_data(self):
-        """Save learned teacher parameters."""
         with open(TEACHER_PROFILES_FILE, 'w') as f:
             json.dump(self._teacher_data, f, indent=2, ensure_ascii=False)
 
     def _load_feedback_correlation(self) -> Dict:
-        """Load feedback correlation data."""
         if FEEDBACK_CORRELATION_FILE.exists():
             try:
                 with open(FEEDBACK_CORRELATION_FILE, 'r') as f:
@@ -109,13 +57,12 @@ class AdaptiveParameterSystem:
         return {"global": [], "by_teacher": {}}
 
     def _save_feedback_correlation(self):
-        """Save feedback correlation data."""
         with open(FEEDBACK_CORRELATION_FILE, 'w') as f:
             json.dump(self._feedback_history, f, indent=2, ensure_ascii=False)
 
     def _log_change(self, param: str, old_value: float, new_value: float,
                     reason: str, teacher: Optional[str] = None):
-        """Log a parameter change with reason."""
+        
         entry = {
             "timestamp": datetime.now().isoformat(),
             "teacher": teacher or self._current_teacher,
@@ -296,7 +243,7 @@ class AdaptiveParameterSystem:
         }
 
     def _find_common_issues(self, feedback_list: List[Dict]) -> List[str]:
-        """Find commonly occurring issues in feedback."""
+        
         issue_counts = {}
         for fb in feedback_list:
             for issue in fb.get("issues", []):
@@ -308,7 +255,7 @@ class AdaptiveParameterSystem:
         return [issue for issue, count in issue_counts.items() if count >= threshold]
 
     def _get_adjustment_for_issue(self, issue_type: str) -> Optional[Tuple[str, str, str]]:
-        """Map issue types to parameter adjustments."""
+        
         issue_adjustments = {
             # Voice filter issues
             "voice_not_detected": ("voice_threshold", "decrease", "Voice not being detected - lowering threshold"),
@@ -328,7 +275,7 @@ class AdaptiveParameterSystem:
         return issue_adjustments.get(issue_type)
 
     def _adjust_parameter(self, param: str, direction: str, reason: str, teacher_key: str):
-        """Adjust a parameter within its allowed range."""
+        
         if param not in DEFAULT_PARAMS:
             return
 
@@ -346,7 +293,7 @@ class AdaptiveParameterSystem:
             self._log_change(param, old_value, new_value, reason, teacher_key)
 
     def _update_teacher_optimal_params(self, teacher_key: str, teacher_name: Optional[str], rating: int):
-        """Update the stored optimal parameters for a teacher based on good feedback."""
+        
         if rating < 4:
             return  # Only learn from good feedback
 
@@ -384,7 +331,7 @@ class AdaptiveParameterSystem:
         self._save_teacher_data()
 
     def _calculate_optimal_params(self, teacher_key: str):
-        """Calculate optimal parameters based on feedback history."""
+        
         teacher_info = self._teacher_data[teacher_key]
         history = teacher_info.get("good_params_history", [])
 
@@ -409,15 +356,14 @@ class AdaptiveParameterSystem:
         teacher_info["optimal_params"] = optimal
 
     def get_current_params(self) -> Dict[str, float]:
-        """Get current parameter values."""
         return dict(self._current_params)
 
     def get_param(self, name: str) -> float:
-        """Get a specific parameter value."""
+        
         return self._current_params.get(name, DEFAULT_PARAMS.get(name, {}).get("value", 0))
 
     def get_teacher_stats(self, teacher_id: str, teacher_name: str) -> Dict:
-        """Get learning statistics for a teacher."""
+        
         teacher_key = f"{teacher_id}_{teacher_name}"
 
         if teacher_key not in self._teacher_data:
@@ -438,7 +384,7 @@ class AdaptiveParameterSystem:
         }
 
     def get_change_log(self, limit: int = 50) -> List[Dict]:
-        """Get recent parameter change log."""
+        
         if not PARAMS_LOG_FILE.exists():
             return []
 
@@ -453,7 +399,7 @@ class AdaptiveParameterSystem:
         return entries[-limit:]
 
     def reset_teacher(self, teacher_id: str, teacher_name: str):
-        """Reset learned data for a teacher (start fresh)."""
+        
         teacher_key = f"{teacher_id}_{teacher_name}"
 
         if teacher_key in self._teacher_data:
@@ -476,7 +422,6 @@ _adaptive_system: Optional[AdaptiveParameterSystem] = None
 
 
 def get_adaptive_system() -> AdaptiveParameterSystem:
-    """Get the singleton adaptive system instance."""
     global _adaptive_system
     if _adaptive_system is None:
         _adaptive_system = AdaptiveParameterSystem()
@@ -484,30 +429,29 @@ def get_adaptive_system() -> AdaptiveParameterSystem:
 
 
 def set_teacher(teacher_name: str, teacher_id: str) -> Dict:
-    """Set current teacher and load optimal parameters."""
+    
     return get_adaptive_system().set_teacher(teacher_name, teacher_id)
 
 
 def record_feedback(rating: int, **kwargs) -> Dict:
-    """Record user feedback."""
+    
     return get_adaptive_system().record_feedback(rating, **kwargs)
 
 
 def get_param(name: str) -> float:
-    """Get a parameter value."""
+    
     return get_adaptive_system().get_param(name)
 
 
 def get_current_params() -> Dict[str, float]:
-    """Get all current parameters."""
     return get_adaptive_system().get_current_params()
 
 
 def get_teacher_stats(teacher_id: str, teacher_name: str) -> Dict:
-    """Get learning stats for a teacher."""
+    
     return get_adaptive_system().get_teacher_stats(teacher_id, teacher_name)
 
 
 def get_change_log(limit: int = 50) -> List[Dict]:
-    """Get parameter change log."""
+    
     return get_adaptive_system().get_change_log(limit)

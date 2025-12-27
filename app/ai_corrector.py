@@ -8,7 +8,6 @@ MAX_TOKENS = 256  # Reduced to prevent runaway generation
 TEMPERATURE = 0.1
 REPETITION_PENALTY = 1.2
 
-
 class AICorrector:
     def __init__(self):
         self._model = None
@@ -123,11 +122,9 @@ Corrected:"""
             from mlx_lm import generate
             import inspect
 
-            # Check which parameters the generate function accepts
             sig = inspect.signature(generate)
             params = sig.parameters
 
-            # Build kwargs based on available parameters
             kwargs = {
                 'model': self._model,
                 'tokenizer': self._tokenizer,
@@ -136,19 +133,16 @@ Corrected:"""
                 'verbose': False
             }
 
-            # Only add temperature if supported
             if 'temperature' in params or 'temp' in params:
                 temp_key = 'temp' if 'temp' in params else 'temperature'
                 kwargs[temp_key] = TEMPERATURE
 
-            # Add repetition penalty if supported
             if 'repetition_penalty' in params:
                 kwargs['repetition_penalty'] = REPETITION_PENALTY
 
             response = generate(**kwargs)
             response = response.strip()
 
-            # Clean up the response - remove any "Correction:", "Corrected:", "Explanation:" prefixes
             response = self._clean_mlx_response(response)
 
             return response
@@ -162,7 +156,6 @@ Corrected:"""
         if not response:
             return ""
 
-        # Split by common repetition markers
         markers = [
             '\n\nCorrection:', '\nCorrection:', 'Correction:',
             '\n\nCorrected:', '\nCorrected:', 'Corrected:',
@@ -172,7 +165,6 @@ Corrected:"""
             '\n\nSentence', '\nSentence',
         ]
 
-        # Find the first occurrence of any marker and cut there
         first_cut = len(response)
         for marker in markers:
             idx = response.find(marker)
@@ -181,7 +173,6 @@ Corrected:"""
 
         response = response[:first_cut].strip()
 
-        # Remove duplicate sentences (same sentence appearing multiple times)
         sentences = re.split(r'(?<=[.!?])\s+', response)
         seen = set()
         unique_sentences = []
@@ -193,7 +184,6 @@ Corrected:"""
 
         response = ' '.join(unique_sentences)
 
-        # Ensure proper ending
         if response and response[-1] not in '.!?':
             last_sentence = max(
                 response.rfind('.'),
@@ -264,16 +254,13 @@ Corrected:"""
             )
         }
 
-
 _corrector: Optional[AICorrector] = None
-
 
 def get_corrector() -> AICorrector:
     global _corrector
     if _corrector is None:
         _corrector = AICorrector()
     return _corrector
-
 
 def correct_transcription(
     text: str,
@@ -283,7 +270,6 @@ def correct_transcription(
     corrector = get_corrector()
     corrected, _ = corrector.correct(text, subject, language)
     return corrected
-
 
 def get_ai_status() -> dict:
     return get_corrector().get_status()
