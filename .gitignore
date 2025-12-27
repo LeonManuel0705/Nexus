@@ -1,0 +1,33 @@
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+
+# Claude
+.claude/
+
+# Temporary files
+audio_temp/
+*.tmp
+*.log
+
+# Data (contains database with recordings)
+data/
+
+# OS files
+.DS_Store
+Thumbs.db
