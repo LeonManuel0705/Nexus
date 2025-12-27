@@ -424,12 +424,23 @@ socket.on('correction_update', (data) => {
     }
 });
 
-socket.on('recording_stopped', async (data) => {
+socket.on('recording_stopping', (data) => {
     state.isRecording = false;
     clearInterval(state.recordingInterval);
     stopWaveformAnimation();
 
     elements.recordBtn.classList.remove('recording');
+    elements.recordBtn.classList.add('processing');
+    elements.recordLabel.textContent = 'Saving...';
+    elements.liveTranscriptionContent.innerHTML = `<p class="processing-text"><span class="spinner"></span> Processing and saving...</p>`;
+});
+
+socket.on('recording_stopped', async (data) => {
+    state.isRecording = false;
+    clearInterval(state.recordingInterval);
+    stopWaveformAnimation();
+
+    elements.recordBtn.classList.remove('recording', 'processing');
     elements.recordLabel.textContent = t('pressToRecord');
     elements.recordingDuration.textContent = '00:00';
     elements.liveTranscription.classList.remove('active');
@@ -440,7 +451,6 @@ socket.on('recording_stopped', async (data) => {
         await loadNotes();
         selectNote(data.note.id);
 
-        // Show feedback modal after successful recording
         if (data.note && data.final_text && data.final_text.length > 20) {
             setTimeout(() => {
                 showFeedbackModal(data.note.id, data.final_text);
