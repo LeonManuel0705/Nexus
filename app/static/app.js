@@ -65,7 +65,19 @@ const i18n = {
         profileCreated: 'Voice profile created!',
         profileActivated: 'Voice filter activated',
         profileDeactivated: 'Voice filter disabled',
-        enrollmentCancelled: 'Enrollment cancelled'
+        enrollmentCancelled: 'Enrollment cancelled',
+        systemCheck: 'System Check',
+        systemCheckDesc: 'Checking required components before recording...',
+        downloadingModels: 'Downloading Models',
+        installMissing: 'Install Missing',
+        modelInstalled: 'Installed',
+        modelMissing: 'Missing',
+        modelRequired: 'Required',
+        modelOptional: 'Optional',
+        allModelsReady: 'All systems ready!',
+        downloadComplete: 'Download complete',
+        downloadFailed: 'Download failed',
+        checkingModels: 'Checking models...'
     },
     de: {
         folders: 'Ordner',
@@ -130,7 +142,19 @@ const i18n = {
         profileCreated: 'Stimmprofil erstellt!',
         profileActivated: 'Stimmenfilter aktiviert',
         profileDeactivated: 'Stimmenfilter deaktiviert',
-        enrollmentCancelled: 'Registrierung abgebrochen'
+        enrollmentCancelled: 'Registrierung abgebrochen',
+        systemCheck: 'Systemprüfung',
+        systemCheckDesc: 'Prüfe erforderliche Komponenten vor der Aufnahme...',
+        downloadingModels: 'Modelle herunterladen',
+        installMissing: 'Fehlende installieren',
+        modelInstalled: 'Installiert',
+        modelMissing: 'Fehlt',
+        modelRequired: 'Erforderlich',
+        modelOptional: 'Optional',
+        allModelsReady: 'Alle Systeme bereit!',
+        downloadComplete: 'Download abgeschlossen',
+        downloadFailed: 'Download fehlgeschlagen',
+        checkingModels: 'Modelle prüfen...'
     }
 };
 
@@ -151,7 +175,11 @@ let state = {
     voiceFilterEnabled: false,
     voiceProfiles: [],
     currentProfile: null,
-    isEnrolling: false
+    isEnrolling: false,
+    modelsChecked: false,
+    modelsReady: false,
+    pendingDownloads: [],
+    downloadProgressInterval: null
 };
 
 const elements = {
@@ -205,7 +233,14 @@ const elements = {
     cancelEnrollmentBtn: document.getElementById('cancelEnrollmentBtn'),
     profilesList: document.getElementById('profilesList'),
     closeVoiceProfileBtn: document.getElementById('closeVoiceProfileBtn'),
-    disableFilterBtn: document.getElementById('disableFilterBtn')
+    disableFilterBtn: document.getElementById('disableFilterBtn'),
+    modelCheckModal: document.getElementById('modelCheckModal'),
+    modelList: document.getElementById('modelList'),
+    downloadProgressSection: document.getElementById('downloadProgressSection'),
+    downloadList: document.getElementById('downloadList'),
+    cancelModelCheckBtn: document.getElementById('cancelModelCheckBtn'),
+    installModelsBtn: document.getElementById('installModelsBtn'),
+    startRecordingBtn: document.getElementById('startRecordingBtn')
 };
 
 function t(key) {
@@ -709,10 +744,14 @@ async function removeTag(noteId, tagName) {
 }
 
 function toggleRecording() {
-    state.isRecording ? stopRecording() : startRecording();
+    if (state.isRecording) {
+        stopRecording();
+    } else {
+        preflightRecordCheck();
+    }
 }
 
-function startRecording() {
+function actuallyStartRecording() {
     socket.emit('start_realtime', {
         folder_id: state.currentFolder,
         language: state.currentLanguage
@@ -1006,8 +1045,6 @@ function initEventListeners() {
     });
 }
 
-// ==================== Voice Profile Functions ====================
-
 async function loadVoiceProfiles() {
     try {
         const data = await api('/api/voice-profiles');
@@ -1059,7 +1096,6 @@ function renderProfilesList() {
         </div>
     `).join('');
 
-    // Add event listeners
     elements.profilesList.querySelectorAll('.profile-item').forEach(item => {
         const profileId = item.dataset.profileId;
 
@@ -1128,7 +1164,6 @@ function startEnrollment() {
     const name = elements.teacherNameInput.value.trim() || 'Teacher';
     state.isEnrolling = true;
 
-    // Update UI
     elements.startEnrollmentBtn.classList.add('hidden');
     elements.stopEnrollmentBtn.classList.remove('hidden');
     elements.cancelEnrollmentBtn.classList.remove('hidden');
@@ -1160,7 +1195,6 @@ function resetEnrollmentUI() {
     elements.teacherNameInput.value = '';
 }
 
-// Socket events for enrollment
 socket.on('enrollment_started', (data) => {
     console.log('Enrollment started:', data);
 });
@@ -1196,11 +1230,9 @@ socket.on('enrollment_cancelled', () => {
 });
 
 socket.on('voice_filter_status', (data) => {
-    // Could show a visual indicator that voices are being filtered
     console.log('Voice filter:', data);
 });
 
-// Initialize voice profile event listeners
 function initVoiceProfileListeners() {
     elements.voiceFilterBtn.addEventListener('click', showVoiceProfileModal);
     elements.closeVoiceProfileBtn.addEventListener('click', hideVoiceProfileModal);
@@ -1212,16 +1244,208 @@ function initVoiceProfileListeners() {
     elements.voiceProfileModal.querySelector('.modal-backdrop').addEventListener('click', hideVoiceProfileModal);
 }
 
+async function checkModels() {
+    try {
+        const data = await api('/api/models/check');
+        return data;
+    } catch (e) {
+        console.error('Failed to check models:', e);
+        return { ready: true, models: {} };
+    }
+}
+
+function showModelCheckModal() {
+    elements.modelList.innerHTML = '<div class="model-check-spinner"><div class="spinner"></div></div>';
+    elements.downloadProgressSection.classList.add('hidden');
+    elements.installModelsBtn.classList.add('hidden');
+    elements.startRecordingBtn.classList.add('hidden');
+    elements.modelCheckModal.classList.add('active');
+
+    performModelCheck();
+}
+
+function hideModelCheckModal() {
+    elements.modelCheckModal.classList.remove('active');
+    if (state.downloadProgressInterval) {
+        clearInterval(state.downloadProgressInterval);
+        state.downloadProgressInterval = null;
+    }
+}
+
+async function performModelCheck() {
+    const data = await checkModels();
+    const models = data.models || {};
+
+    let html = '';
+    let missingModels = [];
+
+    for (const [key, model] of Object.entries(models)) {
+        const statusClass = model.installed ? 'installed' : 'missing';
+        const badgeClass = model.installed ? 'installed' : (model.required ? 'required' : 'optional');
+        const badgeText = model.installed ? t('modelInstalled') : (model.required ? t('modelRequired') : t('modelOptional'));
+
+        if (!model.installed && model.available !== false) {
+            missingModels.push(key);
+        }
+
+        html += `
+            <div class="model-item ${statusClass}" data-model="${key}">
+                <div class="model-info">
+                    <span class="model-name">${escapeHtml(model.display_name)}</span>
+                    <span class="model-meta">${model.size || ''} ${model.message || ''}</span>
+                </div>
+                <div class="model-status">
+                    <span class="status-badge ${badgeClass}">${badgeText}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    elements.modelList.innerHTML = html;
+
+    state.pendingDownloads = missingModels.filter(m => models[m]?.required);
+    const optionalMissing = missingModels.filter(m => !models[m]?.required);
+
+    if (data.ready) {
+        state.modelsReady = true;
+        elements.startRecordingBtn.classList.remove('hidden');
+        elements.installModelsBtn.classList.add('hidden');
+
+        if (optionalMissing.length > 0) {
+            elements.installModelsBtn.textContent = t('installMissing') + ` (${optionalMissing.length})`;
+            elements.installModelsBtn.classList.remove('hidden');
+            state.pendingDownloads = optionalMissing;
+        }
+    } else {
+        state.modelsReady = false;
+        elements.startRecordingBtn.classList.add('hidden');
+        elements.installModelsBtn.classList.remove('hidden');
+        elements.installModelsBtn.textContent = t('installMissing') + ` (${state.pendingDownloads.length})`;
+    }
+
+    state.modelsChecked = true;
+}
+
+async function installMissingModels() {
+    if (state.pendingDownloads.length === 0) return;
+
+    elements.downloadProgressSection.classList.remove('hidden');
+    elements.installModelsBtn.classList.add('hidden');
+    elements.startRecordingBtn.classList.add('hidden');
+
+    let downloadHtml = '';
+    for (const modelName of state.pendingDownloads) {
+        downloadHtml += `
+            <div class="download-item" id="download-${modelName}">
+                <div class="download-header">
+                    <span class="download-name">${modelName}</span>
+                    <span class="download-status">${t('checkingModels')}</span>
+                </div>
+                <div class="download-progress-bar">
+                    <div class="download-progress-fill" id="progress-${modelName}"></div>
+                </div>
+                <div class="download-message" id="message-${modelName}"></div>
+            </div>
+        `;
+    }
+    elements.downloadList.innerHTML = downloadHtml;
+
+    for (const modelName of state.pendingDownloads) {
+        await api(`/api/models/download/${modelName}`, { method: 'POST' });
+    }
+
+    startDownloadProgressPolling();
+}
+
+function startDownloadProgressPolling() {
+    if (state.downloadProgressInterval) {
+        clearInterval(state.downloadProgressInterval);
+    }
+
+    state.downloadProgressInterval = setInterval(async () => {
+        try {
+            const data = await api('/api/models/progress');
+            const downloads = data.downloads || {};
+
+            let allComplete = true;
+            let anyActive = false;
+
+            for (const modelName of state.pendingDownloads) {
+                const item = document.getElementById(`download-${modelName}`);
+                const progressFill = document.getElementById(`progress-${modelName}`);
+                const statusEl = item?.querySelector('.download-status');
+                const messageEl = document.getElementById(`message-${modelName}`);
+
+                const downloadInfo = downloads[modelName];
+
+                if (downloadInfo) {
+                    anyActive = true;
+                    if (progressFill) progressFill.style.width = `${downloadInfo.progress}%`;
+                    if (statusEl) statusEl.textContent = downloadInfo.status;
+                    if (messageEl) messageEl.textContent = downloadInfo.message || '';
+
+                    if (downloadInfo.status === 'complete') {
+                        item?.classList.add('complete');
+                    } else if (downloadInfo.status === 'error') {
+                        item?.classList.add('error');
+                    } else {
+                        allComplete = false;
+                    }
+                } else {
+                    if (progressFill) progressFill.style.width = '100%';
+                    if (statusEl) statusEl.textContent = t('downloadComplete');
+                    item?.classList.add('complete');
+                }
+            }
+
+            if (!anyActive || allComplete) {
+                clearInterval(state.downloadProgressInterval);
+                state.downloadProgressInterval = null;
+
+                setTimeout(() => {
+                    performModelCheck();
+                }, 1000);
+            }
+        } catch (e) {
+            console.error('Failed to get download progress:', e);
+        }
+    }, 500);
+}
+
+function initModelCheckListeners() {
+    elements.cancelModelCheckBtn.addEventListener('click', hideModelCheckModal);
+    elements.installModelsBtn.addEventListener('click', installMissingModels);
+    elements.startRecordingBtn.addEventListener('click', () => {
+        hideModelCheckModal();
+        actuallyStartRecording();
+    });
+    elements.modelCheckModal.querySelector('.modal-backdrop').addEventListener('click', hideModelCheckModal);
+}
+
+async function preflightRecordCheck() {
+    if (state.modelsChecked && state.modelsReady) {
+        actuallyStartRecording();
+    } else {
+        showModelCheckModal();
+    }
+}
+
 async function init() {
     loadTheme();
     const savedUILang = localStorage.getItem('uiLanguage') || 'en';
     setUILanguage(savedUILang);
     initEventListeners();
     initVoiceProfileListeners();
+    initModelCheckListeners();
     await loadFolders();
     await loadNotes();
     await loadTags();
     await loadVoiceProfiles();
+
+    checkModels().then(data => {
+        state.modelsChecked = true;
+        state.modelsReady = data.ready;
+    });
 }
 
 init();

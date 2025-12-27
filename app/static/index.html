@@ -369,6 +369,29 @@
         </div>
     </div>
 
+    <div class="modal" id="modelCheckModal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content modal-lg">
+            <h3 data-i18n="systemCheck">System Check</h3>
+            <p class="modal-description" data-i18n="systemCheckDesc">Checking required components before recording...</p>
+
+            <div class="model-check-content" id="modelCheckContent">
+                <div class="model-list" id="modelList"></div>
+            </div>
+
+            <div class="download-progress-section hidden" id="downloadProgressSection">
+                <h4 data-i18n="downloadingModels">Downloading Models</h4>
+                <div class="download-list" id="downloadList"></div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-ghost" id="cancelModelCheckBtn" data-i18n="cancel">Cancel</button>
+                <button class="btn btn-primary hidden" id="installModelsBtn" data-i18n="installMissing">Install Missing</button>
+                <button class="btn btn-primary hidden" id="startRecordingBtn" data-i18n="startRecording">Start Recording</button>
+            </div>
+        </div>
+    </div>
+
     <div class="context-menu" id="contextMenu">
         <div class="context-menu-item" data-action="rename">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
