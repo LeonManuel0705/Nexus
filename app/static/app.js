@@ -359,6 +359,14 @@ socket.on('recording_stopped', async (data) => {
         showToast(t('noteSaved'), 'success');
         await loadNotes();
         selectNote(data.note.id);
+
+        // Show feedback modal after successful recording
+        if (data.note && data.final_text && data.final_text.length > 20) {
+            setTimeout(() => {
+                showFeedbackModal(data.note.id, data.final_text);
+            }, 1000);
+        }
+
         setTimeout(() => {
             elements.liveTranscriptionContent.innerHTML = `<p class="placeholder">${t('startRecording')}</p>`;
         }, 2000);
