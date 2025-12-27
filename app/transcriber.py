@@ -172,6 +172,124 @@ class TextCorrector:
                    'i', 'you', 'he', 'she', 'it', 'we', 'they', 'this', 'that', 'not', 'also']
         }
 
+        self.number_words_de = {
+            'null': '0', 'eins': '1', 'zwei': '2', 'drei': '3', 'vier': '4',
+            'fünf': '5', 'sechs': '6', 'sieben': '7', 'acht': '8', 'neun': '9',
+            'zehn': '10', 'elf': '11', 'zwölf': '12', 'dreizehn': '13', 'vierzehn': '14',
+            'fünfzehn': '15', 'sechzehn': '16', 'siebzehn': '17', 'achtzehn': '18', 'neunzehn': '19',
+            'zwanzig': '20', 'dreißig': '30', 'vierzig': '40', 'fünfzig': '50',
+            'sechzig': '60', 'siebzig': '70', 'achtzig': '80', 'neunzig': '90',
+            'hundert': '100', 'tausend': '1000', 'million': '1000000',
+            'einundzwanzig': '21', 'zweiundzwanzig': '22', 'dreiundzwanzig': '23',
+            'vierundzwanzig': '24', 'fünfundzwanzig': '25', 'sechsundzwanzig': '26',
+            'siebenundzwanzig': '27', 'achtundzwanzig': '28', 'neunundzwanzig': '29',
+            'einunddreißig': '31', 'zweiunddreißig': '32',
+            'einundvierzig': '41', 'zweiundvierzig': '42',
+            'einundfünfzig': '51', 'zweiundfünfzig': '52',
+        }
+
+        self.number_words_en = {
+            'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4',
+            'five': '5', 'six': '6', 'seven': '7', 'eight': '8', 'nine': '9',
+            'ten': '10', 'eleven': '11', 'twelve': '12', 'thirteen': '13', 'fourteen': '14',
+            'fifteen': '15', 'sixteen': '16', 'seventeen': '17', 'eighteen': '18', 'nineteen': '19',
+            'twenty': '20', 'thirty': '30', 'forty': '40', 'fifty': '50',
+            'sixty': '60', 'seventy': '70', 'eighty': '80', 'ninety': '90',
+            'hundred': '100', 'thousand': '1000', 'million': '1000000',
+        }
+
+        self.url_triggers = [
+            'slash', 'http', 'https', 'www', 'punkt', 'dot', 'at', 'colon',
+            'doppelpunkt', 'schrägstrich'
+        ]
+
+        self.domain_endings = ['.com', '.de', '.org', '.net', '.io', '.edu', '.gov', '.co', '.info']
+
+    def _convert_numbers(self, text: str) -> str:
+        lang = self.language[:2]
+        number_words = self.number_words_de if lang == 'de' else self.number_words_en
+
+        words = text.split()
+        result = []
+        i = 0
+
+        while i < len(words):
+            word_lower = words[i].lower().rstrip('.,!?;:')
+            punctuation = ''
+            if words[i] and words[i][-1] in '.,!?;:':
+                punctuation = words[i][-1]
+
+            if word_lower in number_words:
+                result.append(number_words[word_lower] + punctuation)
+            elif lang == 'de' and 'und' in word_lower:
+                converted = self._parse_compound_german_number(word_lower)
+                if converted:
+                    result.append(converted + punctuation)
+                else:
+                    result.append(words[i])
+            else:
+                result.append(words[i])
+            i += 1
+
+        return ' '.join(result)
+
+    def _parse_compound_german_number(self, word: str) -> Optional[str]:
+        ones = {'ein': 1, 'zwei': 2, 'drei': 3, 'vier': 4, 'fünf': 5,
+                'sechs': 6, 'sieben': 7, 'acht': 8, 'neun': 9}
+        tens = {'zwanzig': 20, 'dreißig': 30, 'vierzig': 40, 'fünfzig': 50,
+                'sechzig': 60, 'siebzig': 70, 'achtzig': 80, 'neunzig': 90}
+
+        for one_word, one_val in ones.items():
+            for ten_word, ten_val in tens.items():
+                if word == f"{one_word}und{ten_word}":
+                    return str(one_val + ten_val)
+
+        return None
+
+    def _detect_and_format_urls(self, text: str) -> str:
+        text = re.sub(r'\b(http|https)\s+(doppelpunkt|colon)\s*(slash|schrägstrich)\s*(slash|schrägstrich)\s*',
+                      r'https://', text, flags=re.IGNORECASE)
+
+        text = re.sub(r'\b(www)\s+(punkt|dot)\s*', r'www.', text, flags=re.IGNORECASE)
+
+        text = re.sub(r'\s+(punkt|dot)\s+(com|de|org|net|io|edu|gov|co|info)\b',
+                      r'.\2', text, flags=re.IGNORECASE)
+
+        text = re.sub(r'\s*(slash|schrägstrich)\s*', '/', text, flags=re.IGNORECASE)
+
+        text = re.sub(r'(https?://\S+)', lambda m: m.group(1).lower(), text)
+
+        return text
+
+    def _format_special_chars(self, text: str) -> str:
+        replacements = {
+            r'\bat\s+zeichen\b': '@',
+            r'\bat\s+sign\b': '@',
+            r'\bät\b': '@',
+            r'\bklammeraffe\b': '@',
+            r'\bunderscore\b': '_',
+            r'\bunterstrich\b': '_',
+            r'\bbindestrich\b': '-',
+            r'\bminus\b': '-',
+            r'\bplus\b': '+',
+            r'\bgleich\b': '=',
+            r'\bequals\b': '=',
+            r'\bprozent\b': '%',
+            r'\bpercent\b': '%',
+            r'\beuro\b': '€',
+            r'\bdollar\b': '$',
+            r'\bhashtag\b': '#',
+            r'\bund zeichen\b': '&',
+            r'\bampersand\b': '&',
+            r'\bsternchen\b': '*',
+            r'\basterisk\b': '*',
+        }
+
+        for pattern, replacement in replacements.items():
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+
+        return text
+
     def _is_likely_mid_sentence(self, before_text: str, after_word: str) -> bool:
         lang = self.language[:2]
         lowercase_words = self.lowercase_words.get(lang, [])
@@ -196,6 +314,10 @@ class TextCorrector:
         for pattern, replacement in self.common_errors.get(lang, {}).items():
             text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
 
+        text = self._convert_numbers(text)
+        text = self._detect_and_format_urls(text)
+        text = self._format_special_chars(text)
+
         text = re.sub(r'\s+', ' ', text).strip()
         text = re.sub(r'\s+([.,!?;:])', r'\1', text)
         text = re.sub(r'([.,!?;:])\s*([.,!?;:])+', r'\1', text)
@@ -216,6 +338,10 @@ class TextCorrector:
 
         for pattern, replacement in self.common_errors.get(lang, {}).items():
             text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+
+        text = self._convert_numbers(text)
+        text = self._detect_and_format_urls(text)
+        text = self._format_special_chars(text)
 
         text = re.sub(r'\s+', ' ', text).strip()
         text = re.sub(r'\s+([.,!?;:])', r'\1', text)
