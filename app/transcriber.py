@@ -2,93 +2,267 @@ from faster_whisper import WhisperModel
 import os
 import numpy as np
 import warnings
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple
 import threading
+import re
+from collections import deque
 
 warnings.filterwarnings("ignore")
 
-_fast_model = None
+_realtime_model = None
 _accurate_model = None
-FAST_MODEL_NAME = "tiny"
-ACCURATE_MODEL_NAME = "base"
+_model_lock = threading.Lock()
 
-from speaker_diarization import get_diarizer, reset_speaker_tracking
-from ai_corrector import get_corrector, correct_transcription, get_ai_status
-
-
-def get_fast_model():
-    global _fast_model
-    if _fast_model is None:
-        print(f"Loading Whisper '{FAST_MODEL_NAME}' model...")
-        _fast_model = WhisperModel(FAST_MODEL_NAME, device="cpu", compute_type="int8")
-        print("Fast model ready")
-    return _fast_model
+REALTIME_MODEL = "small"
+ACCURATE_MODEL = "medium"
 
 
-def get_accurate_model():
-    global _accurate_model
-    if _accurate_model is None:
-        print(f"Loading Whisper '{ACCURATE_MODEL_NAME}' model...")
-        _accurate_model = WhisperModel(ACCURATE_MODEL_NAME, device="cpu", compute_type="int8")
-        print("Accurate model ready")
-    return _accurate_model
+class RealtimeTranscriber:
+    def __init__(self, language: str = "de"):
+        self.language = language
+        self.model = None
+        self.audio_buffer = deque(maxlen=10)
+        self.context_text = ""
+        self.last_transcription = ""
+
+    def load_model(self):
+        global _realtime_model
+        with _model_lock:
+            if _realtime_model is None:
+                print(f"Loading Whisper '{REALTIME_MODEL}' for real-time...")
+                _realtime_model = WhisperModel(
+                    REALTIME_MODEL,
+                    device="cpu",
+                    compute_type="int8",
+                    num_workers=2
+                )
+                print("Real-time model ready")
+            self.model = _realtime_model
+
+    def transcribe_chunk(self, audio_data: np.ndarray, sample_rate: int = 16000) -> Tuple[str, float]:
+        if self.model is None:
+            self.load_model()
+
+        if audio_data.dtype != np.float32:
+            audio_data = audio_data.astype(np.float32)
+
+        if len(audio_data) > 0:
+            max_val = np.max(np.abs(audio_data))
+            if max_val > 1.0:
+                audio_data = audio_data / max_val
+            elif max_val < 0.01:
+                return "", 0.0
+
+        audio_data = self._preprocess_audio(audio_data, sample_rate)
+
+        try:
+            segments, info = self.model.transcribe(
+                audio_data,
+                language=self.language,
+                task="transcribe",
+                beam_size=3,
+                best_of=3,
+                patience=1.0,
+                condition_on_previous_text=True,
+                initial_prompt=self.context_text[-200:] if self.context_text else None,
+                vad_filter=True,
+                vad_parameters={
+                    "threshold": 0.3,
+                    "min_speech_duration_ms": 250,
+                    "min_silence_duration_ms": 100,
+                    "speech_pad_ms": 50,
+                },
+                word_timestamps=False,
+                without_timestamps=True,
+            )
+
+            text_parts = []
+            for seg in segments:
+                text = seg.text.strip()
+                if text:
+                    text_parts.append(text)
+
+            raw_text = ' '.join(text_parts)
+
+            if raw_text:
+                self.context_text += " " + raw_text
+                if len(self.context_text) > 500:
+                    self.context_text = self.context_text[-500:]
+
+            confidence = info.language_probability if hasattr(info, 'language_probability') else 0.9
+
+            return raw_text, confidence
+
+        except Exception as e:
+            print(f"Transcription error: {e}")
+            return "", 0.0
+
+    def _preprocess_audio(self, audio: np.ndarray, sample_rate: int) -> np.ndarray:
+        if sample_rate != 16000:
+            from scipy import signal
+            num_samples = int(len(audio) * 16000 / sample_rate)
+            audio = signal.resample(audio, num_samples)
+
+        audio = audio - np.mean(audio)
+
+        max_val = np.max(np.abs(audio))
+        if max_val > 0:
+            audio = audio / max_val * 0.95
+
+        return audio
+
+    def reset(self):
+        self.context_text = ""
+        self.last_transcription = ""
+        self.audio_buffer.clear()
+
+
+class TextCorrector:
+    def __init__(self, language: str = "de"):
+        self.language = language
+        self.corrections_cache = {}
+        self._init_patterns()
+
+    def _init_patterns(self):
+        self.filler_patterns = {
+            "de": [
+                (r'\b(ähm?|öhm?|hmm?|hm)\b', ''),
+                (r'\b(also\s+ja|ja\s+also)\b', ''),
+                (r'\b(sozusagen|quasi|halt|eben)\b', ''),
+                (r'\b(ich\s+meine?)\s*,?\s*', ''),
+            ],
+            "en": [
+                (r'\b(um+|uh+|er+|hmm?)\b', ''),
+                (r'\b(you\s+know|i\s+mean|like)\b', ''),
+                (r'\b(basically|actually|literally)\b', ''),
+            ]
+        }
+
+        self.common_errors = {
+            "de": {
+                r'\bdas\s+das\b': 'das',
+                r'\bund\s+und\b': 'und',
+                r'\bist\s+ist\b': 'ist',
+                r'\bein\s+ein\b': 'ein',
+                r'\bdie\s+die\b': 'die',
+                r'\bder\s+der\b': 'der',
+                r'\bzu\s+zu\b': 'zu',
+                r'\bso\s+so\b': 'so',
+                r'\bwir\s+wir\b': 'wir',
+                r'\bsie\s+sie\b': 'sie',
+            },
+            "en": {
+                r'\bthe\s+the\b': 'the',
+                r'\band\s+and\b': 'and',
+                r'\bis\s+is\b': 'is',
+                r'\ba\s+a\b': 'a',
+                r'\bto\s+to\b': 'to',
+                r'\bof\s+of\b': 'of',
+            }
+        }
+
+        self.sentence_starters = {
+            "de": ['Der', 'Die', 'Das', 'Ein', 'Eine', 'Wir', 'Sie', 'Es', 'Ich', 'Man', 'Also', 'Wenn', 'Als', 'Nach', 'Bei', 'Für', 'Mit', 'Durch', 'Über', 'Unter'],
+            "en": ['The', 'A', 'An', 'We', 'They', 'It', 'I', 'You', 'This', 'That', 'When', 'If', 'As', 'For', 'With', 'From', 'To', 'In', 'On', 'At']
+        }
+
+    def correct_instant(self, text: str) -> str:
+        if not text or not text.strip():
+            return text
+
+        lang = self.language[:2]
+
+        for pattern, replacement in self.filler_patterns.get(lang, []):
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+
+        for pattern, replacement in self.common_errors.get(lang, {}).items():
+            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+
+        text = re.sub(r'\s+', ' ', text).strip()
+        text = re.sub(r'\s+([.,!?;:])', r'\1', text)
+        text = re.sub(r'([.,!?;:])\s*([.,!?;:])+', r'\1', text)
+
+        if text and not text[0].isupper():
+            text = text[0].upper() + text[1:]
+
+        sentences = re.split(r'([.!?]\s+)', text)
+        result = []
+        for i, part in enumerate(sentences):
+            if i > 0 and re.match(r'^[.!?]\s+$', sentences[i-1] if i > 0 else ''):
+                if part and part[0].islower():
+                    part = part[0].upper() + part[1:]
+            result.append(part)
+        text = ''.join(result)
+
+        return text
+
+    def correct_full(self, text: str, context: Optional[str] = None) -> str:
+        text = self.correct_instant(text)
+
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        corrected_sentences = []
+
+        for sentence in sentences:
+            if not sentence.strip():
+                continue
+
+            sentence = sentence.strip()
+
+            if sentence and sentence[0].islower():
+                sentence = sentence[0].upper() + sentence[1:]
+
+            if sentence and sentence[-1] not in '.!?':
+                sentence += '.'
+
+            corrected_sentences.append(sentence)
+
+        return ' '.join(corrected_sentences)
+
+
+_transcriber: Optional[RealtimeTranscriber] = None
+_corrector: Optional[TextCorrector] = None
+
+
+def get_realtime_transcriber(language: str = "de") -> RealtimeTranscriber:
+    global _transcriber
+    if _transcriber is None or _transcriber.language != language:
+        _transcriber = RealtimeTranscriber(language)
+    return _transcriber
+
+
+def get_text_corrector(language: str = "de") -> TextCorrector:
+    global _corrector
+    if _corrector is None or _corrector.language != language:
+        _corrector = TextCorrector(language)
+    return _corrector
 
 
 def transcribe_audio_chunk(
     audio_data: np.ndarray,
     sample_rate: int = 16000,
-    filter_non_teacher: bool = True,
-    apply_correction: bool = False,
-    subject: Optional[str] = None
-) -> Optional[str]:
-    if audio_data.dtype != np.float32:
-        audio_data = audio_data.astype(np.float32)
+    language: str = "de",
+    apply_instant_correction: bool = True
+) -> Tuple[str, str, float]:
+    transcriber = get_realtime_transcriber(language)
+    corrector = get_text_corrector(language)
 
-    if len(audio_data) > 0 and np.max(np.abs(audio_data)) > 1.0:
-        audio_data = audio_data / 32768.0
+    raw_text, confidence = transcriber.transcribe_chunk(audio_data, sample_rate)
 
-    if filter_non_teacher:
-        diarizer = get_diarizer()
-        diarizer.sample_rate = sample_rate
-        is_teacher, confidence = diarizer.process_audio_chunk(audio_data)
-        if not is_teacher:
-            return None
+    if apply_instant_correction and raw_text:
+        corrected_text = corrector.correct_instant(raw_text)
+    else:
+        corrected_text = raw_text
 
-    model = get_fast_model()
-
-    try:
-        segments, info = model.transcribe(
-            audio_data,
-            language=None,
-            vad_filter=True,
-            beam_size=1,
-            best_of=1,
-            without_timestamps=True,
-            condition_on_previous_text=False,
-        )
-
-        text_parts = [seg.text.strip() for seg in segments]
-        raw_text = ' '.join(text_parts)
-
-        if not raw_text.strip():
-            return None
-
-        if apply_correction:
-            corrected = correct_transcription(raw_text, subject, info.language)
-            return corrected if corrected.strip() else None
-
-        return raw_text
-
-    except Exception as e:
-        print(f"Transcription error: {e}")
-        return None
+    return raw_text, corrected_text, confidence
 
 
 def transcribe_audio(
     audio_path: str,
-    subject: Optional[str] = None,
+    language: str = "de",
     apply_correction: bool = True
 ) -> Dict:
+    global _accurate_model
+
     if not os.path.exists(audio_path):
         return {
             'success': False,
@@ -99,41 +273,53 @@ def transcribe_audio(
         }
 
     try:
-        model = get_accurate_model()
+        with _model_lock:
+            if _accurate_model is None:
+                print(f"Loading Whisper '{ACCURATE_MODEL}' for final transcription...")
+                _accurate_model = WhisperModel(
+                    ACCURATE_MODEL,
+                    device="cpu",
+                    compute_type="int8"
+                )
+                print("Accurate model ready")
 
-        segments, info = model.transcribe(
+        segments, info = _accurate_model.transcribe(
             audio_path,
-            language=None,
+            language=language,
+            task="transcribe",
+            beam_size=5,
+            best_of=5,
+            patience=1.5,
+            condition_on_previous_text=True,
             vad_filter=True,
-            vad_parameters=dict(
-                min_silence_duration_ms=300,
-                speech_pad_ms=100,
-            )
+            vad_parameters={
+                "threshold": 0.4,
+                "min_speech_duration_ms": 300,
+                "min_silence_duration_ms": 200,
+                "speech_pad_ms": 100,
+            }
         )
 
         all_segments = []
         full_text = []
 
         for seg in segments:
-            all_segments.append({
-                'start': seg.start,
-                'end': seg.end,
-                'text': seg.text.strip()
-            })
-            full_text.append(seg.text.strip())
+            text = seg.text.strip()
+            if text:
+                all_segments.append({
+                    'start': seg.start,
+                    'end': seg.end,
+                    'text': text
+                })
+                full_text.append(text)
 
         raw_text = ' '.join(full_text)
 
         if apply_correction and raw_text:
-            corrector = get_corrector()
-            corrected_text, used_ai = corrector.correct(
-                raw_text,
-                subject=subject,
-                language=info.language
-            )
+            corrector = get_text_corrector(language)
+            corrected_text = corrector.correct_full(raw_text)
         else:
             corrected_text = raw_text
-            used_ai = False
 
         return {
             'success': True,
@@ -141,7 +327,7 @@ def transcribe_audio(
             'raw_text': raw_text,
             'language': info.language,
             'segments': all_segments,
-            'used_ai_correction': used_ai,
+            'used_ai_correction': apply_correction,
             'error': None
         }
 
@@ -168,39 +354,41 @@ def cleanup_audio_file(audio_path: str) -> bool:
 
 def get_available_models() -> List[Dict]:
     return [
-        {'name': 'tiny', 'description': 'Ultra-fast (real-time)', 'size': '~75 MB'},
-        {'name': 'base', 'description': 'Fast and accurate', 'size': '~150 MB'},
-        {'name': 'small', 'description': 'High accuracy', 'size': '~500 MB'},
-        {'name': 'medium', 'description': 'Very high accuracy', 'size': '~1.5 GB'},
+        {'name': 'small', 'description': 'Real-time transcription', 'size': '~500 MB'},
+        {'name': 'medium', 'description': 'Final transcription', 'size': '~1.5 GB'},
     ]
 
 
-def preload_model(model_name: str = "tiny"):
-    get_fast_model()
-    threading.Thread(target=lambda: get_corrector().is_ai_available(), daemon=True).start()
+def preload_model():
+    def _load():
+        transcriber = get_realtime_transcriber("de")
+        transcriber.load_model()
+    threading.Thread(target=_load, daemon=True).start()
+
+
+def reset_session():
+    global _transcriber
+    if _transcriber is not None:
+        _transcriber.reset()
+
+
+def get_correction_status() -> Dict:
+    return {
+        'ai_correction': {
+            'available': True,
+            'model': 'Integrated TextCorrector',
+            'message': 'Instant grammar correction active'
+        },
+        'speaker_diarization': {
+            'num_speakers': 0,
+            'teacher_detected': False
+        }
+    }
 
 
 def get_ollama_status() -> Dict:
     return {
         'available': False,
         'model': None,
-        'message': 'Ollama replaced by faster local AI (MLX)'
+        'message': 'Using integrated correction'
     }
-
-
-def get_correction_status() -> Dict:
-    ai_status = get_ai_status()
-    diarizer = get_diarizer()
-    speaker_stats = diarizer.get_speaker_stats()
-
-    return {
-        'ai_correction': ai_status,
-        'speaker_diarization': {
-            'num_speakers': speaker_stats['num_speakers'],
-            'teacher_detected': speaker_stats['teacher_id'] is not None
-        }
-    }
-
-
-def reset_session():
-    reset_speaker_tracking()
