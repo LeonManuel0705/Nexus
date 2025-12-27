@@ -13,8 +13,8 @@ _realtime_model = None
 _accurate_model = None
 _model_lock = threading.Lock()
 
-REALTIME_MODEL = "medium"
-ACCURATE_MODEL = "large-v3"
+REALTIME_MODEL = "small"
+ACCURATE_MODEL = "medium"
 
 
 class RealtimeTranscriber:
@@ -556,7 +556,8 @@ def transcribe_audio(
                 _accurate_model = WhisperModel(
                     ACCURATE_MODEL,
                     device="cpu",
-                    compute_type="int8"
+                    compute_type="int8",
+                    num_workers=4
                 )
                 print("Accurate model ready")
 
@@ -564,16 +565,16 @@ def transcribe_audio(
             audio_path,
             language=language,
             task="transcribe",
-            beam_size=5,
-            best_of=5,
-            patience=1.5,
+            beam_size=3,
+            best_of=1,
+            patience=1.0,
             condition_on_previous_text=True,
             vad_filter=True,
             vad_parameters={
                 "threshold": 0.4,
-                "min_speech_duration_ms": 300,
+                "min_speech_duration_ms": 250,
                 "min_silence_duration_ms": 200,
-                "speech_pad_ms": 100,
+                "speech_pad_ms": 50,
             }
         )
 
