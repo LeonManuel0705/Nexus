@@ -227,27 +227,7 @@ class TextCorrector:
             'klicken': 'click',
         }
 
-        self.math_operators = {
-            r'\bhoch\b': '^',
-            r'\bquadrat\b': '²',
-            r'\bkubik\b': '³',
-            r'\bmal\b': '×',
-            r'\bgeteilt\s+durch\b': '÷',
-            r'\bdurch\b': '÷',
-            r'\bist\s+gleich\b': '=',
-            r'\bgleich\b': '=',
-            r'\bungleich\b': '≠',
-            r'\bgrößer\s+als\b': '>',
-            r'\bgrößer\s+gleich\b': '≥',
-            r'\bkleiner\s+als\b': '<',
-            r'\bkleiner\s+gleich\b': '≤',
-            r'\bwurzel\b': '√',
-            r'\bplus\s+minus\b': '±',
-            r'\bunendlich\b': '∞',
-            r'\bpi\b': 'π',
-            r'\bsumme\b': 'Σ',
-            r'\bintegral\b': '∫',
-        }
+        self.math_operators = {}
 
     def _convert_numbers(self, text: str) -> str:
         lang = self.language[:2]
@@ -335,18 +315,6 @@ class TextCorrector:
         return ' '.join(result)
 
     def _format_math(self, text: str) -> str:
-        for pattern, replacement in self.math_operators.items():
-            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
-
-        text = re.sub(r'(\d+)\s*\^\s*(\d+)', r'\1^\2', text)
-        text = re.sub(r'([a-zA-Z])\s*\^\s*(\d+)', r'\1^\2', text)
-
-        text = re.sub(r'(\d+)\s*[×x]\s*(\d+)', r'\1 × \2', text)
-        text = re.sub(r'(\d+)\s*÷\s*(\d+)', r'\1 ÷ \2', text)
-        text = re.sub(r'(\d+)\s*\+\s*(\d+)', r'\1 + \2', text)
-        text = re.sub(r'(\d+)\s*-\s*(\d+)', r'\1 - \2', text)
-        text = re.sub(r'(\d+)\s*=\s*(\d+)', r'\1 = \2', text)
-
         return text
 
     def _format_special_chars(self, text: str) -> str:
