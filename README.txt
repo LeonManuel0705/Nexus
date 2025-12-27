@@ -36,7 +36,7 @@ HOW TO START
 
 FIRST RUN
 ---------
-On first run, the app will:
+On first run, the program will:
 - Create a virtual environment
 - Install Python dependencies
 - Download the Whisper "base" model (~150 MB)
@@ -74,7 +74,7 @@ USAGE
 
 FILE LOCATIONS
 --------------
-- App files:     ~/Documents/voice-notes/app/
+- Program files:     ~/Documents/voice-notes/app/
 - Database:      ~/Documents/voice-notes/data/notes.db
 - Temp audio:    ~/Documents/voice-notes/audio_temp/ (auto-cleaned)
 
