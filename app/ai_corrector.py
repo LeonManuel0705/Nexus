@@ -89,7 +89,8 @@ class AICorrector:
             for match in reversed(matches):
                 if match.replacements:
                     start = match.offset
-                    end = match.offset + match.errorLength
+                    error_len = getattr(match, 'errorLength', None) or getattr(match, 'error_length', None) or len(match.context.split())
+                    end = start + error_len
                     corrected = corrected[:start] + match.replacements[0] + corrected[end:]
             return corrected
         except Exception as e:
@@ -125,7 +126,7 @@ Corrected:"""
                 self._tokenizer,
                 prompt=prompt,
                 max_tokens=MAX_TOKENS,
-                temp=TEMPERATURE,
+                temperature=TEMPERATURE,
                 verbose=False
             )
 

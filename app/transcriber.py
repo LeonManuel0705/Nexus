@@ -452,6 +452,7 @@ class TextCorrector:
 
 _transcriber: Optional[RealtimeTranscriber] = None
 _corrector: Optional[TextCorrector] = None
+_ai_corrector_available: Optional[bool] = None
 
 
 def get_realtime_transcriber(language: str = "de") -> RealtimeTranscriber:
@@ -466,6 +467,32 @@ def get_text_corrector(language: str = "de") -> TextCorrector:
     if _corrector is None or _corrector.language != language:
         _corrector = TextCorrector(language)
     return _corrector
+
+
+def apply_ai_correction(text: str, language: str = "de", subject: Optional[str] = None) -> str:
+    global _ai_corrector_available
+
+    if not text or not text.strip():
+        return text
+
+    try:
+        from ai_corrector import get_corrector, correct_transcription
+
+        if _ai_corrector_available is None:
+            corrector = get_corrector()
+            _ai_corrector_available = corrector.is_ai_available()
+
+        if _ai_corrector_available:
+            return correct_transcription(text, subject, language)
+        else:
+            return text
+
+    except ImportError:
+        _ai_corrector_available = False
+        return text
+    except Exception as e:
+        print(f"AI correction error: {e}")
+        return text
 
 
 def transcribe_audio_chunk(
@@ -604,17 +631,28 @@ def reset_session():
 
 
 def get_correction_status() -> Dict:
-    return {
-        'ai_correction': {
-            'available': True,
-            'model': 'Integrated TextCorrector',
-            'message': 'Instant grammar correction active'
-        },
-        'speaker_diarization': {
-            'num_speakers': 0,
-            'teacher_detected': False
+    try:
+        from ai_corrector import get_ai_status
+        ai_status = get_ai_status()
+        return {
+            'ai_correction': ai_status,
+            'speaker_diarization': {
+                'num_speakers': 0,
+                'teacher_detected': False
+            }
         }
-    }
+    except ImportError:
+        return {
+            'ai_correction': {
+                'available': True,
+                'model': 'Integrated TextCorrector',
+                'message': 'Instant grammar correction active'
+            },
+            'speaker_diarization': {
+                'num_speakers': 0,
+                'teacher_detected': False
+            }
+        }
 
 
 def get_ollama_status() -> Dict:

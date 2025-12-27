@@ -17,7 +17,8 @@ from recorder import get_recorder, list_audio_devices, get_default_input_device
 from transcriber import (
     cleanup_audio_file, get_available_models,
     preload_model, transcribe_audio_chunk, get_ollama_status,
-    get_correction_status, reset_session, get_text_corrector
+    get_correction_status, reset_session, get_text_corrector,
+    apply_ai_correction
 )
 from voice_profile import get_profile_manager, verify_teacher_audio
 
@@ -34,7 +35,6 @@ last_correction_index = 0
 correction_lock = threading.Lock()
 current_language = "de"
 
-# Voice filtering settings
 voice_filter_enabled = False
 voice_filter_profile_id = None
 enrollment_active = False
@@ -262,6 +262,7 @@ def background_correction_worker():
                 if segments_to_correct:
                     text_to_correct = ' '.join(segments_to_correct)
                     corrected_text = corrector.correct_full(text_to_correct)
+                    corrected_text = apply_ai_correction(corrected_text, current_language)
 
                     corrected_segments.append(corrected_text)
                     last_correction_index = safe_index
@@ -284,7 +285,6 @@ def realtime_transcription_worker():
     recorder = get_recorder()
     corrector = get_text_corrector(current_language)
 
-    # Get voice filter if enabled
     voice_manager = get_profile_manager() if voice_filter_enabled else None
     skipped_chunks = 0
 
@@ -293,13 +293,11 @@ def realtime_transcription_worker():
 
         if chunk is not None:
             try:
-                # Voice filtering: skip if not teacher's voice
                 if voice_filter_enabled and voice_manager is not None:
                     is_teacher, confidence = voice_manager.verify_audio(chunk)
 
                     if not is_teacher or confidence < 0.4:
                         skipped_chunks += 1
-                        # Notify UI occasionally that we're filtering
                         if skipped_chunks % 5 == 0:
                             socketio.emit('voice_filter_status', {
                                 'filtering': True,
@@ -308,7 +306,7 @@ def realtime_transcription_worker():
                             })
                         continue
 
-                    skipped_chunks = 0  # Reset on successful match
+                    skipped_chunks = 0
 
                 raw_text, corrected_text, confidence = transcribe_audio_chunk(
                     chunk,
@@ -403,6 +401,7 @@ def handle_stop_realtime(data):
                 corrector = get_text_corrector(current_language)
                 remaining_text = ' '.join(remaining_segments)
                 corrected_remaining = corrector.correct_full(remaining_text)
+                corrected_remaining = apply_ai_correction(corrected_remaining, current_language)
                 corrected_segments.append(corrected_remaining)
 
         final_text = ' '.join(corrected_segments)
@@ -412,6 +411,7 @@ def handle_stop_realtime(data):
         if final_text.strip():
             corrector = get_text_corrector(current_language)
             final_text = corrector.correct_full(final_text)
+            final_text = apply_ai_correction(final_text, current_language)
 
     if audio_path:
         cleanup_audio_file(audio_path)
@@ -783,11 +783,32 @@ def get_system_status():
     })
 
 
-# ==================== Voice Profile API ====================
+@app.route('/api/models/check', methods=['GET'])
+def check_models():
+    from model_manager import check_all_models
+    return jsonify(check_all_models())
+
+
+@app.route('/api/models/download/<model_name>', methods=['POST'])
+def start_model_download(model_name):
+    from model_manager import download_model_async
+
+    valid_models = ['whisper', 'mlx', 'speaker']
+    if model_name not in valid_models:
+        return jsonify({'error': 'Invalid model name'}), 400
+
+    download_model_async(model_name)
+    return jsonify({'status': 'started', 'model': model_name})
+
+
+@app.route('/api/models/progress', methods=['GET'])
+def get_model_progress():
+    from model_manager import get_download_progress
+    return jsonify({'downloads': get_download_progress()})
+
 
 @app.route('/api/voice-profiles', methods=['GET'])
 def list_voice_profiles():
-    """List all saved voice profiles."""
     manager = get_profile_manager()
     profiles = manager.list_profiles()
     current = manager.get_current_profile()
@@ -799,7 +820,6 @@ def list_voice_profiles():
 
 @app.route('/api/voice-profiles/current', methods=['GET'])
 def get_current_voice_profile():
-    """Get the currently active voice profile."""
     manager = get_profile_manager()
     current = manager.get_current_profile()
     return jsonify({
@@ -809,7 +829,6 @@ def get_current_voice_profile():
 
 @app.route('/api/voice-profiles/<profile_id>', methods=['DELETE'])
 def delete_voice_profile(profile_id):
-    """Delete a voice profile."""
     manager = get_profile_manager()
     success = manager.delete_profile(profile_id)
     if success:
@@ -818,7 +837,6 @@ def delete_voice_profile(profile_id):
 
 @app.route('/api/voice-profiles/<profile_id>/activate', methods=['POST'])
 def activate_voice_profile(profile_id):
-    """Activate a voice profile for filtering."""
     global voice_filter_enabled, voice_filter_profile_id
 
     manager = get_profile_manager()
@@ -833,7 +851,6 @@ def activate_voice_profile(profile_id):
 
 @app.route('/api/voice-profiles/deactivate', methods=['POST'])
 def deactivate_voice_filter():
-    """Disable voice filtering."""
     global voice_filter_enabled, voice_filter_profile_id
 
     voice_filter_enabled = False
@@ -842,7 +859,6 @@ def deactivate_voice_filter():
 
 @app.route('/api/voice-profiles/filter-status', methods=['GET'])
 def get_voice_filter_status():
-    """Get the current voice filter status."""
     manager = get_profile_manager()
     return jsonify({
         'enabled': voice_filter_enabled,
@@ -851,11 +867,8 @@ def get_voice_filter_status():
     })
 
 
-# ==================== Voice Enrollment Socket Events ====================
-
 @socketio.on('start_enrollment')
 def handle_start_enrollment(data):
-    """Start voice enrollment for a new teacher."""
     global enrollment_active
 
     teacher_name = data.get('name', 'Teacher')
@@ -870,7 +883,6 @@ def handle_start_enrollment(data):
         'min_duration': 30
     })
 
-    # Start recording for enrollment
     recorder = get_recorder()
     if not recorder.is_recording():
         recorder.start_recording()
@@ -886,7 +898,6 @@ def handle_start_enrollment(data):
 
 @socketio.on('stop_enrollment')
 def handle_stop_enrollment(data):
-    """Stop and finalize voice enrollment."""
     global enrollment_active, voice_filter_enabled, voice_filter_profile_id
 
     enrollment_active = False
@@ -899,7 +910,6 @@ def handle_stop_enrollment(data):
     result = manager.finish_enrollment()
 
     if result.get('status') == 'success':
-        # Auto-activate the new profile
         voice_filter_profile_id = result['profile_id']
         manager.load_profile(result['profile_id'])
         voice_filter_enabled = True
@@ -909,7 +919,6 @@ def handle_stop_enrollment(data):
 
 @socketio.on('cancel_enrollment')
 def handle_cancel_enrollment():
-    """Cancel ongoing enrollment."""
     global enrollment_active
 
     enrollment_active = False

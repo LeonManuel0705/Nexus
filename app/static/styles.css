@@ -72,7 +72,6 @@ body {
     height: 100vh;
 }
 
-/* Sidebar */
 .sidebar {
     width: 280px;
     min-width: 240px;
@@ -340,7 +339,6 @@ body {
     color: var(--accent);
 }
 
-/* Main Content */
 .main-content {
     flex: 1;
     display: flex;
@@ -434,7 +432,6 @@ body {
     background: #dc2626;
 }
 
-/* Recording Section */
 .recording-section {
     padding: 32px 24px;
     display: flex;
@@ -555,7 +552,6 @@ body {
     font-variant-numeric: tabular-nums;
 }
 
-/* Live Transcription */
 .live-transcription {
     display: none;
     padding: 20px 24px;
@@ -659,7 +655,6 @@ body {
     color: var(--text-muted);
 }
 
-/* Notes Container with Selection */
 .notes-container {
     flex: 1;
     overflow-y: auto;
@@ -837,7 +832,6 @@ body {
     color: var(--text-secondary);
 }
 
-/* Detail Panel */
 .detail-panel {
     width: 400px;
     background: var(--bg-card);
@@ -1034,7 +1028,6 @@ body {
     padding: 12px;
 }
 
-/* Modals */
 .modal {
     display: none;
     position: fixed;
@@ -1125,7 +1118,6 @@ body {
     color: var(--accent);
 }
 
-/* Context Menu */
 .context-menu {
     position: fixed;
     background: var(--bg-card);
@@ -1177,7 +1169,6 @@ body {
     margin: 4px 0;
 }
 
-/* Toast Notifications */
 .toast-container {
     position: fixed;
     bottom: 24px;
@@ -1212,7 +1203,6 @@ body {
     to { transform: translateX(0); opacity: 1; }
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -1231,7 +1221,6 @@ body {
     background: var(--text-muted);
 }
 
-/* Responsive */
 @media (max-width: 1024px) {
     .sidebar {
         width: 240px;
@@ -1265,7 +1254,6 @@ body {
     }
 }
 
-/* Correction indicator */
 .correction-indicator {
     display: flex;
     align-items: center;
@@ -1291,7 +1279,6 @@ body {
     50% { opacity: 0.5; }
 }
 
-/* Voice Filter Button */
 .recording-controls-row {
     display: flex;
     justify-content: center;
@@ -1343,7 +1330,6 @@ body {
     display: block;
 }
 
-/* Voice Profile Modal */
 .modal-lg {
     max-width: 500px;
 }
@@ -1417,7 +1403,6 @@ body {
     color: var(--success);
 }
 
-/* Enrollment Section */
 .enrollment-section {
     display: flex;
     flex-direction: column;
@@ -1505,7 +1490,6 @@ body {
     background: #059669;
 }
 
-/* Saved Profiles */
 .saved-profiles {
     border-top: 1px solid var(--border);
     padding-top: 20px;
@@ -1596,7 +1580,6 @@ body {
     background: var(--danger-light);
 }
 
-/* Voice filter indicator */
 .voice-filter-active {
     display: flex;
     align-items: center;
@@ -1612,4 +1595,182 @@ body {
 .voice-filter-active svg {
     width: 14px;
     height: 14px;
+}
+
+.model-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.model-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.model-item.installed {
+    border-color: var(--success);
+    background: var(--success-light);
+}
+
+.model-item.missing {
+    border-color: var(--warning);
+    background: var(--warning-light);
+}
+
+.model-item.downloading {
+    border-color: var(--accent);
+    background: var(--accent-light);
+}
+
+.model-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.model-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.model-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.model-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.status-badge.installed {
+    background: var(--success);
+    color: white;
+}
+
+.status-badge.missing {
+    background: var(--warning);
+    color: white;
+}
+
+.status-badge.required {
+    background: var(--danger);
+    color: white;
+}
+
+.status-badge.optional {
+    background: var(--text-muted);
+    color: white;
+}
+
+.download-progress-section {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+}
+
+.download-progress-section h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+}
+
+.download-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.download-item {
+    padding: 16px;
+    background: var(--accent-light);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+}
+
+.download-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.download-name {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.download-status {
+    font-size: 12px;
+    color: var(--accent);
+}
+
+.download-progress-bar {
+    height: 8px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.download-progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.download-message {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.download-item.complete .download-progress-fill {
+    background: var(--success);
+}
+
+.download-item.error {
+    border-color: var(--danger);
+    background: var(--danger-light);
+}
+
+.download-item.error .download-status {
+    color: var(--danger);
+}
+
+.model-check-spinner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
