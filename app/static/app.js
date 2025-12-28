@@ -118,6 +118,11 @@ checkInitStatus();
 
 const i18n = {
     en: {
+        // Navbar
+        navHome: 'Home',
+        navFeatures: 'Features',
+        navDocs: 'Docs',
+        // App
         folders: 'Folders',
         tags: 'Tags',
         allNotes: 'All Notes',
@@ -208,6 +213,11 @@ const i18n = {
         filterModeExcludeDesc: 'Filter OUT this voice'
     },
     de: {
+        // Navbar
+        navHome: 'Startseite',
+        navFeatures: 'Funktionen',
+        navDocs: 'Dokumentation',
+        // App
         folders: 'Ordner',
         tags: 'Tags',
         allNotes: 'Alle Notizen',
