@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}How It Works - VoiceNotes{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="/static/css/pages.css">
+{% endblock %}
+
+{% block content %}
+<section class="page-hero">
+    <div class="container">
+        <h1>How It Works</h1>
+        <p>From speech to text in seconds, powered by state-of-the-art AI running entirely on your device.</p>
+    </div>
+</section>
+
+<section class="how-it-works-page">
+    <div class="process-step">
+        <div class="process-content">
+            <div class="process-number">1</div>
+            <h2>Capture Your Voice</h2>
+            <p>Press the record button and start speaking. VoiceNotes captures high-quality audio from your microphone with intelligent noise detection and voice activity monitoring.</p>
+            <ul class="process-features">
+                <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Real-time audio waveform visualization
+                </li>
+                <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Voice activity detection (VAD)
+                </li>
+                <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Works with any microphone
+                </li>
+            </ul>
+        </div>
+        <div class="process-visual">
+            <svg class="process-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+        </div>
+    </div>
+
+    <div class="process-step">
+        <div class="process-content">
+            <div class="process-number">2</div>
+            <h2>AI Transcription</h2>
+            <p>Your audio is processed by Whisper, OpenAI's state-of-the-art speech recognition model, running entirely on your device. No cloud processing, no data uploads.</p>
+            <ul class="process-features">
+                <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Whisper AI for high accuracy
+                </li>
+                <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Real-time streaming output
+                </li>
+                <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    German and English support
+                </li>
+            </ul>
+        </div>
+        <div class="process-visual">
+            <svg class="process-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+            </svg>
+        </div>
+    </div>
+
+    <div class="process-step">
+        <div class="process-content">
+            <div class="process-number">3</div>
+            <h2>Intelligent Enhancement</h2>
+            <p>Your transcription is automatically enhanced using local AI models. Grammar is corrected, punctuation is improved, and context-specific terms are recognized.</p>
+            <ul class="process-features">
+                <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    LanguageTool grammar checking
+                </li>
+                <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    MLX AI on Apple Silicon
+                </li>
+                <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Context-aware corrections
+                </li>
+            </ul>
+        </div>
+        <div class="process-visual">
+            <svg class="process-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+            </svg>
+        </div>
+    </div>
+
+    <div class="process-step">
+        <div class="process-content">
+            <div class="process-number">4</div>
+            <h2>Voice Filtering (Optional)</h2>
+            <p>Need to isolate a specific speaker? Create a voice profile by recording a short sample. VoiceNotes will then filter recordings to include only that voice.</p>
+            <ul class="process-features">
+                <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Speaker recognition AI
+                </li>
+                <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Include or exclude mode
+                </li>
+                <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Adaptive threshold tuning
+                </li>
+            </ul>
+        </div>
+        <div class="process-visual">
+            <svg class="process-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+            </svg>
+        </div>
+    </div>
+
+    <div class="process-step">
+        <div class="process-content">
+            <div class="process-number">5</div>
+            <h2>Organize & Export</h2>
+            <p>Your notes are automatically saved and can be organized into folders with tags. Export anytime to Word, Markdown, or plain text for use in other applications.</p>
+            <ul class="process-features">
+                <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Hierarchical folder structure
+                </li>
+                <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Full-text search
+                </li>
+                <li>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Multiple export formats
+                </li>
+            </ul>
+        </div>
+        <div class="process-visual">
+            <svg class="process-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+        </div>
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="cta-container">
+        <h2>See it in action</h2>
+        <p>Try VoiceNotes now and experience seamless voice transcription.</p>
+        <a href="/app" class="btn btn-primary btn-large">Open VoiceNotes</a>
+    </div>
+</section>
+{% endblock %}
