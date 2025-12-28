@@ -1,9 +1,5 @@
 #!/bin/bash
 
-# Voice Notes - Offline Setup Script
-# ===================================
-# Downloads all required models and data for fully offline operation
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_DIR="$SCRIPT_DIR/app"
 VENV_DIR="$SCRIPT_DIR/venv"
@@ -18,36 +14,30 @@ echo "This script will download all required models"
 echo "for fully offline operation (~2GB total)."
 echo ""
 
-# Check if Python 3 is installed
 if ! command -v python3 &> /dev/null; then
     echo "❌ Error: Python 3 is not installed."
     echo "   Please install Python 3 from https://www.python.org/downloads/"
     exit 1
 fi
 
-# Check if ffmpeg is installed
 if ! command -v ffmpeg &> /dev/null; then
     echo "⚠️  Warning: ffmpeg is not installed."
     echo "   Install it with: brew install ffmpeg"
     echo ""
 fi
 
-# Create virtual environment if it doesn't exist
 if [ ! -d "$VENV_DIR" ]; then
     echo "📦 Creating virtual environment..."
     python3 -m venv "$VENV_DIR"
 fi
 
-# Activate virtual environment
 source "$VENV_DIR/bin/activate"
 
-# Install/upgrade dependencies
 echo ""
 echo "📦 Installing Python dependencies..."
 pip install --quiet --upgrade pip
 pip install --quiet -r "$APP_DIR/requirements.txt"
 
-# Create models directory
 mkdir -p "$MODELS_DIR"
 
 echo ""
@@ -56,7 +46,6 @@ echo "  Downloading Whisper Models"
 echo "=============================================="
 echo ""
 
-# Pre-download Whisper models
 python3 << 'EOF'
 import sys
 print("📥 Downloading Whisper 'base' model (~150MB)...")
@@ -80,7 +69,6 @@ echo "  Downloading LanguageTool Data"
 echo "=============================================="
 echo ""
 
-# Pre-download LanguageTool data
 python3 << 'EOF'
 import sys
 print("📥 Downloading LanguageTool for German (~200MB)...")
@@ -112,7 +100,6 @@ echo "  Downloading Speaker Diarization Model"
 echo "=============================================="
 echo ""
 
-# Pre-download speaker diarization model
 python3 << 'EOF'
 import sys
 print("📥 Downloading speaker embedding model (~80MB)...")
@@ -147,7 +134,6 @@ echo "  Downloading Local AI Model (MLX)"
 echo "=============================================="
 echo ""
 
-# Check if Apple Silicon
 if [[ $(uname -m) == "arm64" ]]; then
     python3 << 'EOF'
 import sys

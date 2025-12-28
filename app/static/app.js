@@ -2,6 +2,40 @@ const API_BASE = '';
 const socket = io();
 
 let modelsInitialized = false;
+let initLanguageSelected = false;
+
+function initLanguageSelector() {
+    const langBtns = document.querySelectorAll('.init-lang-btn');
+    const subtitle = document.getElementById('initSubtitle');
+
+    langBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const lang = btn.dataset.initLang;
+
+            langBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            state.uiLanguage = lang;
+            state.language = lang;
+            localStorage.setItem('voicenotes_ui_lang', lang);
+            localStorage.setItem('voicenotes_lang', lang);
+
+            if (subtitle) {
+                subtitle.textContent = lang === 'de' ? 'Modelle werden initialisiert...' : 'Initializing models...';
+            }
+
+            initLanguageSelected = true;
+            updateUI();
+        });
+    });
+
+    const savedLang = localStorage.getItem('voicenotes_ui_lang') || 'en';
+    const savedBtn = document.querySelector(`.init-lang-btn[data-init-lang="${savedLang}"]`);
+    if (savedBtn) {
+        langBtns.forEach(b => b.classList.remove('active'));
+        savedBtn.classList.add('active');
+    }
+}
 
 function updateInitProgress(data) {
     const overlay = document.getElementById('initOverlay');
@@ -79,6 +113,7 @@ socket.on('models_ready', (data) => {
     }
 });
 
+initLanguageSelector();
 checkInitStatus();
 
 const i18n = {

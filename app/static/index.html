@@ -6,7 +6,7 @@
     <title>VoiceNotes - Real-time Transcription</title>
     <link rel="stylesheet" href="/static/styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet">
     <script src="/static/socket.io.min.js"></script>
 </head>
 <body>
@@ -21,7 +21,12 @@
                 </svg>
             </div>
             <h1 class="init-title">VoiceNotes</h1>
-            <p class="init-subtitle">Initializing models...</p>
+            <p class="init-subtitle" id="initSubtitle">Select your language</p>
+
+            <div class="init-language-selector" id="initLanguageSelector">
+                <button class="init-lang-btn active" data-init-lang="en">English</button>
+                <button class="init-lang-btn" data-init-lang="de">Deutsch</button>
+            </div>
 
             <div class="init-progress-container">
                 <div class="init-progress-bar">
