@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Documentation - VoiceNotes{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="/static/css/pages.css">
+{% endblock %}
+
+{% block content %}
+<section class="page-hero">
+    <div class="container">
+        <h1>Documentation</h1>
+        <p>Everything you need to know to get started with VoiceNotes.</p>
+    </div>
+</section>
+
+<div class="docs-page">
+    <aside class="docs-sidebar">
+        <nav class="docs-nav">
+            <div class="docs-nav-title">Getting Started</div>
+            <a href="#getting-started" class="active">Quick Start</a>
+            <a href="#requirements">Requirements</a>
+            <a href="#installation">Installation</a>
+            <div class="docs-nav-title">Using VoiceNotes</div>
+            <a href="#recording">Recording</a>
+            <a href="#voice-profiles">Voice Profiles</a>
+            <a href="#organizing">Organizing Notes</a>
+            <a href="#exporting">Exporting</a>
+            <div class="docs-nav-title">Advanced</div>
+            <a href="#settings">Settings</a>
+            <a href="#troubleshooting">Troubleshooting</a>
+        </nav>
+    </aside>
+
+    <div class="docs-content">
+        <section id="getting-started" class="docs-section">
+            <h2>Quick Start</h2>
+            <p>VoiceNotes is a voice transcription application that runs entirely on your computer. Here's how to get started:</p>
+            <ol>
+                <li>Launch VoiceNotes by running <code>./start.sh</code> in your terminal</li>
+                <li>Open your browser to <code>http://localhost:5050</code></li>
+                <li>Wait for the models to initialize (first launch may take a few minutes)</li>
+                <li>Select your language (English or German)</li>
+                <li>Click the record button and start speaking</li>
+            </ol>
+            <div class="docs-callout">
+                <p><strong>Tip:</strong> For the best results, use a good quality microphone and speak clearly at a normal pace.</p>
+            </div>
+        </section>
+
+        <section id="requirements" class="docs-section">
+            <h2>Requirements</h2>
+            <h3>System Requirements</h3>
+            <ul>
+                <li>macOS, Windows, or Linux</li>
+                <li>Python 3.9 or higher</li>
+                <li>4GB RAM minimum (8GB recommended)</li>
+                <li>2GB free disk space for models</li>
+            </ul>
+            <h3>For Apple Silicon (M1/M2/M3)</h3>
+            <p>VoiceNotes uses MLX for accelerated AI inference on Apple Silicon Macs. This provides faster and more accurate transcription enhancement.</p>
+        </section>
+
+        <section id="installation" class="docs-section">
+            <h2>Installation</h2>
+            <h3>Automatic Setup</h3>
+            <p>Run the offline setup script to download all required models:</p>
+            <p><code>./setup_offline.sh</code></p>
+            <p>This will download:</p>
+            <ul>
+                <li>Whisper speech recognition models (~650MB)</li>
+                <li>LanguageTool language data (~350MB)</li>
+                <li>Speaker recognition model (~80MB)</li>
+                <li>MLX AI model for Apple Silicon (~500MB)</li>
+            </ul>
+        </section>
+
+        <section id="recording" class="docs-section">
+            <h2>Recording</h2>
+            <h3>Starting a Recording</h3>
+            <p>Click the large record button in the center of the screen. The button will turn red to indicate recording is active.</p>
+            <h3>Live Transcription</h3>
+            <p>As you speak, you'll see your words appear in real-time below the record button. The text updates every few seconds as the AI processes your speech.</p>
+            <h3>Stopping a Recording</h3>
+            <p>Click the record button again to stop. Your recording will be automatically saved as a note in the current folder.</p>
+        </section>
+
+        <section id="voice-profiles" class="docs-section">
+            <h2>Voice Profiles</h2>
+            <p>Voice profiles allow you to filter recordings to include only specific speakers.</p>
+            <h3>Creating a Profile</h3>
+            <ol>
+                <li>Click the voice filter button (person icon)</li>
+                <li>Click "Create New Profile"</li>
+                <li>Enter a name for the profile (e.g., "Professor Smith")</li>
+                <li>Record a 30-second sample of the person speaking</li>
+                <li>Click "Save Profile"</li>
+            </ol>
+            <h3>Using Voice Filter</h3>
+            <p>Select a profile from the dropdown to activate voice filtering. Choose between:</p>
+            <ul>
+                <li><strong>Include Mode:</strong> Only transcribe when this voice is detected</li>
+                <li><strong>Exclude Mode:</strong> Transcribe everything except this voice</li>
+            </ul>
+        </section>
+
+        <section id="organizing" class="docs-section">
+            <h2>Organizing Notes</h2>
+            <h3>Folders</h3>
+            <p>Create folders to organize your notes by course, project, or any category. Right-click on the sidebar to create a new folder or subfolder.</p>
+            <h3>Tags</h3>
+            <p>Add tags to notes for quick filtering. Click on a note to open the detail panel, then add tags in the tags section.</p>
+            <h3>Search</h3>
+            <p>Use the search bar at the top of the sidebar to find notes by content. The search looks through all note text and titles.</p>
+        </section>
+
+        <section id="exporting" class="docs-section">
+            <h2>Exporting</h2>
+            <p>Export your notes in multiple formats:</p>
+            <ul>
+                <li><strong>Word (.docx):</strong> For use in Microsoft Word or Google Docs</li>
+                <li><strong>Markdown (.md):</strong> For use in note-taking apps like Obsidian or Notion</li>
+                <li><strong>Plain Text (.txt):</strong> Universal format for any application</li>
+            </ul>
+            <p>You can export individual notes or entire folders at once.</p>
+        </section>
+
+        <section id="settings" class="docs-section">
+            <h2>Settings</h2>
+            <h3>Language</h3>
+            <p>Select between English and German for both the UI and transcription language.</p>
+            <h3>Theme</h3>
+            <p>Toggle between light and dark mode using the sun/moon icon in the navigation bar.</p>
+            <h3>Voice Filter Threshold</h3>
+            <p>Adjust the sensitivity of voice filtering. Lower values are more strict, higher values are more permissive.</p>
+        </section>
+
+        <section id="troubleshooting" class="docs-section">
+            <h2>Troubleshooting</h2>
+            <h3>Microphone not working</h3>
+            <p>Make sure your browser has permission to access the microphone. Check your system sound settings to ensure the correct microphone is selected.</p>
+            <h3>Slow transcription</h3>
+            <p>Transcription speed depends on your hardware. On slower machines, try using shorter recording sessions.</p>
+            <h3>Models not loading</h3>
+            <p>Run <code>./setup_offline.sh</code> to download all required models. Make sure you have enough disk space.</p>
+            <h3>Port already in use</h3>
+            <p>If port 5050 is already in use, stop any other applications using that port or modify the port in app.py.</p>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.docs-nav a').forEach(link => {
+    link.addEventListener('click', function(e) {
+        document.querySelectorAll('.docs-nav a').forEach(l => l.classList.remove('active'));
+        this.classList.add('active');
+    });
+});
+
+window.addEventListener('scroll', () => {
+    const sections = document.querySelectorAll('.docs-section');
+    let current = '';
+    sections.forEach(section => {
+        const sectionTop = section.offsetTop;
+        if (window.scrollY >= sectionTop - 100) {
+            current = section.getAttribute('id');
+        }
+    });
+    document.querySelectorAll('.docs-nav a').forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + current) {
+            link.classList.add('active');
+        }
+    });
+});
+</script>
+{% endblock %}

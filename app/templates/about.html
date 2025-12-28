@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}About - VoiceNotes{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="/static/css/pages.css">
+{% endblock %}
+
+{% block content %}
+<section class="page-hero">
+    <div class="container">
+        <h1>About VoiceNotes</h1>
+        <p>Built for privacy, designed for productivity.</p>
+    </div>
+</section>
+
+<section class="section about-page">
+    <div class="about-content">
+        <div class="about-section">
+            <h2>Our Mission</h2>
+            <p>VoiceNotes was created with a simple goal: provide powerful voice transcription that respects your privacy. In a world where most services send your data to the cloud, we believe you should have complete control over your information.</p>
+            <p>Every word you speak is processed locally on your device. No accounts, no subscriptions, no data collection. Your notes belong to you.</p>
+        </div>
+
+        <div class="privacy-highlight">
+            <h3>100% Offline</h3>
+            <p>All processing happens on your device. Your voice never leaves your computer. No internet connection required after initial setup.</p>
+        </div>
+
+        <div class="about-section">
+            <h2>Technology</h2>
+            <p>VoiceNotes combines state-of-the-art AI technologies to deliver accurate, real-time transcription:</p>
+            <div class="tech-grid">
+                <div class="tech-card">
+                    <h3>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        </svg>
+                        Whisper
+                    </h3>
+                    <p>OpenAI's advanced speech recognition model, running locally via faster-whisper for optimized performance.</p>
+                </div>
+                <div class="tech-card">
+                    <h3>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
+                            <rect x="9" y="9" width="6" height="6"/>
+                            <line x1="9" y1="1" x2="9" y2="4"/>
+                            <line x1="15" y1="1" x2="15" y2="4"/>
+                            <line x1="9" y1="20" x2="9" y2="23"/>
+                            <line x1="15" y1="20" x2="15" y2="23"/>
+                        </svg>
+                        MLX
+                    </h3>
+                    <p>Apple's machine learning framework for fast inference on Apple Silicon. Powers context-aware grammar correction.</p>
+                </div>
+                <div class="tech-card">
+                    <h3>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 20h9"/>
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                        </svg>
+                        LanguageTool
+                    </h3>
+                    <p>Open-source grammar and spell checker with support for German and English, running completely offline.</p>
+                </div>
+                <div class="tech-card">
+                    <h3>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                            <circle cx="9" cy="7" r="4"/>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        </svg>
+                        SpeechBrain
+                    </h3>
+                    <p>Speaker recognition for voice filtering. Identify and isolate specific speakers in recordings.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="about-section">
+            <h2>Why Offline?</h2>
+            <p>We chose an offline-first approach for several important reasons:</p>
+            <ul style="list-style: none; padding: 0;">
+                <li style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 24px; height: 24px; color: var(--accent); flex-shrink: 0; margin-top: 2px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    <div>
+                        <strong>Privacy:</strong> Your voice contains sensitive information. It should never leave your device without your explicit consent.
+                    </div>
+                </li>
+                <li style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 24px; height: 24px; color: var(--accent); flex-shrink: 0; margin-top: 2px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <div>
+                        <strong>Speed:</strong> No network latency means faster transcription and a more responsive experience.
+                    </div>
+                </li>
+                <li style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 24px; height: 24px; color: var(--accent); flex-shrink: 0; margin-top: 2px;"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+                    <div>
+                        <strong>Reliability:</strong> Works anywhere, anytime. No internet connection required after initial setup.
+                    </div>
+                </li>
+                <li style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 24px; height: 24px; color: var(--accent); flex-shrink: 0; margin-top: 2px;"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    <div>
+                        <strong>Free Forever:</strong> No recurring costs, no usage limits. Once installed, it's yours.
+                    </div>
+                </li>
+            </ul>
+        </div>
+
+        <div class="about-section" style="text-align: center; margin-top: 64px;">
+            <h2>Ready to get started?</h2>
+            <p style="margin-bottom: 24px;">Experience private, powerful voice transcription today.</p>
+            <a href="/app" class="btn btn-primary btn-large">Open VoiceNotes</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

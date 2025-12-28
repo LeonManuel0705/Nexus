@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_from_directory, send_file
+from flask import Flask, request, jsonify, send_from_directory, send_file, render_template
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import os
@@ -380,8 +380,28 @@ def create_folder_word_document(folder, notes):
     return doc
 
 @app.route('/')
-def index():
-    return send_from_directory('static', 'index.html')
+def home():
+    return render_template('home.html', active_page='home')
+
+@app.route('/app')
+def application():
+    return render_template('app.html')
+
+@app.route('/app/features')
+def features():
+    return render_template('features.html', active_page='features')
+
+@app.route('/app/how-it-works')
+def how_it_works():
+    return render_template('how_it_works.html', active_page='how-it-works')
+
+@app.route('/app/docs')
+def docs():
+    return render_template('docs.html', active_page='docs')
+
+@app.route('/app/about')
+def about():
+    return render_template('about.html', active_page='about')
 
 @app.route('/static/<path:path>')
 def serve_static(path):
