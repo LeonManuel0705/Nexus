@@ -28,8 +28,9 @@ audio_temp/
 # Data (contains database with recordings)
 data/
 
-# Voice profiles (user-specific data)
-voice_profiles/
+# Voice profiles (user-specific data, keep folder structure)
+voice_profiles/*
+!voice_profiles/.gitkeep
 
 # OS files
 .DS_Store
