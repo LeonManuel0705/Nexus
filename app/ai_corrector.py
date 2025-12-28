@@ -3,11 +3,11 @@ import threading
 from typing import Optional, Tuple
 import re
 
-MLX_MODEL = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
-MAX_TOKENS = 150
-TEMPERATURE = 0.05
-REPETITION_PENALTY = 1.3
-USE_MLX_AI = False
+MLX_MODEL = "mlx-community/Phi-3-mini-4k-instruct-4bit"
+MAX_TOKENS = 200
+TEMPERATURE = 0.1
+REPETITION_PENALTY = 1.2
+USE_MLX_AI = True
 
 class AICorrector:
     def __init__(self):
@@ -163,24 +163,28 @@ class AICorrector:
         return text
 
     def _build_prompt(self, text: str, subject: Optional[str], language: str) -> str:
-        lang_name = "German" if language == "de" else "English"
-
-        subject_context = ""
-        if subject:
-            subject_context = f"({subject} lecture) "
-
         if language == "de":
-            prompt = f"""Korrigiere diesen Text. {subject_context}Nur korrigierter Text ausgeben, KEINE Erklärungen.
+            prompt = f"""<|user|>
+Du bist ein Textkorrektur-Assistent. Korrigiere den folgenden transkribierten Text:
+- Verbinde unvollständige Sätze
+- Korrigiere Grammatik und Rechtschreibung
+- Behalte natürliche Füllwörter wie "ja", "also", "ne"
+- Gib NUR den korrigierten Text aus, KEINE Erklärungen
 
-"{text}"
-
-Korrigiert:"""
+Text: {text}
+<|end|>
+<|assistant|>"""
         else:
-            prompt = f"""Fix this text. {subject_context}Output ONLY the corrected text, NO explanations.
+            prompt = f"""<|user|>
+You are a text correction assistant. Fix the following transcribed text:
+- Connect incomplete sentences
+- Fix grammar and spelling
+- Keep natural filler words like "yeah", "so", "well"
+- Output ONLY the corrected text, NO explanations
 
-"{text}"
-
-Fixed:"""
+Text: {text}
+<|end|>
+<|assistant|>"""
 
         return prompt
 
