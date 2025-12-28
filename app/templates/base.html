@@ -9,8 +9,48 @@
     <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/base.css">
     {% block styles %}{% endblock %}
+    <style>
+        .page-transition {
+            animation: fadeInUp 0.4s ease-out;
+        }
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .lang-selector {
+            display: flex;
+            gap: 4px;
+            margin-right: 12px;
+        }
+        .lang-selector button {
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 500;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: var(--font-primary);
+        }
+        .lang-selector button:hover {
+            border-color: var(--accent);
+        }
+        .lang-selector button.active {
+            background: var(--accent);
+            color: #ffffff;
+            border-color: var(--accent);
+        }
+    </style>
 </head>
-<body data-theme="light">
+<body data-theme="light" data-lang="en">
     <nav class="navbar" id="navbar">
         <div class="navbar-container">
             <a href="/" class="navbar-logo">
@@ -24,14 +64,18 @@
             </a>
 
             <div class="navbar-links">
-                <a href="/" class="nav-link {% if active_page == 'home' %}active{% endif %}">Home</a>
-                <a href="/app/features" class="nav-link {% if active_page == 'features' %}active{% endif %}">Features</a>
-                <a href="/app/how-it-works" class="nav-link {% if active_page == 'how-it-works' %}active{% endif %}">How it Works</a>
-                <a href="/app/docs" class="nav-link {% if active_page == 'docs' %}active{% endif %}">Docs</a>
-                <a href="/app/about" class="nav-link {% if active_page == 'about' %}active{% endif %}">About</a>
+                <a href="/" class="nav-link {% if active_page == 'home' %}active{% endif %}" data-translate="home">Home</a>
+                <a href="/app/features" class="nav-link {% if active_page == 'features' %}active{% endif %}" data-translate="features">Features</a>
+                <a href="/app/how-it-works" class="nav-link {% if active_page == 'how-it-works' %}active{% endif %}" data-translate="howItWorks">How it Works</a>
+                <a href="/app/docs" class="nav-link {% if active_page == 'docs' %}active{% endif %}" data-translate="docs">Docs</a>
+                <a href="/app/about" class="nav-link {% if active_page == 'about' %}active{% endif %}" data-translate="about">About</a>
             </div>
 
             <div class="navbar-actions">
+                <div class="lang-selector">
+                    <button class="active" data-site-lang="en">EN</button>
+                    <button data-site-lang="de">DE</button>
+                </div>
                 <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
                     <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="5"/>
@@ -48,7 +92,7 @@
                         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
                     </svg>
                 </button>
-                <a href="/app" class="btn btn-primary">Open App</a>
+                <a href="/app" class="btn btn-primary" data-translate="openApp">Open App</a>
             </div>
 
             <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
@@ -58,15 +102,15 @@
     </nav>
 
     <div class="mobile-menu" id="mobileMenu">
-        <a href="/" class="nav-link">Home</a>
-        <a href="/app/features" class="nav-link">Features</a>
-        <a href="/app/how-it-works" class="nav-link">How it Works</a>
-        <a href="/app/docs" class="nav-link">Docs</a>
-        <a href="/app/about" class="nav-link">About</a>
-        <a href="/app" class="btn btn-primary mt-2" style="width: 100%;">Open App</a>
+        <a href="/" class="nav-link" data-translate="home">Home</a>
+        <a href="/app/features" class="nav-link" data-translate="features">Features</a>
+        <a href="/app/how-it-works" class="nav-link" data-translate="howItWorks">How it Works</a>
+        <a href="/app/docs" class="nav-link" data-translate="docs">Docs</a>
+        <a href="/app/about" class="nav-link" data-translate="about">About</a>
+        <a href="/app" class="btn btn-primary mt-2" style="width: 100%;" data-translate="openApp">Open App</a>
     </div>
 
-    <main class="main-content">
+    <main class="main-content page-transition">
         {% block content %}{% endblock %}
     </main>
 
@@ -83,33 +127,33 @@
                         </svg>
                         <span>VoiceNotes</span>
                     </a>
-                    <p class="footer-description">AI-powered voice transcription that works completely offline. Your privacy, your data.</p>
+                    <p class="footer-description" data-translate="footerDesc">AI-powered voice transcription that works completely offline. Your privacy, your data.</p>
                 </div>
                 <div class="footer-links">
-                    <h4>Product</h4>
+                    <h4 data-translate="product">Product</h4>
                     <ul>
-                        <li><a href="/app/features">Features</a></li>
-                        <li><a href="/app/how-it-works">How it Works</a></li>
-                        <li><a href="/app">Open App</a></li>
+                        <li><a href="/app/features" data-translate="features">Features</a></li>
+                        <li><a href="/app/how-it-works" data-translate="howItWorks">How it Works</a></li>
+                        <li><a href="/app" data-translate="openApp">Open App</a></li>
                     </ul>
                 </div>
                 <div class="footer-links">
-                    <h4>Resources</h4>
+                    <h4 data-translate="resources">Resources</h4>
                     <ul>
-                        <li><a href="/app/docs">Documentation</a></li>
-                        <li><a href="/app/about">About</a></li>
+                        <li><a href="/app/docs" data-translate="documentation">Documentation</a></li>
+                        <li><a href="/app/about" data-translate="about">About</a></li>
                     </ul>
                 </div>
                 <div class="footer-links">
-                    <h4>Legal</h4>
+                    <h4 data-translate="legal">Legal</h4>
                     <ul>
-                        <li><a href="#">Privacy</a></li>
-                        <li><a href="#">Terms</a></li>
+                        <li><a href="#" data-translate="privacy">Privacy</a></li>
+                        <li><a href="#" data-translate="terms">Terms</a></li>
                     </ul>
                 </div>
             </div>
             <div class="footer-bottom">
-                <p class="footer-copyright">&copy; 2024 VoiceNotes. All rights reserved.</p>
+                <p class="footer-copyright" data-translate="copyright">&copy; 2025 VoiceNotes. All rights reserved.</p>
             </div>
         </div>
     </footer>
@@ -119,6 +163,63 @@
         const mobileMenuBtn = document.getElementById('mobileMenuBtn');
         const mobileMenu = document.getElementById('mobileMenu');
         const navbar = document.getElementById('navbar');
+
+        // i18n translations for website
+        const siteI18n = {
+            en: {
+                // Navbar
+                home: 'Home',
+                features: 'Features',
+                howItWorks: 'How it Works',
+                docs: 'Docs',
+                about: 'About',
+                openApp: 'Open App',
+                // Footer
+                product: 'Product',
+                resources: 'Resources',
+                legal: 'Legal',
+                documentation: 'Documentation',
+                privacy: 'Privacy',
+                terms: 'Terms',
+                footerDesc: 'AI-powered voice transcription that works completely offline. Your privacy, your data.',
+                copyright: '© 2025 VoiceNotes. All rights reserved.'
+            },
+            de: {
+                // Navbar
+                home: 'Startseite',
+                features: 'Funktionen',
+                howItWorks: 'So funktioniert es',
+                docs: 'Dokumentation',
+                about: 'Über uns',
+                openApp: 'App öffnen',
+                // Footer
+                product: 'Produkt',
+                resources: 'Ressourcen',
+                legal: 'Rechtliches',
+                documentation: 'Dokumentation',
+                privacy: 'Datenschutz',
+                terms: 'Nutzungsbedingungen',
+                footerDesc: 'KI-gestützte Sprachtranskription, die vollständig offline funktioniert. Deine Privatsphäre, deine Daten.',
+                copyright: '© 2025 VoiceNotes. Alle Rechte vorbehalten.'
+            }
+        };
+
+        function setSiteLanguage(lang) {
+            document.body.setAttribute('data-lang', lang);
+            localStorage.setItem('voicenotes_site_lang', lang);
+
+            document.querySelectorAll('[data-site-lang]').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.siteLang === lang);
+            });
+
+            // Update translatable elements
+            document.querySelectorAll('[data-translate]').forEach(el => {
+                const key = el.getAttribute('data-translate');
+                if (siteI18n[lang][key]) {
+                    el.textContent = siteI18n[lang][key];
+                }
+            });
+        }
 
         function setTheme(theme) {
             document.body.setAttribute('data-theme', theme);
@@ -134,19 +235,34 @@
             }
         }
 
+        // Initialize theme
         const savedTheme = localStorage.getItem('voicenotes_theme') || 'light';
         setTheme(savedTheme);
 
+        // Initialize language
+        const savedLang = localStorage.getItem('voicenotes_site_lang') || 'en';
+        setSiteLanguage(savedLang);
+
+        // Theme toggle
         themeToggle.addEventListener('click', () => {
             const current = document.body.getAttribute('data-theme');
             setTheme(current === 'dark' ? 'light' : 'dark');
         });
 
+        // Language toggle
+        document.querySelectorAll('[data-site-lang]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                setSiteLanguage(btn.dataset.siteLang);
+            });
+        });
+
+        // Mobile menu
         mobileMenuBtn.addEventListener('click', () => {
             mobileMenuBtn.classList.toggle('active');
             mobileMenu.classList.toggle('active');
         });
 
+        // Scroll effects
         window.addEventListener('scroll', () => {
             if (window.scrollY > 10) {
                 navbar.classList.add('scrolled');

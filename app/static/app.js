@@ -414,7 +414,7 @@ function updateUILanguage() {
 
 function setUILanguage(lang) {
     state.uiLanguage = lang;
-    localStorage.setItem('uiLanguage', lang);
+    localStorage.setItem('voicenotes_ui_lang', lang);
     document.querySelectorAll('[data-ui-lang]').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.uiLang === lang);
     });
@@ -1028,12 +1028,35 @@ function toggleTheme() {
     const current = document.body.getAttribute('data-theme');
     const newTheme = current === 'dark' ? 'light' : 'dark';
     document.body.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
+    localStorage.setItem('voicenotes_theme', newTheme);
+    updateThemeIcons();
+}
+
+function updateThemeIcons() {
+    const theme = document.body.getAttribute('data-theme');
+    const navThemeToggle = document.getElementById('navThemeToggle');
+    const themeToggle = document.getElementById('themeToggle');
+
+    const buttons = [navThemeToggle, themeToggle].filter(b => b);
+    buttons.forEach(btn => {
+        const sunIcon = btn.querySelector('.sun-icon');
+        const moonIcon = btn.querySelector('.moon-icon');
+        if (sunIcon && moonIcon) {
+            if (theme === 'dark') {
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+            } else {
+                sunIcon.classList.remove('hidden');
+                moonIcon.classList.add('hidden');
+            }
+        }
+    });
 }
 
 function loadTheme() {
-    const saved = localStorage.getItem('theme') || 'light';
+    const saved = localStorage.getItem('voicenotes_theme') || 'light';
     document.body.setAttribute('data-theme', saved);
+    updateThemeIcons();
 }
 
 function escapeHtml(text) {
@@ -1057,7 +1080,9 @@ function formatDuration(seconds) {
 function initEventListeners() {
     elements.recordBtn.addEventListener('click', toggleRecording);
     elements.searchInput.addEventListener('input', (e) => handleSearch(e.target.value));
-    elements.themeToggle.addEventListener('click', toggleTheme);
+    if (elements.themeToggle) elements.themeToggle.addEventListener('click', toggleTheme);
+    const navThemeToggle = document.getElementById('navThemeToggle');
+    if (navThemeToggle) navThemeToggle.addEventListener('click', toggleTheme);
     elements.noteContent.addEventListener('input', updateDetailStats);
 
     document.querySelectorAll('.lang-btn').forEach(btn => {
@@ -1855,7 +1880,7 @@ async function preflightRecordCheck() {
 
 async function init() {
     loadTheme();
-    const savedUILang = localStorage.getItem('uiLanguage') || 'en';
+    const savedUILang = localStorage.getItem('voicenotes_ui_lang') || 'en';
     setUILanguage(savedUILang);
     initEventListeners();
     initVoiceProfileListeners();
