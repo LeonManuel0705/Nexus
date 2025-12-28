@@ -96,35 +96,62 @@ EOF
 
 echo ""
 echo "=============================================="
-echo "  Downloading Speaker Diarization Model"
+echo "  Downloading Speaker Recognition Model"
 echo "=============================================="
 echo ""
 
 python3 << 'EOF'
 import sys
-print("📥 Downloading speaker embedding model (~80MB)...")
+
+# Try TitaNet first (better for noisy environments like classrooms)
+print("📥 Attempting to download TitaNet model (optimized for noisy environments)...")
 sys.stdout.flush()
+titanet_success = False
+
 try:
-    from speechbrain.inference.speaker import EncoderClassifier
-    classifier = EncoderClassifier.from_hparams(
-        source="speechbrain/spkrec-ecapa-voxceleb",
-        savedir="models/speaker_model"
-    )
-    print("   ✅ Speaker model ready")
-except Exception as e:
-    print(f"   ⚠️  Speaker model: {e}")
-    print("   Installing speechbrain...")
     import subprocess
-    subprocess.run([sys.executable, "-m", "pip", "install", "speechbrain", "--quiet"])
+    # Install NeMo toolkit for TitaNet
+    print("   Installing NVIDIA NeMo toolkit...")
+    subprocess.run([sys.executable, "-m", "pip", "install", "nemo_toolkit[asr]", "--quiet"], check=True)
+
+    import nemo.collections.asr as nemo_asr
+    print("📥 Downloading TitaNet model (~100MB)...")
+    sys.stdout.flush()
+    model = nemo_asr.models.EncDecSpeakerLabelModel.from_pretrained(
+        model_name="nvidia/speakerverification_en_titanet_large"
+    )
+    del model
+    print("   ✅ TitaNet speaker model ready (noise-optimized)")
+    titanet_success = True
+except Exception as e:
+    print(f"   ⚠️  TitaNet setup failed: {e}")
+    print("   Falling back to SpeechBrain...")
+
+# Fallback to SpeechBrain if TitaNet fails
+if not titanet_success:
+    print("📥 Downloading SpeechBrain speaker model (~80MB)...")
+    sys.stdout.flush()
     try:
         from speechbrain.inference.speaker import EncoderClassifier
         classifier = EncoderClassifier.from_hparams(
             source="speechbrain/spkrec-ecapa-voxceleb",
             savedir="models/speaker_model"
         )
-        print("   ✅ Speaker model ready (after install)")
-    except Exception as e2:
-        print(f"   ❌ Failed: {e2}")
+        print("   ✅ SpeechBrain speaker model ready (fallback)")
+    except Exception as e:
+        print(f"   ⚠️  Speaker model: {e}")
+        print("   Installing speechbrain...")
+        import subprocess
+        subprocess.run([sys.executable, "-m", "pip", "install", "speechbrain", "--quiet"])
+        try:
+            from speechbrain.inference.speaker import EncoderClassifier
+            classifier = EncoderClassifier.from_hparams(
+                source="speechbrain/spkrec-ecapa-voxceleb",
+                savedir="models/speaker_model"
+            )
+            print("   ✅ SpeechBrain speaker model ready (after install)")
+        except Exception as e2:
+            print(f"   ❌ Failed: {e2}")
 print("")
 EOF
 
@@ -171,7 +198,8 @@ echo ""
 echo "  Features enabled:"
 echo "    ✅ Offline speech-to-text (Whisper)"
 echo "    ✅ Offline spelling correction (LanguageTool)"
-echo "    ✅ Speaker diarization (teacher detection)"
+echo "    ✅ Speaker recognition (TitaNet/SpeechBrain)"
+echo "       - Optimized for noisy classroom environments"
 if [[ $(uname -m) == "arm64" ]]; then
 echo "    ✅ Context-aware AI correction (MLX/Qwen)"
 else

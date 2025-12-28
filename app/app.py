@@ -76,39 +76,157 @@ init_lock = threading.Lock()
 def initialize_all_models():
     global models_ready, models_progress, init_complete
 
-    def update_progress(model, status, progress, message):
+    # Progress tracking settings
+    PROGRESS_UPDATE_INTERVAL = 1.0  # Update every second
+
+    # Model size estimates in MB for progress calculation
+    MODEL_SIZES = {
+        'whisper': 500,      # Whisper small model
+        'speaker': 100,      # TitaNet/SpeechBrain
+        'mlx': 400,          # Qwen2.5
+        'languagetool': 200  # LanguageTool German
+    }
+
+    def update_progress(model, status, progress, message, speed_str='', eta=''):
         with init_lock:
-            models_progress[model] = {'status': status, 'progress': progress, 'message': message}
+            progress_data = {
+                'status': status,
+                'progress': progress,
+                'message': message,
+                'speed': speed_str,
+                'eta': eta
+            }
+            models_progress[model] = progress_data
             socketio.emit('model_progress', {
                 'model': model,
                 'status': status,
                 'progress': progress,
                 'message': message,
+                'speed': speed_str,
+                'eta': eta,
                 'all_progress': models_progress
             })
 
-    update_progress('whisper', 'loading', 10, 'Loading Whisper model...')
+    def track_progress(model, message, stop_event, total_size_mb):
+        """Track real download progress by monitoring cache directory size"""
+        from model_manager import init_download_stats, update_download_stats, get_download_speed
+        from pathlib import Path
+
+        init_download_stats(model, total_size_mb)
+        cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
+        initial_size = get_dir_size(cache_dir) if cache_dir.exists() else 0
+
+        while not stop_event.is_set():
+            time.sleep(PROGRESS_UPDATE_INTERVAL)
+            if stop_event.is_set():
+                break
+
+            current_size = get_dir_size(cache_dir) if cache_dir.exists() else 0
+            downloaded = current_size - initial_size
+
+            update_download_stats(model, downloaded, int(total_size_mb * 1024 * 1024))
+            speed_info = get_download_speed(model)
+
+            progress = speed_info['progress']
+            if progress < 10:
+                progress = 10  # Minimum 10% to show activity
+
+            speed_msg = f" ({speed_info['speed_str']})" if speed_info['speed_str'] else ""
+            eta_msg = f" - ETA: {speed_info['eta']}" if speed_info['eta'] else ""
+
+            update_progress(
+                model, 'loading', progress,
+                f"{message}{speed_msg}{eta_msg}",
+                speed_info['speed_str'],
+                speed_info['eta']
+            )
+
+    def get_dir_size(path):
+        """Get total size of directory in bytes"""
+        total = 0
+        try:
+            for entry in os.scandir(path):
+                if entry.is_file():
+                    total += entry.stat().st_size
+                elif entry.is_dir():
+                    total += get_dir_size(entry.path)
+        except (PermissionError, OSError):
+            pass
+        return total
+
+    def load_with_progress(model, message, load_func, total_size_mb):
+        """Load a model with real progress tracking"""
+        stop_event = threading.Event()
+        progress_thread = threading.Thread(
+            target=track_progress,
+            args=(model, message, stop_event, total_size_mb),
+            daemon=True
+        )
+        progress_thread.start()
+
+        try:
+            result = load_func()
+            stop_event.set()
+            progress_thread.join(timeout=2)
+            return result
+        except Exception as e:
+            stop_event.set()
+            progress_thread.join(timeout=1)
+            raise e
+
+    # Load Whisper with progress tracking
+    update_progress('whisper', 'loading', 5, 'Initializing Whisper...')
     try:
-        preload_model()
+        def load_whisper():
+            preload_model()
+            return True
+        load_with_progress('whisper', 'Loading Whisper model', load_whisper, MODEL_SIZES['whisper'])
         models_ready['whisper'] = True
         update_progress('whisper', 'ready', 100, 'Whisper ready')
     except Exception as e:
         update_progress('whisper', 'error', 0, f'Error: {str(e)[:50]}')
 
-    update_progress('speaker', 'loading', 10, 'Loading speaker recognition...')
+    # Load Speaker model with progress tracking
+    update_progress('speaker', 'loading', 5, 'Initializing speaker recognition...')
+    titanet_failed = False
     try:
-        manager = get_profile_manager()
-        manager._load_model()
+        def load_speaker():
+            nonlocal titanet_failed
+            manager = get_profile_manager()
+            manager._load_model()
+            # Check if TitaNet failed and we fell back to SpeechBrain
+            if hasattr(manager, '_using_titanet') and not manager._using_titanet:
+                titanet_failed = True
+            return manager
+        manager = load_with_progress('speaker', 'Loading speaker recognition', load_speaker, MODEL_SIZES['speaker'])
         models_ready['speaker'] = True
-        update_progress('speaker', 'ready', 100, 'Speaker model ready')
+
+        # Show notification about TitaNet failure
+        if titanet_failed:
+            update_progress('speaker', 'warning', 100, 'Using SpeechBrain (TitaNet unavailable - reduced noise handling)')
+            # Emit special warning event
+            socketio.emit('model_warning', {
+                'model': 'speaker',
+                'title': 'Optimal Model Unavailable',
+                'message': 'TitaNet installation failed. Using SpeechBrain as fallback. This may result in reduced accuracy in noisy environments like classrooms.',
+                'severity': 'warning'
+            })
+        elif hasattr(manager, 'is_using_titanet') and manager.is_using_titanet():
+            update_progress('speaker', 'ready', 100, 'TitaNet ready (noise-optimized)')
+        else:
+            update_progress('speaker', 'ready', 100, 'Speaker model ready')
     except Exception as e:
         update_progress('speaker', 'error', 0, f'Error: {str(e)[:50]}')
 
-    update_progress('mlx', 'loading', 10, 'Loading AI corrector (MLX)...')
+    # Load MLX with progress tracking
+    update_progress('mlx', 'loading', 5, 'Initializing AI corrector...')
     try:
-        from ai_corrector import get_corrector
-        corrector = get_corrector()
-        corrector._load_model()
+        def load_mlx():
+            from ai_corrector import get_corrector
+            corrector = get_corrector()
+            corrector._load_model()
+            return corrector
+        corrector = load_with_progress('mlx', 'Loading AI corrector (MLX)', load_mlx, MODEL_SIZES['mlx'])
         if corrector._mlx_available:
             models_ready['mlx'] = True
             update_progress('mlx', 'ready', 100, 'MLX AI corrector ready')
@@ -119,16 +237,20 @@ def initialize_all_models():
         models_ready['mlx'] = True
         update_progress('mlx', 'skipped', 100, f'MLX skipped: {str(e)[:30]}')
 
-    update_progress('languagetool', 'loading', 10, 'Loading LanguageTool...')
+    # Load LanguageTool with progress tracking
+    update_progress('languagetool', 'loading', 5, 'Initializing LanguageTool...')
     try:
-        from ai_corrector import get_corrector
-        corrector = get_corrector()
-        corrector._get_language_tool('de')
+        def load_languagetool():
+            from ai_corrector import get_corrector
+            corrector = get_corrector()
+            corrector._get_language_tool('de')
+            return True
+        load_with_progress('languagetool', 'Loading LanguageTool', load_languagetool, MODEL_SIZES['languagetool'])
         models_ready['languagetool'] = True
         update_progress('languagetool', 'ready', 100, 'LanguageTool ready')
     except Exception as e:
         models_ready['languagetool'] = True
-        update_progress('languagetool', 'skipped', 100, f'LanguageTool skipped')
+        update_progress('languagetool', 'skipped', 100, 'LanguageTool skipped')
 
     with init_lock:
         init_complete = True
