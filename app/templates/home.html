@@ -45,6 +45,11 @@
                     <div class="waveform-bar"></div>
                     <div class="waveform-bar"></div>
                     <div class="waveform-bar"></div>
+                    <div class="waveform-bar"></div>
+                    <div class="waveform-bar"></div>
+                    <div class="waveform-bar"></div>
+                    <div class="waveform-bar"></div>
+                    <div class="waveform-bar"></div>
                 </div>
                 <div class="hero-text-preview">
                     <span id="typingText"></span><span class="cursor"></span>
@@ -189,7 +194,21 @@
             "Today we learned about the Renaissance period and its impact on art...",
             "Remember to follow up with the client about the contract details...",
             "The key insight from the lecture was about machine learning algorithms...",
-            "Action items: Complete project proposal by Friday, schedule team review..."
+            "Action items: Complete project proposal by Friday, schedule team review...",
+            "The chemical reaction between sodium and chlorine produces table salt...",
+            "Interview summary: Candidate has 5 years of experience in software development...",
+            "The main theme of today's discussion was sustainable energy solutions...",
+            "Note to self: Research the new JavaScript framework before the presentation...",
+            "Dr. Schmidt emphasized the importance of proper documentation in research...",
+            "Budget review: Marketing expenses are 8 percent under the quarterly target...",
+            "The patient reported improved symptoms after two weeks of treatment...",
+            "Key takeaway: Always validate user input before processing the data...",
+            "Historical analysis: The industrial revolution changed European society...",
+            "Project update: Backend API is 90 percent complete, frontend needs review...",
+            "The experiment demonstrated a clear correlation between the variables...",
+            "Reminder: Submit the grant application before the December deadline...",
+            "Customer feedback: Users want a simpler navigation in the mobile app...",
+            "Legal note: Contract clause 4.2 requires 30 days written notice..."
         ],
         de: [
             "Der Professor erklärte, dass die Quantenphysik die Natur auf atomarer Ebene beschreibt...",
@@ -197,24 +216,57 @@
             "Heute haben wir etwas über die Renaissance und ihren Einfluss auf die Kunst gelernt...",
             "Denken Sie daran, den Kunden wegen der Vertragsdetails zu kontaktieren...",
             "Die wichtigste Erkenntnis aus der Vorlesung war über maschinelles Lernen...",
-            "Aufgaben: Projektvorschlag bis Freitag fertigstellen, Teamüberprüfung planen..."
+            "Aufgaben: Projektvorschlag bis Freitag fertigstellen, Teamüberprüfung planen...",
+            "Die chemische Reaktion zwischen Natrium und Chlor erzeugt Kochsalz...",
+            "Zusammenfassung des Interviews: Kandidat hat 5 Jahre Erfahrung in der Softwareentwicklung...",
+            "Das Hauptthema der heutigen Diskussion waren nachhaltige Energielösungen...",
+            "Notiz an mich selbst: Das neue JavaScript-Framework vor der Präsentation recherchieren...",
+            "Dr. Müller betonte die Bedeutung einer ordentlichen Dokumentation in der Forschung...",
+            "Budgetüberprüfung: Marketingausgaben liegen 8 Prozent unter dem Quartalsziel...",
+            "Der Patient berichtete über verbesserte Symptome nach zwei Wochen Behandlung...",
+            "Wichtige Erkenntnis: Benutzereingaben immer validieren, bevor die Daten verarbeitet werden...",
+            "Historische Analyse: Die industrielle Revolution veränderte die europäische Gesellschaft...",
+            "Projektupdate: Backend-API ist zu 90 Prozent fertig, Frontend muss überprüft werden...",
+            "Das Experiment zeigte eine klare Korrelation zwischen den Variablen...",
+            "Erinnerung: Förderantrag vor der Dezember-Frist einreichen...",
+            "Kundenfeedback: Benutzer wünschen sich eine einfachere Navigation in der mobilen App...",
+            "Rechtlicher Hinweis: Vertragsklausel 4.2 erfordert 30 Tage schriftliche Kündigungsfrist..."
         ]
     };
 
     const typingElement = document.getElementById('typingText');
     if (!typingElement) return;
 
-    let currentPhraseIndex = 0;
     let currentCharIndex = 0;
     let isDeleting = false;
     let currentLang = document.body.getAttribute('data-lang') || 'en';
+    let shuffledIndices = [];
+    let currentShuffleIndex = 0;
 
-    function getCurrentPhrases() {
-        return phrases[currentLang] || phrases.en;
+    function shuffleArray(length) {
+        const indices = Array.from({ length }, (_, i) => i);
+        for (let i = indices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [indices[i], indices[j]] = [indices[j], indices[i]];
+        }
+        return indices;
     }
 
+    function getNextPhraseIndex() {
+        const currentPhrases = phrases[currentLang] || phrases.en;
+
+        if (shuffledIndices.length === 0 || currentShuffleIndex >= shuffledIndices.length) {
+            shuffledIndices = shuffleArray(currentPhrases.length);
+            currentShuffleIndex = 0;
+        }
+
+        return shuffledIndices[currentShuffleIndex++];
+    }
+
+    let currentPhraseIndex = 0;
+
     function typeText() {
-        const currentPhrases = getCurrentPhrases();
+        const currentPhrases = phrases[currentLang] || phrases.en;
         const currentPhrase = currentPhrases[currentPhraseIndex];
 
         if (isDeleting) {
@@ -223,7 +275,7 @@
 
             if (currentCharIndex === 0) {
                 isDeleting = false;
-                currentPhraseIndex = (currentPhraseIndex + 1) % currentPhrases.length;
+                currentPhraseIndex = getNextPhraseIndex();
                 setTimeout(typeText, 500);
             } else {
                 setTimeout(typeText, 20);
@@ -250,13 +302,16 @@
                 currentLang = document.body.getAttribute('data-lang') || 'en';
                 currentCharIndex = 0;
                 isDeleting = false;
-                currentPhraseIndex = 0;
+                shuffledIndices = [];
+                currentShuffleIndex = 0;
+                currentPhraseIndex = getNextPhraseIndex();
             }
         });
     });
     observer.observe(document.body, { attributes: true });
 
-    // Start typing animation
+    // Start with a random phrase
+    currentPhraseIndex = getNextPhraseIndex();
     setTimeout(typeText, 1000);
 })();
 </script>
