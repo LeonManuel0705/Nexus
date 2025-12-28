@@ -83,18 +83,18 @@
 }
 
 .waveform-container {
-    width: 85%;
+    width: 90%;
     height: 120px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;
+    gap: 8px;
 }
 
 .waveform-bar {
-    width: 6px;
+    width: 12px;
     background: var(--accent);
-    border-radius: 3px;
+    border-radius: 6px;
     animation: waveform 1s ease-in-out infinite;
 }
 

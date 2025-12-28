@@ -8,7 +8,7 @@ import hashlib
 
 PROFILES_DIR = Path(__file__).parent.parent / "voice_profiles"
 EMBEDDING_DIM = 192
-DEFAULT_VERIFICATION_THRESHOLD = 0.30  # Default cosine similarity threshold
+DEFAULT_VERIFICATION_THRESHOLD = 0.30
 HIGH_CONFIDENCE_THRESHOLD = 0.50
 MIN_ENROLLMENT_DURATION = 30.0
 SAMPLE_RATE = 16000
@@ -21,7 +21,7 @@ def get_verification_threshold() -> float:
     except:
         return DEFAULT_VERIFICATION_THRESHOLD
 
-SPEAKER_MODEL = "speechbrain/spkrec-ecapa-voxceleb"  # Default, can be changed
+SPEAKER_MODEL = "speechbrain/spkrec-ecapa-voxceleb"
 
 class VoiceProfile:
 
@@ -189,7 +189,7 @@ class VoiceProfileManager:
 
         energy = np.sqrt(np.mean(audio ** 2))
         if energy < 0.001:
-            return audio  # Return as-is if too quiet
+            return audio
 
         pre_emphasis = 0.97
         audio = np.append(audio[0], audio[1:] - pre_emphasis * audio[:-1])
@@ -323,7 +323,7 @@ class VoiceProfileManager:
 
     def is_teacher_speaking(self, audio: np.ndarray) -> bool:
         is_match, confidence = self.verify_audio(audio)
-        return is_match  # Just use the match result, confidence is already factored in
+        return is_match
 
     def list_profiles(self) -> List[dict]:
         profiles = []

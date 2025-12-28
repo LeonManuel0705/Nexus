@@ -35,6 +35,7 @@ from adaptive_system import (
     record_feedback as adaptive_record_feedback, get_param,
     get_current_params, get_teacher_stats, get_change_log
 )
+import app_logger
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
@@ -648,6 +649,12 @@ def realtime_transcription_worker():
                         voice_manager._extract_embedding(chunk), top_k=5
                     )[1] if voice_manager._current_profile else 0
 
+                    app_logger.log_voice_filter(
+                        voice_manager._current_profile_id or "unknown",
+                        is_match,
+                        confidence
+                    )
+
                     similarity_history.append(confidence)
                     if len(similarity_history) > 100:
                         similarity_history.pop(0)
@@ -841,6 +848,12 @@ def handle_set_language(data):
     global current_language
     current_language = data.get('language', 'de')
     emit('language_changed', {'language': current_language})
+
+@socketio.on('set_logging')
+def handle_set_logging(data):
+    enabled = data.get('enabled', False)
+    app_logger.init_logging(enabled)
+    emit('logging_set', {'enabled': enabled})
 
 @app.route('/api/recording/start', methods=['POST'])
 def start_recording():
