@@ -3,10 +3,11 @@ import threading
 from typing import Optional, Tuple
 import re
 
-MLX_MODEL = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"  # Larger model for better output
-MAX_TOKENS = 150  # Reduced further to prevent AI commentary
-TEMPERATURE = 0.05  # Lower temperature for more deterministic output
-REPETITION_PENALTY = 1.3  # Higher to prevent repetition
+MLX_MODEL = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
+MAX_TOKENS = 150
+TEMPERATURE = 0.05
+REPETITION_PENALTY = 1.3
+USE_MLX_AI = False
 
 class AICorrector:
     def __init__(self):
@@ -81,7 +82,7 @@ class AICorrector:
     def _correct_with_language_tool(self, text: str, language: str) -> str:
         tool = self._get_language_tool(language)
         if tool is None:
-            return text
+            return self._post_process_text(text, language)
 
         try:
             matches = tool.check(text)
@@ -92,10 +93,40 @@ class AICorrector:
                     error_len = getattr(match, 'errorLength', None) or getattr(match, 'error_length', None) or len(match.context.split())
                     end = start + error_len
                     corrected = corrected[:start] + match.replacements[0] + corrected[end:]
-            return corrected
+            return self._post_process_text(corrected, language)
         except Exception as e:
             print(f"LanguageTool correction failed: {e}")
+            return self._post_process_text(text, language)
+
+    def _post_process_text(self, text: str, language: str) -> str:
+        if not text:
             return text
+
+        text = re.sub(r'\s+', ' ', text).strip()
+
+        text = re.sub(r'\s+([.,!?;:])', r'\1', text)
+
+        text = re.sub(r'([.,!?;:])\s*([.,!?;:])', r'\1', text)
+
+        text = re.sub(r'([.!?])\s*', r'\1 ', text)
+        text = text.strip()
+
+        if text and text[0].islower():
+            text = text[0].upper() + text[1:]
+
+        sentences = re.split(r'([.!?]\s+)', text)
+        result = []
+        for i, part in enumerate(sentences):
+            if i > 0 and sentences[i-1].strip() in '.!?':
+                if part and part[0].islower():
+                    part = part[0].upper() + part[1:]
+            result.append(part)
+        text = ''.join(result)
+
+        if text and text[-1] not in '.!?':
+            text += '.'
+
+        return text
 
     def _build_prompt(self, text: str, subject: Optional[str], language: str) -> str:
         lang_name = "German" if language == "de" else "English"
@@ -260,7 +291,7 @@ Fixed:"""
 
         text = self._remove_fillers(text, language)
 
-        if self._load_model() and self._mlx_available:
+        if USE_MLX_AI and self._load_model() and self._mlx_available:
             prompt = self._build_prompt(text, subject, language)
             corrected = self._generate_with_mlx(prompt)
 
@@ -275,10 +306,14 @@ Fixed:"""
             "de": [
                 r'\bähm?\b', r'\böhm?\b', r'\bhmm?\b', r'\bhm\b',
                 r'\bja\s+also\b', r'\balso\s+ja\b', r'\bso\s+quasi\b',
+                r'\bgenau\b', r'\bhalt\b', r'\beigentlich\b', r'\bsozusagen\b',
+                r'\bquasi\b', r'\beben\b', r'\bnaja\b', r'\btja\b',
             ],
             "en": [
                 r'\buh+\b', r'\bum+\b', r'\bhm+\b', r'\ber+\b',
-                r'\byou know\b', r'\bso\s+yeah\b',
+                r'\byou know\b', r'\bso\s+yeah\b', r'\blike\b',
+                r'\bbasically\b', r'\bactually\b', r'\bi mean\b',
+                r'\bkind of\b', r'\bsort of\b', r'\byeah\b',
             ]
         }
 

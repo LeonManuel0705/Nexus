@@ -32,6 +32,9 @@ data/
 voice_profiles/*
 !voice_profiles/.gitkeep
 
+# Logs (user diagnostic data)
+app/logs/
+
 # OS files
 .DS_Store
 Thumbs.db

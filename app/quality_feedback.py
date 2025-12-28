@@ -1,8 +1,3 @@
-"""
-Quality Feedback System for Voice Notes
-Collects user feedback, detects errors, and creates improvement reports.
-"""
-
 import os
 import json
 import re
@@ -13,36 +8,25 @@ from pathlib import Path
 FEEDBACK_DIR = Path(__file__).parent.parent / "feedback_logs"
 REPORTS_DIR = Path(__file__).parent.parent / "error_reports"
 
-# Ensure directories exist
 FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class TranscriptionAnalyzer:
-    """Analyzes transcriptions for logical and grammatical issues."""
 
     def __init__(self, language: str = "de"):
         self.language = language
         self._init_patterns()
 
     def _init_patterns(self):
-        """Initialize error detection patterns."""
-        # Patterns that indicate logical/structural problems
         self.logical_error_patterns = {
             "de": [
-                # Sentence fragments after periods
                 (r'\.\s+[a-zäöü]', 'lowercase_after_period', 'Kleinbuchstabe nach Punkt'),
-                # Repeated words
                 (r'\b(\w+)\s+\1\b', 'repeated_word', 'Wort wiederholt'),
-                # Very short sentences that don't make sense
                 (r'(?:^|\.)\s*[A-ZÄÖÜ][a-zäöü]{0,2}\.', 'very_short_sentence', 'Sehr kurzer Satz'),
-                # Missing verb indicators (common transcription errors)
                 (r'\b(Ich|Du|Er|Sie|Wir|Ihr)\s+[A-ZÄÖÜ]', 'missing_verb', 'Mögliches fehlendes Verb'),
-                # Broken sentence patterns
                 (r'[,\.]\s*(und|oder|aber|denn|weil)\s*[,\.]', 'broken_conjunction', 'Abgebrochene Konjunktion'),
-                # Random punctuation
                 (r'\s+[,\.]\s+[,\.]', 'double_punctuation', 'Doppelte Satzzeichen'),
-                # Incomplete thoughts
                 (r'\b(dass|wenn|weil|obwohl)\s*[,\.]', 'incomplete_subordinate', 'Unvollständiger Nebensatz'),
             ],
             "en": [
@@ -56,7 +40,6 @@ class TranscriptionAnalyzer:
             ]
         }
 
-        # Common transcription errors (phonetic confusions)
         self.phonetic_errors = {
             "de": {
                 'ihre': ['ire', 'ihe'],
@@ -78,18 +61,12 @@ class TranscriptionAnalyzer:
         }
 
     def analyze(self, text: str) -> Dict:
-        """
-        Analyze transcription for issues.
-        Returns dict with issues found and quality score.
-        """
         issues = []
         patterns = self.logical_error_patterns.get(self.language, self.logical_error_patterns["de"])
 
-        # Check logical patterns
         for pattern, error_type, description in patterns:
             matches = re.finditer(pattern, text, re.IGNORECASE)
             for match in matches:
-                # Get context around the error
                 start = max(0, match.start() - 30)
                 end = min(len(text), match.end() + 30)
                 context = text[start:end]
@@ -103,7 +80,6 @@ class TranscriptionAnalyzer:
                     'severity': self._get_severity(error_type)
                 })
 
-        # Check for phonetic errors
         phonetic = self.phonetic_errors.get(self.language, {})
         for correct, wrongs in phonetic.items():
             for wrong in wrongs:
@@ -119,7 +95,6 @@ class TranscriptionAnalyzer:
                         'suggestion': correct
                     })
 
-        # Calculate quality score (0-100)
         quality_score = self._calculate_quality_score(text, issues)
 
         return {
@@ -132,7 +107,6 @@ class TranscriptionAnalyzer:
         }
 
     def _get_severity(self, error_type: str) -> str:
-        """Determine severity of error type."""
         high_severity = ['missing_verb', 'incomplete_subordinate', 'broken_conjunction']
         medium_severity = ['lowercase_after_period', 'very_short_sentence']
 
@@ -143,7 +117,6 @@ class TranscriptionAnalyzer:
         return 'low'
 
     def _calculate_quality_score(self, text: str, issues: List[Dict]) -> int:
-        """Calculate quality score from 0-100."""
         if not text:
             return 0
 
@@ -151,7 +124,6 @@ class TranscriptionAnalyzer:
         if word_count == 0:
             return 0
 
-        # Start with 100, deduct for issues
         score = 100
 
         for issue in issues:
@@ -163,7 +135,6 @@ class TranscriptionAnalyzer:
             else:
                 score -= 3
 
-        # Normalize by text length (longer texts may have more issues naturally)
         if word_count > 100:
             score += min(10, word_count // 50)
 
@@ -171,7 +142,6 @@ class TranscriptionAnalyzer:
 
 
 class FeedbackCollector:
-    """Collects and stores user feedback on transcriptions."""
 
     def __init__(self):
         self.analyzer = TranscriptionAnalyzer()
@@ -180,19 +150,15 @@ class FeedbackCollector:
         self,
         note_id: str,
         transcription: str,
-        rating: int,  # 1-5 stars
+        rating: int,
         folder_id: Optional[str] = None,
         teacher_name: Optional[str] = None,
         subject: Optional[str] = None,
         user_comments: Optional[str] = None,
         language: str = "de"
     ) -> Dict:
-        """
-        Save user feedback about a transcription.
-        """
         self.analyzer.language = language
 
-        # Analyze transcription
         analysis = self.analyzer.analyze(transcription)
 
         feedback_data = {
@@ -211,19 +177,16 @@ class FeedbackCollector:
             'needs_review': rating <= 2 or analysis['quality_score'] < 60
         }
 
-        # Save to file
         feedback_file = FEEDBACK_DIR / f"{feedback_data['feedback_id']}.json"
         with open(feedback_file, 'w', encoding='utf-8') as f:
             json.dump(feedback_data, f, ensure_ascii=False, indent=2)
 
-        # If quality is bad, create error report
         if feedback_data['needs_review']:
             self._create_error_report(feedback_data, transcription)
 
         return feedback_data
 
     def _create_error_report(self, feedback: Dict, full_transcription: str) -> str:
-        """Create detailed error report for admin review."""
         report_id = f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
         report_content = f"""Voice Notes - Error Report
@@ -274,7 +237,6 @@ FULL TRANSCRIPTION
 End of Report
 """
 
-        # Save report
         report_file = REPORTS_DIR / f"{report_id}.txt"
         with open(report_file, 'w', encoding='utf-8') as f:
             f.write(report_content)
@@ -282,7 +244,6 @@ End of Report
         return str(report_file)
 
     def get_feedback_stats(self) -> Dict:
-        """Get statistics from collected feedback."""
         feedbacks = []
 
         for file in FEEDBACK_DIR.glob("*.json"):
@@ -313,7 +274,6 @@ End of Report
         }
 
     def get_pending_reports(self) -> List[Dict]:
-        """Get list of error reports pending review."""
         reports = []
 
         for file in REPORTS_DIR.glob("*.txt"):
@@ -328,27 +288,19 @@ End of Report
 
 
 class LogicCorrector:
-    """Advanced logic and grammar correction."""
 
     def __init__(self, language: str = "de"):
         self.language = language
         self._init_rules()
 
     def _init_rules(self):
-        """Initialize correction rules."""
         self.sentence_rules = {
             "de": [
-                # Fix lowercase after period
                 (r'\.(\s+)([a-zäöü])', lambda m: f'.{m.group(1)}{m.group(2).upper()}'),
-                # Remove double periods
                 (r'\.\.+', '.'),
-                # Fix space before punctuation
                 (r'\s+([,\.!?;:])', r'\1'),
-                # Fix missing space after punctuation
                 (r'([,\.!?;:])([A-Za-zÄÖÜäöü])', r'\1 \2'),
-                # Remove repeated words
                 (r'\b(\w+)(\s+\1)+\b', r'\1'),
-                # Fix broken conjunctions
                 (r',\s*(und|oder|aber)\s*\.', r' \1'),
                 (r'\.\s*(und|oder|aber)\s*,', r', \1'),
             ],
@@ -364,10 +316,6 @@ class LogicCorrector:
         }
 
     def correct(self, text: str) -> Tuple[str, List[str]]:
-        """
-        Apply logic corrections to text.
-        Returns (corrected_text, list_of_changes).
-        """
         if not text:
             return text, []
 
@@ -385,12 +333,10 @@ class LogicCorrector:
             if result != original:
                 changes.append(f"Applied rule: {pattern[:30]}...")
 
-        # Ensure text starts with capital
         if result and result[0].islower():
             result = result[0].upper() + result[1:]
             changes.append("Capitalized first letter")
 
-        # Ensure text ends with punctuation
         if result and result[-1] not in '.!?':
             result += '.'
             changes.append("Added final period")
@@ -398,7 +344,6 @@ class LogicCorrector:
         return result, changes
 
 
-# Singleton instances
 _feedback_collector: Optional[FeedbackCollector] = None
 _logic_corrector: Optional[LogicCorrector] = None
 _analyzer: Optional[TranscriptionAnalyzer] = None
@@ -426,7 +371,6 @@ def get_analyzer(language: str = "de") -> TranscriptionAnalyzer:
 
 
 def analyze_transcription(text: str, language: str = "de") -> Dict:
-    """Analyze a transcription for quality issues."""
     return get_analyzer(language).analyze(text)
 
 
@@ -436,10 +380,8 @@ def save_feedback(
     rating: int,
     **kwargs
 ) -> Dict:
-    """Save user feedback for a transcription."""
     return get_feedback_collector().save_feedback(note_id, transcription, rating, **kwargs)
 
 
 def apply_logic_correction(text: str, language: str = "de") -> Tuple[str, List[str]]:
-    """Apply logic corrections to text."""
     return get_logic_corrector(language).correct(text)

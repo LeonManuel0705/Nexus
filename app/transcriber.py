@@ -56,7 +56,6 @@ class RealtimeTranscriber:
         audio_data = self._preprocess_audio(audio_data, sample_rate)
 
         try:
-            # Build context prompt for better accuracy
             base_prompt = ""
             if self.language == "de":
                 base_prompt = "Dies ist eine Vorlesung oder Unterrichtsstunde auf Deutsch. "

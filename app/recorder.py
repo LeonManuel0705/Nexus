@@ -34,7 +34,6 @@ class AudioRecorder:
         self.speech_detected = False
         self.silence_samples = 0
 
-        # Enrollment-specific: collects all audio without speech detection
         self.enrollment_queue = queue.Queue()
         self.enrollment_buffer = []
         self.enrollment_samples = 0
@@ -56,12 +55,10 @@ class AudioRecorder:
         audio = indata.copy().flatten()
         self.audio_data.append(indata.copy())
 
-        # Debug: log every 50th callback to avoid spam
         if len(self.audio_data) % 50 == 1:
             energy = self._calculate_energy(audio)
-            print(f"[Recorder] Callback #{len(self.audio_data)}: {len(audio)} samples, energy={energy:.4f}")
+            print(f"[Recorder] Callback: {len(audio)} samples, energy={energy:.4f}")
 
-        # Enrollment buffer: collect ALL audio, emit every 3 seconds regardless of speech
         self.enrollment_buffer.append(audio)
         self.enrollment_samples += len(audio)
         enrollment_duration = self.enrollment_samples / self.sample_rate
@@ -74,7 +71,6 @@ class AudioRecorder:
             self.enrollment_buffer = []
             self.enrollment_samples = 0
 
-        # Regular transcription: requires speech detection
         has_speech = self._has_speech(audio)
 
         if has_speech:
@@ -190,7 +186,6 @@ class AudioRecorder:
         self.silence_samples = 0
         self.last_error = None
 
-        # Reset enrollment buffers
         self.enrollment_buffer = []
         self.enrollment_samples = 0
 
@@ -261,7 +256,6 @@ class AudioRecorder:
             return None
 
     def get_enrollment_chunk(self, timeout=0.5):
-        """Get audio chunk for enrollment - emits every 3s regardless of speech detection."""
         try:
             return self.enrollment_queue.get(timeout=timeout)
         except queue.Empty:
@@ -279,13 +273,11 @@ class AudioRecorder:
             self.stream.close()
             self.stream = None
 
-        # Always flush pending audio when stopping - don't require speech_detected
         if len(self.pending_audio) > 0:
             chunk_audio = np.concatenate(self.pending_audio)
             chunk_audio = self._enhance_audio(chunk_audio)
             self.audio_queue.put(chunk_audio)
 
-        # Also flush enrollment buffer
         if len(self.enrollment_buffer) > 0:
             enrollment_audio = np.concatenate(self.enrollment_buffer)
             enrollment_audio = self._enhance_audio(enrollment_audio)
