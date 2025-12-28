@@ -3,11 +3,11 @@ import threading
 from typing import Optional, Tuple
 import re
 
-MLX_MODEL = "mlx-community/Phi-3-mini-4k-instruct-4bit"
+MLX_MODEL = "mlx-community/Qwen2.5-3B-Instruct-4bit"
 MAX_TOKENS = 200
 TEMPERATURE = 0.1
 REPETITION_PENALTY = 1.2
-USE_MLX_AI = True
+USE_MLX_AI = False
 
 class AICorrector:
     def __init__(self):
