@@ -7,7 +7,7 @@ MLX_MODEL = "mlx-community/Qwen2.5-3B-Instruct-4bit"
 MAX_TOKENS = 200
 TEMPERATURE = 0.1
 REPETITION_PENALTY = 1.2
-USE_MLX_AI = False
+USE_MLX_AI = True
 
 class AICorrector:
     def __init__(self):
@@ -164,27 +164,19 @@ class AICorrector:
 
     def _build_prompt(self, text: str, subject: Optional[str], language: str) -> str:
         if language == "de":
-            prompt = f"""<|user|>
-Du bist ein Textkorrektur-Assistent. Korrigiere den folgenden transkribierten Text:
-- Verbinde unvollständige Sätze
-- Korrigiere Grammatik und Rechtschreibung
-- Behalte natürliche Füllwörter wie "ja", "also", "ne"
-- Gib NUR den korrigierten Text aus, KEINE Erklärungen
-
-Text: {text}
-<|end|>
-<|assistant|>"""
+            prompt = f"""<|im_start|>system
+Du korrigierst Transkriptionen. Gib NUR den korrigierten Text aus.<|im_end|>
+<|im_start|>user
+Korrigiere: {text}<|im_end|>
+<|im_start|>assistant
+"""
         else:
-            prompt = f"""<|user|>
-You are a text correction assistant. Fix the following transcribed text:
-- Connect incomplete sentences
-- Fix grammar and spelling
-- Keep natural filler words like "yeah", "so", "well"
-- Output ONLY the corrected text, NO explanations
-
-Text: {text}
-<|end|>
-<|assistant|>"""
+            prompt = f"""<|im_start|>system
+You correct transcriptions. Output ONLY the corrected text.<|im_end|>
+<|im_start|>user
+Fix: {text}<|im_end|>
+<|im_start|>assistant
+"""
 
         return prompt
 
