@@ -108,6 +108,11 @@ class AICorrector:
 
         text = re.sub(r'([.,!?;:])\s*([.,!?;:])', r'\1', text)
 
+        text = re.sub(r'\.\s*,', ',', text)
+        text = re.sub(r',\s*\.', '.', text)
+
+        text = self._merge_fragments(text, language)
+
         text = re.sub(r'([.!?])\s*', r'\1 ', text)
         text = text.strip()
 
@@ -123,10 +128,62 @@ class AICorrector:
             result.append(part)
         text = ''.join(result)
 
+        text = self._remove_very_short_sentences(text, language)
+
         if text and text[-1] not in '.!?':
             text += '.'
 
         return text
+
+    def _merge_fragments(self, text: str, language: str) -> str:
+        if language == "de":
+            incomplete_patterns = [
+                r'\.\s+(dass|weil|wenn|obwohl|damit|sodass|ob|als|während|bevor|nachdem|sobald|falls|sofern)\s+',
+                r'\.\s+(und|oder|aber|denn|sondern|doch|jedoch)\s+',
+                r'\.\s+(der|die|das|den|dem|des)\s+',
+                r'(ist|sind|war|waren|hat|haben|wird|werden|kann|können|muss|müssen|soll|sollen)\s*\.\s+([A-ZÄÖÜ])',
+            ]
+        else:
+            incomplete_patterns = [
+                r'\.\s+(that|because|when|although|if|while|before|after|unless|since)\s+',
+                r'\.\s+(and|or|but|so|yet|for|nor)\s+',
+                r'\.\s+(the|a|an)\s+',
+                r'(is|are|was|were|has|have|will|would|can|could|must|should)\s*\.\s+([A-Z])',
+            ]
+
+        for pattern in incomplete_patterns[:-1]:
+            text = re.sub(pattern, lambda m: ', ' + m.group(1).lower() + ' ', text, flags=re.IGNORECASE)
+
+        if incomplete_patterns:
+            text = re.sub(incomplete_patterns[-1], r'\1 \2', text, flags=re.IGNORECASE)
+
+        return text
+
+    def _remove_very_short_sentences(self, text: str, language: str) -> str:
+        sentences = re.split(r'([.!?]\s+)', text)
+        result = []
+
+        skip_words_de = {'ja', 'nee', 'nein', 'ok', 'okay', 'so', 'also', 'nun', 'gut', 'ach', 'oh', 'ah'}
+        skip_words_en = {'yes', 'no', 'ok', 'okay', 'so', 'well', 'oh', 'ah', 'right'}
+        skip_words = skip_words_de if language == "de" else skip_words_en
+
+        i = 0
+        while i < len(sentences):
+            part = sentences[i]
+            words = part.strip().split()
+
+            if len(words) <= 2:
+                word_lower = ' '.join(words).lower().rstrip('.,!?')
+                if word_lower in skip_words or len(word_lower) <= 3:
+                    i += 2 if i + 1 < len(sentences) else 1
+                    continue
+
+            result.append(part)
+            if i + 1 < len(sentences):
+                result.append(sentences[i + 1])
+            i += 2
+
+        return ''.join(result)
 
     def _build_prompt(self, text: str, subject: Optional[str], language: str) -> str:
         lang_name = "German" if language == "de" else "English"
@@ -306,8 +363,13 @@ Fixed:"""
             "de": [
                 r'\bähm?\b', r'\böhm?\b', r'\bhmm?\b', r'\bhm\b',
                 r'\bja\s+also\b', r'\balso\s+ja\b', r'\bso\s+quasi\b',
-                r'\bgenau\b', r'\bhalt\b', r'\beigentlich\b', r'\bsozusagen\b',
+                r'\bgenau\b', r'\bhalt\b', r'\bsozusagen\b',
                 r'\bquasi\b', r'\beben\b', r'\bnaja\b', r'\btja\b',
+                r'\bBis ja\b', r'\bJa\.\s*$', r'^\s*Ja\.\s*',
+                r',\s*Ja\.\s*', r'\.\s*Ja\.\s*',
+                r'\bNee,?\s*', r'\bAlso\s+nichts\b',
+                r'\bKeine Ahnung\b', r'\bNur mal sagen wir\b',
+                r'\bSo ungefähr\b', r'\bNormal\b(?=\.\s|,\s|\s*$)',
             ],
             "en": [
                 r'\buh+\b', r'\bum+\b', r'\bhm+\b', r'\ber+\b',
