@@ -63,6 +63,14 @@
                 <button class="init-lang-btn" data-init-lang="de">Deutsch</button>
             </div>
 
+            <div class="init-log-preference hidden" id="initLogPreference">
+                <p class="log-preference-text" data-i18n="logPreferenceText">Would you like to create diagnostic logs? Logs help improve the system and can be manually sent to developers.</p>
+                <div class="log-preference-buttons">
+                    <button class="btn btn-ghost" id="logPreferenceNo" data-i18n="noThanks">No, thanks</button>
+                    <button class="btn btn-primary" id="logPreferenceYes" data-i18n="yesEnableLogs">Yes, enable logs</button>
+                </div>
+            </div>
+
             <div class="init-progress-container">
                 <div class="init-progress-bar">
                     <div class="init-progress-fill" id="initProgressFill"></div>
@@ -174,14 +182,24 @@
                         <button class="lang-btn active" data-lang="de">Deutsch</button>
                         <button class="lang-btn" data-lang="en">English</button>
                     </div>
-                    <button class="btn btn-voice-filter" id="voiceFilterBtn" title="Voice Filter">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                            <circle cx="12" cy="7" r="4"/>
-                        </svg>
-                        <span data-i18n="voiceFilter">Voice Filter</span>
-                        <span class="filter-status" id="filterStatus"></span>
-                    </button>
+                    <div class="voice-filter-wrapper">
+                        <button class="btn btn-voice-filter" id="voiceFilterBtn" title="Voice Filter">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                <circle cx="12" cy="7" r="4"/>
+                            </svg>
+                            <span data-i18n="voiceFilter">Voice Filter</span>
+                            <span class="filter-status" id="filterStatus"></span>
+                        </button>
+                        <div class="voice-filter-tip" id="voiceFilterTip">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tip-icon">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                            <span data-i18n="voiceFilterRecommendation">For recordings with multiple speakers, we recommend using the Voice Filter to isolate specific voices.</span>
+                            <button class="tip-dismiss" id="dismissVoiceFilterTip" aria-label="Dismiss">×</button>
+                        </div>
+                    </div>
                 </div>
                 <button class="record-btn" id="recordBtn">
                     <div class="record-btn-inner">
@@ -341,6 +359,14 @@
                     </svg>
                     <span>Word Document (.docx)</span>
                 </button>
+                <button class="export-option" data-format="pdf">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <path d="M10 12h4M10 16h4"/>
+                    </svg>
+                    <span data-i18n="exportPDF">PDF (GoodNotes compatible)</span>
+                </button>
                 <button class="export-option" data-format="txt">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -416,6 +442,31 @@
                             <span data-i18n="finishEnrollment">Finish & Save Profile</span>
                         </button>
                         <button class="btn btn-ghost hidden" id="cancelEnrollmentBtn" data-i18n="cancel">Cancel</button>
+                    </div>
+                </div>
+
+                <div class="filter-mode-section" id="filterModeSection">
+                    <h4>Filter Mode</h4>
+                    <div class="filter-mode-toggle">
+                        <button class="filter-mode-btn active" id="filterModeIncludeBtn" data-mode="include">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            <div class="mode-info">
+                                <span class="mode-label" data-i18n="filterModeInclude">Include Mode</span>
+                                <span class="mode-desc" data-i18n="filterModeIncludeDesc">Only transcribe this voice</span>
+                            </div>
+                        </button>
+                        <button class="filter-mode-btn" id="filterModeExcludeBtn" data-mode="exclude">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                            <div class="mode-info">
+                                <span class="mode-label" data-i18n="filterModeExclude">Exclude Mode</span>
+                                <span class="mode-desc" data-i18n="filterModeExcludeDesc">Filter OUT this voice</span>
+                            </div>
+                        </button>
                     </div>
                 </div>
 

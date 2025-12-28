@@ -4,9 +4,9 @@ from typing import Optional, Tuple
 import re
 
 MLX_MODEL = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"  # Larger model for better output
-MAX_TOKENS = 256  # Reduced to prevent runaway generation
-TEMPERATURE = 0.1
-REPETITION_PENALTY = 1.2
+MAX_TOKENS = 150  # Reduced further to prevent AI commentary
+TEMPERATURE = 0.05  # Lower temperature for more deterministic output
+REPETITION_PENALTY = 1.3  # Higher to prevent repetition
 
 class AICorrector:
     def __init__(self):
@@ -102,18 +102,20 @@ class AICorrector:
 
         subject_context = ""
         if subject:
-            subject_context = f"This is a {subject} lecture. "
+            subject_context = f"({subject} lecture) "
 
-        prompt = f"""Fix this {lang_name} classroom transcription. {subject_context}Rules:
-1. Fix spelling/grammar errors
-2. Remove filler words (um, uh, äh, ähm)
-3. Keep only lecture content, remove off-topic chat
-4. Keep same language
-5. Return ONLY the corrected text
+        if language == "de":
+            prompt = f"""Korrigiere diesen Text. {subject_context}Nur korrigierter Text ausgeben, KEINE Erklärungen.
 
-Text: {text}
+"{text}"
 
-Corrected:"""
+Korrigiert:"""
+        else:
+            prompt = f"""Fix this text. {subject_context}Output ONLY the corrected text, NO explanations.
+
+"{text}"
+
+Fixed:"""
 
         return prompt
 
@@ -164,18 +166,46 @@ Corrected:"""
                 'corrected version', 'i have', 'i\'ve', 'note:', 'explanation:',
                 'changes made', 'changes:', 'original:', 'fixed:', 'result:',
                 '---', '===', '***', 'step', 'rule', '1.', '2.', '3.',
+                'if you have any questions', 'feel free to ask', 'i hope this helps',
+                'let me know', 'i\'m here to help', 'happy to help', 'please provide',
+                'thank you for', 'you\'re welcome', 'this is a correct', 'the sentence',
+                'the text', 'in english', 'translates to', 'it means', 'literally means',
+                'this phrase', 'the phrase', 'the word', 'is often used', 'it\'s often',
+                'it is often', 'commonly used', 'a common phrase', 'the corrected german',
+                'hier ist', 'die korrigierte', 'korrigierte version', 'korrigierter text',
+                'wenn du fragen hast', 'bei fragen', 'ich hoffe', 'gerne geschehen',
             ]
             if any(p in line.lower() for p in skip_patterns):
                 continue
-            if line.startswith(('-', '*', '#', '>')):
+            if line.startswith(('-', '*', '#', '>', '•')):
                 continue
             if line:
                 clean_lines.append(line)
 
         response = ' '.join(clean_lines)
 
-        response = re.sub(r'\s*\([^)]*(?:corrected|fixed|changed|removed)[^)]*\)\s*', ' ', response, flags=re.IGNORECASE)
-        response = re.sub(r'\s*\[[^\]]*(?:corrected|fixed|changed|removed)[^\]]*\]\s*', ' ', response, flags=re.IGNORECASE)
+        response = re.sub(r'\s*\([^)]*(?:corrected|fixed|changed|removed|korrigiert|geändert)[^)]*\)\s*', ' ', response, flags=re.IGNORECASE)
+        response = re.sub(r'\s*\[[^\]]*(?:corrected|fixed|changed|removed|korrigiert|geändert)[^\]]*\]\s*', ' ', response, flags=re.IGNORECASE)
+
+        ai_commentary_patterns = [
+            r'(?:also,?\s*)?if you have any questions.*$',
+            r'feel free to ask.*$',
+            r'i(?:\'m| am) here to help.*$',
+            r'(?:i )?hope this helps.*$',
+            r'let me know if.*$',
+            r'please (?:provide|let me know).*$',
+            r'thank you for (?:using|your).*$',
+            r'this is a (?:correct|proper|simple|common).*$',
+            r'the (?:text|sentence|phrase|word) (?:is|means|translates).*$',
+            r'in (?:german|english),?\s*(?:this|it|the).*$',
+            r'(?:it|this) (?:literally|basically|essentially) (?:means|translates).*$',
+            r'(?:it|this) (?:is|can be) (?:often|commonly|frequently) used.*$',
+            r'bei fragen.*$',
+            r'wenn (?:du|sie) fragen.*$',
+            r'ich hoffe.*$',
+        ]
+        for pattern in ai_commentary_patterns:
+            response = re.sub(pattern, '', response, flags=re.IGNORECASE)
 
         markers = [
             '\n\nCorrection:', '\nCorrection:', 'Correction:',
@@ -183,6 +213,8 @@ Corrected:"""
             '\n\nExplanation:', '\nExplanation:', 'Explanation:',
             '\n\nNote:', '\nNote:', 'Note:',
             'Here is', 'Here\'s', 'The corrected',
+            '\n\nKorrigiert:', '\nKorrigiert:', 'Korrigiert:',
+            'Hier ist', 'Die korrigierte',
         ]
 
         first_cut = len(response)
