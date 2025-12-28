@@ -28,6 +28,9 @@ audio_temp/
 # Data (contains database with recordings)
 data/
 
+# Voice profiles (user-specific data)
+voice_profiles/
+
 # OS files
 .DS_Store
 Thumbs.db
