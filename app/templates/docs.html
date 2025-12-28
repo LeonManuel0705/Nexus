@@ -10,7 +10,7 @@
 <section class="page-hero">
     <div class="container">
         <h1 data-translate="docsTitle">Documentation</h1>
-        <p data-translate="docsHeroDesc">Everything you need to know to get started with VoiceNotes.</p>
+        <p data-translate="docsDesc">Everything you need to know to get started with VoiceNotes.</p>
     </div>
 </section>
 
@@ -35,7 +35,7 @@
     <div class="docs-content">
         <section id="getting-started" class="docs-section">
             <h2 data-translate="quickStart">Quick Start</h2>
-            <p data-translate="quickStartIntro">VoiceNotes is a voice transcription application that runs entirely on your computer. Here's how to get started:</p>
+            <p data-translate="quickStartDesc">VoiceNotes is a voice transcription application that runs entirely on your computer. Here's how to get started:</p>
             <ol>
                 <li data-translate="quickStartStep1">Launch VoiceNotes by running <code>./start.sh</code> in your terminal</li>
                 <li data-translate="quickStartStep2">Open your browser to <code>http://localhost:5050</code></li>
@@ -44,7 +44,7 @@
                 <li data-translate="quickStartStep5">Click the record button and start speaking</li>
             </ol>
             <div class="docs-callout">
-                <p><strong data-translate="tip">Tip:</strong> <span data-translate="quickStartTip">For the best results, use a good quality microphone and speak clearly at a normal pace.</span></p>
+                <p data-translate="docsTip"><strong>Tip:</strong> For the best results, use a good quality microphone and speak clearly at a normal pace.</p>
             </div>
         </section>
 
@@ -57,21 +57,21 @@
                 <li data-translate="reqRAM">4GB RAM minimum (8GB recommended)</li>
                 <li data-translate="reqDisk">2GB free disk space for models</li>
             </ul>
-            <h3 data-translate="forAppleSilicon">For Apple Silicon (M1/M2/M3)</h3>
+            <h3 data-translate="appleSilicon">For Apple Silicon (M1/M2/M3)</h3>
             <p data-translate="appleSiliconDesc">VoiceNotes uses MLX for accelerated AI inference on Apple Silicon Macs. This provides faster and more accurate transcription enhancement.</p>
         </section>
 
         <section id="installation" class="docs-section">
             <h2 data-translate="installation">Installation</h2>
             <h3 data-translate="automaticSetup">Automatic Setup</h3>
-            <p data-translate="installStep1">Run the offline setup script to download all required models:</p>
+            <p data-translate="automaticSetupDesc">Run the offline setup script to download all required models:</p>
             <p><code>./setup_offline.sh</code></p>
-            <p data-translate="installStep2">This will download:</p>
+            <p data-translate="thisWillDownload">This will download:</p>
             <ul>
-                <li data-translate="installWhisper">Whisper speech recognition models (~650MB)</li>
-                <li data-translate="installLT">LanguageTool language data (~350MB)</li>
-                <li data-translate="installSpeaker">Speaker recognition model (~80MB)</li>
-                <li data-translate="installMLX">MLX AI model for Apple Silicon (~500MB)</li>
+                <li data-translate="downloadWhisper">Whisper speech recognition models (~650MB)</li>
+                <li data-translate="downloadLT">LanguageTool language data (~350MB)</li>
+                <li data-translate="downloadSpeaker">Speaker recognition model (~80MB)</li>
+                <li data-translate="downloadMLX">MLX AI model for Apple Silicon (~500MB)</li>
             </ul>
         </section>
 
@@ -79,15 +79,15 @@
             <h2 data-translate="recording">Recording</h2>
             <h3 data-translate="startingRecording">Starting a Recording</h3>
             <p data-translate="startingRecordingDesc">Click the large record button in the center of the screen. The button will turn red to indicate recording is active.</p>
-            <h3 data-translate="liveTranscription">Live Transcription</h3>
-            <p data-translate="liveTranscriptionDesc">As you speak, you'll see your words appear in real-time below the record button. The text updates every few seconds as the AI processes your speech.</p>
+            <h3 data-translate="liveTranscriptionDoc">Live Transcription</h3>
+            <p data-translate="liveTranscriptionDocDesc">As you speak, you'll see your words appear in real-time below the record button. The text updates every few seconds as the AI processes your speech.</p>
             <h3 data-translate="stoppingRecording">Stopping a Recording</h3>
             <p data-translate="stoppingRecordingDesc">Click the record button again to stop. Your recording will be automatically saved as a note in the current folder.</p>
         </section>
 
         <section id="voice-profiles" class="docs-section">
             <h2 data-translate="voiceProfiles">Voice Profiles</h2>
-            <p data-translate="voiceProfilesIntro">Voice profiles allow you to filter recordings to include only specific speakers.</p>
+            <p data-translate="voiceProfilesDesc">Voice profiles allow you to filter recordings to include only specific speakers.</p>
             <h3 data-translate="creatingProfile">Creating a Profile</h3>
             <ol>
                 <li data-translate="profileStep1">Click the voice filter button (person icon)</li>
@@ -99,8 +99,8 @@
             <h3 data-translate="usingVoiceFilter">Using Voice Filter</h3>
             <p data-translate="usingVoiceFilterDesc">Select a profile from the dropdown to activate voice filtering. Choose between:</p>
             <ul>
-                <li><strong data-translate="includeMode">Include Mode:</strong> <span data-translate="includeModeDesc">Only transcribe when this voice is detected</span></li>
-                <li><strong data-translate="excludeMode">Exclude Mode:</strong> <span data-translate="excludeModeDesc">Transcribe everything except this voice</span></li>
+                <li data-translate="includeMode">Include Mode: Only transcribe when this voice is detected</li>
+                <li data-translate="excludeMode">Exclude Mode: Transcribe everything except this voice</li>
             </ul>
         </section>
 
@@ -116,23 +116,23 @@
 
         <section id="exporting" class="docs-section">
             <h2 data-translate="exporting">Exporting</h2>
-            <p data-translate="exportingIntro">Export your notes in multiple formats:</p>
+            <p data-translate="exportingDesc">Export your notes in multiple formats:</p>
             <ul>
-                <li><strong data-translate="wordFormat">Word (.docx):</strong> <span data-translate="wordFormatDesc">Professionally formatted documents for Microsoft Word, Google Docs, or any word processor. Includes proper headings, paragraphs, and styling.</span></li>
-                <li><strong data-translate="markdownFormat">Markdown (.md):</strong> <span data-translate="markdownFormatDesc">For use in note-taking apps like Obsidian or Notion</span></li>
-                <li><strong data-translate="plainTextFormat">Plain Text (.txt):</strong> <span data-translate="plainTextFormatDesc">Universal format for any application</span></li>
+                <li data-translate="wordExport">Word (.docx): For use in Microsoft Word or Google Docs</li>
+                <li data-translate="markdownExport">Markdown (.md): For use in note-taking apps like Obsidian or Notion</li>
+                <li data-translate="plainTextExport">Plain Text (.txt): Universal format for any application</li>
             </ul>
             <p data-translate="exportBulk">You can export individual notes or entire folders at once.</p>
         </section>
 
         <section id="settings" class="docs-section">
             <h2 data-translate="settings">Settings</h2>
-            <h3 data-translate="languageSetting">Language</h3>
-            <p data-translate="languageSettingDesc">Select between English and German for both the UI and transcription language.</p>
-            <h3 data-translate="themeSetting">Theme</h3>
-            <p data-translate="themeSettingDesc">Toggle between light and dark mode using the sun/moon icon in the navigation bar.</p>
-            <h3 data-translate="thresholdSetting">Voice Filter Threshold</h3>
-            <p data-translate="thresholdSettingDesc">Adjust the sensitivity of voice filtering. Lower values are more strict, higher values are more permissive.</p>
+            <h3 data-translate="language">Language</h3>
+            <p data-translate="languageDesc">Select between English and German for both the UI and transcription language.</p>
+            <h3 data-translate="theme">Theme</h3>
+            <p data-translate="themeDesc">Toggle between light and dark mode using the sun/moon icon in the navigation bar.</p>
+            <h3 data-translate="voiceFilterThreshold">Voice Filter Threshold</h3>
+            <p data-translate="voiceFilterThresholdDesc">Adjust the sensitivity of voice filtering. Lower values are more strict, higher values are more permissive.</p>
         </section>
 
         <section id="troubleshooting" class="docs-section">
