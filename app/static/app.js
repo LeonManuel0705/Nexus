@@ -37,6 +37,36 @@ function initLanguageSelector() {
     }
 }
 
+function initLogPreference() {
+    const logPref = document.getElementById('initLogPreference');
+    const yesBtn = document.getElementById('logPreferenceYes');
+    const noBtn = document.getElementById('logPreferenceNo');
+
+    if (!logPref || !yesBtn || !noBtn) return;
+
+    const logPreferenceSet = localStorage.getItem('voicenotes_log_preference_set');
+
+    if (!logPreferenceSet) {
+        logPref.classList.remove('hidden');
+    }
+
+    yesBtn.addEventListener('click', () => {
+        localStorage.setItem('voicenotes_log_preference_set', 'true');
+        localStorage.setItem('voicenotes_logs_enabled', 'true');
+        logPref.classList.add('hidden');
+    });
+
+    noBtn.addEventListener('click', () => {
+        localStorage.setItem('voicenotes_log_preference_set', 'true');
+        localStorage.setItem('voicenotes_logs_enabled', 'false');
+        logPref.classList.add('hidden');
+    });
+}
+
+function isLoggingEnabled() {
+    return localStorage.getItem('voicenotes_logs_enabled') === 'true';
+}
+
 function updateInitProgress(data) {
     const overlay = document.getElementById('initOverlay');
     if (!overlay) return;
@@ -114,6 +144,7 @@ socket.on('models_ready', (data) => {
 });
 
 initLanguageSelector();
+initLogPreference();
 checkInitStatus();
 
 const i18n = {
@@ -210,7 +241,12 @@ const i18n = {
         filterModeInclude: 'Include Mode',
         filterModeExclude: 'Exclude Mode',
         filterModeIncludeDesc: 'Only transcribe this voice',
-        filterModeExcludeDesc: 'Filter OUT this voice'
+        filterModeExcludeDesc: 'Filter OUT this voice',
+        exportPDF: 'PDF (GoodNotes compatible)',
+        voiceFilterRecommendation: 'For recordings with multiple speakers, we recommend using the Voice Filter to isolate specific voices.',
+        logPreferenceText: 'Would you like to create diagnostic logs? Logs help improve the system and can be manually sent to developers.',
+        noThanks: 'No, thanks',
+        yesEnableLogs: 'Yes, enable logs'
     },
     de: {
         // Navbar
@@ -305,7 +341,12 @@ const i18n = {
         filterModeInclude: 'Einschließen-Modus',
         filterModeExclude: 'Ausschließen-Modus',
         filterModeIncludeDesc: 'Nur diese Stimme transkribieren',
-        filterModeExcludeDesc: 'Diese Stimme AUSFILTERN'
+        filterModeExcludeDesc: 'Diese Stimme AUSFILTERN',
+        exportPDF: 'PDF (GoodNotes kompatibel)',
+        voiceFilterRecommendation: 'Bei Aufnahmen mit mehreren Sprechern empfehlen wir die Verwendung des Stimmenfilters, um bestimmte Stimmen zu isolieren.',
+        logPreferenceText: 'Möchten Sie Diagnoseprotokolle erstellen? Protokolle helfen, das System zu verbessern und können manuell an Entwickler gesendet werden.',
+        noThanks: 'Nein, danke',
+        yesEnableLogs: 'Ja, Protokolle aktivieren'
     }
 };
 
@@ -1691,6 +1732,48 @@ async function setVoiceFilterMode(mode) {
     }
 }
 
+async function setFilterMode(mode) {
+    try {
+        await api('/api/voice-profiles/set-mode', {
+            method: 'POST',
+            body: JSON.stringify({ mode })
+        });
+
+        const includeBtn = document.getElementById('filterModeIncludeBtn');
+        const excludeBtn = document.getElementById('filterModeExcludeBtn');
+
+        if (mode === 'include') {
+            includeBtn.classList.add('active');
+            excludeBtn.classList.remove('active');
+        } else {
+            excludeBtn.classList.add('active');
+            includeBtn.classList.remove('active');
+        }
+    } catch (e) {
+        console.error('Failed to set filter mode:', e);
+    }
+}
+
+async function loadFilterMode() {
+    try {
+        const data = await api('/api/voice-profiles/filter-status');
+        const mode = data.mode || 'include';
+
+        const includeBtn = document.getElementById('filterModeIncludeBtn');
+        const excludeBtn = document.getElementById('filterModeExcludeBtn');
+
+        if (mode === 'include') {
+            includeBtn.classList.add('active');
+            excludeBtn.classList.remove('active');
+        } else {
+            excludeBtn.classList.add('active');
+            includeBtn.classList.remove('active');
+        }
+    } catch (e) {
+        console.error('Failed to load filter mode:', e);
+    }
+}
+
 function initVoiceProfileListeners() {
     elements.voiceFilterBtn.addEventListener('click', showVoiceProfileModal);
     elements.closeVoiceProfileBtn.addEventListener('click', hideVoiceProfileModal);
@@ -1700,6 +1783,18 @@ function initVoiceProfileListeners() {
     elements.cancelEnrollmentBtn.addEventListener('click', cancelEnrollment);
 
     elements.voiceProfileModal.querySelector('.modal-backdrop').addEventListener('click', hideVoiceProfileModal);
+
+    const includeBtn = document.getElementById('filterModeIncludeBtn');
+    const excludeBtn = document.getElementById('filterModeExcludeBtn');
+
+    if (includeBtn) {
+        includeBtn.addEventListener('click', () => setFilterMode('include'));
+    }
+    if (excludeBtn) {
+        excludeBtn.addEventListener('click', () => setFilterMode('exclude'));
+    }
+
+    loadFilterMode();
 }
 
 async function checkModels() {
@@ -1888,6 +1983,27 @@ async function preflightRecordCheck() {
     }
 }
 
+function initVoiceFilterTip() {
+    const tip = document.getElementById('voiceFilterTip');
+    const dismissBtn = document.getElementById('dismissVoiceFilterTip');
+
+    if (!tip || !dismissBtn) return;
+
+    const tipDismissed = localStorage.getItem('voicenotes_filter_tip_dismissed');
+    const tipShownCount = parseInt(localStorage.getItem('voicenotes_filter_tip_count') || '0');
+
+    if (tipDismissed === 'true' || tipShownCount >= 3) {
+        tip.classList.add('hidden');
+    } else {
+        localStorage.setItem('voicenotes_filter_tip_count', (tipShownCount + 1).toString());
+    }
+
+    dismissBtn.addEventListener('click', () => {
+        tip.classList.add('hidden');
+        localStorage.setItem('voicenotes_filter_tip_dismissed', 'true');
+    });
+}
+
 async function init() {
     loadTheme();
     const savedUILang = localStorage.getItem('voicenotes_ui_lang') || 'en';
@@ -1897,6 +2013,7 @@ async function init() {
     initModelCheckListeners();
     initFeedbackListeners();
     initDashboardListeners();
+    initVoiceFilterTip();
     await loadFolders();
     await loadNotes();
     await loadTags();

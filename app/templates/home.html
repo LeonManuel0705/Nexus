@@ -47,7 +47,7 @@
                     <div class="waveform-bar"></div>
                 </div>
                 <div class="hero-text-preview">
-                    The quick brown fox jumps over the lazy dog...<span class="cursor"></span>
+                    <span id="typingText"></span><span class="cursor"></span>
                 </div>
             </div>
         </div>
@@ -177,4 +177,87 @@
         <a href="/app" class="btn btn-primary btn-large" data-translate="openApp">Open VoiceNotes</a>
     </div>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    const phrases = {
+        en: [
+            "The professor explained that quantum physics describes nature at the atomic level...",
+            "Meeting notes: Q4 revenue exceeded expectations by 12 percent...",
+            "Today we learned about the Renaissance period and its impact on art...",
+            "Remember to follow up with the client about the contract details...",
+            "The key insight from the lecture was about machine learning algorithms...",
+            "Action items: Complete project proposal by Friday, schedule team review..."
+        ],
+        de: [
+            "Der Professor erklärte, dass die Quantenphysik die Natur auf atomarer Ebene beschreibt...",
+            "Besprechungsnotizen: Der Q4-Umsatz übertraf die Erwartungen um 12 Prozent...",
+            "Heute haben wir etwas über die Renaissance und ihren Einfluss auf die Kunst gelernt...",
+            "Denken Sie daran, den Kunden wegen der Vertragsdetails zu kontaktieren...",
+            "Die wichtigste Erkenntnis aus der Vorlesung war über maschinelles Lernen...",
+            "Aufgaben: Projektvorschlag bis Freitag fertigstellen, Teamüberprüfung planen..."
+        ]
+    };
+
+    const typingElement = document.getElementById('typingText');
+    if (!typingElement) return;
+
+    let currentPhraseIndex = 0;
+    let currentCharIndex = 0;
+    let isDeleting = false;
+    let currentLang = document.body.getAttribute('data-lang') || 'en';
+
+    function getCurrentPhrases() {
+        return phrases[currentLang] || phrases.en;
+    }
+
+    function typeText() {
+        const currentPhrases = getCurrentPhrases();
+        const currentPhrase = currentPhrases[currentPhraseIndex];
+
+        if (isDeleting) {
+            currentCharIndex--;
+            typingElement.textContent = currentPhrase.substring(0, currentCharIndex);
+
+            if (currentCharIndex === 0) {
+                isDeleting = false;
+                currentPhraseIndex = (currentPhraseIndex + 1) % currentPhrases.length;
+                setTimeout(typeText, 500);
+            } else {
+                setTimeout(typeText, 20);
+            }
+        } else {
+            currentCharIndex++;
+            typingElement.textContent = currentPhrase.substring(0, currentCharIndex);
+
+            if (currentCharIndex === currentPhrase.length) {
+                isDeleting = true;
+                const pauseDuration = 4000 + Math.random() * 3000;
+                setTimeout(typeText, pauseDuration);
+            } else {
+                const typingSpeed = 30 + Math.random() * 40;
+                setTimeout(typeText, typingSpeed);
+            }
+        }
+    }
+
+    // Update language when changed
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.attributeName === 'data-lang') {
+                currentLang = document.body.getAttribute('data-lang') || 'en';
+                currentCharIndex = 0;
+                isDeleting = false;
+                currentPhraseIndex = 0;
+            }
+        });
+    });
+    observer.observe(document.body, { attributes: true });
+
+    // Start typing animation
+    setTimeout(typeText, 1000);
+})();
+</script>
 {% endblock %}
