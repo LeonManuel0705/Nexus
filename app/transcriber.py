@@ -493,6 +493,9 @@ def apply_ai_correction(text: str, language: str = "de", subject: Optional[str] 
     if not text or not text.strip():
         return text
 
+    result = text
+
+    # Step 1: Apply MLX/LanguageTool correction
     try:
         from ai_corrector import get_corrector, correct_transcription
 
@@ -501,16 +504,23 @@ def apply_ai_correction(text: str, language: str = "de", subject: Optional[str] 
             _ai_corrector_available = corrector.is_ai_available()
 
         if _ai_corrector_available:
-            return correct_transcription(text, subject, language)
-        else:
-            return text
+            result = correct_transcription(text, subject, language)
 
     except ImportError:
         _ai_corrector_available = False
-        return text
     except Exception as e:
         print(f"AI correction error: {e}")
-        return text
+
+    # Step 2: Apply Smart Post-Processor for semantic analysis
+    try:
+        from smart_postprocessor import process_final
+        result = process_final(result, subject, language)
+    except ImportError:
+        pass
+    except Exception as e:
+        print(f"Smart postprocessor error: {e}")
+
+    return result
 
 
 def transcribe_audio_chunk(
@@ -526,6 +536,13 @@ def transcribe_audio_chunk(
 
     if apply_instant_correction and raw_text:
         corrected_text = corrector.correct_instant(raw_text)
+
+        # Apply real-time smart postprocessing (fast pass only)
+        try:
+            from smart_postprocessor import process_realtime
+            corrected_text = process_realtime(corrected_text, transcriber.context_text, language)
+        except Exception:
+            pass
     else:
         corrected_text = raw_text
 

@@ -3,7 +3,7 @@ import threading
 from typing import Optional, Tuple
 import re
 
-MLX_MODEL = "mlx-community/Qwen2.5-3B-Instruct-4bit"
+MLX_MODEL = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
 MAX_TOKENS = 200
 TEMPERATURE = 0.1
 REPETITION_PENALTY = 1.2

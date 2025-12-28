@@ -7,21 +7,23 @@ from pathlib import Path
 import hashlib
 
 PROFILES_DIR = Path(__file__).parent.parent / "voice_profiles"
-EMBEDDING_DIM = 192
+EMBEDDING_DIM = 192  # TitaNet uses 192-dim embeddings
 DEFAULT_VERIFICATION_THRESHOLD = 0.30
 HIGH_CONFIDENCE_THRESHOLD = 0.50
 MIN_ENROLLMENT_DURATION = 30.0
 SAMPLE_RATE = 16000
 
 def get_verification_threshold() -> float:
-    
+
     try:
         from adaptive_system import get_param
         return get_param("voice_threshold")
     except:
         return DEFAULT_VERIFICATION_THRESHOLD
 
-SPEAKER_MODEL = "speechbrain/spkrec-ecapa-voxceleb"
+# TitaNet model - better for noisy environments than SpeechBrain ECAPA
+SPEAKER_MODEL = "nvidia/speakerverification_en_titanet_large"
+FALLBACK_SPEAKER_MODEL = "speechbrain/spkrec-ecapa-voxceleb"  # Fallback if TitaNet unavailable
 
 class VoiceProfile:
 
@@ -143,6 +145,8 @@ class VoiceProfileManager:
         self._current_profile: Optional[VoiceProfile] = None
         self._enrollment_buffer: List[np.ndarray] = []
         self._is_enrolling = False
+        self._using_titanet = False
+        self._current_profile_id: Optional[str] = None
         PROFILES_DIR.mkdir(parents=True, exist_ok=True)
 
     def _load_model(self) -> bool:
@@ -153,30 +157,85 @@ class VoiceProfileManager:
             if self._model_loaded:
                 return self._model is not None
 
-            try:
-                from speechbrain.inference.speaker import EncoderClassifier
+            import torch
+            if torch.backends.mps.is_available():
+                device = "mps"
+            elif torch.cuda.is_available():
+                device = "cuda"
+            else:
+                device = "cpu"
 
-                model_dir = Path(__file__).parent.parent / "models" / "speaker_model"
-                model_dir.mkdir(parents=True, exist_ok=True)
-
-                import torch
-                if torch.backends.mps.is_available():
-                    device = "mps"
-                else:
-                    device = "cpu"
-
-                self._model = EncoderClassifier.from_hparams(
-                    source="speechbrain/spkrec-ecapa-voxceleb",
-                    savedir=str(model_dir),
-                    run_opts={"device": device}
-                )
+            # Try TitaNet first (better for noisy environments)
+            if self._try_load_titanet(device):
                 self._model_loaded = True
                 return True
 
-            except Exception as e:
-                print(f"Failed to load speaker model: {e}")
+            # Fallback to SpeechBrain ECAPA
+            if self._try_load_speechbrain(device):
                 self._model_loaded = True
-                return False
+                return True
+
+            print("Failed to load any speaker model")
+            self._model_loaded = True
+            return False
+
+    def _try_load_titanet(self, device: str) -> bool:
+        """Try to load NVIDIA TitaNet model - better for noisy environments"""
+        try:
+            import nemo.collections.asr as nemo_asr
+
+            model_dir = Path(__file__).parent.parent / "models" / "titanet_model"
+            model_dir.mkdir(parents=True, exist_ok=True)
+
+            print("Loading TitaNet speaker verification model...")
+            self._model = nemo_asr.models.EncDecSpeakerLabelModel.from_pretrained(
+                model_name=SPEAKER_MODEL
+            )
+
+            # Move to appropriate device
+            if device == "mps":
+                # TitaNet doesn't fully support MPS, use CPU
+                self._model = self._model.to("cpu")
+            else:
+                self._model = self._model.to(device)
+
+            self._model.eval()
+            self._using_titanet = True
+            print("TitaNet speaker model ready (optimized for noisy environments)")
+            return True
+
+        except ImportError:
+            print("NeMo not installed, trying SpeechBrain fallback...")
+            return False
+        except Exception as e:
+            print(f"TitaNet load failed: {e}, trying SpeechBrain fallback...")
+            return False
+
+    def _try_load_speechbrain(self, device: str) -> bool:
+        """Fallback to SpeechBrain ECAPA-TDNN"""
+        try:
+            from speechbrain.inference.speaker import EncoderClassifier
+
+            model_dir = Path(__file__).parent.parent / "models" / "speaker_model"
+            model_dir.mkdir(parents=True, exist_ok=True)
+
+            print("Loading SpeechBrain ECAPA-TDNN model...")
+            self._model = EncoderClassifier.from_hparams(
+                source=FALLBACK_SPEAKER_MODEL,
+                savedir=str(model_dir),
+                run_opts={"device": device}
+            )
+            self._using_titanet = False
+            print("SpeechBrain speaker model ready (fallback)")
+            return True
+
+        except Exception as e:
+            print(f"SpeechBrain load failed: {e}")
+            return False
+
+    def is_using_titanet(self) -> bool:
+        """Check if TitaNet is being used"""
+        return self._using_titanet
 
     def _preprocess_audio(self, audio: np.ndarray) -> np.ndarray:
         
@@ -214,17 +273,64 @@ class VoiceProfileManager:
                 print(f"[VoiceFilter] Audio too short: {len(audio)} samples")
                 return None
 
+            if self._using_titanet:
+                # TitaNet embedding extraction
+                return self._extract_titanet_embedding(audio)
+            else:
+                # SpeechBrain embedding extraction
+                return self._extract_speechbrain_embedding(audio)
+
+        except Exception as e:
+            print(f"Embedding extraction error: {e}")
+            return None
+
+    def _extract_titanet_embedding(self, audio: np.ndarray) -> Optional[np.ndarray]:
+        """Extract embedding using TitaNet (NVIDIA NeMo)"""
+        try:
+            import torch
+            import tempfile
+            import soundfile as sf
+
+            # TitaNet expects audio file path, so we need to save temporarily
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
+                temp_path = f.name
+                sf.write(temp_path, audio, SAMPLE_RATE)
+
+            try:
+                with torch.no_grad():
+                    # Get embedding from TitaNet
+                    _, embedding = self._model.verify_speakers(temp_path, temp_path)
+                    # The model returns embeddings in its internal format
+                    # We extract the speaker embedding
+                    emb = self._model.get_embedding(temp_path)
+                    emb = emb.squeeze().cpu().numpy()
+                    emb = emb / (np.linalg.norm(emb) + 1e-8)
+                    return emb
+            finally:
+                # Clean up temp file
+                import os
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+
+        except Exception as e:
+            print(f"TitaNet embedding error: {e}")
+            return None
+
+    def _extract_speechbrain_embedding(self, audio: np.ndarray) -> Optional[np.ndarray]:
+        """Extract embedding using SpeechBrain ECAPA-TDNN"""
+        try:
+            import torch
+
             audio_tensor = torch.tensor(audio).unsqueeze(0)
 
             with torch.no_grad():
                 embedding = self._model.encode_batch(audio_tensor)
                 emb = embedding.squeeze().cpu().numpy()
-
                 emb = emb / (np.linalg.norm(emb) + 1e-8)
                 return emb
 
         except Exception as e:
-            print(f"Embedding extraction error: {e}")
+            print(f"SpeechBrain embedding error: {e}")
             return None
 
     def start_enrollment(self, teacher_name: str) -> str:

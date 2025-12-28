@@ -6,10 +6,17 @@ import time
 
 WHISPER_MODEL = "small"
 MLX_MODEL = "mlx-community/Qwen2.5-0.5B-Instruct-4bit"
-SPEAKER_MODEL = "speechbrain/spkrec-ecapa-voxceleb"
+
+# Speaker models - TitaNet preferred for noisy environments
+TITANET_MODEL = "nvidia/speakerverification_en_titanet_large"
+SPEECHBRAIN_MODEL = "speechbrain/spkrec-ecapa-voxceleb"
+
+# Progress tracking settings
+PROGRESS_UPDATE_INTERVAL = 1.0  # Update every second
 
 _download_progress: Dict[str, dict] = {}
 _download_lock = threading.Lock()
+_download_stats: Dict[str, dict] = {}  # Track download statistics per model
 
 
 def get_download_progress() -> Dict[str, dict]:
@@ -30,6 +37,102 @@ def clear_download_progress(model_name: str):
     with _download_lock:
         if model_name in _download_progress:
             del _download_progress[model_name]
+        if model_name in _download_stats:
+            del _download_stats[model_name]
+
+
+def init_download_stats(model_name: str, total_size_mb: float = 0):
+    """Initialize download statistics for a model"""
+    with _download_lock:
+        _download_stats[model_name] = {
+            'start_time': time.time(),
+            'last_update': time.time(),
+            'bytes_downloaded': 0,
+            'total_bytes': int(total_size_mb * 1024 * 1024),
+            'speed_history': [],  # Last 5 speed measurements for smoothing
+        }
+
+
+def update_download_stats(model_name: str, bytes_downloaded: int, total_bytes: int = 0):
+    """Update download statistics and calculate speed"""
+    with _download_lock:
+        if model_name not in _download_stats:
+            _download_stats[model_name] = {
+                'start_time': time.time(),
+                'last_update': time.time(),
+                'bytes_downloaded': 0,
+                'total_bytes': total_bytes,
+                'speed_history': [],
+            }
+
+        stats = _download_stats[model_name]
+        now = time.time()
+        time_diff = now - stats['last_update']
+
+        if time_diff > 0:
+            # Calculate current speed
+            bytes_diff = bytes_downloaded - stats['bytes_downloaded']
+            current_speed = bytes_diff / time_diff if time_diff > 0 else 0
+
+            # Keep last 5 measurements for smoothing
+            stats['speed_history'].append(current_speed)
+            if len(stats['speed_history']) > 5:
+                stats['speed_history'].pop(0)
+
+        stats['bytes_downloaded'] = bytes_downloaded
+        stats['last_update'] = now
+        if total_bytes > 0:
+            stats['total_bytes'] = total_bytes
+
+
+def get_download_speed(model_name: str) -> dict:
+    """Get download speed and progress for a model"""
+    with _download_lock:
+        if model_name not in _download_stats:
+            return {'speed': 0, 'speed_str': '', 'progress': 0, 'eta': ''}
+
+        stats = _download_stats[model_name]
+
+        # Calculate smoothed speed (average of recent measurements)
+        if stats['speed_history']:
+            avg_speed = sum(stats['speed_history']) / len(stats['speed_history'])
+        else:
+            elapsed = time.time() - stats['start_time']
+            avg_speed = stats['bytes_downloaded'] / elapsed if elapsed > 0 else 0
+
+        # Format speed string
+        if avg_speed >= 1024 * 1024:
+            speed_str = f"{avg_speed / (1024 * 1024):.1f} MB/s"
+        elif avg_speed >= 1024:
+            speed_str = f"{avg_speed / 1024:.1f} KB/s"
+        else:
+            speed_str = f"{avg_speed:.0f} B/s"
+
+        # Calculate progress percentage
+        progress = 0
+        if stats['total_bytes'] > 0:
+            progress = min(99, int(stats['bytes_downloaded'] / stats['total_bytes'] * 100))
+
+        # Calculate ETA
+        eta_str = ''
+        if avg_speed > 0 and stats['total_bytes'] > 0:
+            remaining = stats['total_bytes'] - stats['bytes_downloaded']
+            eta_seconds = remaining / avg_speed
+            if eta_seconds < 60:
+                eta_str = f"{int(eta_seconds)}s"
+            elif eta_seconds < 3600:
+                eta_str = f"{int(eta_seconds / 60)}m {int(eta_seconds % 60)}s"
+            else:
+                eta_str = f"{int(eta_seconds / 3600)}h {int((eta_seconds % 3600) / 60)}m"
+
+        return {
+            'speed': avg_speed,
+            'speed_str': speed_str,
+            'progress': progress,
+            'eta': eta_str,
+            'downloaded_mb': stats['bytes_downloaded'] / (1024 * 1024),
+            'total_mb': stats['total_bytes'] / (1024 * 1024),
+        }
 
 
 def check_whisper_model() -> dict:
@@ -113,22 +216,55 @@ def check_mlx_model() -> dict:
         }
 
 
+def check_titanet_available() -> bool:
+    """Check if TitaNet (NeMo) is available"""
+    try:
+        import nemo.collections.asr as nemo_asr
+        return True
+    except ImportError:
+        return False
+
+
 def check_speaker_model() -> dict:
     try:
+        # Check for TitaNet first (preferred for noisy environments)
+        titanet_available = check_titanet_available()
+
+        if titanet_available:
+            # Check if TitaNet model files exist in NeMo cache
+            nemo_cache = Path.home() / ".cache" / "torch" / "NeMo"
+            titanet_installed = nemo_cache.exists() and any(nemo_cache.glob("**/*titanet*"))
+
+            if not titanet_installed:
+                # Also check huggingface cache
+                hf_cache = Path.home() / ".cache" / "huggingface" / "hub"
+                titanet_installed = any(hf_cache.glob("*titanet*"))
+
+            return {
+                'name': 'speaker',
+                'display_name': 'Voice Filter (TitaNet)',
+                'installed': titanet_installed,
+                'required': False,
+                'size': '~100 MB',
+                'model_type': 'titanet'
+            }
+
+        # Fallback to SpeechBrain check
         model_dir = Path(__file__).parent.parent / "models" / "speaker_model"
-        model_installed = model_dir.exists() and any(model_dir.glob("*.ckpt")) or any(model_dir.glob("**/*.ckpt"))
+        model_installed = model_dir.exists() and (any(model_dir.glob("*.ckpt")) or any(model_dir.glob("**/*.ckpt")))
 
         return {
             'name': 'speaker',
             'display_name': 'Voice Filter (SpeechBrain)',
             'installed': model_installed,
             'required': False,
-            'size': '~100 MB'
+            'size': '~100 MB',
+            'model_type': 'speechbrain'
         }
     except Exception as e:
         return {
             'name': 'speaker',
-            'display_name': 'Voice Filter (SpeechBrain)',
+            'display_name': 'Voice Filter',
             'installed': False,
             'required': False,
             'size': '~100 MB',
@@ -162,12 +298,17 @@ def download_whisper_model(progress_callback: Optional[Callable] = None) -> bool
 
         set_download_progress('whisper', 10, 'downloading', 'Downloading Whisper model...')
 
+        # Start animated progress
+        start_progress_animation('whisper', max_progress=90)
+
         model = WhisperModel(
             WHISPER_MODEL,
             device="cpu",
             compute_type="int8"
         )
 
+        # Stop animation and set to complete
+        stop_progress_animation('whisper')
         set_download_progress('whisper', 100, 'complete', 'Whisper model ready')
         time.sleep(0.5)
         clear_download_progress('whisper')
@@ -175,6 +316,7 @@ def download_whisper_model(progress_callback: Optional[Callable] = None) -> bool
         return True
 
     except Exception as e:
+        stop_progress_animation('whisper')
         set_download_progress('whisper', 0, 'error', f'Download failed: {str(e)}')
         return False
 
@@ -192,8 +334,13 @@ def download_mlx_model(progress_callback: Optional[Callable] = None) -> bool:
 
         set_download_progress('mlx', 10, 'downloading', 'Downloading Qwen2.5 model...')
 
+        # Start animated progress
+        start_progress_animation('mlx', max_progress=90)
+
         model, tokenizer = load(MLX_MODEL)
 
+        # Stop animation and set to complete
+        stop_progress_animation('mlx')
         set_download_progress('mlx', 100, 'complete', 'MLX model ready')
         time.sleep(0.5)
         clear_download_progress('mlx')
@@ -204,9 +351,11 @@ def download_mlx_model(progress_callback: Optional[Callable] = None) -> bool:
         return True
 
     except ImportError as e:
+        stop_progress_animation('mlx')
         set_download_progress('mlx', 0, 'error', 'MLX not installed')
         return False
     except Exception as e:
+        stop_progress_animation('mlx')
         set_download_progress('mlx', 0, 'error', f'Download failed: {str(e)}')
         return False
 
@@ -214,6 +363,50 @@ def download_mlx_model(progress_callback: Optional[Callable] = None) -> bool:
 def download_speaker_model(progress_callback: Optional[Callable] = None) -> bool:
     set_download_progress('speaker', 0, 'downloading', 'Initializing speaker model download...')
 
+    # Try TitaNet first (better for noisy environments)
+    if _try_download_titanet():
+        return True
+
+    # Fallback to SpeechBrain
+    return _try_download_speechbrain()
+
+
+def _try_download_titanet() -> bool:
+    """Try to download TitaNet model"""
+    try:
+        import nemo.collections.asr as nemo_asr
+
+        set_download_progress('speaker', 10, 'downloading', 'Downloading TitaNet model (optimized for noisy environments)...')
+
+        # Start animated progress
+        start_progress_animation('speaker', max_progress=90)
+
+        model = nemo_asr.models.EncDecSpeakerLabelModel.from_pretrained(
+            model_name=TITANET_MODEL
+        )
+
+        # Stop animation and set to complete
+        stop_progress_animation('speaker')
+        set_download_progress('speaker', 100, 'complete', 'TitaNet speaker model ready')
+        time.sleep(0.5)
+        clear_download_progress('speaker')
+
+        del model
+
+        return True
+
+    except ImportError:
+        stop_progress_animation('speaker')
+        print("NeMo not installed, trying SpeechBrain...")
+        return False
+    except Exception as e:
+        stop_progress_animation('speaker')
+        print(f"TitaNet download failed: {e}, trying SpeechBrain...")
+        return False
+
+
+def _try_download_speechbrain() -> bool:
+    """Fallback to SpeechBrain ECAPA-TDNN"""
     try:
         from speechbrain.inference.speaker import EncoderClassifier
 
@@ -222,13 +415,18 @@ def download_speaker_model(progress_callback: Optional[Callable] = None) -> bool
 
         set_download_progress('speaker', 10, 'downloading', 'Downloading SpeechBrain model...')
 
+        # Start animated progress
+        start_progress_animation('speaker', max_progress=90)
+
         model = EncoderClassifier.from_hparams(
-            source=SPEAKER_MODEL,
+            source=SPEECHBRAIN_MODEL,
             savedir=str(model_dir),
             run_opts={"device": "cpu"}
         )
 
-        set_download_progress('speaker', 100, 'complete', 'Speaker model ready')
+        # Stop animation and set to complete
+        stop_progress_animation('speaker')
+        set_download_progress('speaker', 100, 'complete', 'SpeechBrain speaker model ready')
         time.sleep(0.5)
         clear_download_progress('speaker')
 
@@ -237,9 +435,11 @@ def download_speaker_model(progress_callback: Optional[Callable] = None) -> bool
         return True
 
     except ImportError as e:
+        stop_progress_animation('speaker')
         set_download_progress('speaker', 0, 'error', 'SpeechBrain not installed')
         return False
     except Exception as e:
+        stop_progress_animation('speaker')
         set_download_progress('speaker', 0, 'error', f'Download failed: {str(e)}')
         return False
 
