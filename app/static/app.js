@@ -246,7 +246,30 @@ const i18n = {
         voiceFilterRecommendation: 'For recordings with multiple speakers, we recommend using the Voice Filter to isolate specific voices.',
         logPreferenceText: 'Would you like to create diagnostic logs? Logs help improve the system and can be manually sent to developers.',
         noThanks: 'No, thanks',
-        yesEnableLogs: 'Yes, enable logs'
+        yesEnableLogs: 'Yes, enable logs',
+        tabRecord: 'Record',
+        tabUpload: 'Upload File',
+        tabVocabulary: 'Vocabulary',
+        dropFilesHere: 'Drop audio/video files here',
+        orClickToBrowse: 'or click to browse',
+        supportedFormats: 'MP3, MP4, WAV, M4A, FLAC, OGG, WebM',
+        transcriptionLanguage: 'Language:',
+        generateSubtitles: 'Generate subtitles (SRT)',
+        uploading: 'Uploading...',
+        transcribing: 'Transcribing...',
+        completed: 'Completed',
+        fileTranscribed: 'File transcribed successfully',
+        customVocabulary: 'Custom Vocabulary',
+        vocabularyDesc: 'Teach VoiceNotes to recognize specialized terms, names, and abbreviations that may be transcribed incorrectly.',
+        howYouSayIt: 'How you say it',
+        correctSpelling: 'Correct spelling',
+        phoneticExample: "e.g., 'crisp-er'",
+        spellingExample: "e.g., 'CRISPR'",
+        savedWords: 'Saved Words',
+        noWordsYet: 'No custom words added yet. Add words above to improve transcription accuracy.',
+        wordAdded: 'Word added',
+        wordDeleted: 'Word deleted',
+        fillBothFields: 'Please fill both fields'
     },
     de: {
         // Navbar
@@ -346,7 +369,30 @@ const i18n = {
         voiceFilterRecommendation: 'Bei Aufnahmen mit mehreren Sprechern empfehlen wir die Verwendung des Stimmenfilters, um bestimmte Stimmen zu isolieren.',
         logPreferenceText: 'Möchten Sie Diagnoseprotokolle erstellen? Protokolle helfen, das System zu verbessern und können manuell an Entwickler gesendet werden.',
         noThanks: 'Nein, danke',
-        yesEnableLogs: 'Ja, Protokolle aktivieren'
+        yesEnableLogs: 'Ja, Protokolle aktivieren',
+        tabRecord: 'Aufnehmen',
+        tabUpload: 'Datei hochladen',
+        tabVocabulary: 'Vokabular',
+        dropFilesHere: 'Audio-/Videodateien hier ablegen',
+        orClickToBrowse: 'oder klicken zum Durchsuchen',
+        supportedFormats: 'MP3, MP4, WAV, M4A, FLAC, OGG, WebM',
+        transcriptionLanguage: 'Sprache:',
+        generateSubtitles: 'Untertitel generieren (SRT)',
+        uploading: 'Hochladen...',
+        transcribing: 'Transkribieren...',
+        completed: 'Fertig',
+        fileTranscribed: 'Datei erfolgreich transkribiert',
+        customVocabulary: 'Eigenes Vokabular',
+        vocabularyDesc: 'Bringe VoiceNotes bei, spezielle Begriffe, Namen und Abkürzungen zu erkennen, die möglicherweise falsch transkribiert werden.',
+        howYouSayIt: 'Wie du es sagst',
+        correctSpelling: 'Korrekte Schreibweise',
+        phoneticExample: "z.B. 'krisp-er'",
+        spellingExample: "z.B. 'CRISPR'",
+        savedWords: 'Gespeicherte Wörter',
+        noWordsYet: 'Noch keine eigenen Wörter hinzugefügt. Füge oben Wörter hinzu, um die Transkriptionsgenauigkeit zu verbessern.',
+        wordAdded: 'Wort hinzugefügt',
+        wordDeleted: 'Wort gelöscht',
+        fillBothFields: 'Bitte beide Felder ausfüllen'
     }
 };
 
@@ -2004,6 +2050,274 @@ function initVoiceFilterTip() {
     });
 }
 
+function initTabs() {
+    const tabs = document.querySelectorAll('.main-tab');
+    const panes = document.querySelectorAll('.tab-pane');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const targetTab = tab.dataset.tab;
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            panes.forEach(pane => {
+                pane.classList.remove('active');
+                if (pane.id === targetTab + '-tab') {
+                    pane.classList.add('active');
+                }
+            });
+        });
+    });
+}
+
+let uploadLanguage = 'de';
+
+function initFileUpload() {
+    const dropzone = document.getElementById('uploadDropzone');
+    const fileInput = document.getElementById('fileInput');
+    const uploadQueue = document.getElementById('uploadQueue');
+    const langBtns = document.querySelectorAll('.upload-lang-btn');
+
+    if (!dropzone || !fileInput) return;
+
+    langBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            langBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            uploadLanguage = btn.dataset.uploadLang;
+        });
+    });
+
+    dropzone.addEventListener('click', () => fileInput.click());
+
+    dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('dragover');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+        dropzone.classList.remove('dragover');
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+        const files = Array.from(e.dataTransfer.files);
+        handleFileUpload(files);
+    });
+
+    fileInput.addEventListener('change', () => {
+        const files = Array.from(fileInput.files);
+        handleFileUpload(files);
+        fileInput.value = '';
+    });
+}
+
+function handleFileUpload(files) {
+    const uploadQueue = document.getElementById('uploadQueue');
+    const generateSrt = document.getElementById('generateSubtitles')?.checked || false;
+
+    files.forEach(file => {
+        const itemId = 'upload-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        const item = document.createElement('div');
+        item.className = 'upload-item';
+        item.id = itemId;
+        item.innerHTML = `
+            <div class="upload-item-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                </svg>
+            </div>
+            <div class="upload-item-info">
+                <div class="upload-item-name">${file.name}</div>
+                <div class="upload-item-status" data-i18n="uploading">Uploading...</div>
+                <div class="upload-item-progress">
+                    <div class="upload-item-progress-bar" style="width: 0%"></div>
+                </div>
+            </div>
+        `;
+        uploadQueue.appendChild(item);
+
+        transcribeFile(file, itemId, generateSrt);
+    });
+}
+
+async function transcribeFile(file, itemId, generateSrt) {
+    const item = document.getElementById(itemId);
+    const statusEl = item.querySelector('.upload-item-status');
+    const progressBar = item.querySelector('.upload-item-progress-bar');
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('language', uploadLanguage);
+    formData.append('generate_srt', generateSrt.toString());
+
+    try {
+        statusEl.textContent = translations[state.uiLanguage]?.transcribing || 'Transcribing...';
+        progressBar.style.width = '30%';
+
+        const response = await fetch('/api/transcribe-file', {
+            method: 'POST',
+            body: formData
+        });
+
+        progressBar.style.width = '90%';
+
+        const data = await response.json();
+
+        if (data.success) {
+            progressBar.style.width = '100%';
+            item.classList.add('completed');
+            item.querySelector('.upload-item-icon').innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+            `;
+            statusEl.textContent = translations[state.uiLanguage]?.completed || 'Completed';
+            item.querySelector('.upload-item-progress').remove();
+
+            if (data.srt) {
+                const srtBtn = document.createElement('button');
+                srtBtn.className = 'btn-icon-sm';
+                srtBtn.title = 'Download SRT';
+                srtBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+                srtBtn.onclick = () => downloadSrt(data.title, data.srt);
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'upload-item-actions';
+                actionsDiv.appendChild(srtBtn);
+                item.appendChild(actionsDiv);
+            }
+
+            await loadNotes();
+            showToast(translations[state.uiLanguage]?.fileTranscribed || 'File transcribed successfully', 'success');
+        } else {
+            throw new Error(data.error || 'Transcription failed');
+        }
+    } catch (error) {
+        item.classList.add('error');
+        item.querySelector('.upload-item-icon').innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+            </svg>
+        `;
+        statusEl.textContent = error.message;
+        item.querySelector('.upload-item-progress')?.remove();
+        showToast(error.message, 'error');
+    }
+}
+
+function downloadSrt(title, srtContent) {
+    const blob = new Blob([srtContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = title + '.srt';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+async function loadVocabulary() {
+    try {
+        const response = await fetch('/api/vocabulary');
+        const data = await response.json();
+        renderVocabularyList(data.words);
+        const countEl = document.getElementById('vocabCount');
+        if (countEl) {
+            countEl.textContent = data.count + ' ' + (translations[state.uiLanguage]?.words || 'words');
+        }
+    } catch (error) {
+        console.error('Failed to load vocabulary:', error);
+    }
+}
+
+function renderVocabularyList(words) {
+    const list = document.getElementById('vocabularyList');
+    if (!list) return;
+
+    if (words.length === 0) {
+        list.innerHTML = `<p class="vocabulary-empty" data-i18n="noWordsYet">${translations[state.uiLanguage]?.noWordsYet || 'No custom words added yet.'}</p>`;
+        return;
+    }
+
+    list.innerHTML = words.map(word => `
+        <div class="vocabulary-item" data-phonetic="${word.phonetic}">
+            <span class="vocabulary-item-phonetic">${word.phonetic}</span>
+            <span class="vocabulary-item-arrow">→</span>
+            <span class="vocabulary-item-spelling">${word.spelling}</span>
+            <button class="vocabulary-item-delete" onclick="deleteVocabWord('${word.phonetic}')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+            </button>
+        </div>
+    `).join('');
+}
+
+function initVocabulary() {
+    const addBtn = document.getElementById('addVocabBtn');
+    const phoneticInput = document.getElementById('vocabPhonetic');
+    const spellingInput = document.getElementById('vocabSpelling');
+
+    if (!addBtn || !phoneticInput || !spellingInput) return;
+
+    addBtn.addEventListener('click', async () => {
+        const phonetic = phoneticInput.value.trim();
+        const spelling = spellingInput.value.trim();
+
+        if (!phonetic || !spelling) {
+            showToast(translations[state.uiLanguage]?.fillBothFields || 'Please fill both fields', 'warning');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/vocabulary', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phonetic, spelling })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                phoneticInput.value = '';
+                spellingInput.value = '';
+                await loadVocabulary();
+                showToast(translations[state.uiLanguage]?.wordAdded || 'Word added', 'success');
+            } else {
+                showToast(data.error || 'Failed to add word', 'error');
+            }
+        } catch (error) {
+            showToast('Failed to add word', 'error');
+        }
+    });
+
+    phoneticInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') spellingInput.focus();
+    });
+
+    spellingInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') addBtn.click();
+    });
+}
+
+async function deleteVocabWord(phonetic) {
+    try {
+        const response = await fetch('/api/vocabulary/' + encodeURIComponent(phonetic), {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            await loadVocabulary();
+            showToast(translations[state.uiLanguage]?.wordDeleted || 'Word deleted', 'success');
+        }
+    } catch (error) {
+        showToast('Failed to delete word', 'error');
+    }
+}
+
 async function init() {
     loadTheme();
     const savedUILang = localStorage.getItem('voicenotes_ui_lang') || 'en';
@@ -2014,10 +2328,14 @@ async function init() {
     initFeedbackListeners();
     initDashboardListeners();
     initVoiceFilterTip();
+    initTabs();
+    initFileUpload();
+    initVocabulary();
     await loadFolders();
     await loadNotes();
     await loadTags();
     await loadVoiceProfiles();
+    await loadVocabulary();
 
     checkModels().then(data => {
         state.modelsChecked = true;

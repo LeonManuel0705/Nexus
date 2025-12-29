@@ -158,6 +158,32 @@
                 <div class="breadcrumb" id="breadcrumb">
                     <span data-i18n="allNotes">All Notes</span>
                 </div>
+                <div class="main-tabs">
+                    <button class="main-tab active" data-tab="record">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        </svg>
+                        <span data-i18n="tabRecord">Record</span>
+                    </button>
+                    <button class="main-tab" data-tab="upload">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        <span data-i18n="tabUpload">Upload File</span>
+                    </button>
+                    <button class="main-tab" data-tab="vocabulary">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                            <line x1="12" y1="6" x2="12" y2="12"/>
+                            <line x1="9" y1="9" x2="15" y2="9"/>
+                        </svg>
+                        <span data-i18n="tabVocabulary">Vocabulary</span>
+                    </button>
+                </div>
                 <div class="top-bar-actions">
                     <div class="stats" id="statsDisplay">
                         <span class="stat-item" id="noteCount">0 notes</span>
@@ -173,7 +199,9 @@
                 </div>
             </header>
 
-            <div class="recording-section">
+            <div class="tab-content">
+                <div class="tab-pane active" id="record-tab">
+                    <div class="recording-section">
                 <div class="waveform-container" id="waveformContainer">
                     <canvas id="waveformCanvas"></canvas>
                 </div>
@@ -229,6 +257,77 @@
                 <div class="transcription-stats" id="transcriptionStats">
                     <span id="wordCount">0 words</span>
                     <span id="charCount">0 characters</span>
+                </div>
+            </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane" id="upload-tab">
+                    <div class="upload-section">
+                        <div class="upload-dropzone" id="uploadDropzone">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                            <h3 data-i18n="dropFilesHere">Drop audio/video files here</h3>
+                            <p data-i18n="orClickToBrowse">or click to browse</p>
+                            <span class="upload-formats" data-i18n="supportedFormats">MP3, MP4, WAV, M4A, FLAC, OGG, WebM</span>
+                            <input type="file" id="fileInput" accept="audio/*,video/*,.mp3,.mp4,.wav,.m4a,.flac,.ogg,.webm" multiple hidden>
+                        </div>
+                        <div class="upload-options">
+                            <div class="upload-option-row">
+                                <label data-i18n="transcriptionLanguage">Language:</label>
+                                <div class="upload-lang-selector">
+                                    <button class="upload-lang-btn active" data-upload-lang="de">Deutsch</button>
+                                    <button class="upload-lang-btn" data-upload-lang="en">English</button>
+                                </div>
+                            </div>
+                            <div class="upload-option-row">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="generateSubtitles">
+                                    <span data-i18n="generateSubtitles">Generate subtitles (SRT)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="upload-queue" id="uploadQueue"></div>
+                    </div>
+                </div>
+
+                <div class="tab-pane" id="vocabulary-tab">
+                    <div class="vocabulary-section">
+                        <div class="vocabulary-intro">
+                            <h3 data-i18n="customVocabulary">Custom Vocabulary</h3>
+                            <p data-i18n="vocabularyDesc">Teach VoiceNotes to recognize specialized terms, names, and abbreviations that may be transcribed incorrectly.</p>
+                        </div>
+                        <div class="vocabulary-form">
+                            <div class="vocabulary-form-row">
+                                <div class="vocabulary-input-group">
+                                    <label data-i18n="howYouSayIt">How you say it</label>
+                                    <input type="text" id="vocabPhonetic" data-i18n-placeholder="phoneticExample" placeholder="e.g., 'crisp-er'">
+                                </div>
+                                <div class="vocabulary-arrow">→</div>
+                                <div class="vocabulary-input-group">
+                                    <label data-i18n="correctSpelling">Correct spelling</label>
+                                    <input type="text" id="vocabSpelling" data-i18n-placeholder="spellingExample" placeholder="e.g., 'CRISPR'">
+                                </div>
+                                <button class="btn btn-primary" id="addVocabBtn">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="12" y1="5" x2="12" y2="19"/>
+                                        <line x1="5" y1="12" x2="19" y2="12"/>
+                                    </svg>
+                                    <span data-i18n="add">Add</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="vocabulary-list-header">
+                            <h4 data-i18n="savedWords">Saved Words</h4>
+                            <span class="vocabulary-count" id="vocabCount">0 words</span>
+                        </div>
+                        <div class="vocabulary-list" id="vocabularyList">
+                            <p class="vocabulary-empty" data-i18n="noWordsYet">No custom words added yet. Add words above to improve transcription accuracy.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 

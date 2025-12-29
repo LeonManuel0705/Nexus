@@ -1686,7 +1686,7 @@ def auto_tag_note(note_id):
     })
 
 @app.route('/api/intelligence/analyze', methods=['POST'])
-def analyze_text():
+def analyze_text_intelligence():
     from note_intelligence import detect_topics, generate_summary, generate_key_points
 
     data = request.get_json()
@@ -1797,6 +1797,132 @@ def handle_cancel_enrollment():
     manager.cancel_enrollment()
 
     emit('enrollment_cancelled', {'success': True})
+
+
+@app.route('/api/vocabulary', methods=['GET'])
+def get_vocabulary():
+    from word_training import get_all_words, get_vocabulary_count
+    return jsonify({
+        'words': get_all_words(),
+        'count': get_vocabulary_count()
+    })
+
+@app.route('/api/vocabulary', methods=['POST'])
+def add_vocabulary_word():
+    from word_training import add_word
+    data = request.get_json()
+    phonetic = data.get('phonetic', '')
+    spelling = data.get('spelling', '')
+    if not phonetic or not spelling:
+        return jsonify({'error': 'Both phonetic and spelling are required'}), 400
+    success = add_word(phonetic, spelling)
+    if success:
+        return jsonify({'success': True, 'phonetic': phonetic.lower(), 'spelling': spelling})
+    return jsonify({'error': 'Failed to save word'}), 500
+
+@app.route('/api/vocabulary/<path:phonetic>', methods=['DELETE'])
+def delete_vocabulary_word(phonetic):
+    from word_training import remove_word
+    success = remove_word(phonetic)
+    if success:
+        return jsonify({'success': True})
+    return jsonify({'error': 'Word not found'}), 404
+
+
+@app.route('/api/transcribe-file', methods=['POST'])
+def transcribe_file():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    language = request.form.get('language', 'de')
+    generate_srt = request.form.get('generate_srt', 'false').lower() == 'true'
+
+    allowed_extensions = {'mp3', 'mp4', 'wav', 'm4a', 'flac', 'ogg', 'webm', 'mpeg', 'mpga'}
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    if ext not in allowed_extensions:
+        return jsonify({'error': f'Unsupported file format: {ext}'}), 400
+
+    import tempfile
+    import os
+    temp_dir = os.path.expanduser("~/Documents/voice-notes/audio_temp")
+    os.makedirs(temp_dir, exist_ok=True)
+
+    temp_path = os.path.join(temp_dir, f"upload_{int(time.time())}_{file.filename}")
+    file.save(temp_path)
+
+    try:
+        whisper_model = get_whisper_model()
+        if whisper_model is None:
+            os.remove(temp_path)
+            return jsonify({'error': 'Whisper model not available'}), 500
+
+        segments, info = whisper_model.transcribe(
+            temp_path,
+            language=language,
+            beam_size=5,
+            word_timestamps=generate_srt,
+            vad_filter=True
+        )
+
+        segments_list = list(segments)
+        full_text = ' '.join([s.text.strip() for s in segments_list])
+
+        from word_training import apply_vocabulary
+        full_text = apply_vocabulary(full_text)
+
+        from ai_corrector import correct_transcription
+        full_text = correct_transcription(full_text, language=language)
+
+        srt_content = None
+        if generate_srt and segments_list:
+            srt_lines = []
+            for i, seg in enumerate(segments_list, 1):
+                start = format_srt_time(seg.start)
+                end = format_srt_time(seg.end)
+                text = apply_vocabulary(seg.text.strip())
+                srt_lines.append(f"{i}\n{start} --> {end}\n{text}\n")
+            srt_content = '\n'.join(srt_lines)
+
+        title = os.path.splitext(file.filename)[0]
+        duration = info.duration if hasattr(info, 'duration') else None
+
+        from database import create_note
+        note_id = create_note(
+            title=title,
+            content=full_text,
+            language=language,
+            audio_duration=duration
+        )
+
+        os.remove(temp_path)
+
+        return jsonify({
+            'success': True,
+            'note_id': note_id,
+            'title': title,
+            'content': full_text,
+            'duration': duration,
+            'language': language,
+            'srt': srt_content
+        })
+
+    except Exception as e:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        print(f"File transcription error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+def format_srt_time(seconds):
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    millis = int((seconds - int(seconds)) * 1000)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+
 
 if __name__ == '__main__':
     print("\n" + "=" * 50)
