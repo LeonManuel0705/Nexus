@@ -2451,3 +2451,466 @@ body {
         display: none;
     }
 }
+
+.main-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-tertiary);
+    padding: 4px;
+    border-radius: var(--radius-lg);
+}
+
+.main-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-primary);
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.main-tab svg {
+    width: 18px;
+    height: 18px;
+}
+
+.main-tab:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+.main-tab.active {
+    background: var(--accent);
+    color: white;
+}
+
+.main-tab.active svg {
+    color: white;
+}
+
+.tab-content {
+    flex: 0 0 auto;
+}
+
+.tab-pane {
+    display: none;
+    animation: fadeIn 0.2s ease;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.upload-section {
+    padding: 32px;
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.upload-dropzone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-xl);
+    padding: 48px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--bg-secondary);
+}
+
+.upload-dropzone:hover,
+.upload-dropzone.dragover {
+    border-color: var(--accent);
+    background: var(--accent-light);
+}
+
+.upload-dropzone svg {
+    width: 48px;
+    height: 48px;
+    color: var(--accent);
+    margin-bottom: 16px;
+}
+
+.upload-dropzone h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.upload-dropzone p {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin-bottom: 12px;
+}
+
+.upload-formats {
+    display: inline-block;
+    padding: 4px 12px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius);
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.upload-options {
+    margin-top: 24px;
+    padding: 16px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+}
+
+.upload-option-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.upload-option-row:last-child {
+    margin-bottom: 0;
+}
+
+.upload-option-row > label {
+    font-size: 14px;
+    color: var(--text-secondary);
+    min-width: 80px;
+}
+
+.upload-lang-selector {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-tertiary);
+    padding: 3px;
+    border-radius: var(--radius);
+}
+
+.upload-lang-btn {
+    padding: 6px 14px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-primary);
+    font-size: 13px;
+    border-radius: calc(var(--radius) - 2px);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.upload-lang-btn:hover {
+    color: var(--text-primary);
+}
+
+.upload-lang-btn.active {
+    background: var(--accent);
+    color: white;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+}
+
+.upload-queue {
+    margin-top: 24px;
+}
+
+.upload-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+}
+
+.upload-item-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--accent-light);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.upload-item-icon svg {
+    width: 20px;
+    height: 20px;
+    color: var(--accent);
+}
+
+.upload-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.upload-item-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.upload-item-status {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.upload-item-progress {
+    width: 100%;
+    height: 4px;
+    background: var(--bg-tertiary);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+}
+
+.upload-item-progress-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.upload-item-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.upload-item.completed .upload-item-icon {
+    background: var(--success-light);
+}
+
+.upload-item.completed .upload-item-icon svg {
+    color: var(--success);
+}
+
+.upload-item.error .upload-item-icon {
+    background: var(--danger-light);
+}
+
+.upload-item.error .upload-item-icon svg {
+    color: var(--danger);
+}
+
+.vocabulary-section {
+    padding: 32px;
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.vocabulary-intro {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.vocabulary-intro h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.vocabulary-intro p {
+    color: var(--text-secondary);
+    font-size: 14px;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.vocabulary-form {
+    background: var(--bg-secondary);
+    padding: 20px;
+    border-radius: var(--radius-lg);
+    margin-bottom: 24px;
+}
+
+.vocabulary-form-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+}
+
+.vocabulary-input-group {
+    flex: 1;
+}
+
+.vocabulary-input-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.vocabulary-input-group input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-family: var(--font-primary);
+    font-size: 14px;
+}
+
+.vocabulary-input-group input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.vocabulary-arrow {
+    font-size: 24px;
+    color: var(--accent);
+    padding-bottom: 8px;
+}
+
+.vocabulary-form-row .btn {
+    padding: 10px 20px;
+    white-space: nowrap;
+}
+
+.vocabulary-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.vocabulary-list-header h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.vocabulary-count {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.vocabulary-list {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.vocabulary-empty {
+    padding: 32px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.vocabulary-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.vocabulary-item:last-child {
+    border-bottom: none;
+}
+
+.vocabulary-item-phonetic {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.vocabulary-item-arrow {
+    color: var(--text-muted);
+    margin: 0 12px;
+}
+
+.vocabulary-item-spelling {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.vocabulary-item-delete {
+    padding: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: var(--radius);
+    transition: all 0.15s ease;
+}
+
+.vocabulary-item-delete:hover {
+    background: var(--danger-light);
+    color: var(--danger);
+}
+
+.vocabulary-item-delete svg {
+    width: 16px;
+    height: 16px;
+}
+
+@media (max-width: 768px) {
+    .main-tabs {
+        width: 100%;
+        justify-content: center;
+        margin: 8px 0;
+    }
+
+    .main-tab span {
+        display: none;
+    }
+
+    .main-tab {
+        padding: 10px 14px;
+    }
+
+    .top-bar {
+        flex-wrap: wrap;
+    }
+
+    .vocabulary-form-row {
+        flex-wrap: wrap;
+    }
+
+    .vocabulary-arrow {
+        display: none;
+    }
+
+    .vocabulary-input-group {
+        flex: 1 1 100%;
+        margin-bottom: 12px;
+    }
+
+    .vocabulary-form-row .btn {
+        width: 100%;
+    }
+}

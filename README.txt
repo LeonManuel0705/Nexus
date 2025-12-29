@@ -8,6 +8,9 @@ All processing happens locally - your voice data never leaves your device.
 FEATURES
 --------
 - Real-time voice transcription using Whisper AI (German & English)
+- Audio/Video File Transcription - upload MP3, MP4, WAV, M4A, FLAC files
+- SRT Subtitle Generation - create subtitles from uploaded videos
+- Custom Vocabulary Training - teach specialized terms, names, abbreviations
 - Voice filtering with TitaNet - isolate specific speakers in noisy environments
 - AI-powered grammar correction using MLX (Apple Silicon) or LanguageTool
 - AI Summarization - get instant summaries of your notes with one click
@@ -89,6 +92,20 @@ USAGE
    - Choose Word, Markdown, or plain text format
    - Export entire folders at once
 
+7. FILE UPLOAD (for existing audio/video):
+   - Click the "Upload File" tab
+   - Drag and drop files or click to browse
+   - Supports MP3, MP4, WAV, M4A, FLAC, OGG, WebM
+   - Enable "Generate subtitles (SRT)" for video files
+   - Transcription creates a new note automatically
+
+8. CUSTOM VOCABULARY:
+   - Click the "Vocabulary" tab
+   - Add words that are often transcribed incorrectly
+   - Enter how you say it (phonetic) and the correct spelling
+   - Examples: "crisp-er" → "CRISPR", "eye-fone" → "iPhone"
+   - Custom words are automatically applied to new transcriptions
+
 
 TECHNOLOGIES
 ------------
@@ -105,6 +122,7 @@ FILE LOCATIONS
 - Program files:     ~/Documents/voice-notes/app/
 - Database:          ~/Documents/voice-notes/data/notes.db
 - Voice profiles:    ~/Documents/voice-notes/voice_profiles/
+- Custom vocabulary: ~/Documents/voice-notes/data/custom_vocabulary.json
 - Temp audio:        ~/Documents/voice-notes/audio_temp/ (auto-cleaned)
 - AI models cache:   ~/.cache/huggingface/hub/
 
