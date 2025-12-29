@@ -10,6 +10,9 @@ FEATURES
 - Real-time voice transcription using Whisper AI (German & English)
 - Voice filtering with TitaNet - isolate specific speakers in noisy environments
 - AI-powered grammar correction using MLX (Apple Silicon) or LanguageTool
+- AI Summarization - get instant summaries of your notes with one click
+- Topic Detection - automatic detection across 16 subject categories
+- Auto-Tagging - let AI automatically tag notes based on content
 - Organize notes in folders and subfolders
 - Full-text search across all notes
 - Tag notes for easy filtering
@@ -92,6 +95,7 @@ TECHNOLOGIES
 - Whisper (OpenAI): State-of-the-art speech recognition
 - TitaNet (NVIDIA): Speaker verification optimized for noisy environments
 - MLX (Apple): Fast AI inference on Apple Silicon
+- Qwen2.5 (via MLX): AI summarization, topic detection, and grammar correction
 - LanguageTool: Offline grammar and spell checking
 - Flask + SocketIO: Real-time web interface
 
