@@ -76,15 +76,13 @@ init_lock = threading.Lock()
 def initialize_all_models():
     global models_ready, models_progress, init_complete
 
-    # Progress tracking settings
-    PROGRESS_UPDATE_INTERVAL = 1.0  # Update every second
+    PROGRESS_UPDATE_INTERVAL = 1.0
 
-    # Model size estimates in MB for progress calculation
     MODEL_SIZES = {
-        'whisper': 500,      # Whisper small model
-        'speaker': 100,      # TitaNet/SpeechBrain
-        'mlx': 400,          # Qwen2.5
-        'languagetool': 200  # LanguageTool German
+        'whisper': 500,
+        'speaker': 100,
+        'mlx': 400,
+        'languagetool': 200
     }
 
     def update_progress(model, status, progress, message, speed_str='', eta=''):
@@ -108,7 +106,6 @@ def initialize_all_models():
             })
 
     def track_progress(model, message, stop_event, total_size_mb):
-        """Track real download progress by monitoring cache directory size"""
         from model_manager import init_download_stats, update_download_stats, get_download_speed
         from pathlib import Path
 
@@ -129,7 +126,7 @@ def initialize_all_models():
 
             progress = speed_info['progress']
             if progress < 10:
-                progress = 10  # Minimum 10% to show activity
+                progress = 10
 
             speed_msg = f" ({speed_info['speed_str']})" if speed_info['speed_str'] else ""
             eta_msg = f" - ETA: {speed_info['eta']}" if speed_info['eta'] else ""
@@ -142,7 +139,6 @@ def initialize_all_models():
             )
 
     def get_dir_size(path):
-        """Get total size of directory in bytes"""
         total = 0
         try:
             for entry in os.scandir(path):
@@ -155,7 +151,6 @@ def initialize_all_models():
         return total
 
     def load_with_progress(model, message, load_func, total_size_mb):
-        """Load a model with real progress tracking"""
         stop_event = threading.Event()
         progress_thread = threading.Thread(
             target=track_progress,
@@ -174,7 +169,6 @@ def initialize_all_models():
             progress_thread.join(timeout=1)
             raise e
 
-    # Load Whisper with progress tracking
     update_progress('whisper', 'loading', 5, 'Initializing Whisper...')
     try:
         def load_whisper():
@@ -186,7 +180,6 @@ def initialize_all_models():
     except Exception as e:
         update_progress('whisper', 'error', 0, f'Error: {str(e)[:50]}')
 
-    # Load Speaker model with progress tracking
     update_progress('speaker', 'loading', 5, 'Initializing speaker recognition...')
     titanet_failed = False
     try:
@@ -194,17 +187,14 @@ def initialize_all_models():
             nonlocal titanet_failed
             manager = get_profile_manager()
             manager._load_model()
-            # Check if TitaNet failed and we fell back to SpeechBrain
             if hasattr(manager, '_using_titanet') and not manager._using_titanet:
                 titanet_failed = True
             return manager
         manager = load_with_progress('speaker', 'Loading speaker recognition', load_speaker, MODEL_SIZES['speaker'])
         models_ready['speaker'] = True
 
-        # Show notification about TitaNet failure
         if titanet_failed:
             update_progress('speaker', 'warning', 100, 'Using SpeechBrain (TitaNet unavailable - reduced noise handling)')
-            # Emit special warning event
             socketio.emit('model_warning', {
                 'model': 'speaker',
                 'title': 'Optimal Model Unavailable',
@@ -218,7 +208,6 @@ def initialize_all_models():
     except Exception as e:
         update_progress('speaker', 'error', 0, f'Error: {str(e)[:50]}')
 
-    # Load MLX with progress tracking
     update_progress('mlx', 'loading', 5, 'Initializing AI corrector...')
     try:
         def load_mlx():
@@ -237,7 +226,6 @@ def initialize_all_models():
         models_ready['mlx'] = True
         update_progress('mlx', 'skipped', 100, f'MLX skipped: {str(e)[:30]}')
 
-    # Load LanguageTool with progress tracking
     update_progress('languagetool', 'loading', 5, 'Initializing LanguageTool...')
     try:
         def load_languagetool():
@@ -1610,6 +1598,114 @@ def check_audio_quality():
 
     quality = analyze_audio_quality(audio_array, sample_rate)
     return jsonify(quality)
+
+@app.route('/api/notes/<int:note_id>/summarize', methods=['POST'])
+def summarize_note(note_id):
+    from note_intelligence import generate_summary
+
+    note = db.get_note(note_id)
+    if not note:
+        return jsonify({'error': 'Note not found'}), 404
+
+    data = request.get_json() or {}
+    language = data.get('language', current_language)
+    max_length = data.get('max_length', 100)
+
+    summary = generate_summary(note['content'], language, max_length)
+
+    return jsonify({
+        'note_id': note_id,
+        'summary': summary,
+        'language': language
+    })
+
+@app.route('/api/notes/<int:note_id>/topics', methods=['GET'])
+def get_note_topics(note_id):
+    from note_intelligence import detect_topics
+
+    note = db.get_note(note_id)
+    if not note:
+        return jsonify({'error': 'Note not found'}), 404
+
+    language = request.args.get('language', current_language)
+    max_topics = int(request.args.get('max_topics', 3))
+
+    topics = detect_topics(note['content'], language, max_topics)
+
+    return jsonify({
+        'note_id': note_id,
+        'topics': topics,
+        'language': language
+    })
+
+@app.route('/api/notes/<int:note_id>/key-points', methods=['POST'])
+def get_note_key_points(note_id):
+    from note_intelligence import generate_key_points
+
+    note = db.get_note(note_id)
+    if not note:
+        return jsonify({'error': 'Note not found'}), 404
+
+    data = request.get_json() or {}
+    language = data.get('language', current_language)
+    max_points = data.get('max_points', 5)
+
+    key_points = generate_key_points(note['content'], language, max_points)
+
+    return jsonify({
+        'note_id': note_id,
+        'key_points': key_points,
+        'language': language
+    })
+
+@app.route('/api/notes/<int:note_id>/auto-tag', methods=['POST'])
+def auto_tag_note(note_id):
+    from note_intelligence import detect_topics
+
+    note = db.get_note(note_id)
+    if not note:
+        return jsonify({'error': 'Note not found'}), 404
+
+    data = request.get_json() or {}
+    language = data.get('language', current_language)
+
+    topics = detect_topics(note['content'], language, 3)
+
+    existing_tags = note.get('tags', []) or []
+    new_tags = [t for t in topics if t.lower() not in [et.lower() for et in existing_tags]]
+
+    if new_tags:
+        all_tags = existing_tags + new_tags
+        db.update_note_tags(note_id, all_tags)
+
+    return jsonify({
+        'note_id': note_id,
+        'detected_topics': topics,
+        'added_tags': new_tags,
+        'all_tags': existing_tags + new_tags
+    })
+
+@app.route('/api/intelligence/analyze', methods=['POST'])
+def analyze_text():
+    from note_intelligence import detect_topics, generate_summary, generate_key_points
+
+    data = request.get_json()
+    if not data or 'text' not in data:
+        return jsonify({'error': 'text required'}), 400
+
+    text = data['text']
+    language = data.get('language', current_language)
+
+    topics = detect_topics(text, language, 3)
+    summary = generate_summary(text, language, 100)
+    key_points = generate_key_points(text, language, 5)
+
+    return jsonify({
+        'topics': topics,
+        'summary': summary,
+        'key_points': key_points,
+        'language': language
+    })
 
 @socketio.on('start_enrollment')
 def handle_start_enrollment(data):

@@ -7,7 +7,7 @@ from pathlib import Path
 import hashlib
 
 PROFILES_DIR = Path(__file__).parent.parent / "voice_profiles"
-EMBEDDING_DIM = 192  # TitaNet uses 192-dim embeddings
+EMBEDDING_DIM = 192
 DEFAULT_VERIFICATION_THRESHOLD = 0.30
 HIGH_CONFIDENCE_THRESHOLD = 0.50
 MIN_ENROLLMENT_DURATION = 30.0
@@ -21,9 +21,8 @@ def get_verification_threshold() -> float:
     except:
         return DEFAULT_VERIFICATION_THRESHOLD
 
-# TitaNet model - better for noisy environments than SpeechBrain ECAPA
 SPEAKER_MODEL = "nvidia/speakerverification_en_titanet_large"
-FALLBACK_SPEAKER_MODEL = "speechbrain/spkrec-ecapa-voxceleb"  # Fallback if TitaNet unavailable
+FALLBACK_SPEAKER_MODEL = "speechbrain/spkrec-ecapa-voxceleb"
 
 class VoiceProfile:
 
@@ -72,7 +71,7 @@ class VoiceProfile:
         return is_match, confidence
 
     def verify_multi(self, embedding: np.ndarray, top_k: int = 5) -> Tuple[bool, float]:
-        
+
         if not self.embeddings:
             return False, 0.0
 
@@ -165,12 +164,10 @@ class VoiceProfileManager:
             else:
                 device = "cpu"
 
-            # Try TitaNet first (better for noisy environments)
             if self._try_load_titanet(device):
                 self._model_loaded = True
                 return True
 
-            # Fallback to SpeechBrain ECAPA
             if self._try_load_speechbrain(device):
                 self._model_loaded = True
                 return True
@@ -180,7 +177,6 @@ class VoiceProfileManager:
             return False
 
     def _try_load_titanet(self, device: str) -> bool:
-        """Try to load NVIDIA TitaNet model - better for noisy environments"""
         try:
             import nemo.collections.asr as nemo_asr
 
@@ -192,9 +188,7 @@ class VoiceProfileManager:
                 model_name=SPEAKER_MODEL
             )
 
-            # Move to appropriate device
             if device == "mps":
-                # TitaNet doesn't fully support MPS, use CPU
                 self._model = self._model.to("cpu")
             else:
                 self._model = self._model.to(device)
@@ -212,7 +206,6 @@ class VoiceProfileManager:
             return False
 
     def _try_load_speechbrain(self, device: str) -> bool:
-        """Fallback to SpeechBrain ECAPA-TDNN"""
         try:
             from speechbrain.inference.speaker import EncoderClassifier
 
@@ -234,11 +227,10 @@ class VoiceProfileManager:
             return False
 
     def is_using_titanet(self) -> bool:
-        """Check if TitaNet is being used"""
         return self._using_titanet
 
     def _preprocess_audio(self, audio: np.ndarray) -> np.ndarray:
-        
+
         from scipy import signal
 
         if audio.dtype != np.float32:
@@ -274,10 +266,8 @@ class VoiceProfileManager:
                 return None
 
             if self._using_titanet:
-                # TitaNet embedding extraction
                 return self._extract_titanet_embedding(audio)
             else:
-                # SpeechBrain embedding extraction
                 return self._extract_speechbrain_embedding(audio)
 
         except Exception as e:
@@ -285,29 +275,23 @@ class VoiceProfileManager:
             return None
 
     def _extract_titanet_embedding(self, audio: np.ndarray) -> Optional[np.ndarray]:
-        """Extract embedding using TitaNet (NVIDIA NeMo)"""
         try:
             import torch
             import tempfile
             import soundfile as sf
 
-            # TitaNet expects audio file path, so we need to save temporarily
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
                 temp_path = f.name
                 sf.write(temp_path, audio, SAMPLE_RATE)
 
             try:
                 with torch.no_grad():
-                    # Get embedding from TitaNet
                     _, embedding = self._model.verify_speakers(temp_path, temp_path)
-                    # The model returns embeddings in its internal format
-                    # We extract the speaker embedding
                     emb = self._model.get_embedding(temp_path)
                     emb = emb.squeeze().cpu().numpy()
                     emb = emb / (np.linalg.norm(emb) + 1e-8)
                     return emb
             finally:
-                # Clean up temp file
                 import os
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
@@ -317,7 +301,6 @@ class VoiceProfileManager:
             return None
 
     def _extract_speechbrain_embedding(self, audio: np.ndarray) -> Optional[np.ndarray]:
-        """Extract embedding using SpeechBrain ECAPA-TDNN"""
         try:
             import torch
 
