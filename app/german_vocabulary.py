@@ -1,60 +1,27 @@
-"""
-German Vocabulary Database for Smart Post-Processor
-====================================================
-
-Contains:
-- Common Whisper transcription errors and their corrections
-- German word embeddings (semantic similarity clusters)
-- Phonetically similar word pairs
-- Domain-specific vocabularies
-"""
-
-# ============================================================================
-# COMMON WHISPER TRANSCRIPTION ERRORS
-# ============================================================================
-
-# Maps commonly misheard words to their likely correct forms
-# Format: "misheard_word": ["possible_correction_1", "possible_correction_2", ...]
-
 WHISPER_ERROR_CORRECTIONS = {
-    # Common German speech recognition errors (phonetically similar)
-
-    # ---- Emotions and expressions ----
     'Seesucht': ['Sehnsucht'],
     'Sesucht': ['Sehnsucht'],
     'Sänsucht': ['Sehnsucht'],
 
-    # ---- Common mishearings ----
-    # Only correct truly nonsensical words - not valid German words
-    'Reindacht': ['reingedacht', 'wirklich'],  # Gibberish -> meaningful
-    'Koffen': ['Koffer', 'hoffen'],  # Not a real German word
-    'Sprachkennungsassistenten': ['Spracherkennungsassistenten'],  # Missing syllable
-    'Erkennungsassistenten': ['Spracherkennungsassistenten'],  # Truncated
-    'Alltagssparen': ['Alltagssprache'],  # Wrong word (sounds similar)
-    'Zufalliges': ['zuverlässig'],  # Wrong word
-    'Zeichensetzer': ['Satzzeichen'],  # Wrong compound word
-    'saubert': ['sauber'],  # Wrong verb form (adjective intended)
-    'Ausdehnte': ['Aussagen'],  # Wrong word (sounds similar)
-    'Musiklauf': ['Musik läuft'],  # Wrong compound
-    # 'Textes' and 'Kontrolle' are valid German words - use phrase corrections instead
+    'Reindacht': ['reingedacht', 'wirklich'],
+    'Koffen': ['Koffer', 'hoffen'],
+    'Sprachkennungsassistenten': ['Spracherkennungsassistenten'],
+    'Erkennungsassistenten': ['Spracherkennungsassistenten'],
+    'Alltagssparen': ['Alltagssprache'],
+    'Zufalliges': ['zuverlässig'],
+    'Zeichensetzer': ['Satzzeichen'],
+    'saubert': ['sauber'],
+    'Ausdehnte': ['Aussagen'],
+    'Musiklauf': ['Musik läuft'],
 
-    # NOTE: 'linke', 'Rechte', 'Läufe', 'Endes' are valid German words
-    # They are only corrected as part of phrase corrections (see PHRASE_CORRECTIONS)
-
-    # 'Offen' is valid German (means "open") - keep as-is
-    # 'Saftgeschmack' and 'Potenzial' are also valid - keep as-is
-
-    # ---- Filler-like errors ----
     'am Offen': ['am Ofen', 'offen'],
     'komm am': ['komm an', 'kommen'],
 
-    # ---- Article/Pronoun confusions ----
     'das des': ['das', 'des'],
     'die der': ['die', 'der'],
     'ihm im': ['ihm', 'im'],
     'ihn in': ['ihn', 'in'],
 
-    # ---- Verb confusions ----
     'is': ['ist', 'es'],
     'hab': ['habe', 'hab'],
     'ham': ['haben'],
@@ -64,13 +31,11 @@ WHISPER_ERROR_CORRECTIONS = {
     'sollt': ['sollte', 'sollt'],
     'wollt': ['wollte', 'wollt'],
 
-    # ---- Adverb/Conjunction confusions ----
     'den dann': ['denn', 'dann'],
     'wan wann': ['wann', 'wenn'],
     'wen wenn': ['wenn', 'wen'],
     'das dass': ['dass', 'das'],
 
-    # ---- Common compound word errors ----
     'einmal': ['einmal', 'ein Mal'],
     'aufeinmal': ['auf einmal'],
     'vorallem': ['vor allem'],
@@ -78,21 +43,18 @@ WHISPER_ERROR_CORRECTIONS = {
     'nachdem': ['nachdem', 'nach dem'],
     'seitdem': ['seitdem', 'seit dem'],
 
-    # ---- Academic/formal German ----
     'Universität': ['Universität'],
     'Universiät': ['Universität'],
     'Professer': ['Professor'],
     'Proffessor': ['Professor'],
     'Studend': ['Student'],
 
-    # ---- Numbers and measurements ----
     'Prozend': ['Prozent'],
     'prozent': ['Prozent'],
     'prozand': ['Prozent'],
     'Kilommeter': ['Kilometer'],
     'kilometa': ['Kilometer'],
 
-    # ---- Technology terms ----
     'Komputer': ['Computer'],
     'Compiuter': ['Computer'],
     'Softwäre': ['Software'],
@@ -102,7 +64,6 @@ WHISPER_ERROR_CORRECTIONS = {
     'Dattenbank': ['Datenbank'],
     'Datanbank': ['Datenbank'],
 
-    # ---- Medical terms ----
     'Pazient': ['Patient'],
     'Patiend': ['Patient'],
     'Diagnosse': ['Diagnose'],
@@ -112,7 +73,6 @@ WHISPER_ERROR_CORRECTIONS = {
     'Medikamend': ['Medikament'],
     'Medikemant': ['Medikament'],
 
-    # ---- Business terms ----
     'Firmma': ['Firma'],
     'Geschäfd': ['Geschäft'],
     'Marketink': ['Marketing'],
@@ -120,7 +80,6 @@ WHISPER_ERROR_CORRECTIONS = {
     'Strategie': ['Strategie'],
     'Strateghi': ['Strategie'],
 
-    # ---- Education terms ----
     'Volesung': ['Vorlesung'],
     'Vorlesunk': ['Vorlesung'],
     'Seminahr': ['Seminar'],
@@ -130,11 +89,6 @@ WHISPER_ERROR_CORRECTIONS = {
     'Abschlus': ['Abschluss'],
 }
 
-# ============================================================================
-# SEMANTIC WORD CLUSTERS
-# ============================================================================
-
-# Words that are semantically related - if one appears, others are likely in context
 SEMANTIC_CLUSTERS = {
     'schule': {
         'core': ['Schule', 'Lehrer', 'Schüler', 'Unterricht', 'Klasse', 'Fach', 'Note'],
@@ -188,13 +142,7 @@ SEMANTIC_CLUSTERS = {
     },
 }
 
-# ============================================================================
-# PHONETIC SIMILARITY MAPPING
-# ============================================================================
-
-# Maps phonetic patterns to possible words
 PHONETIC_WORD_GROUPS = {
-    # Words that sound very similar in German
     'ieren_ending': [
         'funktionieren', 'studieren', 'passieren', 'interessieren', 'analysieren',
         'organisieren', 'optimieren', 'realisieren', 'spezialisieren', 'fokussieren',
@@ -222,42 +170,27 @@ PHONETIC_WORD_GROUPS = {
     ],
 }
 
-# ============================================================================
-# CONTEXT-DEPENDENT CORRECTIONS
-# ============================================================================
-
-# Corrections that depend on surrounding context
 CONTEXT_CORRECTIONS = {
-    # (word, context_pattern) -> correction
     ('mal', r'ein\s+mal'): 'einmal',
     ('mals', r'nie\s+mals'): 'niemals',
-    ('dem', r'nach\s+dem'): 'nachdem',  # Could be either depending on meaning
+    ('dem', r'nach\s+dem'): 'nachdem',
     ('dem', r'seit\s+dem'): 'seitdem',
     ('all', r'vor\s+all'): 'vor allem',
     ('her', r'bis\s+her'): 'bisher',
     ('hin', r'bis\s+hin'): 'bishin',
 
-    # Common spoken German that gets transcribed oddly
-    ('n', r'auf\s+n'): "auf 'n",  # Keep dialectal forms
+    ('n', r'auf\s+n'): "auf 'n",
     ('nen', r'für\s+nen'): "für 'nen",
     ('ne', r'so\s+ne'): "so 'ne",
 }
 
-# ============================================================================
-# PHRASE-LEVEL CORRECTIONS
-# ============================================================================
-
-# Multi-word phrase corrections (Whisper often breaks phrases incorrectly)
-# Format: "incorrect_phrase": "correct_phrase"
 PHRASE_CORRECTIONS = {
-    # ---- Common multi-word errors from real transcription tests ----
     'linke Sätze': 'längere Sätze',
     'Endes Textes': 'Ende des Tests',
     'Endes Tests': 'Ende des Tests',
     'solltet ihr zahlen': 'sollte die Zahl sieben',
-    'Das ist Dezember': 'Dezember',  # Remove filler "Das ist"
+    'Das ist Dezember': 'Dezember',
 
-    # ---- Test 2: Complex transcription errors ----
     'Das ist ein ganzes Maß': 'Es ist ein ganz normaler Nachmittag',
     'Charakter Grammatik sind verlassen': 'korrekter Grammatik',
     'Charakter Grammatik': 'korrekter Grammatik',
@@ -272,72 +205,54 @@ PHRASE_CORRECTIONS = {
     'Gleiches Musiklauf': 'Während im Hintergrund leise Musik läuft',
     'schreiben Sie eine Nachricht': 'schließlich eine Nachricht schreiben',
 
-    # ---- Context-dependent corrections ----
     'im Kontrolle': 'im Kontext',
     'im Kontrolle von': 'im Kontext von',
     'Textes schreiben': 'Tests schreiben',
     'Textes machen': 'Tests machen',
 
-    # ---- Article/preposition errors ----
     'am Offen': 'am Ofen',
     'komm am': 'komm an',
-    'auf einmal': 'auf einmal',  # Preserve correct form
-    'vor allem': 'vor allem',  # Preserve correct form
+    'auf einmal': 'auf einmal',
+    'vor allem': 'vor allem',
 
-    # ---- Number-related phrase errors ----
     'die Zahl 7': 'die Zahl sieben',
     'Zahl 7': 'Zahl sieben',
     '1 Minute benötigt': 'achtzehn Minuten gebraucht',
     '50 Millilitern': '750 Milliliter',
 
-    # ---- Common verb phrase errors ----
-    'ich laufe': 'ich laufe',  # Preserve correct
-    'Ich Läufe': 'Ich laufe',  # Fix capitalization and verb form
+    'ich laufe': 'ich laufe',
+    'Ich Läufe': 'Ich laufe',
     'ich Läufe': 'ich laufe',
 
-    # ---- Truncated word corrections ----
-    'die Rechte': 'die Rechtschreibung',  # In writing context
+    'die Rechte': 'die Rechtschreibung',
     'zur Rechte': 'zur Rechtschreibung',
 
-    # ---- Filler removal patterns ----
     'Das ist ähm': '',
     'Also ähm': 'Also',
     'Ja also': 'Also',
 
-    # ---- Sentence boundary fixes ----
     'saubert, Aber': 'sauber in',
     ', Aber ein Text': ' in Text',
 }
 
-# ============================================================================
-# SENTENCE PATTERN CORRECTIONS
-# ============================================================================
-
-# Common sentence-level patterns that need correction
 SENTENCE_PATTERNS = {
-    # Broken sentences that Whisper often produces
     'fragment_starters': [
-        r'^\.\s+[A-ZÄÖÜ]',  # Period at start followed by capital
-        r'^,\s+[a-zäöü]',   # Comma at start followed by lowercase
-        r'^[a-zäöü]',       # Starting with lowercase (unless it's ich, etc.)
+        r'^\.\s+[A-ZÄÖÜ]',
+        r'^,\s+[a-zäöü]',
+        r'^[a-zäöü]',
     ],
     'fragment_enders': [
-        r'[a-zäöü]\s*$',    # Ending with lowercase and no punctuation
-        r',\s*$',           # Ending with comma
-        r'\s+und\s*$',      # Ending with 'und'
-        r'\s+oder\s*$',     # Ending with 'oder'
+        r'[a-zäöü]\s*$',
+        r',\s*$',
+        r'\s+und\s*$',
+        r'\s+oder\s*$',
     ],
     'incomplete_clauses': [
-        r'\b(dass|weil|wenn|obwohl|ob)\s*[,.!?]',  # Subordinating conjunction followed by punctuation
-        r'[,.]\s*(der|die|das)\s*[,.!?]',          # Article between punctuation
+        r'\b(dass|weil|wenn|obwohl|ob)\s*[,.!?]',
+        r'[,.]\s*(der|die|das)\s*[,.!?]',
     ],
 }
 
-# ============================================================================
-# ACADEMIC/LECTURE VOCABULARY
-# ============================================================================
-
-# Common words in academic contexts (lectures, presentations)
 ACADEMIC_VOCABULARY = {
     'transitions': [
         'erstens', 'zweitens', 'drittens', 'viertens', 'fünftens',
@@ -366,16 +281,11 @@ ACADEMIC_VOCABULARY = {
     ],
 }
 
-# ============================================================================
-# HELPER FUNCTIONS
-# ============================================================================
 
 def get_correction_candidates(word: str) -> list:
-    """Get possible corrections for a potentially misheard word."""
     word_lower = word.lower()
     candidates = []
 
-    # Check direct error mappings
     if word in WHISPER_ERROR_CORRECTIONS:
         candidates.extend(WHISPER_ERROR_CORRECTIONS[word])
     if word_lower in WHISPER_ERROR_CORRECTIONS:
@@ -385,7 +295,6 @@ def get_correction_candidates(word: str) -> list:
 
 
 def get_semantic_cluster(word: str) -> dict:
-    """Get the semantic cluster a word belongs to."""
     word_lower = word.lower()
 
     for cluster_name, cluster_data in SEMANTIC_CLUSTERS.items():
@@ -403,7 +312,6 @@ def get_semantic_cluster(word: str) -> dict:
 
 
 def get_phonetic_group(word: str) -> list:
-    """Get words that sound similar based on ending pattern."""
     word_lower = word.lower()
     similar = []
 
@@ -416,14 +324,12 @@ def get_phonetic_group(word: str) -> list:
 
 
 def is_academic_term(word: str) -> bool:
-    """Check if a word is common in academic contexts."""
     word_lower = word.lower()
 
     for category, terms in ACADEMIC_VOCABULARY.items():
         terms_lower = [t.lower() for t in terms]
         if word_lower in terms_lower:
             return True
-        # Check if word is part of a multi-word term
         for term in terms:
             if word_lower in term.lower():
                 return True
@@ -432,14 +338,12 @@ def is_academic_term(word: str) -> bool:
 
 
 def apply_phrase_corrections(text: str) -> str:
-    """Apply multi-word phrase corrections to text."""
     if not text:
         return text
 
     result = text
     for incorrect, correct in PHRASE_CORRECTIONS.items():
         if incorrect.lower() in result.lower():
-            # Case-insensitive replacement while preserving some structure
             import re
             pattern = re.compile(re.escape(incorrect), re.IGNORECASE)
             result = pattern.sub(correct, result)
@@ -448,5 +352,4 @@ def apply_phrase_corrections(text: str) -> str:
 
 
 def get_all_known_errors() -> dict:
-    """Return all known Whisper transcription errors."""
     return dict(WHISPER_ERROR_CORRECTIONS)
