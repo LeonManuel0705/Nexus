@@ -1,0 +1,69 @@
+{% extends "hub/base.html" %}
+
+{% block title %}Nexus - Tasks{% endblock %}
+
+{% block content %}
+<section class="widget glass-card widget-full">
+    <div class="widget-header">
+        <div>
+            <h2 class="widget-title" data-i18n="tasks">Tasks</h2>
+            <p class="widget-subtitle" data-i18n="tasks_subtitle">Manage your to-do list</p>
+        </div>
+        <div class="todo-filters">
+            <button class="filter-btn active" data-filter="all" data-i18n="all">All</button>
+            <button class="filter-btn" data-filter="today" data-i18n="today">Today</button>
+            <button class="filter-btn" data-filter="pending" data-i18n="pending">Pending</button>
+        </div>
+    </div>
+
+    <div class="todo-list" id="todoList"></div>
+
+    <div class="todo-add">
+        <input type="text" id="todoInput" placeholder="Add a new task..." data-i18n-placeholder="add_task_placeholder" />
+        <button class="add-btn" id="addTodoBtn">+</button>
+    </div>
+</section>
+{% endblock %}
+
+{% block modals %}
+<!-- Todo Modal -->
+<div class="modal" id="todoModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="todoModalTitle" data-i18n="add_task">Add Task</h3>
+            <button class="modal-close" id="todoModalClose">&times;</button>
+        </div>
+        <form id="todoForm">
+            <div class="form-group">
+                <label for="todoTitle" data-i18n="task_title">Task</label>
+                <input type="text" id="todoTitle" required>
+            </div>
+            <div class="form-group">
+                <label for="todoDueDate" data-i18n="due_date">Due Date (optional)</label>
+                <input type="date" id="todoDueDate">
+            </div>
+            <div class="form-group">
+                <label for="todoPriority" data-i18n="priority">Priority</label>
+                <select id="todoPriority">
+                    <option value="low" data-i18n="priority_low">Low</option>
+                    <option value="medium" selected data-i18n="priority_medium">Medium</option>
+                    <option value="high" data-i18n="priority_high">High</option>
+                </select>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" id="deleteTodo" style="display: none;" data-i18n="delete">Delete</button>
+                <button type="submit" class="btn-primary" data-i18n="save">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        HubApp.initTodos();
+        HubApp.initEventListeners();
+    });
+</script>
+{% endblock %}

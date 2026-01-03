@@ -694,3 +694,21 @@ def get_ollama_status() -> Dict:
         'model': None,
         'message': 'Using integrated correction'
     }
+
+
+def get_whisper_model():
+    """Get the accurate Whisper model for file transcription."""
+    global _accurate_model
+
+    with _model_lock:
+        if _accurate_model is None:
+            print(f"Loading Whisper '{ACCURATE_MODEL}' for file transcription...")
+            _accurate_model = WhisperModel(
+                ACCURATE_MODEL,
+                device="cpu",
+                compute_type="int8",
+                num_workers=4
+            )
+            print("Accurate model ready")
+
+    return _accurate_model

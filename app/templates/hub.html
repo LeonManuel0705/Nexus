@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus - Your Personal Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/hub.css">
+</head>
+<body data-theme="light">
+    <div class="hub-container">
+        <header class="hub-header">
+            <div class="hub-title">
+                <h1>Nexus</h1>
+                <span class="offline-indicator" id="offlineIndicator">Offline</span>
+            </div>
+            <div class="hub-controls">
+                <button class="icon-btn" id="settingsBtn" title="Settings">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                </button>
+                <button class="icon-btn" id="themeToggle" title="Toggle theme">
+                    <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <svg class="moon-icon hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+                <a href="/info" class="icon-btn" title="Info">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                </a>
+            </div>
+        </header>
+
+        <main class="hub-grid">
+            <section class="widget widget-clock" id="clockWidget">
+                <div class="clock-time" id="clockTime">--:--</div>
+                <div class="clock-date" id="clockDate">Loading...</div>
+            </section>
+
+            <section class="widget widget-weather" id="weatherWidget">
+                <div class="widget-header">
+                    <h2>Weather</h2>
+                    <button class="refresh-btn" id="refreshWeather" title="Refresh">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6"></path>
+                            <path d="M1 20v-6h6"></path>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="weather-content" id="weatherContent">
+                    <div class="weather-loading">Loading weather...</div>
+                </div>
+                <div class="weather-location" id="weatherLocation"></div>
+                <div class="weather-updated" id="weatherUpdated"></div>
+            </section>
+
+            <section class="widget widget-pomodoro" id="pomodoroWidget">
+                <div class="widget-header">
+                    <h2>Pomodoro</h2>
+                    <span class="pomodoro-sessions" id="pomodoroSessions">0 sessions</span>
+                </div>
+                <div class="pomodoro-display">
+                    <svg class="pomodoro-ring" viewBox="0 0 100 100">
+                        <circle class="ring-bg" cx="50" cy="50" r="45" fill="none" stroke-width="6"/>
+                        <circle class="ring-progress" id="pomodoroRing" cx="50" cy="50" r="45" fill="none" stroke-width="6"
+                                stroke-dasharray="283" stroke-dashoffset="0" transform="rotate(-90 50 50)"/>
+                    </svg>
+                    <div class="pomodoro-time" id="pomodoroTime">25:00</div>
+                    <div class="pomodoro-status" id="pomodoroStatus">Ready</div>
+                </div>
+                <div class="pomodoro-controls">
+                    <button class="pomodoro-btn" id="pomodoroStart" title="Start">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                        </svg>
+                    </button>
+                    <button class="pomodoro-btn" id="pomodoroPause" title="Pause" style="display:none;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="6" y="4" width="4" height="16"></rect>
+                            <rect x="14" y="4" width="4" height="16"></rect>
+                        </svg>
+                    </button>
+                    <button class="pomodoro-btn" id="pomodoroReset" title="Reset">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                            <path d="M3 3v5h5"></path>
+                        </svg>
+                    </button>
+                </div>
+            </section>
+
+            <section class="widget widget-todos" id="todosWidget">
+                <div class="widget-header">
+                    <h2>Tasks</h2>
+                    <div class="todo-filters">
+                        <button class="filter-btn active" data-filter="all">All</button>
+                        <button class="filter-btn" data-filter="today">Today</button>
+                        <button class="filter-btn" data-filter="pending">Pending</button>
+                    </div>
+                </div>
+                <div class="todo-list" id="todoList"></div>
+                <div class="todo-add">
+                    <input type="text" id="todoInput" placeholder="Add a task..." />
+                    <button class="add-btn" id="addTodoBtn">+</button>
+                </div>
+            </section>
+
+            <section class="widget widget-notes" id="notesWidget">
+                <div class="widget-header">
+                    <h2>Notes</h2>
+                    <div class="notes-tabs" id="notesTabs"></div>
+                    <button class="add-btn small" id="addNoteBtn" title="New note">+</button>
+                </div>
+                <div class="notes-editor">
+                    <textarea id="noteContent" placeholder="Start typing..."></textarea>
+                    <div class="notes-footer">
+                        <span class="word-count" id="wordCount">0 words</span>
+                        <button class="delete-note-btn" id="deleteNoteBtn" title="Delete note">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="widget widget-bookmarks" id="bookmarksWidget">
+                <div class="widget-header">
+                    <h2>Bookmarks</h2>
+                    <button class="add-btn small" id="addBookmarkBtn" title="Add bookmark">+</button>
+                </div>
+                <div class="bookmarks-list" id="bookmarksList"></div>
+            </section>
+
+            <section class="widget widget-calendar" id="calendarWidget">
+                <div class="widget-header">
+                    <h2>Calendar</h2>
+                    <div class="calendar-nav">
+                        <button id="prevMonth" title="Previous month">&lt;</button>
+                        <span id="calendarMonth">Month Year</span>
+                        <button id="nextMonth" title="Next month">&gt;</button>
+                    </div>
+                </div>
+                <div class="calendar-grid" id="calendarGrid"></div>
+                <div class="calendar-events" id="calendarEvents">
+                    <div class="events-header">
+                        <h3>Events</h3>
+                        <button class="add-btn small" id="addEventBtn" title="Add event">+</button>
+                    </div>
+                    <div class="events-list" id="eventsList"></div>
+                </div>
+            </section>
+
+            <section class="widget widget-apps">
+                <h2>Apps</h2>
+                <div class="apps-grid">
+                    <a href="/app" class="app-card">
+                        <div class="app-icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                <line x1="12" y1="19" x2="12" y2="23"></line>
+                                <line x1="8" y1="23" x2="16" y2="23"></line>
+                            </svg>
+                        </div>
+                        <span class="app-name">VoiceNotes</span>
+                    </a>
+                    <a href="/info/docs" class="app-card">
+                        <div class="app-icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                        </div>
+                        <span class="app-name">Docs</span>
+                    </a>
+                </div>
+            </section>
+
+            <section class="widget widget-email" id="emailWidget">
+                <h2>Email</h2>
+                <div class="email-quick-links-grid">
+                    <a href="https://mail.google.com" target="_blank" rel="noopener" class="email-quick-link gmail">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6zm-2 0l-8 5-8-5h16zm0 12H4V8l8 5 8-5v10z"/>
+                        </svg>
+                        <span>Gmail</span>
+                    </a>
+                    <a href="https://outlook.live.com" target="_blank" rel="noopener" class="email-quick-link outlook">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6zm-2 0l-8 5-8-5h16zm0 12H4V8l8 5 8-5v10z"/>
+                        </svg>
+                        <span>Outlook</span>
+                    </a>
+                    <a href="https://mail.proton.me" target="_blank" rel="noopener" class="email-quick-link proton">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6zm-2 0l-8 5-8-5h16zm0 12H4V8l8 5 8-5v10z"/>
+                        </svg>
+                        <span>ProtonMail</span>
+                    </a>
+                    <a href="https://mail.yahoo.com" target="_blank" rel="noopener" class="email-quick-link yahoo">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6zm-2 0l-8 5-8-5h16zm0 12H4V8l8 5 8-5v10z"/>
+                        </svg>
+                        <span>Yahoo</span>
+                    </a>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div class="modal" id="eventModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="eventModalTitle">Add Event</h3>
+                <button class="modal-close" id="eventModalClose">&times;</button>
+            </div>
+            <form id="eventForm">
+                <div class="form-group">
+                    <label for="eventTitle">Title</label>
+                    <input type="text" id="eventTitle" required>
+                </div>
+                <div class="form-group">
+                    <label for="eventDate">Date</label>
+                    <input type="date" id="eventDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="eventTime">Time (optional)</label>
+                    <input type="time" id="eventTime">
+                </div>
+                <div class="form-group">
+                    <label for="eventDescription">Description</label>
+                    <textarea id="eventDescription" rows="3"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="deleteEvent" style="display: none;">Delete</button>
+                    <button type="submit" class="btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="locationModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Set Your Location</h3>
+            </div>
+            <form id="locationForm">
+                <p>Could not auto-detect your location. Please enter your city:</p>
+                <div class="form-group">
+                    <label for="cityInput">City</label>
+                    <input type="text" id="cityInput" placeholder="e.g., Berlin" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Save Location</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="todoModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="todoModalTitle">Add Task</h3>
+                <button class="modal-close" id="todoModalClose">&times;</button>
+            </div>
+            <form id="todoForm">
+                <div class="form-group">
+                    <label for="todoTitle">Task</label>
+                    <input type="text" id="todoTitle" required>
+                </div>
+                <div class="form-group">
+                    <label for="todoDueDate">Due Date (optional)</label>
+                    <input type="date" id="todoDueDate">
+                </div>
+                <div class="form-group">
+                    <label for="todoPriority">Priority</label>
+                    <select id="todoPriority">
+                        <option value="low">Low</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="deleteTodo" style="display: none;">Delete</button>
+                    <button type="submit" class="btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="bookmarkModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="bookmarkModalTitle">Add Bookmark</h3>
+                <button class="modal-close" id="bookmarkModalClose">&times;</button>
+            </div>
+            <form id="bookmarkForm">
+                <div class="form-group">
+                    <label for="bookmarkTitle">Title</label>
+                    <input type="text" id="bookmarkTitle" required>
+                </div>
+                <div class="form-group">
+                    <label for="bookmarkUrl">URL</label>
+                    <input type="url" id="bookmarkUrl" placeholder="https://..." required>
+                </div>
+                <div class="form-group">
+                    <label for="bookmarkCategory">Category</label>
+                    <select id="bookmarkCategory">
+                        <option value="Work">Work</option>
+                        <option value="Personal">Personal</option>
+                        <option value="Dev">Dev</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="deleteBookmark" style="display: none;">Delete</button>
+                    <button type="submit" class="btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button class="modal-close" id="settingsModalClose">&times;</button>
+            </div>
+            <div class="settings-section">
+                <h4>Pomodoro Settings</h4>
+                <div class="form-group">
+                    <label for="workDuration">Work Duration (min)</label>
+                    <input type="number" id="workDuration" min="1" max="60" value="25">
+                </div>
+                <div class="form-group">
+                    <label for="breakDuration">Break Duration (min)</label>
+                    <input type="number" id="breakDuration" min="1" max="30" value="5">
+                </div>
+            </div>
+            <div class="settings-section">
+                <h4>Data Backup</h4>
+                <div class="settings-buttons">
+                    <button class="btn-secondary" id="exportData">Export Data</button>
+                    <label class="btn-secondary file-input-label">
+                        Import Data
+                        <input type="file" id="importData" accept=".json" hidden>
+                    </label>
+                </div>
+            </div>
+            <div class="settings-section">
+                <h4>Location</h4>
+                <div class="settings-buttons">
+                    <button class="btn-secondary" id="changeLocation">Change Location</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const HubApp = {
+            state: {
+                theme: localStorage.getItem('hub_theme') || 'light',
+                currentDate: new Date(),
+                viewDate: new Date(),
+                events: JSON.parse(localStorage.getItem('hub_events') || '[]'),
+                weather: JSON.parse(localStorage.getItem('hub_weather') || 'null'),
+                location: JSON.parse(localStorage.getItem('hub_location') || 'null'),
+                todos: JSON.parse(localStorage.getItem('hub_todos') || '[]'),
+                notes: JSON.parse(localStorage.getItem('hub_notes') || '[{"id":"default","title":"Note 1","content":"","updatedAt":""}]'),
+                activeNoteId: localStorage.getItem('hub_active_note') || 'default',
+                bookmarks: JSON.parse(localStorage.getItem('hub_bookmarks') || '[]'),
+                pomodoro: JSON.parse(localStorage.getItem('hub_pomodoro') || '{"workDuration":25,"breakDuration":5,"todaySessions":0,"lastSessionDate":""}'),
+                editingEventId: null,
+                editingTodoId: null,
+                editingBookmarkId: null,
+                todoFilter: 'all',
+                isOnline: navigator.onLine,
+                pomodoroTimer: null,
+                pomodoroTimeLeft: 25 * 60,
+                pomodoroIsWork: true,
+                pomodoroRunning: false,
+                macOSEvents: []
+            },
+
+            init() {
+                this.initTheme();
+                this.initClock();
+                this.initCalendar();
+                this.initWeather();
+                this.initTodos();
+                this.initNotes();
+                this.initBookmarks();
+                this.initPomodoro();
+                this.initEventListeners();
+                this.updateOnlineStatus();
+            },
+
+            initTheme() {
+                document.body.setAttribute('data-theme', this.state.theme);
+                this.updateThemeIcon();
+            },
+
+            updateThemeIcon() {
+                const sunIcon = document.querySelector('.sun-icon');
+                const moonIcon = document.querySelector('.moon-icon');
+                if (this.state.theme === 'dark') {
+                    sunIcon.classList.add('hidden');
+                    moonIcon.classList.remove('hidden');
+                } else {
+                    sunIcon.classList.remove('hidden');
+                    moonIcon.classList.add('hidden');
+                }
+            },
+
+            toggleTheme() {
+                this.state.theme = this.state.theme === 'dark' ? 'light' : 'dark';
+                document.body.setAttribute('data-theme', this.state.theme);
+                localStorage.setItem('hub_theme', this.state.theme);
+                this.updateThemeIcon();
+            },
+
+            initClock() {
+                this.updateClock();
+                setInterval(() => this.updateClock(), 1000);
+            },
+
+            updateClock() {
+                const now = new Date();
+                document.getElementById('clockTime').textContent = now.toLocaleTimeString('de-DE', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                document.getElementById('clockDate').textContent = now.toLocaleDateString('de-DE', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            },
+
+            initPomodoro() {
+                const today = new Date().toISOString().split('T')[0];
+                if (this.state.pomodoro.lastSessionDate !== today) {
+                    this.state.pomodoro.todaySessions = 0;
+                    this.state.pomodoro.lastSessionDate = today;
+                    this.savePomodoro();
+                }
+                this.state.pomodoroTimeLeft = this.state.pomodoro.workDuration * 60;
+                this.updatePomodoroDisplay();
+                this.updatePomodoroSessions();
+            },
+
+            updatePomodoroDisplay() {
+                const mins = Math.floor(this.state.pomodoroTimeLeft / 60);
+                const secs = this.state.pomodoroTimeLeft % 60;
+                document.getElementById('pomodoroTime').textContent =
+                    `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+                const totalTime = this.state.pomodoroIsWork ?
+                    this.state.pomodoro.workDuration * 60 :
+                    this.state.pomodoro.breakDuration * 60;
+                const progress = (totalTime - this.state.pomodoroTimeLeft) / totalTime;
+                const circumference = 2 * Math.PI * 45;
+                document.getElementById('pomodoroRing').style.strokeDashoffset =
+                    circumference * (1 - progress);
+            },
+
+            updatePomodoroSessions() {
+                document.getElementById('pomodoroSessions').textContent =
+                    `${this.state.pomodoro.todaySessions} session${this.state.pomodoro.todaySessions !== 1 ? 's' : ''}`;
+            },
+
+            startPomodoro() {
+                if (this.state.pomodoroRunning) return;
+                this.state.pomodoroRunning = true;
+                document.getElementById('pomodoroStart').style.display = 'none';
+                document.getElementById('pomodoroPause').style.display = 'flex';
+                document.getElementById('pomodoroStatus').textContent =
+                    this.state.pomodoroIsWork ? 'Working...' : 'Break';
+
+                this.state.pomodoroTimer = setInterval(() => {
+                    this.state.pomodoroTimeLeft--;
+                    this.updatePomodoroDisplay();
+
+                    if (this.state.pomodoroTimeLeft <= 0) {
+                        this.pomodoroComplete();
+                    }
+                }, 1000);
+            },
+
+            pausePomodoro() {
+                this.state.pomodoroRunning = false;
+                clearInterval(this.state.pomodoroTimer);
+                document.getElementById('pomodoroStart').style.display = 'flex';
+                document.getElementById('pomodoroPause').style.display = 'none';
+                document.getElementById('pomodoroStatus').textContent = 'Paused';
+            },
+
+            resetPomodoro() {
+                this.pausePomodoro();
+                this.state.pomodoroIsWork = true;
+                this.state.pomodoroTimeLeft = this.state.pomodoro.workDuration * 60;
+                this.updatePomodoroDisplay();
+                document.getElementById('pomodoroStatus').textContent = 'Ready';
+            },
+
+            pomodoroComplete() {
+                this.pausePomodoro();
+                this.playNotificationSound();
+
+                if (this.state.pomodoroIsWork) {
+                    this.state.pomodoro.todaySessions++;
+                    this.state.pomodoro.lastSessionDate = new Date().toISOString().split('T')[0];
+                    this.savePomodoro();
+                    this.updatePomodoroSessions();
+                    this.state.pomodoroIsWork = false;
+                    this.state.pomodoroTimeLeft = this.state.pomodoro.breakDuration * 60;
+                    document.getElementById('pomodoroStatus').textContent = 'Break time!';
+                } else {
+                    this.state.pomodoroIsWork = true;
+                    this.state.pomodoroTimeLeft = this.state.pomodoro.workDuration * 60;
+                    document.getElementById('pomodoroStatus').textContent = 'Ready';
+                }
+                this.updatePomodoroDisplay();
+            },
+
+            playNotificationSound() {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                oscillator.frequency.value = 800;
+                oscillator.type = 'sine';
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.5);
+            },
+
+            savePomodoro() {
+                localStorage.setItem('hub_pomodoro', JSON.stringify(this.state.pomodoro));
+            },
+
+            initTodos() {
+                this.renderTodos();
+            },
+
+            renderTodos() {
+                const list = document.getElementById('todoList');
+                const today = new Date().toISOString().split('T')[0];
+
+                let filtered = this.state.todos;
+                if (this.state.todoFilter === 'today') {
+                    filtered = this.state.todos.filter(t => t.dueDate === today);
+                } else if (this.state.todoFilter === 'pending') {
+                    filtered = this.state.todos.filter(t => !t.completed);
+                }
+
+                filtered.sort((a, b) => {
+                    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+                    const priorityOrder = { high: 0, medium: 1, low: 2 };
+                    return priorityOrder[a.priority] - priorityOrder[b.priority];
+                });
+
+                if (filtered.length === 0) {
+                    list.innerHTML = '<p class="no-items">No tasks</p>';
+                    return;
+                }
+
+                list.innerHTML = filtered.map(todo => `
+                    <div class="todo-item ${todo.completed ? 'completed' : ''} priority-${todo.priority}" data-id="${todo.id}">
+                        <input type="checkbox" class="todo-checkbox" ${todo.completed ? 'checked' : ''}>
+                        <span class="todo-title">${todo.title}</span>
+                        ${todo.dueDate ? `<span class="todo-due">${new Date(todo.dueDate + 'T12:00').toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })}</span>` : ''}
+                        <button class="todo-edit" title="Edit">...</button>
+                    </div>
+                `).join('');
+
+                list.querySelectorAll('.todo-checkbox').forEach(cb => {
+                    cb.addEventListener('change', (e) => {
+                        const id = e.target.closest('.todo-item').dataset.id;
+                        this.toggleTodo(id);
+                    });
+                });
+
+                list.querySelectorAll('.todo-edit').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const id = e.target.closest('.todo-item').dataset.id;
+                        this.openTodoModal(id);
+                    });
+                });
+            },
+
+            addQuickTodo() {
+                const input = document.getElementById('todoInput');
+                const title = input.value.trim();
+                if (!title) return;
+
+                this.state.todos.push({
+                    id: Date.now().toString(),
+                    title,
+                    dueDate: '',
+                    priority: 'medium',
+                    completed: false,
+                    createdAt: new Date().toISOString()
+                });
+                this.saveTodos();
+                this.renderTodos();
+                input.value = '';
+            },
+
+            toggleTodo(id) {
+                const todo = this.state.todos.find(t => t.id === id);
+                if (todo) {
+                    todo.completed = !todo.completed;
+                    this.saveTodos();
+                    this.renderTodos();
+                }
+            },
+
+            openTodoModal(id = null) {
+                const modal = document.getElementById('todoModal');
+                const title = document.getElementById('todoModalTitle');
+                const deleteBtn = document.getElementById('deleteTodo');
+
+                if (id) {
+                    const todo = this.state.todos.find(t => t.id === id);
+                    if (!todo) return;
+                    title.textContent = 'Edit Task';
+                    document.getElementById('todoTitle').value = todo.title;
+                    document.getElementById('todoDueDate').value = todo.dueDate || '';
+                    document.getElementById('todoPriority').value = todo.priority;
+                    this.state.editingTodoId = id;
+                    deleteBtn.style.display = 'block';
+                } else {
+                    title.textContent = 'Add Task';
+                    document.getElementById('todoTitle').value = '';
+                    document.getElementById('todoDueDate').value = '';
+                    document.getElementById('todoPriority').value = 'medium';
+                    this.state.editingTodoId = null;
+                    deleteBtn.style.display = 'none';
+                }
+                modal.classList.add('active');
+            },
+
+            saveTodoFromModal(e) {
+                e.preventDefault();
+                const todo = {
+                    id: this.state.editingTodoId || Date.now().toString(),
+                    title: document.getElementById('todoTitle').value,
+                    dueDate: document.getElementById('todoDueDate').value,
+                    priority: document.getElementById('todoPriority').value,
+                    completed: false,
+                    createdAt: new Date().toISOString()
+                };
+
+                if (this.state.editingTodoId) {
+                    const existing = this.state.todos.find(t => t.id === this.state.editingTodoId);
+                    if (existing) {
+                        todo.completed = existing.completed;
+                        todo.createdAt = existing.createdAt;
+                    }
+                    const idx = this.state.todos.findIndex(t => t.id === this.state.editingTodoId);
+                    if (idx !== -1) this.state.todos[idx] = todo;
+                } else {
+                    this.state.todos.push(todo);
+                }
+
+                this.saveTodos();
+                this.renderTodos();
+                document.getElementById('todoModal').classList.remove('active');
+            },
+
+            deleteTodo() {
+                if (!this.state.editingTodoId) return;
+                this.state.todos = this.state.todos.filter(t => t.id !== this.state.editingTodoId);
+                this.saveTodos();
+                this.renderTodos();
+                document.getElementById('todoModal').classList.remove('active');
+            },
+
+            saveTodos() {
+                localStorage.setItem('hub_todos', JSON.stringify(this.state.todos));
+            },
+
+            initNotes() {
+                if (!this.state.notes.find(n => n.id === this.state.activeNoteId)) {
+                    this.state.activeNoteId = this.state.notes[0]?.id || 'default';
+                }
+                this.renderNoteTabs();
+                this.loadActiveNote();
+            },
+
+            renderNoteTabs() {
+                const tabs = document.getElementById('notesTabs');
+                tabs.innerHTML = this.state.notes.map(note => `
+                    <button class="note-tab ${note.id === this.state.activeNoteId ? 'active' : ''}"
+                            data-id="${note.id}" title="${note.title}">
+                        ${note.title.substring(0, 8)}${note.title.length > 8 ? '...' : ''}
+                    </button>
+                `).join('');
+
+                tabs.querySelectorAll('.note-tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        this.switchNote(tab.dataset.id);
+                    });
+                    tab.addEventListener('dblclick', () => {
+                        const newTitle = prompt('Rename note:', this.state.notes.find(n => n.id === tab.dataset.id)?.title);
+                        if (newTitle) this.renameNote(tab.dataset.id, newTitle);
+                    });
+                });
+            },
+
+            switchNote(id) {
+                this.saveCurrentNote();
+                this.state.activeNoteId = id;
+                localStorage.setItem('hub_active_note', id);
+                this.renderNoteTabs();
+                this.loadActiveNote();
+            },
+
+            loadActiveNote() {
+                const note = this.state.notes.find(n => n.id === this.state.activeNoteId);
+                document.getElementById('noteContent').value = note?.content || '';
+                this.updateWordCount();
+            },
+
+            saveCurrentNote() {
+                const note = this.state.notes.find(n => n.id === this.state.activeNoteId);
+                if (note) {
+                    note.content = document.getElementById('noteContent').value;
+                    note.updatedAt = new Date().toISOString();
+                    this.saveNotes();
+                }
+            },
+
+            addNote() {
+                const newNote = {
+                    id: Date.now().toString(),
+                    title: `Note ${this.state.notes.length + 1}`,
+                    content: '',
+                    updatedAt: new Date().toISOString()
+                };
+                this.state.notes.push(newNote);
+                this.saveNotes();
+                this.switchNote(newNote.id);
+            },
+
+            renameNote(id, title) {
+                const note = this.state.notes.find(n => n.id === id);
+                if (note) {
+                    note.title = title;
+                    this.saveNotes();
+                    this.renderNoteTabs();
+                }
+            },
+
+            deleteCurrentNote() {
+                if (this.state.notes.length <= 1) {
+                    alert('Cannot delete the last note');
+                    return;
+                }
+                if (!confirm('Delete this note?')) return;
+
+                this.state.notes = this.state.notes.filter(n => n.id !== this.state.activeNoteId);
+                this.saveNotes();
+                this.state.activeNoteId = this.state.notes[0].id;
+                this.renderNoteTabs();
+                this.loadActiveNote();
+            },
+
+            updateWordCount() {
+                const content = document.getElementById('noteContent').value;
+                const words = content.trim() ? content.trim().split(/\s+/).length : 0;
+                document.getElementById('wordCount').textContent = `${words} word${words !== 1 ? 's' : ''}`;
+            },
+
+            saveNotes() {
+                localStorage.setItem('hub_notes', JSON.stringify(this.state.notes));
+            },
+
+            initBookmarks() {
+                this.renderBookmarks();
+            },
+
+            renderBookmarks() {
+                const list = document.getElementById('bookmarksList');
+                const categories = [...new Set(this.state.bookmarks.map(b => b.category))];
+
+                if (this.state.bookmarks.length === 0) {
+                    list.innerHTML = '<p class="no-items">No bookmarks</p>';
+                    return;
+                }
+
+                list.innerHTML = categories.map(cat => `
+                    <div class="bookmark-category">
+                        <div class="category-header">${cat}</div>
+                        <div class="category-links">
+                            ${this.state.bookmarks.filter(b => b.category === cat).map(b => `
+                                <a href="${b.url}" target="_blank" rel="noopener" class="bookmark-link" data-id="${b.id}">
+                                    <img src="https://www.google.com/s2/favicons?domain=${new URL(b.url).hostname}&sz=32"
+                                         alt="" class="bookmark-favicon" onerror="this.style.display='none'">
+                                    <span>${b.title}</span>
+                                </a>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('');
+
+                list.querySelectorAll('.bookmark-link').forEach(link => {
+                    link.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        this.openBookmarkModal(link.dataset.id);
+                    });
+                });
+            },
+
+            openBookmarkModal(id = null) {
+                const modal = document.getElementById('bookmarkModal');
+                const title = document.getElementById('bookmarkModalTitle');
+                const deleteBtn = document.getElementById('deleteBookmark');
+
+                if (id) {
+                    const bookmark = this.state.bookmarks.find(b => b.id === id);
+                    if (!bookmark) return;
+                    title.textContent = 'Edit Bookmark';
+                    document.getElementById('bookmarkTitle').value = bookmark.title;
+                    document.getElementById('bookmarkUrl').value = bookmark.url;
+                    document.getElementById('bookmarkCategory').value = bookmark.category;
+                    this.state.editingBookmarkId = id;
+                    deleteBtn.style.display = 'block';
+                } else {
+                    title.textContent = 'Add Bookmark';
+                    document.getElementById('bookmarkTitle').value = '';
+                    document.getElementById('bookmarkUrl').value = '';
+                    document.getElementById('bookmarkCategory').value = 'Other';
+                    this.state.editingBookmarkId = null;
+                    deleteBtn.style.display = 'none';
+                }
+                modal.classList.add('active');
+            },
+
+            saveBookmarkFromModal(e) {
+                e.preventDefault();
+                const bookmark = {
+                    id: this.state.editingBookmarkId || Date.now().toString(),
+                    title: document.getElementById('bookmarkTitle').value,
+                    url: document.getElementById('bookmarkUrl').value,
+                    category: document.getElementById('bookmarkCategory').value
+                };
+
+                if (this.state.editingBookmarkId) {
+                    const idx = this.state.bookmarks.findIndex(b => b.id === this.state.editingBookmarkId);
+                    if (idx !== -1) this.state.bookmarks[idx] = bookmark;
+                } else {
+                    this.state.bookmarks.push(bookmark);
+                }
+
+                this.saveBookmarks();
+                this.renderBookmarks();
+                document.getElementById('bookmarkModal').classList.remove('active');
+            },
+
+            deleteBookmark() {
+                if (!this.state.editingBookmarkId) return;
+                this.state.bookmarks = this.state.bookmarks.filter(b => b.id !== this.state.editingBookmarkId);
+                this.saveBookmarks();
+                this.renderBookmarks();
+                document.getElementById('bookmarkModal').classList.remove('active');
+            },
+
+            saveBookmarks() {
+                localStorage.setItem('hub_bookmarks', JSON.stringify(this.state.bookmarks));
+            },
+
+            async initCalendar() {
+                this.renderCalendar();
+                this.renderEvents();
+                await this.fetchMacOSCalendarEvents();
+            },
+
+            async fetchMacOSCalendarEvents() {
+                try {
+                    const response = await fetch('/api/calendar/macos?days=30');
+                    const data = await response.json();
+
+                    if (data.success && data.events && data.events.length > 0) {
+                        // Store macOS events separately
+                        this.state.macOSEvents = data.events;
+                        // Re-render with merged events
+                        this.renderCalendar();
+                        this.renderEvents();
+                    } else if (data.error === 'not_installed') {
+                        console.log('icalBuddy not installed - run: brew install ical-buddy');
+                    } else if (data.error === 'no_calendars') {
+                        console.log('Calendar permission needed: System Settings > Privacy & Security > Calendars');
+                    }
+                } catch (err) {
+                    console.log('Could not fetch macOS calendar events:', err.message);
+                }
+            },
+
+            getAllEvents() {
+                // Merge local events with macOS calendar events
+                const localEvents = this.state.events || [];
+                const macOSEvents = this.state.macOSEvents || [];
+
+                // Create a map to avoid duplicates by ID
+                const eventMap = new Map();
+
+                // Add local events first
+                localEvents.forEach(e => eventMap.set(e.id, { ...e, source: 'local' }));
+
+                // Add macOS events (won't override existing local events)
+                macOSEvents.forEach(e => {
+                    if (!eventMap.has(e.id)) {
+                        eventMap.set(e.id, { ...e, source: 'macos' });
+                    }
+                });
+
+                return Array.from(eventMap.values());
+            },
+
+            renderCalendar() {
+                const grid = document.getElementById('calendarGrid');
+                const monthEl = document.getElementById('calendarMonth');
+                const year = this.state.viewDate.getFullYear();
+                const month = this.state.viewDate.getMonth();
+
+                monthEl.textContent = this.state.viewDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+
+                const firstDay = new Date(year, month, 1);
+                const lastDay = new Date(year, month + 1, 0);
+                const startDay = firstDay.getDay() || 7;
+
+                let html = '<div class="calendar-weekdays">';
+                ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].forEach(day => html += `<span>${day}</span>`);
+                html += '</div><div class="calendar-days">';
+
+                for (let i = 1; i < startDay; i++) html += '<span class="empty"></span>';
+
+                const today = new Date();
+                const allEvents = this.getAllEvents();
+                for (let day = 1; day <= lastDay.getDate(); day++) {
+                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
+                    const hasEvents = allEvents.some(e => e.date === dateStr);
+                    html += `<span class="day${isToday ? ' today' : ''}${hasEvents ? ' has-events' : ''}" data-date="${dateStr}">${day}</span>`;
+                }
+                html += '</div>';
+                grid.innerHTML = html;
+
+                grid.querySelectorAll('.day').forEach(el => {
+                    el.addEventListener('click', () => this.openEventModal(el.dataset.date));
+                });
+            },
+
+            renderEvents() {
+                const list = document.getElementById('eventsList');
+                const todayStr = new Date().toISOString().split('T')[0];
+                const allEvents = this.getAllEvents();
+                const upcoming = allEvents
+                    .filter(e => e.date >= todayStr)
+                    .sort((a, b) => {
+                        // Sort by date first, then by time
+                        const dateCompare = a.date.localeCompare(b.date);
+                        if (dateCompare !== 0) return dateCompare;
+                        return (a.time || '').localeCompare(b.time || '');
+                    })
+                    .slice(0, 8);
+
+                if (upcoming.length === 0) {
+                    list.innerHTML = '<p class="no-items">No upcoming events</p>';
+                    return;
+                }
+
+                list.innerHTML = upcoming.map(event => `
+                    <div class="event-item ${event.source === 'macos' ? 'macos-event' : 'local-event'}" data-id="${event.id}" data-source="${event.source || 'local'}">
+                        <div class="event-date">${new Date(event.date + 'T12:00').toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })}${event.time ? ' ' + event.time : ''}</div>
+                        <div class="event-title">${event.title}${event.source === 'macos' ? '<span class="event-source">📅</span>' : ''}</div>
+                        ${event.location ? `<div class="event-location">📍 ${event.location}</div>` : ''}
+                    </div>
+                `).join('');
+
+                list.querySelectorAll('.event-item').forEach(el => {
+                    el.addEventListener('click', () => {
+                        const source = el.dataset.source;
+                        if (source === 'macos') {
+                            // macOS events are read-only, show info
+                            const event = this.getAllEvents().find(e => e.id === el.dataset.id);
+                            if (event) {
+                                alert(`📅 ${event.title}\n📆 ${event.date} ${event.time || ''}\n${event.location ? '📍 ' + event.location : ''}\n${event.description ? '\n' + event.description : ''}\n\n(From macOS Calendar - edit in Calendar app)`);
+                            }
+                        } else {
+                            // Local events can be edited
+                            const event = this.state.events.find(e => e.id === el.dataset.id);
+                            if (event) this.openEventModal(event.date, event);
+                        }
+                    });
+                });
+            },
+
+            openEventModal(date, event = null) {
+                const modal = document.getElementById('eventModal');
+                document.getElementById('eventDate').value = date;
+
+                if (event) {
+                    document.getElementById('eventModalTitle').textContent = 'Edit Event';
+                    document.getElementById('eventTitle').value = event.title;
+                    document.getElementById('eventTime').value = event.time || '';
+                    document.getElementById('eventDescription').value = event.description || '';
+                    this.state.editingEventId = event.id;
+                    document.getElementById('deleteEvent').style.display = 'block';
+                } else {
+                    document.getElementById('eventModalTitle').textContent = 'Add Event';
+                    document.getElementById('eventTitle').value = '';
+                    document.getElementById('eventTime').value = '';
+                    document.getElementById('eventDescription').value = '';
+                    this.state.editingEventId = null;
+                    document.getElementById('deleteEvent').style.display = 'none';
+                }
+                modal.classList.add('active');
+            },
+
+            saveEvent(e) {
+                e.preventDefault();
+                const event = {
+                    id: this.state.editingEventId || Date.now().toString(),
+                    title: document.getElementById('eventTitle').value,
+                    date: document.getElementById('eventDate').value,
+                    time: document.getElementById('eventTime').value,
+                    description: document.getElementById('eventDescription').value
+                };
+
+                if (this.state.editingEventId) {
+                    const idx = this.state.events.findIndex(e => e.id === this.state.editingEventId);
+                    if (idx !== -1) this.state.events[idx] = event;
+                } else {
+                    this.state.events.push(event);
+                }
+
+                localStorage.setItem('hub_events', JSON.stringify(this.state.events));
+                document.getElementById('eventModal').classList.remove('active');
+                this.renderCalendar();
+                this.renderEvents();
+            },
+
+            deleteEvent() {
+                if (!this.state.editingEventId) return;
+                this.state.events = this.state.events.filter(e => e.id !== this.state.editingEventId);
+                localStorage.setItem('hub_events', JSON.stringify(this.state.events));
+                document.getElementById('eventModal').classList.remove('active');
+                this.renderCalendar();
+                this.renderEvents();
+            },
+
+            async initWeather() {
+                if (this.state.weather && this.state.location) {
+                    this.renderWeather();
+                    if (Date.now() - new Date(this.state.weather.timestamp) > 30 * 60 * 1000) {
+                        this.refreshWeather();
+                    }
+                } else if (this.state.location) {
+                    await this.refreshWeather();
+                } else {
+                    await this.detectLocation();
+                }
+            },
+
+            async detectLocation() {
+                document.getElementById('weatherContent').innerHTML = '<div class="weather-loading">Detecting location...</div>';
+                try {
+                    const response = await fetch('https://ipapi.co/json/');
+                    if (!response.ok) throw new Error('Location detection failed');
+                    const data = await response.json();
+                    this.state.location = { city: data.city, lat: data.latitude, lon: data.longitude };
+                    localStorage.setItem('hub_location', JSON.stringify(this.state.location));
+                    await this.refreshWeather();
+                } catch (err) {
+                    document.getElementById('locationModal').classList.add('active');
+                }
+            },
+
+            async setManualLocation(city) {
+                document.getElementById('weatherContent').innerHTML = '<div class="weather-loading">Finding city...</div>';
+                document.getElementById('locationModal').classList.remove('active');
+                try {
+                    const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`);
+                    const data = await response.json();
+                    if (!data.results?.length) throw new Error('City not found');
+                    const result = data.results[0];
+                    this.state.location = { city: result.name, lat: result.latitude, lon: result.longitude };
+                    localStorage.setItem('hub_location', JSON.stringify(this.state.location));
+                    await this.refreshWeather();
+                } catch (err) {
+                    document.getElementById('weatherContent').innerHTML = '<div class="weather-error">City not found</div>';
+                    setTimeout(() => document.getElementById('locationModal').classList.add('active'), 2000);
+                }
+            },
+
+            async refreshWeather() {
+                if (!this.state.location) { await this.detectLocation(); return; }
+                if (!navigator.onLine) {
+                    if (this.state.weather) this.renderWeather();
+                    else document.getElementById('weatherContent').innerHTML = '<div class="weather-error">Offline</div>';
+                    return;
+                }
+
+                document.getElementById('weatherContent').innerHTML = '<div class="weather-loading">Loading...</div>';
+                try {
+                    const { lat, lon } = this.state.location;
+                    const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto`);
+                    if (!response.ok) throw new Error('Weather fetch failed');
+                    const data = await response.json();
+                    this.state.weather = { current: data.current, daily: data.daily, timestamp: new Date().toISOString() };
+                    localStorage.setItem('hub_weather', JSON.stringify(this.state.weather));
+                    this.renderWeather();
+                } catch (err) {
+                    if (this.state.weather) this.renderWeather();
+                    else document.getElementById('weatherContent').innerHTML = '<div class="weather-error">Error</div>';
+                }
+            },
+
+            renderWeather() {
+                const { weather, location } = this.state;
+                if (!weather?.current) { document.getElementById('weatherContent').innerHTML = '<div class="weather-error">No data</div>'; return; }
+
+                const emojis = { 0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️', 45: '🌫️', 48: '🌫️', 51: '🌧️', 53: '🌧️', 55: '🌧️', 61: '🌧️', 63: '🌧️', 65: '🌧️', 71: '🌨️', 73: '🌨️', 75: '🌨️', 80: '🌦️', 81: '🌦️', 82: '🌦️', 95: '⛈️', 96: '⛈️', 99: '⛈️' };
+                const code = weather.current.weather_code;
+
+                document.getElementById('weatherContent').innerHTML = `
+                    <div class="weather-current">
+                        <div class="weather-icon">${emojis[code] || '🌡️'}</div>
+                        <div class="weather-temp">${Math.round(weather.current.temperature_2m)}°C</div>
+                    </div>
+                    <div class="weather-forecast">
+                        ${weather.daily.time.slice(1, 4).map((date, i) => `
+                            <div class="forecast-day">
+                                <span class="forecast-name">${new Date(date).toLocaleDateString('de-DE', { weekday: 'short' })}</span>
+                                <span class="forecast-icon">${emojis[weather.daily.weather_code[i + 1]] || '🌡️'}</span>
+                                <span class="forecast-temps">${Math.round(weather.daily.temperature_2m_max[i + 1])}°</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                document.getElementById('weatherLocation').textContent = location.city;
+                const diffMins = Math.round((Date.now() - new Date(weather.timestamp)) / 60000);
+                document.getElementById('weatherUpdated').textContent = diffMins < 1 ? 'Just now' : diffMins < 60 ? `${diffMins}m ago` : new Date(weather.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+            },
+
+            updateOnlineStatus() {
+                const indicator = document.getElementById('offlineIndicator');
+                indicator.classList.toggle('visible', !navigator.onLine);
+                this.state.isOnline = navigator.onLine;
+            },
+
+            exportData() {
+                const data = {};
+                ['hub_theme', 'hub_events', 'hub_todos', 'hub_notes', 'hub_bookmarks', 'hub_pomodoro', 'hub_location'].forEach(key => {
+                    const val = localStorage.getItem(key);
+                    if (val) data[key] = JSON.parse(val);
+                });
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `hub-backup-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            },
+
+            importData(file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        Object.entries(data).forEach(([key, value]) => {
+                            localStorage.setItem(key, JSON.stringify(value));
+                        });
+                        location.reload();
+                    } catch (err) {
+                        alert('Invalid backup file');
+                    }
+                };
+                reader.readAsText(file);
+            },
+
+            initEventListeners() {
+                document.getElementById('themeToggle').addEventListener('click', () => this.toggleTheme());
+                document.getElementById('settingsBtn').addEventListener('click', () => document.getElementById('settingsModal').classList.add('active'));
+                document.getElementById('settingsModalClose').addEventListener('click', () => document.getElementById('settingsModal').classList.remove('active'));
+
+                document.getElementById('prevMonth').addEventListener('click', () => { this.state.viewDate.setMonth(this.state.viewDate.getMonth() - 1); this.renderCalendar(); });
+                document.getElementById('nextMonth').addEventListener('click', () => { this.state.viewDate.setMonth(this.state.viewDate.getMonth() + 1); this.renderCalendar(); });
+                document.getElementById('addEventBtn').addEventListener('click', () => this.openEventModal(new Date().toISOString().split('T')[0]));
+                document.getElementById('eventModalClose').addEventListener('click', () => document.getElementById('eventModal').classList.remove('active'));
+                document.getElementById('eventForm').addEventListener('submit', (e) => this.saveEvent(e));
+                document.getElementById('deleteEvent').addEventListener('click', () => this.deleteEvent());
+
+                document.getElementById('refreshWeather').addEventListener('click', () => this.refreshWeather());
+                document.getElementById('locationForm').addEventListener('submit', (e) => { e.preventDefault(); this.setManualLocation(document.getElementById('cityInput').value); });
+                document.getElementById('changeLocation').addEventListener('click', () => { document.getElementById('settingsModal').classList.remove('active'); document.getElementById('locationModal').classList.add('active'); });
+
+                document.getElementById('pomodoroStart').addEventListener('click', () => this.startPomodoro());
+                document.getElementById('pomodoroPause').addEventListener('click', () => this.pausePomodoro());
+                document.getElementById('pomodoroReset').addEventListener('click', () => this.resetPomodoro());
+
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        this.state.todoFilter = btn.dataset.filter;
+                        this.renderTodos();
+                    });
+                });
+                document.getElementById('todoInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') this.addQuickTodo(); });
+                document.getElementById('addTodoBtn').addEventListener('click', () => this.addQuickTodo());
+                document.getElementById('todoModalClose').addEventListener('click', () => document.getElementById('todoModal').classList.remove('active'));
+                document.getElementById('todoForm').addEventListener('submit', (e) => this.saveTodoFromModal(e));
+                document.getElementById('deleteTodo').addEventListener('click', () => this.deleteTodo());
+
+                document.getElementById('noteContent').addEventListener('input', () => { this.saveCurrentNote(); this.updateWordCount(); });
+                document.getElementById('addNoteBtn').addEventListener('click', () => this.addNote());
+                document.getElementById('deleteNoteBtn').addEventListener('click', () => this.deleteCurrentNote());
+
+                document.getElementById('addBookmarkBtn').addEventListener('click', () => this.openBookmarkModal());
+                document.getElementById('bookmarkModalClose').addEventListener('click', () => document.getElementById('bookmarkModal').classList.remove('active'));
+                document.getElementById('bookmarkForm').addEventListener('submit', (e) => this.saveBookmarkFromModal(e));
+                document.getElementById('deleteBookmark').addEventListener('click', () => this.deleteBookmark());
+
+                document.getElementById('workDuration').addEventListener('change', (e) => { this.state.pomodoro.workDuration = parseInt(e.target.value); this.savePomodoro(); this.resetPomodoro(); });
+                document.getElementById('breakDuration').addEventListener('change', (e) => { this.state.pomodoro.breakDuration = parseInt(e.target.value); this.savePomodoro(); });
+                document.getElementById('exportData').addEventListener('click', () => this.exportData());
+                document.getElementById('importData').addEventListener('change', (e) => { if (e.target.files[0]) this.importData(e.target.files[0]); });
+
+                window.addEventListener('online', () => this.updateOnlineStatus());
+                window.addEventListener('offline', () => this.updateOnlineStatus());
+
+                document.querySelectorAll('.modal').forEach(modal => {
+                    modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('active'); });
+                });
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => HubApp.init());
+    </script>
+</body>
+</html>

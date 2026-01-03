@@ -126,7 +126,7 @@ class AudioRecorder:
         try:
             sd._terminate()
             sd._initialize()
-        except:
+        except Exception:
             pass
 
         try:
@@ -135,7 +135,7 @@ class AudioRecorder:
                 device_info = sd.query_devices(default_device)
                 if device_info['max_input_channels'] > 0:
                     return default_device
-        except:
+        except Exception:
             pass
 
         try:
@@ -152,9 +152,9 @@ class AudioRecorder:
                         )
                         test_stream.close()
                         return i
-                    except:
+                    except Exception:
                         continue
-        except:
+        except Exception:
             pass
 
         return None
@@ -166,13 +166,13 @@ class AudioRecorder:
             try:
                 sd.check_input_settings(device=device_id, samplerate=rate, channels=1)
                 return rate
-            except:
+            except Exception:
                 continue
 
         try:
             device_info = sd.query_devices(device_id)
             return int(device_info['default_samplerate'])
-        except:
+        except Exception:
             return 16000
 
     def start_recording(self, on_chunk_ready=None):
@@ -192,13 +192,13 @@ class AudioRecorder:
         while not self.audio_queue.empty():
             try:
                 self.audio_queue.get_nowait()
-            except:
+            except Exception:
                 break
 
         while not self.enrollment_queue.empty():
             try:
                 self.enrollment_queue.get_nowait()
-            except:
+            except Exception:
                 break
 
         for attempt in range(MAX_DEVICE_RETRIES):
@@ -234,7 +234,7 @@ class AudioRecorder:
                     sd._terminate()
                     time.sleep(DEVICE_RETRY_DELAY)
                     sd._initialize()
-                except:
+                except Exception:
                     pass
 
                 if attempt < MAX_DEVICE_RETRIES - 1:
@@ -329,7 +329,7 @@ def refresh_audio_devices():
 def list_audio_devices():
     try:
         devices = sd.query_devices()
-    except:
+    except Exception:
         refresh_audio_devices()
         devices = sd.query_devices()
 
@@ -339,7 +339,7 @@ def list_audio_devices():
             usable = True
             try:
                 sd.check_input_settings(device=i, channels=1)
-            except:
+            except Exception:
                 usable = False
 
             input_devices.append({
@@ -362,7 +362,7 @@ def get_default_input_device():
             'channels': device['max_input_channels'],
             'sample_rate': device['default_samplerate']
         }
-    except:
+    except Exception:
         return None
 
 

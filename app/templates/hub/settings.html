@@ -1,0 +1,214 @@
+{% extends "hub/base.html" %}
+
+{% block title %}Nexus - Settings{% endblock %}
+
+{% block content %}
+<section class="widget glass-card widget-full">
+    <div class="widget-header">
+        <div>
+            <h2 class="widget-title" data-i18n="settings">Settings</h2>
+            <p class="widget-subtitle" data-i18n="settings_subtitle">Configure your Nexus hub</p>
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <h4 data-i18n="appearance">Appearance</h4>
+        <div class="settings-buttons">
+            <button class="btn-secondary" id="toggleThemeBtn">
+                <span id="themeLabel" data-i18n="switch_dark">Switch to Dark Mode</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <h4 data-i18n="pomodoro_title">Pomodoro Timer</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="settingsWorkDuration" data-i18n="work_duration">Work Duration (min)</label>
+                <input type="number" id="settingsWorkDuration" min="1" max="60" value="25">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="settingsBreakDuration" data-i18n="break_duration">Break Duration (min)</label>
+                <input type="number" id="settingsBreakDuration" min="1" max="30" value="5">
+            </div>
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <h4 data-i18n="weather_location">Weather Location</h4>
+        <div class="form-group" style="margin-bottom: 16px;">
+            <label for="locationDisplay" data-i18n="current_location">Current Location</label>
+            <input type="text" id="locationDisplay" readonly placeholder="Not set" data-i18n-placeholder="not_set">
+        </div>
+        <div class="settings-buttons">
+            <button class="btn-secondary" id="changeLocationBtn" data-i18n="change_location">Change Location</button>
+            <button class="btn-secondary" id="autoDetectLocationBtn" data-i18n="auto_detect">Auto-detect</button>
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <h4 data-i18n="data_backup">Data Backup</h4>
+        <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 14px;" data-i18n="backup_description">
+            Export your tasks, notes, bookmarks, and settings to a JSON file, or import from a backup.
+        </p>
+        <div class="settings-buttons">
+            <button class="btn-secondary" id="exportData" data-i18n="export_data">Export Data</button>
+            <label class="btn-secondary file-input-label">
+                <span data-i18n="import_data">Import Data</span>
+                <input type="file" id="importData" accept=".json" hidden>
+            </label>
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <h4 data-i18n="clear_data">Clear Data</h4>
+        <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 14px;" data-i18n="clear_warning">
+            Warning: This will permanently delete all your local data.
+        </p>
+        <div class="settings-buttons">
+            <button class="btn-secondary" id="clearAllData" style="border-color: var(--danger); color: var(--danger);" data-i18n="clear_all">
+                Clear All Data
+            </button>
+        </div>
+    </div>
+</section>
+
+<!-- About Section -->
+<section class="widget glass-card">
+    <h2 class="widget-title" style="margin-bottom: 16px;" data-i18n="about_nexus">About Nexus</h2>
+    <div style="color: var(--text-secondary); line-height: 1.8;">
+        <p><strong>Nexus</strong> - <span data-i18n="about_description">Your personal life management hub</span></p>
+        <p style="margin-top: 8px;"><em>Centralized. Reliable. Efficient.</em></p>
+        <p style="margin-top: 8px;" data-i18n="about_features">Manage tasks, calendar, notes, and more - all in one place.</p>
+        <p style="margin-top: 16px; font-size: 13px; color: var(--text-muted);" data-i18n="about_storage">
+            All data is stored locally in your browser.
+        </p>
+    </div>
+</section>
+{% endblock %}
+
+{% block modals %}
+<!-- Location Modal -->
+<div class="modal" id="locationModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 data-i18n="set_location">Set Your Location</h3>
+            <button class="modal-close" id="locationModalClose">&times;</button>
+        </div>
+        <form id="locationForm">
+            <div class="form-group">
+                <label for="cityInput" data-i18n="city">City</label>
+                <input type="text" id="cityInput" placeholder="e.g., Berlin" required>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn-primary" data-i18n="save_location">Save Location</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Load current settings
+        const pomodoro = JSON.parse(localStorage.getItem('hub_pomodoro') || '{"workDuration":25,"breakDuration":5}');
+        document.getElementById('settingsWorkDuration').value = pomodoro.workDuration;
+        document.getElementById('settingsBreakDuration').value = pomodoro.breakDuration;
+
+        const location = JSON.parse(localStorage.getItem('hub_location') || 'null');
+        if (location) {
+            document.getElementById('locationDisplay').value = location.city;
+        }
+
+        const theme = localStorage.getItem('hub_theme') || 'light';
+        document.getElementById('themeLabel').textContent = theme === 'dark' ? HubApp.t('switch_light') : HubApp.t('switch_dark');
+
+        // Theme toggle
+        document.getElementById('toggleThemeBtn').addEventListener('click', () => {
+            HubApp.toggleTheme();
+            const newTheme = document.body.getAttribute('data-theme');
+            document.getElementById('themeLabel').textContent = newTheme === 'dark' ? HubApp.t('switch_light') : HubApp.t('switch_dark');
+        });
+
+        // Pomodoro settings
+        document.getElementById('settingsWorkDuration').addEventListener('change', (e) => {
+            const pomodoro = JSON.parse(localStorage.getItem('hub_pomodoro') || '{}');
+            pomodoro.workDuration = parseInt(e.target.value);
+            localStorage.setItem('hub_pomodoro', JSON.stringify(pomodoro));
+        });
+
+        document.getElementById('settingsBreakDuration').addEventListener('change', (e) => {
+            const pomodoro = JSON.parse(localStorage.getItem('hub_pomodoro') || '{}');
+            pomodoro.breakDuration = parseInt(e.target.value);
+            localStorage.setItem('hub_pomodoro', JSON.stringify(pomodoro));
+        });
+
+        // Location
+        document.getElementById('changeLocationBtn').addEventListener('click', () => {
+            document.getElementById('locationModal').classList.add('active');
+        });
+
+        document.getElementById('locationModalClose').addEventListener('click', () => {
+            document.getElementById('locationModal').classList.remove('active');
+        });
+
+        document.getElementById('locationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const city = document.getElementById('cityInput').value;
+            try {
+                const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`);
+                const data = await response.json();
+                if (data.results?.length) {
+                    const result = data.results[0];
+                    const location = { city: result.name, lat: result.latitude, lon: result.longitude };
+                    localStorage.setItem('hub_location', JSON.stringify(location));
+                    document.getElementById('locationDisplay').value = result.name;
+                    document.getElementById('locationModal').classList.remove('active');
+                } else {
+                    alert('City not found');
+                }
+            } catch (err) {
+                alert('Error finding city');
+            }
+        });
+
+        document.getElementById('autoDetectLocationBtn').addEventListener('click', async () => {
+            try {
+                const response = await fetch('https://ipapi.co/json/');
+                const data = await response.json();
+                const location = { city: data.city, lat: data.latitude, lon: data.longitude };
+                localStorage.setItem('hub_location', JSON.stringify(location));
+                document.getElementById('locationDisplay').value = data.city;
+            } catch (err) {
+                alert('Could not detect location');
+            }
+        });
+
+        // Export/Import
+        document.getElementById('exportData').addEventListener('click', () => HubApp.exportData());
+        document.getElementById('importData').addEventListener('change', (e) => {
+            if (e.target.files[0]) HubApp.importData(e.target.files[0]);
+        });
+
+        // Clear data
+        document.getElementById('clearAllData').addEventListener('click', () => {
+            if (confirm(HubApp.t('confirm_clear'))) {
+                ['hub_theme', 'hub_events', 'hub_todos', 'hub_notes', 'hub_bookmarks', 'hub_pomodoro', 'hub_location', 'hub_weather', 'hub_active_note'].forEach(key => {
+                    localStorage.removeItem(key);
+                });
+                location.reload();
+            }
+        });
+
+        // Modal close on backdrop
+        document.getElementById('locationModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('locationModal')) {
+                document.getElementById('locationModal').classList.remove('active');
+            }
+        });
+
+        HubApp.initEventListeners();
+    });
+</script>
+{% endblock %}

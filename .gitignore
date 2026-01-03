@@ -25,6 +25,9 @@ audio_temp/
 *.tmp
 *.log
 
+# Environment variables (secrets)
+.env
+
 # Data (contains database with recordings)
 data/
 

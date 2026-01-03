@@ -70,11 +70,11 @@ def apply_vocabulary_fuzzy(text: str, threshold: float = 0.8) -> Tuple[str, List
     for i, word in enumerate(words):
         word_lower = word.lower().strip('.,!?;:')
         for phonetic, spelling in vocab.items():
-            if word_lower == phonetic:
+            if word_lower == phonetic and spelling:
                 clean_word = word.strip('.,!?;:')
                 punctuation = word[len(clean_word):]
                 new_word = spelling + punctuation
-                if word[0].isupper() and spelling[0].islower():
+                if word and spelling and word[0].isupper() and spelling[0].islower():
                     new_word = spelling[0].upper() + spelling[1:] + punctuation
                 words[i] = new_word
                 replacements.append({

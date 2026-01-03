@@ -18,7 +18,7 @@ def get_verification_threshold() -> float:
     try:
         from adaptive_system import get_param
         return get_param("voice_threshold")
-    except:
+    except (ImportError, Exception):
         return DEFAULT_VERIFICATION_THRESHOLD
 
 SPEAKER_MODEL = "nvidia/speakerverification_en_titanet_large"

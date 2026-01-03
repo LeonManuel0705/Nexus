@@ -1,0 +1,40 @@
+{% extends "hub/base.html" %}
+
+{% block title %}Nexus - Notes{% endblock %}
+
+{% block content %}
+<section class="widget glass-card widget-full">
+    <div class="widget-header">
+        <div>
+            <h2 class="widget-title" data-i18n="notes">Notes</h2>
+            <p class="widget-subtitle" data-i18n="notes_subtitle">Quick notes and thoughts</p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div class="notes-tabs" id="notesTabs"></div>
+            <button class="add-btn small" id="addNoteBtn" title="New note">+</button>
+        </div>
+    </div>
+
+    <div class="notes-editor">
+        <textarea id="noteContent" placeholder="Start typing..." data-i18n-placeholder="start_typing"></textarea>
+        <div class="notes-footer">
+            <span class="word-count" id="wordCount">0 words</span>
+            <button class="delete-note-btn" id="deleteNoteBtn" title="Delete note">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        HubApp.initNotes();
+        HubApp.initEventListeners();
+    });
+</script>
+{% endblock %}

@@ -23,7 +23,7 @@ from transcriber import (
     cleanup_audio_file, get_available_models,
     preload_model, transcribe_audio_chunk, get_ollama_status,
     get_correction_status, reset_session, get_text_corrector,
-    apply_ai_correction
+    apply_ai_correction, get_whisper_model
 )
 from voice_profile import get_profile_manager, verify_teacher_audio
 from quality_feedback import (
@@ -48,6 +48,7 @@ current_transcription = []
 corrected_segments = []
 last_correction_index = 0
 correction_lock = threading.Lock()
+realtime_state_lock = threading.Lock()
 current_language = "de"
 
 voice_filter_enabled = False
@@ -509,7 +510,7 @@ def create_pdf_document(note):
         fontSize=24,
         textColor=HexColor('#2962ff'),
         spaceAfter=12,
-        alignment=1  # Center
+        alignment=1
     )
 
     meta_style = ParagraphStyle(
@@ -664,32 +665,72 @@ def create_folder_pdf_document(folder, notes):
     buffer.seek(0)
     return buffer
 
+# ==========================================
+# NEXUS HUB ROUTES
+# ==========================================
+
 @app.route('/')
-def home():
-    return render_template('home.html', active_page='home')
+def hub_home():
+    return render_template('hub/home.html', active_tab='home')
+
+@app.route('/hub/tasks')
+def hub_tasks():
+    return render_template('hub/tasks.html', active_tab='tasks')
+
+@app.route('/hub/calendar')
+def hub_calendar():
+    return render_template('hub/calendar.html', active_tab='calendar')
+
+@app.route('/hub/notes')
+def hub_notes():
+    return render_template('hub/notes.html', active_tab='notes')
+
+@app.route('/hub/bookmarks')
+def hub_bookmarks():
+    return render_template('hub/bookmarks.html', active_tab='bookmarks')
+
+@app.route('/hub/pomodoro')
+def hub_pomodoro():
+    return render_template('hub/pomodoro.html', active_tab='home')
+
+@app.route('/hub/settings')
+def hub_settings():
+    return render_template('hub/settings.html', active_tab='settings')
+
+@app.route('/hub/email')
+def hub_email():
+    return render_template('hub/email.html', active_tab='email')
+
+# ==========================================
+# VOICENOTES APP ROUTES
+# ==========================================
 
 @app.route('/app')
 def application():
     return render_template('app.html')
 
-@app.route('/app/features')
-def features():
+@app.route('/app/info')
+def app_info_home():
+    return render_template('home.html', active_page='home')
+
+@app.route('/app/info/features')
+def app_features():
     return render_template('features.html', active_page='features')
 
-@app.route('/app/how-it-works')
-def how_it_works():
+@app.route('/app/info/how-it-works')
+def app_how_it_works():
     return render_template('how_it_works.html', active_page='how-it-works')
 
-@app.route('/app/docs')
-def docs():
+@app.route('/app/info/docs')
+def app_docs():
     return render_template('docs.html', active_page='docs')
 
-@app.route('/app/about')
-def about():
+@app.route('/app/info/about')
+def app_about():
     return render_template('about.html', active_page='about')
 
-@app.route('/app/terms')
-def terms():
+@app.route('/app/info/terms')
+def app_terms():
     return render_template('terms.html', active_page='terms')
 
 @app.route('/static/<path:path>')
@@ -858,7 +899,9 @@ def handle_start_realtime(data):
         corrected_segments = []
         last_correction_index = 0
 
-    realtime_active = True
+    with realtime_state_lock:
+        realtime_active = True
+
     reset_session()
 
     subject = None
@@ -869,11 +912,12 @@ def handle_start_realtime(data):
 
     recorder.start_recording()
 
-    realtime_thread = threading.Thread(target=realtime_transcription_worker, daemon=True)
-    realtime_thread.start()
+    with realtime_state_lock:
+        realtime_thread = threading.Thread(target=realtime_transcription_worker, daemon=True)
+        realtime_thread.start()
 
-    correction_thread = threading.Thread(target=background_correction_worker, daemon=True)
-    correction_thread.start()
+        correction_thread = threading.Thread(target=background_correction_worker, daemon=True)
+        correction_thread.start()
 
     emit('recording_started', {
         'message': 'Recording started',
@@ -892,7 +936,9 @@ def handle_stop_realtime(data):
         emit('error', {'message': 'Not recording'})
         return
 
-    realtime_active = False
+    with realtime_state_lock:
+        realtime_active = False
+
     audio_path, duration = recorder.stop_recording()
 
     emit('recording_stopping', {'message': 'Processing and saving...'})
@@ -1922,6 +1968,346 @@ def format_srt_time(seconds):
     secs = int(seconds % 60)
     millis = int((seconds - int(seconds)) * 1000)
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+
+@app.route('/api/email/accounts', methods=['GET'])
+def get_email_accounts_route():
+    from email_service import get_email_accounts
+    from google_oauth import get_google_accounts
+    # Combine IMAP accounts with Google OAuth accounts
+    imap_accounts = get_email_accounts()
+    google_accounts = get_google_accounts()
+    return jsonify(imap_accounts + google_accounts)
+
+@app.route('/api/email/accounts', methods=['POST'])
+def add_email_account_route():
+    from email_service import add_email_account
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    email = data.get('email', '').strip()
+    password = data.get('password', '')
+    provider = data.get('provider', '')
+
+    if not email or not password or not provider:
+        return jsonify({'error': 'Email, password, and provider are required'}), 400
+
+    result = add_email_account(email, password, provider)
+    if result['success']:
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/email/accounts/<path:email>', methods=['DELETE'])
+def remove_email_account_route(email):
+    from email_service import remove_email_account
+    from google_oauth import remove_google_account, get_google_accounts
+
+    # Check if it's a Google OAuth account
+    google_accounts = [a['email'] for a in get_google_accounts()]
+    if email in google_accounts:
+        success = remove_google_account(email)
+    else:
+        success = remove_email_account(email)
+
+    if success:
+        return jsonify({'success': True})
+    return jsonify({'error': 'Account not found'}), 404
+
+@app.route('/api/email/folders/<path:email>', methods=['GET'])
+def get_email_folders_route(email):
+    from email_service import get_folders
+    result = get_folders(email)
+    if result['success']:
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/email/messages/<path:email>', methods=['GET'])
+def get_email_messages_route(email):
+    from email_service import fetch_emails
+    from google_oauth import get_google_accounts, fetch_gmail_messages
+
+    # Check if this is a Google OAuth account
+    google_accounts = [a['email'] for a in get_google_accounts()]
+    if email in google_accounts:
+        limit = request.args.get('limit', 20, type=int)
+        result = fetch_gmail_messages(email, limit)
+    else:
+        folder = request.args.get('folder', 'INBOX')
+        limit = request.args.get('limit', 20, type=int)
+        result = fetch_emails(email, folder, limit)
+
+    if result['success']:
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/email/message/<path:email>/<msg_id>', methods=['GET'])
+def get_email_detail_route(email, msg_id):
+    from email_service import get_email_detail
+    from google_oauth import get_google_accounts, get_gmail_message_detail
+
+    # Check if this is a Google OAuth account
+    google_accounts = [a['email'] for a in get_google_accounts()]
+    if email in google_accounts:
+        result = get_gmail_message_detail(email, msg_id)
+    else:
+        folder = request.args.get('folder', 'INBOX')
+        result = get_email_detail(email, msg_id, folder)
+
+    if result['success']:
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/email/send', methods=['POST'])
+def send_email_route():
+    from email_service import send_email
+    from google_oauth import get_google_accounts, send_gmail
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    from_email = data.get('from_email', data.get('from', '')).strip()
+    to_email = data.get('to_email', data.get('to', '')).strip()
+    subject = data.get('subject', '').strip()
+    body = data.get('body', '')
+
+    if not from_email or not to_email or not subject:
+        return jsonify({'error': 'From, to, and subject are required'}), 400
+
+    # Check if this is a Google OAuth account
+    google_accounts = [a['email'] for a in get_google_accounts()]
+    if from_email in google_accounts:
+        result = send_gmail(from_email, to_email, subject, body)
+    else:
+        result = send_email(from_email, to_email, subject, body)
+
+    if result['success']:
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/email/google/status', methods=['GET'])
+def google_oauth_status():
+    """Check Google OAuth configuration status."""
+    from google_oauth import get_oauth_status
+    return jsonify(get_oauth_status())
+
+@app.route('/api/email/google/auth', methods=['POST'])
+def start_google_auth():
+    """Start Google OAuth flow."""
+    from google_oauth import start_oauth_flow
+    result = start_oauth_flow()
+    return jsonify(result)
+
+@app.route('/api/email/google/callback', methods=['POST'])
+def complete_google_auth():
+    """Complete Google OAuth with authorization code (manual entry)."""
+    from google_oauth import complete_oauth_flow
+    data = request.get_json()
+    if not data or not data.get('code'):
+        return jsonify({'success': False, 'error': 'Authorization code required'}), 400
+    result = complete_oauth_flow(data['code'])
+    return jsonify(result)
+
+@app.route('/api/email/google/oauth-callback', methods=['GET'])
+def google_oauth_redirect_callback():
+    """Handle OAuth redirect from Google."""
+    from google_oauth import complete_oauth_flow
+
+    code = request.args.get('code')
+    error = request.args.get('error')
+
+    if error:
+        return f'''
+        <html><body style="font-family: -apple-system, sans-serif; text-align: center; padding: 50px;">
+            <h2 style="color: #d93025;">Authorization Failed</h2>
+            <p>Error: {error}</p>
+            <p>You can close this window and try again.</p>
+            <script>setTimeout(() => window.close(), 3000);</script>
+        </body></html>
+        '''
+
+    if not code:
+        return '''
+        <html><body style="font-family: -apple-system, sans-serif; text-align: center; padding: 50px;">
+            <h2 style="color: #d93025;">No Authorization Code</h2>
+            <p>No authorization code received from Google.</p>
+            <script>setTimeout(() => window.close(), 3000);</script>
+        </body></html>
+        '''
+
+    result = complete_oauth_flow(code)
+
+    if result.get('success'):
+        email = result.get('email', 'your account')
+        return f'''
+        <html><body style="font-family: -apple-system, sans-serif; text-align: center; padding: 50px;">
+            <h2 style="color: #34a853;">Successfully Connected!</h2>
+            <p>Connected: <strong>{email}</strong></p>
+            <p>You can close this window and return to Nexus.</p>
+            <script>
+                // Notify opener window
+                if (window.opener) {{
+                    window.opener.postMessage({{ type: 'google-oauth-success', email: '{email}' }}, '*');
+                }}
+                setTimeout(() => window.close(), 2000);
+            </script>
+        </body></html>
+        '''
+    else:
+        error_msg = result.get('error', 'Unknown error')
+        return f'''
+        <html><body style="font-family: -apple-system, sans-serif; text-align: center; padding: 50px;">
+            <h2 style="color: #d93025;">Connection Failed</h2>
+            <p>{error_msg}</p>
+            <p>Please close this window and try again.</p>
+            <script>setTimeout(() => window.close(), 5000);</script>
+        </body></html>
+        '''
+
+@app.route('/api/email/google/remove/<path:email>', methods=['DELETE'])
+def remove_google_account_route(email):
+    """Remove a Google OAuth account."""
+    from google_oauth import remove_google_account
+    success = remove_google_account(email)
+    return jsonify({'success': success})
+
+@app.route('/api/calendar/events', methods=['GET'])
+def get_calendar_events():
+    """Fetch events from Google Calendar (primary) or macOS Calendar (fallback)."""
+    from google_oauth import fetch_google_calendar_events, load_tokens
+    days = request.args.get('days', 14, type=int)
+    account = request.args.get('account')  # Optional: specific Google account
+
+    # Try Google Calendar first if user has connected a Google account
+    tokens = load_tokens()
+    if tokens:
+        result = fetch_google_calendar_events(days, account_email=account)
+        if result.get('success'):
+            return jsonify(result)
+        # If scope error, still return the error so user knows to re-auth
+        if result.get('error') == 'scope_needed':
+            return jsonify(result)
+
+    # Fall back to macOS calendar
+    from calendar_service import get_macos_calendar_events
+    result = get_macos_calendar_events(days)
+    return jsonify(result)
+
+@app.route('/api/calendar/macos', methods=['GET'])
+def get_macos_calendar():
+    """Fetch events from macOS Calendar app."""
+    from calendar_service import get_macos_calendar_events
+    days = request.args.get('days', 14, type=int)
+    result = get_macos_calendar_events(days)
+    return jsonify(result)
+
+@app.route('/api/calendar/list', methods=['GET'])
+def get_calendar_list():
+    """Get list of available macOS calendars."""
+    from calendar_service import get_calendars
+    result = get_calendars()
+    return jsonify(result)
+
+
+@app.route('/api/calendar/google/calendars', methods=['GET'])
+def get_google_calendars_route():
+    """Get list of Google calendars for an account."""
+    from google_oauth import get_google_calendars
+    account = request.args.get('account')
+    result = get_google_calendars(account_email=account)
+    return jsonify(result)
+
+
+@app.route('/api/calendar/events', methods=['POST'])
+def create_calendar_event():
+    """Create a new event in Google Calendar."""
+    from google_oauth import create_google_calendar_event
+    data = request.get_json()
+
+    if not data or not data.get('title') or not data.get('date'):
+        return jsonify({'success': False, 'error': 'Title and date are required'}), 400
+
+    result = create_google_calendar_event(
+        title=data['title'],
+        start_date=data['date'],
+        start_time=data.get('time'),
+        end_date=data.get('end_date'),
+        end_time=data.get('end_time'),
+        description=data.get('description'),
+        location=data.get('location'),
+        calendar_id=data.get('calendar_id', 'primary'),
+        account_email=data.get('account')
+    )
+
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+
+@app.route('/api/calendar/events/<event_id>', methods=['PUT'])
+def update_calendar_event(event_id):
+    """Update an existing event in Google Calendar."""
+    from google_oauth import update_google_calendar_event
+    data = request.get_json()
+
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    result = update_google_calendar_event(
+        event_id=event_id,
+        title=data.get('title'),
+        start_date=data.get('date'),
+        start_time=data.get('time'),
+        end_date=data.get('end_date'),
+        end_time=data.get('end_time'),
+        description=data.get('description'),
+        location=data.get('location'),
+        calendar_id=data.get('calendar_id', 'primary'),
+        account_email=data.get('account')
+    )
+
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+
+@app.route('/api/calendar/events/<event_id>', methods=['DELETE'])
+def delete_calendar_event(event_id):
+    """Delete an event from Google Calendar."""
+    from google_oauth import delete_google_calendar_event
+
+    calendar_id = request.args.get('calendar_id', 'primary')
+    account = request.args.get('account')
+
+    result = delete_google_calendar_event(
+        event_id=event_id,
+        calendar_id=calendar_id,
+        account_email=account
+    )
+
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+
+@app.route('/api/email/message/<path:email>/<msg_id>', methods=['DELETE'])
+def delete_email_message(email, msg_id):
+    """Delete an email message."""
+    from google_oauth import get_google_accounts, delete_gmail_message
+    from email_service import delete_email
+
+    permanent = request.args.get('permanent', 'false').lower() == 'true'
+
+    # Check if it's a Google OAuth account
+    google_accounts = [a['email'] for a in get_google_accounts()]
+    if email in google_accounts:
+        result = delete_gmail_message(email, msg_id, permanent=permanent)
+    else:
+        # For IMAP accounts, use the email_service
+        result = delete_email(email, msg_id)
+
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
 
 
 if __name__ == '__main__':
