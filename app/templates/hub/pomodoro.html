@@ -1,0 +1,76 @@
+{% extends "hub/base.html" %}
+
+{% block title %}Nexus - Pomodoro{% endblock %}
+
+{% block content %}
+<section class="widget glass-card widget-full pomodoro-widget">
+    <div class="widget-header" style="justify-content: center;">
+        <div style="text-align: center;">
+            <h2 class="widget-title" data-i18n="pomodoro_title">Pomodoro Timer</h2>
+            <span class="pomodoro-sessions" id="pomodoroSessions">0 sessions today</span>
+        </div>
+    </div>
+
+    <div class="pomodoro-display">
+        <svg class="pomodoro-ring" viewBox="0 0 100 100">
+            <circle class="ring-bg" cx="50" cy="50" r="45" fill="none" stroke-width="6"/>
+            <circle class="ring-progress" id="pomodoroRing" cx="50" cy="50" r="45" fill="none" stroke-width="6"
+                    stroke-dasharray="283" stroke-dashoffset="0" transform="rotate(-90 50 50)"/>
+        </svg>
+        <div class="pomodoro-time" id="pomodoroTime">25:00</div>
+        <div class="pomodoro-status" id="pomodoroStatus" data-i18n="ready">Ready</div>
+    </div>
+
+    <div class="pomodoro-controls">
+        <button class="pomodoro-btn" id="pomodoroStart" title="Start">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+        </button>
+        <button class="pomodoro-btn" id="pomodoroPause" title="Pause" style="display:none;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="4" width="4" height="16"></rect>
+                <rect x="14" y="4" width="4" height="16"></rect>
+            </svg>
+        </button>
+        <button class="pomodoro-btn" id="pomodoroReset" title="Reset">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                <path d="M3 3v5h5"></path>
+            </svg>
+        </button>
+    </div>
+</section>
+
+<!-- Timer Info -->
+<section class="widget glass-card">
+    <h2 class="widget-title" style="margin-bottom: 16px;" data-i18n="how_it_works">How it works</h2>
+    <div style="color: var(--text-secondary); line-height: 1.8;">
+        <p><strong>1.</strong> <span data-i18n="work_focus">Work for 25 minutes with full focus</span></p>
+        <p><strong>2.</strong> <span data-i18n="take_break">Take a 5-minute break</span></p>
+        <p><strong>3.</strong> <span data-i18n="repeat_track">Repeat and track your sessions</span></p>
+    </div>
+</section>
+
+<!-- Quick Settings -->
+<section class="widget glass-card">
+    <h2 class="widget-title" style="margin-bottom: 16px;" data-i18n="timer_settings">Timer Settings</h2>
+    <div class="form-group">
+        <label for="workDuration" data-i18n="work_duration">Work Duration (min)</label>
+        <input type="number" id="workDuration" min="1" max="60" value="25">
+    </div>
+    <div class="form-group" style="margin-bottom: 0;">
+        <label for="breakDuration" data-i18n="break_duration">Break Duration (min)</label>
+        <input type="number" id="breakDuration" min="1" max="30" value="5">
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        HubApp.initPomodoro();
+        HubApp.initEventListeners();
+    });
+</script>
+{% endblock %}

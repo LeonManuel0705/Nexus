@@ -1,13 +1,18 @@
 import os
+import json
 import threading
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Dict
+from pathlib import Path
 import re
 
-MLX_MODEL = "mlx-community/Qwen2.5-1.5B-Instruct-4bit"
-MAX_TOKENS = 200
+MLX_MODEL = "mlx-community/Qwen2.5-3B-Instruct-4bit"
+MAX_TOKENS = 300
 TEMPERATURE = 0.1
 REPETITION_PENALTY = 1.2
 USE_MLX_AI = True
+NUM_FEW_SHOT_EXAMPLES = 5
+
+LEARNING_DATA_DIR = Path(__file__).parent.parent / "learning_data"
 
 class AICorrector:
     def __init__(self):
@@ -18,6 +23,88 @@ class AICorrector:
         self._mlx_available = False
         self._language_tool = None
         self._lt_lang = None
+        self._training_pairs: List[Dict] = []
+        self._word_alignments: Dict = {}
+        self._load_training_data()
+
+    def _load_training_data(self):
+        try:
+            training_file = LEARNING_DATA_DIR / "training_pairs.jsonl"
+            if training_file.exists():
+                self._training_pairs = []
+                seen = set()
+                with open(training_file, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        if line.strip():
+                            pair = json.loads(line)
+                            key = (pair.get('incorrect', ''), pair.get('correct', ''))
+                            if key not in seen:
+                                seen.add(key)
+                                self._training_pairs.append(pair)
+                print(f"Loaded {len(self._training_pairs)} training pairs for few-shot learning")
+
+            alignments_file = LEARNING_DATA_DIR / "word_alignments.json"
+            if alignments_file.exists():
+                with open(alignments_file, 'r', encoding='utf-8') as f:
+                    self._word_alignments = json.load(f)
+                print(f"Loaded word alignments with {len(self._word_alignments.get('word_corrections', {}))} entries")
+        except Exception as e:
+            print(f"Failed to load training data: {e}")
+
+    def reload_training_data(self):
+        self._load_training_data()
+
+    def _find_similar_examples(self, text: str, n: int = NUM_FEW_SHOT_EXAMPLES) -> List[Dict]:
+        if not self._training_pairs:
+            return []
+
+        text_words = set(text.lower().split())
+        scored_pairs = []
+
+        for pair in self._training_pairs:
+            incorrect = pair.get('incorrect', '').lower()
+            incorrect_words = set(incorrect.split())
+
+            if not incorrect_words:
+                continue
+            intersection = len(text_words & incorrect_words)
+            union = len(text_words | incorrect_words)
+            similarity = intersection / union if union > 0 else 0
+
+            if incorrect in text.lower():
+                similarity += 0.5
+
+            if similarity > 0:
+                scored_pairs.append((similarity, pair))
+
+        scored_pairs.sort(key=lambda x: x[0], reverse=True)
+        return [pair for _, pair in scored_pairs[:n]]
+
+    def _apply_known_corrections(self, text: str) -> str:
+        if not self._word_alignments:
+            return text
+
+        word_corrections = self._word_alignments.get('word_corrections', {})
+        result = text
+
+        sorted_corrections = sorted(word_corrections.items(), key=lambda x: len(x[0]), reverse=True)
+
+        for incorrect, corrections in sorted_corrections:
+            if not corrections:
+                continue
+
+            if len(incorrect) < 5:
+                continue
+
+            best_correction, count = max(corrections.items(), key=lambda x: x[1])
+
+            if count < 2:
+                continue
+
+            pattern = re.compile(r'\b' + re.escape(incorrect) + r'\b', re.IGNORECASE)
+            result = pattern.sub(best_correction, result)
+
+        return result
 
     def _check_mlx_available(self) -> bool:
         try:
@@ -163,18 +250,46 @@ class AICorrector:
         return text
 
     def _build_prompt(self, text: str, subject: Optional[str], language: str) -> str:
+        examples = self._find_similar_examples(text)
+
         if language == "de":
+            system_msg = """Du bist ein Experte für die Korrektur von Sprachtranskriptionen.
+Deine Aufgabe ist es, fehlerhafte Transkriptionen zu korrigieren und dabei:
+- Falsch erkannte Wörter zu korrigieren
+- Grammatik und Satzstruktur zu verbessern
+- Den gemeinten Sinn beizubehalten
+- NUR den korrigierten Text auszugeben, keine Erklärungen"""
+
+            examples_text = ""
+            if examples:
+                examples_text = "\n\nBeispiele für Korrekturen:\n"
+                for ex in examples:
+                    examples_text += f"Falsch: {ex['incorrect']}\nRichtig: {ex['correct']}\n\n"
+
             prompt = f"""<|im_start|>system
-Du korrigierst Transkriptionen. Gib NUR den korrigierten Text aus.<|im_end|>
+{system_msg}{examples_text}<|im_end|>
 <|im_start|>user
-Korrigiere: {text}<|im_end|>
+Korrigiere diese Transkription: {text}<|im_end|>
 <|im_start|>assistant
 """
         else:
+            system_msg = """You are an expert at correcting speech transcriptions.
+Your task is to fix transcription errors by:
+- Correcting misrecognized words
+- Improving grammar and sentence structure
+- Preserving the intended meaning
+- Output ONLY the corrected text, no explanations"""
+
+            examples_text = ""
+            if examples:
+                examples_text = "\n\nExamples of corrections:\n"
+                for ex in examples:
+                    examples_text += f"Wrong: {ex['incorrect']}\nCorrect: {ex['correct']}\n\n"
+
             prompt = f"""<|im_start|>system
-You correct transcriptions. Output ONLY the corrected text.<|im_end|>
+{system_msg}{examples_text}<|im_end|>
 <|im_start|>user
-Fix: {text}<|im_end|>
+Fix this transcription: {text}<|im_end|>
 <|im_start|>assistant
 """
 
@@ -321,6 +436,8 @@ Fix: {text}<|im_end|>
 
         text = self._remove_fillers(text, language)
 
+        text = self._apply_known_corrections(text)
+
         if USE_MLX_AI and self._load_model() and self._mlx_available:
             prompt = self._build_prompt(text, subject, language)
             corrected = self._generate_with_mlx(prompt)
@@ -356,14 +473,18 @@ Fix: {text}<|im_end|>
     def get_status(self) -> dict:
         self._load_model()
 
+        training_info = f", {len(self._training_pairs)} training examples" if self._training_pairs else ""
+
         return {
             'mlx_available': self._mlx_available,
             'model': MLX_MODEL if self._mlx_available else None,
             'fallback': 'LanguageTool',
+            'training_pairs': len(self._training_pairs),
+            'word_corrections': len(self._word_alignments.get('word_corrections', {})),
             'message': (
-                'AI correction ready (MLX/Qwen2.5)'
+                f'AI correction ready (MLX/Qwen2.5-3B){training_info}'
                 if self._mlx_available
-                else 'Using LanguageTool (MLX requires Apple Silicon)'
+                else f'Using LanguageTool (MLX requires Apple Silicon){training_info}'
             )
         }
 

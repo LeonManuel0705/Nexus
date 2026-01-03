@@ -1,0 +1,61 @@
+{% extends "hub/base.html" %}
+
+{% block title %}Nexus - Bookmarks{% endblock %}
+
+{% block content %}
+<section class="widget glass-card widget-full">
+    <div class="widget-header">
+        <div>
+            <h2 class="widget-title" data-i18n="bookmarks">Bookmarks</h2>
+            <p class="widget-subtitle" data-i18n="bookmarks_subtitle">Your saved links</p>
+        </div>
+        <button class="add-btn small" id="addBookmarkBtn" title="Add bookmark">+</button>
+    </div>
+
+    <div class="bookmarks-list" id="bookmarksList"></div>
+</section>
+{% endblock %}
+
+{% block modals %}
+<!-- Bookmark Modal -->
+<div class="modal" id="bookmarkModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="bookmarkModalTitle" data-i18n="add_bookmark">Add Bookmark</h3>
+            <button class="modal-close" id="bookmarkModalClose">&times;</button>
+        </div>
+        <form id="bookmarkForm">
+            <div class="form-group">
+                <label for="bookmarkTitle" data-i18n="bookmark_title">Title</label>
+                <input type="text" id="bookmarkTitle" required>
+            </div>
+            <div class="form-group">
+                <label for="bookmarkUrl" data-i18n="bookmark_url">URL</label>
+                <input type="url" id="bookmarkUrl" placeholder="https://..." required>
+            </div>
+            <div class="form-group">
+                <label for="bookmarkCategory" data-i18n="category">Category</label>
+                <select id="bookmarkCategory">
+                    <option value="Work">Work</option>
+                    <option value="Personal">Personal</option>
+                    <option value="Dev">Dev</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" id="deleteBookmark" style="display: none;" data-i18n="delete">Delete</button>
+                <button type="submit" class="btn-primary" data-i18n="save">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        HubApp.initBookmarks();
+        HubApp.initEventListeners();
+    });
+</script>
+{% endblock %}

@@ -149,11 +149,9 @@ checkInitStatus();
 
 const i18n = {
     en: {
-        // Navbar
         navHome: 'Home',
         navFeatures: 'Features',
         navDocs: 'Docs',
-        // App
         folders: 'Folders',
         tags: 'Tags',
         allNotes: 'All Notes',
@@ -272,11 +270,9 @@ const i18n = {
         fillBothFields: 'Please fill both fields'
     },
     de: {
-        // Navbar
         navHome: 'Startseite',
         navFeatures: 'Funktionen',
         navDocs: 'Dokumentation',
-        // App
         folders: 'Ordner',
         tags: 'Tags',
         allNotes: 'Alle Notizen',
@@ -577,17 +573,17 @@ socket.on('recording_stopped', async (data) => {
         elements.liveTranscriptionContent.innerHTML = `<p style="color: var(--success)">${escapeHtml(data.final_text)}</p>`;
         showToast(t('noteSaved'), 'success');
         await loadNotes();
-        selectNote(data.note.id);
-
-        if (data.note && data.final_text && data.final_text.length > 20) {
-            setTimeout(() => {
-                showFeedbackModal(data.note.id, data.final_text);
-            }, 1000);
-        }
+        await selectNote(data.note.id);
 
         setTimeout(() => {
             elements.liveTranscriptionContent.innerHTML = `<p class="placeholder">${t('startRecording')}</p>`;
         }, 2000);
+
+        if (data.note && data.final_text && data.final_text.length > 20) {
+            setTimeout(() => {
+                showFeedbackModal(data.note.id, data.final_text);
+            }, 1500);
+        }
     } else {
         elements.liveTranscriptionContent.innerHTML = `<p style="color: var(--danger)">${data.message || t('noSpeech')}</p>`;
         setTimeout(() => {
@@ -796,17 +792,24 @@ async function deleteFolder(folderId) {
 
 async function loadNotes() {
     let data;
-    if (state.searchQuery) {
-        data = await api(`/api/notes/search?q=${encodeURIComponent(state.searchQuery)}`);
-    } else if (state.currentFolder !== null) {
-        data = await api(`/api/notes?folder_id=${state.currentFolder}`);
-    } else {
-        data = await api('/api/notes');
+    try {
+        if (state.searchQuery) {
+            data = await api(`/api/notes/search?q=${encodeURIComponent(state.searchQuery)}`);
+        } else if (state.currentFolder !== null) {
+            data = await api(`/api/notes?folder_id=${state.currentFolder}`);
+        } else {
+            data = await api('/api/notes');
+        }
+        state.notes = data.notes || [];
+        console.log('Loaded notes:', state.notes.length, state.notes);
+        renderNotes();
+        const noteWord = state.notes.length === 1 ? t('note') : t('notes');
+        elements.noteCount.textContent = `${state.notes.length} ${noteWord}`;
+    } catch (err) {
+        console.error('Error loading notes:', err);
+        state.notes = [];
+        renderNotes();
     }
-    state.notes = data.notes;
-    renderNotes();
-    const noteWord = state.notes.length === 1 ? t('note') : t('notes');
-    elements.noteCount.textContent = `${state.notes.length} ${noteWord}`;
 }
 
 function renderNotes() {
@@ -888,10 +891,18 @@ async function deleteSelectedNotes() {
 }
 
 async function selectNote(noteId) {
-    const data = await api(`/api/notes/${noteId}`);
-    state.currentNote = data.note;
-    renderNotes();
-    showNoteDetail();
+    try {
+        const data = await api(`/api/notes/${noteId}`);
+        if (data && data.note) {
+            state.currentNote = data.note;
+            renderNotes();
+            showNoteDetail();
+        } else {
+            console.error('Failed to load note:', noteId, data);
+        }
+    } catch (err) {
+        console.error('Error selecting note:', err);
+    }
 }
 
 function showNoteDetail() {

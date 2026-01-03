@@ -24,7 +24,7 @@
             </p>
             <div class="hero-buttons">
                 <a href="/app" class="btn btn-primary btn-large" data-translate="getStarted">Get Started</a>
-                <a href="/app/features" class="btn btn-secondary btn-large" data-translate="learnMore">Learn More</a>
+                <a href="/info/features" class="btn btn-secondary btn-large" data-translate="learnMore">Learn More</a>
             </div>
         </div>
         <div class="hero-visual">
@@ -295,7 +295,6 @@
         }
     }
 
-    // Update language when changed
     const observer = new MutationObserver(function(mutations) {
         mutations.forEach(function(mutation) {
             if (mutation.attributeName === 'data-lang') {
@@ -310,7 +309,6 @@
     });
     observer.observe(document.body, { attributes: true });
 
-    // Start with a random phrase
     currentPhraseIndex = getNextPhraseIndex();
     setTimeout(typeText, 1000);
 })();

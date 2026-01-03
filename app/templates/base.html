@@ -64,11 +64,11 @@
             </a>
 
             <div class="navbar-links">
-                <a href="/" class="nav-link {% if active_page == 'home' %}active{% endif %}" data-translate="home">Home</a>
-                <a href="/app/features" class="nav-link {% if active_page == 'features' %}active{% endif %}" data-translate="features">Features</a>
-                <a href="/app/how-it-works" class="nav-link {% if active_page == 'how-it-works' %}active{% endif %}" data-translate="howItWorks">How it Works</a>
-                <a href="/app/docs" class="nav-link {% if active_page == 'docs' %}active{% endif %}" data-translate="docs">Docs</a>
-                <a href="/app/about" class="nav-link {% if active_page == 'about' %}active{% endif %}" data-translate="about">About</a>
+                <a href="/app/info" class="nav-link {% if active_page == 'home' %}active{% endif %}" data-translate="home">Home</a>
+                <a href="/app/info/features" class="nav-link {% if active_page == 'features' %}active{% endif %}" data-translate="features">Features</a>
+                <a href="/app/info/how-it-works" class="nav-link {% if active_page == 'how-it-works' %}active{% endif %}" data-translate="howItWorks">How it Works</a>
+                <a href="/app/info/docs" class="nav-link {% if active_page == 'docs' %}active{% endif %}" data-translate="docs">Docs</a>
+                <a href="/app/info/about" class="nav-link {% if active_page == 'about' %}active{% endif %}" data-translate="about">About</a>
             </div>
 
             <div class="navbar-actions">
@@ -102,11 +102,11 @@
     </nav>
 
     <div class="mobile-menu" id="mobileMenu">
-        <a href="/" class="nav-link" data-translate="home">Home</a>
-        <a href="/app/features" class="nav-link" data-translate="features">Features</a>
-        <a href="/app/how-it-works" class="nav-link" data-translate="howItWorks">How it Works</a>
-        <a href="/app/docs" class="nav-link" data-translate="docs">Docs</a>
-        <a href="/app/about" class="nav-link" data-translate="about">About</a>
+        <a href="/app/info" class="nav-link" data-translate="home">Home</a>
+        <a href="/app/info/features" class="nav-link" data-translate="features">Features</a>
+        <a href="/app/info/how-it-works" class="nav-link" data-translate="howItWorks">How it Works</a>
+        <a href="/app/info/docs" class="nav-link" data-translate="docs">Docs</a>
+        <a href="/app/info/about" class="nav-link" data-translate="about">About</a>
         <a href="/app" class="btn btn-primary mt-2" style="width: 100%;" data-translate="openApp">Open App</a>
     </div>
 
@@ -118,7 +118,7 @@
         <div class="footer-container">
             <div class="footer-content">
                 <div class="footer-brand">
-                    <a href="/" class="footer-logo">
+                    <a href="/app/info" class="footer-logo">
                         <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 24px; height: 24px; color: var(--accent);">
                             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
                             <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
@@ -132,22 +132,22 @@
                 <div class="footer-links">
                     <h4 data-translate="product">Product</h4>
                     <ul>
-                        <li><a href="/app/features" data-translate="features">Features</a></li>
-                        <li><a href="/app/how-it-works" data-translate="howItWorks">How it Works</a></li>
+                        <li><a href="/app/info/features" data-translate="features">Features</a></li>
+                        <li><a href="/app/info/how-it-works" data-translate="howItWorks">How it Works</a></li>
                         <li><a href="/app" data-translate="openApp">Open App</a></li>
                     </ul>
                 </div>
                 <div class="footer-links">
                     <h4 data-translate="resources">Resources</h4>
                     <ul>
-                        <li><a href="/app/docs" data-translate="documentation">Documentation</a></li>
-                        <li><a href="/app/about" data-translate="about">About</a></li>
+                        <li><a href="/app/info/docs" data-translate="documentation">Documentation</a></li>
+                        <li><a href="/app/info/about" data-translate="about">About</a></li>
                     </ul>
                 </div>
                 <div class="footer-links">
                     <h4 data-translate="legal">Legal</h4>
                     <ul>
-                        <li><a href="/app/terms" data-translate="terms">Terms of Use</a></li>
+                        <li><a href="/app/info/terms" data-translate="terms">Terms of Use</a></li>
                     </ul>
                 </div>
             </div>
@@ -163,17 +163,14 @@
         const mobileMenu = document.getElementById('mobileMenu');
         const navbar = document.getElementById('navbar');
 
-        // i18n translations for website
         const siteI18n = {
             en: {
-                // Navbar
                 home: 'Home',
                 features: 'Features',
                 howItWorks: 'How it Works',
                 docs: 'Docs',
                 about: 'About',
                 openApp: 'Open App',
-                // Footer
                 product: 'Product',
                 resources: 'Resources',
                 legal: 'Legal',
@@ -182,7 +179,6 @@
                 terms: 'Terms',
                 footerDesc: 'AI-powered voice transcription that works completely offline. Your privacy, your data.',
                 copyright: '© 2025 VoiceNotes. All rights reserved.',
-                // Home page
                 heroBadge: '100% Offline & Private',
                 heroTitle: 'Record. Transcribe. Remember.',
                 heroSubtitle: 'AI-powered voice transcription that works completely offline. Capture lectures, meetings, and ideas with real-time transcription and intelligent grammar correction.',
@@ -216,7 +212,6 @@
                 researchersDesc: 'Document interviews and observations accurately. Export to your preferred format for analysis.',
                 ctaTitle: 'Ready to capture your ideas?',
                 ctaDesc: 'Start transcribing with AI-powered accuracy. No account needed, completely free.',
-                // Features page
                 featuresPageTitle: 'Powerful Features',
                 featuresPageDesc: 'Everything you need for professional voice transcription, built with privacy in mind.',
                 realtimeTranscription: 'Real-time Transcription',
@@ -241,7 +236,6 @@
                 readyToTryDesc: 'All features are free and work completely offline.',
                 legalNotice: 'Legal Notice',
                 voiceFilterLegal: '* Voice Filter / Recording: Recording audio of other individuals may require their explicit consent depending on your jurisdiction. It is the user\'s sole responsibility to ensure compliance with all applicable laws and regulations regarding audio recording, including but not limited to two-party consent laws. The creator of VoiceNotes is not liable for any misuse of this feature.',
-                // About page
                 aboutTitle: 'About VoiceNotes',
                 aboutSubtitle: 'Built for privacy, designed for productivity.',
                 ourMission: 'Our Mission',
@@ -278,7 +272,6 @@
                 limitationLiabilityDesc: 'The creator of VoiceNotes shall not be held liable for any direct, indirect, incidental, consequential, or punitive damages arising from the use or misuse of this software. This includes, but is not limited to, any illegal activities conducted using this software. Users are solely responsible for ensuring their use complies with all applicable laws and regulations.',
                 noWarranty: 'No Warranty:',
                 noWarrantyDesc: 'This software is provided "as is" without warranty of any kind, express or implied. The creator makes no guarantees regarding the accuracy, reliability, or availability of the transcription service.',
-                // How it Works page
                 howItWorksPageTitle: 'How It Works',
                 howItWorksPageDesc: 'From speech to text in seconds, powered by state-of-the-art AI running entirely on your device.',
                 captureVoice: 'Capture Your Voice',
@@ -308,13 +301,11 @@
                 multipleExportFormats: 'Multiple export formats',
                 seeItInAction: 'See it in action',
                 seeItInActionDesc: 'Try VoiceNotes now and experience seamless voice transcription.',
-                // How it Works page - AI Intelligence
                 aiIntelligence: 'AI Intelligence',
                 aiIntelligenceDesc: 'Your notes are automatically analyzed by AI. Get instant summaries, detect topics, and let the system auto-tag your notes based on content.',
                 autoSummarization: 'Automatic summarization',
                 topicDetection: 'Topic detection (16 subjects)',
                 autoTagging: 'Smart auto-tagging',
-                // Features page - New features
                 aiSummarization: 'AI Summarization',
                 aiSummarizationDesc: 'Get instant AI-generated summaries of your notes. Extract key points and main ideas from long transcriptions with a single click.',
                 topicDetectionFeature: 'Topic Detection',
@@ -325,10 +316,8 @@
                 fileUploadFeatureDesc: 'Upload existing audio and video files for transcription. Supports MP3, MP4, WAV, M4A, FLAC, OGG, and WebM formats with optional SRT subtitle generation.',
                 customVocabFeature: 'Custom Vocabulary',
                 customVocabFeatureDesc: 'Train VoiceNotes to recognize specialized terms, names, and abbreviations. Add custom word corrections to improve transcription accuracy for your specific domain.',
-                // About page - AI Intelligence
                 aiIntelligenceAbout: 'AI Intelligence',
                 aiIntelligenceAboutDesc: 'Automatic summarization, topic detection across 16 subjects, and smart auto-tagging. All powered by local AI models.',
-                // Docs page
                 docsTitle: 'Documentation',
                 docsDesc: 'Everything you need to know to get started with VoiceNotes.',
                 gettingStarted: 'Getting Started',
@@ -388,29 +377,24 @@
                 modelsNotLoadingDesc: 'Run ./setup_offline.sh to download all required models. Make sure you have enough disk space.',
                 portInUse: 'Port already in use',
                 portInUseDesc: 'If port 5050 is already in use, stop any other applications using that port or modify the port in app.py.',
-                // Docs page - Quick Start steps
                 quickStartStep1: 'Launch VoiceNotes by running ./start.sh in your terminal',
                 quickStartStep2: 'Open your browser to http://localhost:5050',
                 quickStartStep3: 'Wait for the models to initialize (first launch may take a few minutes)',
                 quickStartStep4: 'Select your language (English or German)',
                 quickStartStep5: 'Click the record button and start speaking',
-                // Docs page - System requirements
                 reqOS: 'macOS, Windows, or Linux',
                 reqPython: 'Python 3.9 or higher',
                 reqRAM: '4GB RAM minimum (8GB recommended)',
                 reqDisk: '2GB free disk space for models',
-                // Docs page - Download items
                 downloadWhisper: 'Whisper speech recognition models (~650MB)',
                 downloadLT: 'LanguageTool language data (~350MB)',
                 downloadSpeaker: 'Speaker recognition model (~80MB)',
                 downloadMLX: 'MLX AI model for Apple Silicon (~500MB)',
-                // Docs page - Profile steps
                 profileStep1: 'Click the voice filter button (person icon)',
                 profileStep2: 'Click "Create New Profile"',
                 profileStep3: 'Enter a name for the profile (e.g., "Professor Smith")',
                 profileStep4: 'Record a 30-second sample of the person speaking',
                 profileStep5: 'Click "Save Profile"',
-                // Terms of Use page
                 termsTitle: 'Terms of Use',
                 termsSubtitle: 'Please read these terms carefully before using VoiceNotes',
                 termsAcceptance: '1. Acceptance of Terms',
@@ -482,14 +466,12 @@
                 termsLastUpdated: 'Last Updated: December 2025'
             },
             de: {
-                // Navbar
                 home: 'Startseite',
                 features: 'Funktionen',
                 howItWorks: 'So funktioniert es',
                 docs: 'Dokumentation',
                 about: 'Über uns',
                 openApp: 'App öffnen',
-                // Footer
                 product: 'Produkt',
                 resources: 'Ressourcen',
                 legal: 'Rechtliches',
@@ -498,7 +480,6 @@
                 terms: 'Nutzungsbedingungen',
                 footerDesc: 'KI-gestützte Sprachtranskription, die vollständig offline funktioniert. Deine Privatsphäre, deine Daten.',
                 copyright: '© 2025 VoiceNotes. Alle Rechte vorbehalten.',
-                // Home page
                 heroBadge: '100% Offline & Privat',
                 heroTitle: 'Aufnehmen. Transkribieren. Erinnern.',
                 heroSubtitle: 'KI-gestützte Sprachtranskription, die vollständig offline funktioniert. Erfasse Vorlesungen, Meetings und Ideen mit Echtzeit-Transkription und intelligenter Grammatikkorrektur.',
@@ -532,7 +513,6 @@
                 researchersDesc: 'Dokumentiere Interviews und Beobachtungen präzise. Exportiere in dein bevorzugtes Format zur Analyse.',
                 ctaTitle: 'Bereit, deine Ideen festzuhalten?',
                 ctaDesc: 'Starte mit KI-gestützter Genauigkeit zu transkribieren. Kein Konto nötig, komplett kostenlos.',
-                // Features page
                 featuresPageTitle: 'Leistungsstarke Funktionen',
                 featuresPageDesc: 'Alles was du für professionelle Sprachtranskription brauchst, entwickelt mit Fokus auf Privatsphäre.',
                 realtimeTranscription: 'Echtzeit-Transkription',
@@ -557,7 +537,6 @@
                 readyToTryDesc: 'Alle Funktionen sind kostenlos und funktionieren vollständig offline.',
                 legalNotice: 'Rechtlicher Hinweis',
                 voiceFilterLegal: '* Stimmenfilter / Aufnahme: Die Aufnahme von Audio anderer Personen kann je nach Rechtsordnung deren ausdrückliche Zustimmung erfordern. Es liegt in der alleinigen Verantwortung des Nutzers, die Einhaltung aller geltenden Gesetze und Vorschriften bezüglich Audioaufnahmen sicherzustellen. Der Ersteller von VoiceNotes haftet nicht für Missbrauch dieser Funktion.',
-                // About page
                 aboutTitle: 'Über VoiceNotes',
                 aboutSubtitle: 'Entwickelt für Privatsphäre, gestaltet für Produktivität.',
                 ourMission: 'Unsere Mission',
@@ -594,7 +573,6 @@
                 limitationLiabilityDesc: 'Der Ersteller von VoiceNotes haftet nicht für direkte, indirekte, zufällige, Folge- oder Strafschäden, die aus der Nutzung oder dem Missbrauch dieser Software entstehen. Dies schließt unter anderem illegale Aktivitäten ein, die mit dieser Software durchgeführt werden. Nutzer sind allein dafür verantwortlich, sicherzustellen, dass ihre Nutzung allen geltenden Gesetzen und Vorschriften entspricht.',
                 noWarranty: 'Keine Gewährleistung:',
                 noWarrantyDesc: 'Diese Software wird „wie sie ist" ohne jegliche ausdrückliche oder stillschweigende Gewährleistung bereitgestellt. Der Entwickler übernimmt keine Gewähr für die Genauigkeit, Zuverlässigkeit oder Verfügbarkeit des Transkriptionsdienstes.',
-                // How it Works page
                 howItWorksPageTitle: 'So funktioniert es',
                 howItWorksPageDesc: 'Von Sprache zu Text in Sekunden, angetrieben von modernster KI, die vollständig auf deinem Gerät läuft.',
                 captureVoice: 'Nimm deine Stimme auf',
@@ -624,13 +602,11 @@
                 multipleExportFormats: 'Mehrere Exportformate',
                 seeItInAction: 'Sieh es in Aktion',
                 seeItInActionDesc: 'Probiere VoiceNotes jetzt aus und erlebe nahtlose Sprachtranskription.',
-                // How it Works page - AI Intelligence
                 aiIntelligence: 'KI-Intelligenz',
                 aiIntelligenceDesc: 'Deine Notizen werden automatisch von KI analysiert. Erhalte sofortige Zusammenfassungen, erkenne Themen und lass das System deine Notizen basierend auf dem Inhalt automatisch taggen.',
                 autoSummarization: 'Automatische Zusammenfassung',
                 topicDetection: 'Themenerkennung (16 Fächer)',
                 autoTagging: 'Intelligentes Auto-Tagging',
-                // Features page - New features
                 aiSummarization: 'KI-Zusammenfassung',
                 aiSummarizationDesc: 'Erhalte sofortige KI-generierte Zusammenfassungen deiner Notizen. Extrahiere Kernpunkte und Hauptideen aus langen Transkriptionen mit einem Klick.',
                 topicDetectionFeature: 'Themenerkennung',
@@ -641,10 +617,8 @@
                 fileUploadFeatureDesc: 'Lade bestehende Audio- und Videodateien zur Transkription hoch. Unterstützt MP3, MP4, WAV, M4A, FLAC, OGG und WebM mit optionaler SRT-Untertitelgenerierung.',
                 customVocabFeature: 'Eigenes Vokabular',
                 customVocabFeatureDesc: 'Trainiere VoiceNotes, spezialisierte Begriffe, Namen und Abkürzungen zu erkennen. Füge benutzerdefinierte Wortkorrekturen hinzu, um die Transkriptionsgenauigkeit für deinen Fachbereich zu verbessern.',
-                // About page - AI Intelligence
                 aiIntelligenceAbout: 'KI-Intelligenz',
                 aiIntelligenceAboutDesc: 'Automatische Zusammenfassung, Themenerkennung über 16 Fächer und intelligentes Auto-Tagging. Alles von lokalen KI-Modellen angetrieben.',
-                // Docs page
                 docsTitle: 'Dokumentation',
                 docsDesc: 'Alles was du wissen musst, um mit VoiceNotes zu starten.',
                 gettingStarted: 'Erste Schritte',
@@ -704,29 +678,24 @@
                 modelsNotLoadingDesc: 'Führe ./setup_offline.sh aus, um alle erforderlichen Modelle herunterzuladen. Stelle sicher, dass du genügend Speicherplatz hast.',
                 portInUse: 'Port bereits in Verwendung',
                 portInUseDesc: 'Wenn Port 5050 bereits verwendet wird, beende andere Anwendungen, die diesen Port nutzen, oder ändere den Port in app.py.',
-                // Docs page - Quick Start steps
                 quickStartStep1: 'Starte VoiceNotes, indem du ./start.sh in deinem Terminal ausführst',
                 quickStartStep2: 'Öffne deinen Browser unter http://localhost:5050',
                 quickStartStep3: 'Warte, bis die Modelle initialisiert sind (erster Start kann einige Minuten dauern)',
                 quickStartStep4: 'Wähle deine Sprache (Englisch oder Deutsch)',
                 quickStartStep5: 'Klicke auf den Aufnahme-Button und beginne zu sprechen',
-                // Docs page - System requirements
                 reqOS: 'macOS, Windows oder Linux',
                 reqPython: 'Python 3.9 oder höher',
                 reqRAM: 'Mindestens 4GB RAM (8GB empfohlen)',
                 reqDisk: '2GB freier Speicherplatz für Modelle',
-                // Docs page - Download items
                 downloadWhisper: 'Whisper Spracherkennungsmodelle (~650MB)',
                 downloadLT: 'LanguageTool Sprachdaten (~350MB)',
                 downloadSpeaker: 'Sprechererkennungsmodell (~80MB)',
                 downloadMLX: 'MLX KI-Modell für Apple Silicon (~500MB)',
-                // Docs page - Profile steps
                 profileStep1: 'Klicke auf den Stimmenfilter-Button (Personen-Symbol)',
                 profileStep2: 'Klicke auf "Neues Profil erstellen"',
                 profileStep3: 'Gib einen Namen für das Profil ein (z.B. "Professor Müller")',
                 profileStep4: 'Nimm eine 30-Sekunden-Probe der sprechenden Person auf',
                 profileStep5: 'Klicke auf "Profil speichern"',
-                // Terms of Use page
                 termsTitle: 'Nutzungsbedingungen',
                 termsSubtitle: 'Bitte lies diese Bedingungen sorgfältig durch, bevor du VoiceNotes verwendest',
                 termsAcceptance: '1. Annahme der Bedingungen',
@@ -807,7 +776,6 @@
                 btn.classList.toggle('active', btn.dataset.siteLang === lang);
             });
 
-            // Update translatable elements
             document.querySelectorAll('[data-translate]').forEach(el => {
                 const key = el.getAttribute('data-translate');
                 if (siteI18n[lang][key]) {
@@ -830,34 +798,28 @@
             }
         }
 
-        // Initialize theme
         const savedTheme = localStorage.getItem('voicenotes_theme') || 'light';
         setTheme(savedTheme);
 
-        // Initialize language
         const savedLang = localStorage.getItem('voicenotes_site_lang') || 'en';
         setSiteLanguage(savedLang);
 
-        // Theme toggle
         themeToggle.addEventListener('click', () => {
             const current = document.body.getAttribute('data-theme');
             setTheme(current === 'dark' ? 'light' : 'dark');
         });
 
-        // Language toggle
         document.querySelectorAll('[data-site-lang]').forEach(btn => {
             btn.addEventListener('click', () => {
                 setSiteLanguage(btn.dataset.siteLang);
             });
         });
 
-        // Mobile menu
         mobileMenuBtn.addEventListener('click', () => {
             mobileMenuBtn.classList.toggle('active');
             mobileMenu.classList.toggle('active');
         });
 
-        // Scroll effects
         window.addEventListener('scroll', () => {
             if (window.scrollY > 10) {
                 navbar.classList.add('scrolled');
