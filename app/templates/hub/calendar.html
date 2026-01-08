@@ -1,90 +1,215 @@
 {% extends "hub/base.html" %}
+{% set active_tab = 'calendar' %}
 
-{% block title %}Nexus - Calendar{% endblock %}
+{% block title %}Kalender - Nexus{% endblock %}
 
 {% block content %}
-<section class="widget glass-card widget-full">
-    <div class="widget-header">
+<div class="page-container" style="max-width: 1100px;">
+    <div class="page-header">
         <div>
-            <h2 class="widget-title" data-i18n="calendar">Calendar</h2>
-            <p class="widget-subtitle" data-i18n="calendar_subtitle">Your schedule at a glance</p>
+            <h1 class="page-title">Kalender</h1>
+            <p class="page-subtitle">Deine Termine im Überblick</p>
         </div>
-        <div class="calendar-controls">
-            <select id="calendarAccountSelect" class="account-select" title="Select Google Account">
-                <option value="">Loading...</option>
+        <div class="page-actions">
+            <select id="calendarAccountSelect" class="account-select" title="Kalender-Account">
+                <option value="">Laden...</option>
             </select>
-            <div class="calendar-nav">
-                <button id="prevMonth" title="Previous month">&lt;</button>
-                <span id="calendarMonth">Month Year</span>
-                <button id="nextMonth" title="Next month">&gt;</button>
+            <button class="add-btn small" onclick="openAddCalendarAccountModal()" title="Kalender-Account hinzufügen">+</button>
+            <button class="btn-primary" onclick="openAddEventModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Termin
+            </button>
+        </div>
+    </div>
+
+    <div class="filter-tabs">
+        <button class="filter-tab active" data-filter="all" onclick="setCalendarFilter('all')">Alle</button>
+        <button class="filter-tab" data-filter="school" onclick="setCalendarFilter('school')">Schule</button>
+        <button class="filter-tab" data-filter="training" onclick="setCalendarFilter('training')">Training</button>
+        <button class="filter-tab" data-filter="personal" onclick="setCalendarFilter('personal')">Privat</button>
+        <button class="filter-tab" data-filter="holiday" onclick="setCalendarFilter('holiday')">Feiertage</button>
+        <button class="filter-tab" data-filter="iserv" onclick="setCalendarFilter('iserv')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
+                <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+                <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+            </svg>
+            IServ
+        </button>
+    </div>
+
+    <div class="calendar-layout">
+        
+        <section class="widget glass-card calendar-widget">
+            <div class="widget-header">
+                <div class="calendar-nav">
+                    <button onclick="changeMonth(-1)" title="Vorheriger Monat">&lt;</button>
+                    <span id="calendarMonth">Monat Jahr</span>
+                    <button onclick="changeMonth(1)" title="Nächster Monat">&gt;</button>
+                </div>
+                <button class="icon-btn" onclick="goToToday()" title="Heute">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                </button>
             </div>
-        </div>
-    </div>
 
-    <div class="calendar-grid" id="calendarGrid"></div>
+            <div class="calendar-grid">
+                <div class="calendar-weekdays">
+                    <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
+                </div>
+                <div class="calendar-days" id="calendarDays"></div>
+            </div>
+        </section>
 
-    <div class="calendar-events" id="calendarEvents">
-        <div class="events-header">
-            <h3 data-i18n="upcoming_events">Upcoming Events</h3>
-            <button class="add-btn small" id="addEventBtn" title="Add event">+</button>
-        </div>
-        <div class="events-list" id="eventsList"></div>
+        <section class="widget glass-card events-widget">
+            <div class="widget-header">
+                <h3 id="eventsTitle">Heute</h3>
+                <span class="event-count" id="eventCount">0 Termine</span>
+            </div>
+            <div class="events-list" id="eventsList">
+                <div class="empty-state">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <span>Keine Termine</span>
+                </div>
+            </div>
+        </section>
     </div>
-</section>
+</div>
 {% endblock %}
 
 {% block modals %}
-<!-- Event Modal -->
+
 <div class="modal" id="eventModal">
     <div class="modal-content">
         <div class="modal-header">
-            <h3 id="eventModalTitle" data-i18n="add_event">Add Event</h3>
-            <button class="modal-close" id="eventModalClose">&times;</button>
+            <h3 id="eventModalTitle">Neuer Termin</h3>
+            <button class="modal-close" onclick="closeModal('eventModal')">&times;</button>
         </div>
-        <form id="eventForm">
+        <form id="eventForm" onsubmit="saveEvent(event)">
+            <input type="hidden" id="eventId" name="id">
+            <input type="hidden" id="eventCalendarId" name="calendar_id">
             <div class="form-group">
-                <label for="eventTitle" data-i18n="event_title">Title</label>
-                <input type="text" id="eventTitle" required>
+                <label for="eventTitle">Titel</label>
+                <input type="text" id="eventTitle" name="title" placeholder="Termin-Titel" required>
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label for="eventDate" data-i18n="date">Date</label>
-                    <input type="date" id="eventDate" required>
+                    <label for="eventDate">Datum</label>
+                    <input type="date" id="eventDate" name="start_date" required>
                 </div>
                 <div class="form-group">
-                    <label for="eventTime" data-i18n="time">Time</label>
-                    <input type="time" id="eventTime">
+                    <label for="eventTime">Uhrzeit</label>
+                    <input type="time" id="eventTime" name="start_time">
                 </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label for="eventEndDate" data-i18n="end_date">End Date</label>
-                    <input type="date" id="eventEndDate">
+                    <label for="eventEndDate">Ende Datum</label>
+                    <input type="date" id="eventEndDate" name="end_date">
                 </div>
                 <div class="form-group">
-                    <label for="eventEndTime" data-i18n="end_time">End Time</label>
-                    <input type="time" id="eventEndTime">
+                    <label for="eventEndTime">Ende Uhrzeit</label>
+                    <input type="time" id="eventEndTime" name="end_time">
                 </div>
             </div>
             <div class="form-group">
-                <label for="eventLocation" data-i18n="location">Location</label>
-                <input type="text" id="eventLocation" placeholder="Add location">
-            </div>
-            <div class="form-group">
-                <label for="eventCalendar" data-i18n="calendar_select">Calendar</label>
-                <select id="eventCalendar">
-                    <option value="primary">Primary Calendar</option>
+                <label for="eventCategory">Kategorie</label>
+                <select id="eventCategory" name="category">
+                    <option value="personal">Privat</option>
+                    <option value="school">Schule</option>
+                    <option value="training">Training</option>
+                    <option value="work">Arbeit</option>
                 </select>
             </div>
             <div class="form-group">
-                <label for="eventDescription" data-i18n="description">Description</label>
-                <textarea id="eventDescription" rows="3"></textarea>
+                <label for="eventLocation">Ort</label>
+                <input type="text" id="eventLocation" name="location" placeholder="Ort hinzufügen">
+            </div>
+            <div class="form-group">
+                <label for="eventDescription">Beschreibung</label>
+                <textarea id="eventDescription" name="description" rows="3" placeholder="Notizen..."></textarea>
             </div>
             <div class="form-actions">
-                <button type="button" class="btn-secondary btn-danger" id="deleteEvent" style="display: none;" data-i18n="delete">Delete</button>
-                <button type="submit" class="btn-primary" data-i18n="save">Save</button>
+                <button type="button" class="btn-secondary btn-danger" id="deleteEventBtn" style="display: none;" onclick="deleteEvent()">Löschen</button>
+                <button type="submit" class="btn-primary">Speichern</button>
             </div>
-            <div id="eventError" class="form-error" style="display: none;"></div>
+        </form>
+    </div>
+</div>
+
+<div class="modal" id="routeModal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h3 id="routeModalTitle">Route planen</h3>
+            <button class="modal-close" onclick="closeModal('routeModal')">&times;</button>
+        </div>
+        <div class="route-content">
+            <div class="route-info">
+                <div class="route-event-info" id="routeEventInfo"></div>
+                <div class="route-location-status" id="locationStatus">
+                    <svg class="spinner" width="16" height="16" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" opacity="0.3"/>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="2" fill="none"/>
+                    </svg>
+                    <span>Standort wird ermittelt...</span>
+                </div>
+            </div>
+            <div class="route-results" id="routeResults">
+                <div class="empty-state">
+                    <span>Warte auf Standort...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="addCalendarAccountModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Kalender-Account hinzufügen</h3>
+            <button class="modal-close" onclick="closeModal('addCalendarAccountModal')">&times;</button>
+        </div>
+        <form id="addCalendarAccountForm" onsubmit="addCalendarAccount(event)">
+            <div class="form-group">
+                <label for="calAccountProvider">Anbieter</label>
+                <select id="calAccountProvider" name="provider" onchange="updateCalendarProviderFields()">
+                    <option value="samsung">Samsung Calendar</option>
+                    <option value="icloud">Apple iCloud</option>
+                    <option value="caldav">Anderer CalDAV</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="calAccountName">Name (optional)</label>
+                <input type="text" id="calAccountName" name="name" placeholder="z.B. Samsung Privat">
+            </div>
+            <div class="form-group">
+                <label for="calAccountUsername">Benutzername / E-Mail</label>
+                <input type="text" id="calAccountUsername" name="username" required placeholder="email@example.com">
+            </div>
+            <div class="form-group">
+                <label for="calAccountPassword">Passwort / App-Passwort</label>
+                <input type="password" id="calAccountPassword" name="password" required>
+            </div>
+            <div class="form-group" id="calAccountUrlGroup" style="display: none;">
+                <label for="calAccountUrl">CalDAV-URL</label>
+                <input type="url" id="calAccountUrl" name="url" placeholder="https://caldav.example.com/">
+            </div>
+            <p class="form-hint" id="calAccountHint">
+                Samsung: Verwende dein Samsung-Konto und Passwort.
+            </p>
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">Hinzufügen</button>
+            </div>
+            <div id="calAccountError" class="form-error" style="display: none;"></div>
         </form>
     </div>
 </div>
@@ -92,9 +217,1660 @@
 
 {% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        HubApp.initCalendar();
-        HubApp.initEventListeners();
+let currentMonth = new Date().getMonth();
+let currentYear = new Date().getFullYear();
+let selectedDate = new Date();
+let events = [];
+let calendarFilter = 'all';
+let accountFilter = 'all';  // Filter by account/source
+
+// Helper function to format date as YYYY-MM-DD in local timezone (avoids UTC offset issues)
+function formatLocalDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    renderCalendar();
+    loadEvents();
+    loadCalendarAccounts();
+    syncCachedChanges(); // Sync any offline changes
+});
+
+// ==========================================
+// Offline Caching System
+// ==========================================
+
+const CACHE_KEY = 'nexus-calendar-pending-changes';
+
+function getCachedChanges() {
+    try {
+        return JSON.parse(localStorage.getItem(CACHE_KEY) || '[]');
+    } catch {
+        return [];
+    }
+}
+
+function saveCachedChanges(changes) {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(changes));
+}
+
+function cacheEventChange(action, eventData, eventId = null, calendarId = 'primary') {
+    const changes = getCachedChanges();
+    changes.push({
+        action, // 'create', 'update', 'delete'
+        eventData,
+        eventId,
+        calendarId,
+        timestamp: new Date().toISOString()
     });
+    saveCachedChanges(changes);
+}
+
+async function syncCachedChanges() {
+    const changes = getCachedChanges();
+    if (changes.length === 0) return;
+
+    const remaining = [];
+    const savedAccount = localStorage.getItem('nexus-google-calendar-account') || '';
+
+    for (const change of changes) {
+        try {
+            let url, method;
+            const calendarId = change.calendarId || change.eventData?.calendar_id || 'primary';
+
+            if (change.action === 'create') {
+                url = '/api/calendar/events';
+                method = 'POST';
+            } else if (change.action === 'update') {
+                url = `/api/calendar/events/${change.eventId}`;
+                method = 'PUT';
+            } else if (change.action === 'delete') {
+                url = `/api/calendar/events/${change.eventId}?account=${encodeURIComponent(savedAccount)}&calendar_id=${encodeURIComponent(calendarId)}`;
+                method = 'DELETE';
+            }
+
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: change.action !== 'delete' ? JSON.stringify(change.eventData) : undefined
+            });
+
+            if (!response.ok) {
+                remaining.push(change); // Keep for retry
+            }
+        } catch {
+            remaining.push(change); // Keep for retry
+        }
+    }
+
+    saveCachedChanges(remaining);
+    if (remaining.length < changes.length) {
+        loadEvents(); // Reload if any changes synced
+    }
+}
+
+// ==========================================
+// Brandenburg Holidays
+// ==========================================
+
+function getBrandenburgHolidays(year) {
+    // Fixed holidays
+    const holidays = [
+        { date: `${year}-01-01`, title: 'Neujahr', category: 'holiday' },
+        { date: `${year}-05-01`, title: 'Tag der Arbeit', category: 'holiday' },
+        { date: `${year}-10-03`, title: 'Tag der Deutschen Einheit', category: 'holiday' },
+        { date: `${year}-10-31`, title: 'Reformationstag', category: 'holiday' }, // Brandenburg specific
+        { date: `${year}-12-25`, title: '1. Weihnachtstag', category: 'holiday' },
+        { date: `${year}-12-26`, title: '2. Weihnachtstag', category: 'holiday' }
+    ];
+
+    // Calculate Easter-dependent holidays
+    const easter = calculateEaster(year);
+    const easterDate = new Date(year, easter.month - 1, easter.day);
+
+    // Karfreitag (Good Friday) - 2 days before Easter
+    const karfreitag = new Date(easterDate);
+    karfreitag.setDate(easterDate.getDate() - 2);
+    holidays.push({ date: formatLocalDate(karfreitag), title: 'Karfreitag', category: 'holiday' });
+
+    // Ostersonntag (Easter Sunday)
+    holidays.push({ date: formatLocalDate(easterDate), title: 'Ostersonntag', category: 'holiday' });
+
+    // Ostermontag (Easter Monday) - 1 day after Easter
+    const ostermontag = new Date(easterDate);
+    ostermontag.setDate(easterDate.getDate() + 1);
+    holidays.push({ date: formatLocalDate(ostermontag), title: 'Ostermontag', category: 'holiday' });
+
+    // Christi Himmelfahrt (Ascension Day) - 39 days after Easter
+    const himmelfahrt = new Date(easterDate);
+    himmelfahrt.setDate(easterDate.getDate() + 39);
+    holidays.push({ date: formatLocalDate(himmelfahrt), title: 'Christi Himmelfahrt', category: 'holiday' });
+
+    // Pfingstsonntag (Whit Sunday) - 49 days after Easter
+    const pfingstsonntag = new Date(easterDate);
+    pfingstsonntag.setDate(easterDate.getDate() + 49);
+    holidays.push({ date: formatLocalDate(pfingstsonntag), title: 'Pfingstsonntag', category: 'holiday' });
+
+    // Pfingstmontag (Whit Monday) - 50 days after Easter
+    const pfingstmontag = new Date(easterDate);
+    pfingstmontag.setDate(easterDate.getDate() + 50);
+    holidays.push({ date: formatLocalDate(pfingstmontag), title: 'Pfingstmontag', category: 'holiday' });
+
+    return holidays;
+}
+
+// Calculate Easter Sunday using the Anonymous Gregorian algorithm
+function calculateEaster(year) {
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return { month, day };
+}
+
+function renderCalendar() {
+    const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+    document.getElementById('calendarMonth').textContent = `${monthNames[currentMonth]} ${currentYear}`;
+
+    const container = document.getElementById('calendarDays');
+    container.innerHTML = '';
+
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    const lastDay = new Date(currentYear, currentMonth + 1, 0);
+    const startDay = (firstDay.getDay() + 6) % 7; // Monday = 0
+
+    // Empty cells before first day
+    for (let i = 0; i < startDay; i++) {
+        container.innerHTML += '<div class="day-cell empty"></div>';
+    }
+
+    const today = new Date();
+    for (let day = 1; day <= lastDay.getDate(); day++) {
+        const date = new Date(currentYear, currentMonth, day);
+        const dateStr = formatLocalDate(date);
+        const isToday = date.toDateString() === today.toDateString();
+        const isSelected = date.toDateString() === selectedDate.toDateString();
+        const dayEvents = getEventsForDate(dateStr);
+
+        let classes = 'day-cell';
+        if (isToday) classes += ' today';
+        if (isSelected) classes += ' selected';
+        if (dayEvents.length > 0) classes += ' has-events';
+
+        // Generate event preview lines (max 3)
+        const eventPreviews = dayEvents.slice(0, 3).map(e => {
+            const color = e.calendar_color || getCategoryColor(e.category) || '#6366f1';
+            const title = e.title.length > 12 ? e.title.substring(0, 12) + '…' : e.title;
+            return `<div class="event-preview" style="background: ${color};" title="${escapeHtml(e.title)}">${escapeHtml(title)}</div>`;
+        }).join('');
+
+        const moreCount = dayEvents.length > 3 ? `<div class="event-more">+${dayEvents.length - 3}</div>` : '';
+
+        container.innerHTML += `
+            <div class="${classes}" onclick="selectDate(${day})">
+                <span class="day-number">${day}</span>
+                <div class="day-events">${eventPreviews}${moreCount}</div>
+            </div>
+        `;
+    }
+}
+
+function getEventsForDate(dateStr) {
+    return events.filter(e => {
+        // Filter by category
+        if (calendarFilter !== 'all') {
+            if (calendarFilter === 'iserv') {
+                if (e.source !== 'iserv') return false;
+            } else if (calendarFilter === 'holiday') {
+                if (e.source !== 'holiday' && e.category !== 'holiday') return false;
+            } else if (e.category !== calendarFilter && e.source !== calendarFilter) {
+                return false;
+            }
+        }
+        // Filter by account/source
+        if (accountFilter !== 'all') {
+            const eventAccount = e.account || e.calendar || e.source || '';
+            if (accountFilter.startsWith('caldav:')) {
+                // Filter for specific CalDAV account
+                if (e.source !== 'caldav' || e.account_id !== accountFilter.replace('caldav:', '')) return false;
+            } else if (accountFilter === 'google') {
+                if (e.source !== 'google') return false;
+            } else if (accountFilter === 'iserv') {
+                if (e.source !== 'iserv') return false;
+            } else if (accountFilter === 'holiday') {
+                if (e.source !== 'holiday') return false;
+            } else if (accountFilter === 'local') {
+                if (e.source !== 'local') return false;
+            } else {
+                // Match by email/name
+                if (eventAccount.toLowerCase() !== accountFilter.toLowerCase()) return false;
+            }
+        }
+        // Check if date falls within event range (for multi-day events)
+        const eventStart = e.start_date;
+        const eventEnd = e.end_date || e.start_date;
+        return dateStr >= eventStart && dateStr <= eventEnd;
+    });
+}
+
+function getCategoryColor(category) {
+    const colors = {
+        'school': '#38bdf8',
+        'training': '#f97316',
+        'personal': '#9f7aea',
+        'work': '#ed8936',
+        'iserv': '#3498db',
+        'holiday': '#e74c3c'
+    };
+    return colors[category] || '#6366f1';
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function checkHasEvents(date) {
+    const dateStr = formatLocalDate(date);
+    return events.some(e => e.start_date === dateStr);
+}
+
+function selectDate(day) {
+    selectedDate = new Date(currentYear, currentMonth, day);
+    renderCalendar();
+    updateEventsForDate();
+}
+
+function updateEventsForDate() {
+    const dateStr = formatLocalDate(selectedDate);
+    const dayEvents = getEventsForDate(dateStr);
+
+    const today = new Date();
+    let title = 'Termine';
+    if (selectedDate.toDateString() === today.toDateString()) {
+        title = 'Heute';
+    } else if (selectedDate.toDateString() === new Date(today.getTime() + 86400000).toDateString()) {
+        title = 'Morgen';
+    } else {
+        title = selectedDate.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+    }
+
+    document.getElementById('eventsTitle').textContent = title;
+    document.getElementById('eventCount').textContent = `${dayEvents.length} Termin${dayEvents.length !== 1 ? 'e' : ''}`;
+
+    const container = document.getElementById('eventsList');
+    if (dayEvents.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                <span>Keine Termine</span>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = dayEvents.map(e => {
+        const colorStyle = e.calendar_color ? `border-left: 4px solid ${e.calendar_color};` : '';
+        const calendarName = e.calendar || getCategoryLabel(e.category);
+        const hasLocation = e.location && e.location.trim().length > 0;
+        return `
+        <div class="event-item category-${e.category || 'personal'}" style="${colorStyle}">
+            <div class="event-time">${e.start_time || 'Ganztägig'}</div>
+            <div class="event-info" onclick="openEditEventModal('${e.id}')">
+                <div class="event-title">${escapeHtml(e.title)}</div>
+                ${hasLocation ? `<div class="event-location">📍 ${escapeHtml(e.location)}</div>` : ''}
+            </div>
+            <div class="event-actions">
+                ${hasLocation ? `<button class="btn-route" onclick="event.stopPropagation(); openRouteModal('${e.id}')" title="Route planen">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="10" r="3"/>
+                        <path d="M12 2a8 8 0 0 0-8 8c0 5.4 7 12 8 12s8-6.6 8-12a8 8 0 0 0-8-8z"/>
+                    </svg>
+                </button>` : ''}
+                <span class="tag" ${e.calendar_color ? `style="background: ${e.calendar_color}20; color: ${e.calendar_color}"` : ''}>${calendarName}</span>
+            </div>
+        </div>
+    `}).join('');
+}
+
+function getCategoryLabel(cat) {
+    const labels = { 'personal': 'Privat', 'school': 'Schule', 'training': 'Training', 'work': 'Arbeit', 'iserv': 'IServ', 'holiday': 'Feiertag' };
+    return labels[cat] || cat;
+}
+
+function changeMonth(delta) {
+    currentMonth += delta;
+    if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+    if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+    renderCalendar();
+    loadEvents();
+}
+
+function goToToday() {
+    const today = new Date();
+    currentMonth = today.getMonth();
+    currentYear = today.getFullYear();
+    selectedDate = today;
+    renderCalendar();
+    updateEventsForDate();
+}
+
+function setCalendarFilter(filter) {
+    calendarFilter = filter;
+    document.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.filter === filter);
+    });
+    updateEventsForDate();
+}
+
+async function loadEvents() {
+    try {
+        events = [];
+
+        // Calculate date range: previous month to next 2 months
+        const startDate = new Date(currentYear, currentMonth - 1, 1);
+        const endDate = new Date(currentYear, currentMonth + 3, 0); // Last day of month+2
+
+        const startStr = formatLocalDate(startDate);
+        const endStr = formatLocalDate(endDate);
+
+        // Add Brandenburg public holidays (Feiertage) for current and next year
+        const holidaysThisYear = getBrandenburgHolidays(currentYear).map(h => ({
+            id: `holiday_${h.date}`,
+            title: h.title,
+            start_date: h.date,
+            start_time: null,
+            all_day: true,
+            category: 'holiday',
+            source: 'holiday',
+            calendar: 'Feiertage',
+            calendar_color: '#e74c3c'
+        }));
+        const holidaysNextYear = getBrandenburgHolidays(currentYear + 1).map(h => ({
+            id: `holiday_${h.date}`,
+            title: h.title,
+            start_date: h.date,
+            start_time: null,
+            all_day: true,
+            category: 'holiday',
+            source: 'holiday',
+            calendar: 'Feiertage',
+            calendar_color: '#e74c3c'
+        }));
+        events = events.concat(holidaysThisYear, holidaysNextYear);
+
+        // Load Brandenburg school holidays (Schulferien) from server
+        await loadSchoolHolidays();
+
+        // Fetch Google Calendar events for the extended range (always fetch all accounts)
+        const googleResponse = await fetch(`/api/calendar/events?start=${startStr}&end=${endStr}`);
+        if (googleResponse.ok) {
+            const data = await googleResponse.json();
+            const googleEvents = (data.events || []).map(e => ({
+                ...e,
+                source: e.source || 'google',
+                account: e.calendar || 'Google'
+            }));
+            events = events.concat(googleEvents);
+        }
+
+        // Fetch CalDAV events (Samsung, iCloud, etc.)
+        await loadCalDAVEvents(startStr, endStr);
+
+        // Fetch IServ events
+        await loadIServEvents();
+
+        // Fetch local macOS calendar events
+        await loadLocalCalendarEvents();
+
+        // Deduplicate events (same title + date = duplicate)
+        const seen = new Map();
+        events = events.filter(e => {
+            const key = `${e.title.toLowerCase().trim()}|${e.start_date}`;
+            if (seen.has(key)) {
+                return false; // Skip duplicate
+            }
+            seen.set(key, true);
+            return true;
+        });
+
+        // Sort all events by date/time
+        events.sort((a, b) => {
+            if (a.start_date !== b.start_date) return a.start_date.localeCompare(b.start_date);
+            return (a.start_time || '00:00').localeCompare(b.start_time || '00:00');
+        });
+
+        renderCalendar();
+        updateEventsForDate();
+    } catch (err) {
+        console.log('Calendar API not available:', err);
+    }
+}
+
+async function loadCalDAVEvents(startStr, endStr) {
+    try {
+        const response = await fetch(`/api/calendar/caldav/events?start=${startStr}&end=${endStr}`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (!data.success || !data.events) return;
+
+        // Add CalDAV events to the events array
+        events = events.concat(data.events);
+    } catch (err) {
+        console.log('CalDAV events not available:', err);
+    }
+}
+
+async function loadIServEvents() {
+    try {
+        // Check IServ connection status first
+        const statusResponse = await fetch('/api/iserv/status');
+        if (!statusResponse.ok) return;
+
+        const status = await statusResponse.json();
+        if (!status.connected && !status.has_credentials) return;
+
+        // If not connected but has credentials, try to connect
+        if (!status.connected && status.has_credentials) {
+            await fetch('/api/iserv/connect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+        }
+
+        // Fetch IServ events
+        const eventsResponse = await fetch('/api/iserv/events');
+        if (!eventsResponse.ok) return;
+
+        const data = await eventsResponse.json();
+        if (!data.success) {
+            console.log('IServ events error:', data.error);
+            return;
+        }
+        if (!data.events || data.events.length === 0) return;
+
+        // Convert IServ events to Nexus format and add to events array
+        const iservEvents = data.events.map(e => {
+            // Parse IServ event format - handle multiple possible field names
+            let startDate = '', startTime = '', endDate = '', endTime = '';
+
+            // Try different field names for start date/time
+            const startField = e.start || e.startDate || e.dtstart || e.begin;
+            if (startField) {
+                if (typeof startField === 'string') {
+                    // Handle ISO format (2024-01-15T10:00:00) or date only
+                    startDate = startField.split('T')[0] || startField.split(' ')[0] || '';
+                    if (startField.includes('T')) {
+                        startTime = startField.split('T')[1]?.substring(0, 5) || '';
+                    } else if (startField.includes(' ')) {
+                        startTime = startField.split(' ')[1]?.substring(0, 5) || '';
+                    }
+                } else if (startField.dateTime) {
+                    startDate = startField.dateTime.split('T')[0];
+                    startTime = startField.dateTime.split('T')[1]?.substring(0, 5) || '';
+                } else if (startField.date) {
+                    startDate = startField.date;
+                }
+            }
+
+            // Try different field names for end date/time
+            const endField = e.end || e.endDate || e.dtend || e.finish;
+            if (endField) {
+                if (typeof endField === 'string') {
+                    endDate = endField.split('T')[0] || endField.split(' ')[0] || '';
+                    if (endField.includes('T')) {
+                        endTime = endField.split('T')[1]?.substring(0, 5) || '';
+                    } else if (endField.includes(' ')) {
+                        endTime = endField.split(' ')[1]?.substring(0, 5) || '';
+                    }
+                } else if (endField.dateTime) {
+                    endDate = endField.dateTime.split('T')[0];
+                    endTime = endField.dateTime.split('T')[1]?.substring(0, 5) || '';
+                } else if (endField.date) {
+                    endDate = endField.date;
+                }
+            }
+
+            // Get title from various possible field names
+            const title = e.title || e.summary || e.subject || e.name || 'Unbenannter Termin';
+
+            // Get calendar name if available
+            const calendarName = e.calendar || e.calendarName || e.source || 'IServ';
+
+            return {
+                id: `iserv_${e.id || e.uid || e.eventId || Math.random().toString(36).substr(2, 9)}`,
+                title: title,
+                start_date: startDate,
+                start_time: startTime,
+                end_date: endDate || startDate,
+                end_time: endTime,
+                location: e.location || e.place || '',
+                description: e.description || e.notes || e.body || '',
+                category: 'iserv',
+                calendar: calendarName,
+                calendar_color: e.color || e.backgroundColor || '#3498db',
+                source: 'iserv',
+                all_day: e.allDay || e.isAllDay || !startTime
+            };
+        }).filter(e => e.start_date); // Filter out events without valid dates
+
+        events = events.concat(iservEvents);
+        console.log(`Loaded ${iservEvents.length} events from IServ calendar`);
+    } catch (err) {
+        console.error('IServ calendar error:', err);
+    }
+}
+
+// Debug function to check IServ calendar status
+async function debugIServCalendar() {
+    try {
+        const statusRes = await fetch('/api/iserv/status');
+        const status = await statusRes.json();
+        console.log('IServ Status:', status);
+
+        if (status.connected || status.has_credentials) {
+            const eventsRes = await fetch('/api/iserv/events');
+            const events = await eventsRes.json();
+            console.log('IServ Events Response:', events);
+        }
+    } catch (e) {
+        console.error('Debug IServ failed:', e);
+    }
+}
+
+async function loadSchoolHolidays() {
+    try {
+        const response = await fetch('/api/calendar/holidays');
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (!data.success || !data.holidays) return;
+
+        // Convert school holidays to event format
+        const schoolHolidays = data.holidays.map(h => ({
+            id: `schulferien_${h.start}_${h.name.replace(/\s+/g, '_')}`,
+            title: h.name,
+            start_date: h.start,
+            end_date: h.end,
+            start_time: null,
+            all_day: true,
+            category: 'holiday',
+            source: 'holiday',
+            calendar: 'Schulferien',
+            calendar_color: h.color || '#718096'  // Grey for school holidays
+        }));
+
+        events = events.concat(schoolHolidays);
+    } catch (err) {
+        console.log('School holidays not available:', err);
+    }
+}
+
+async function loadLocalCalendarEvents() {
+    try {
+        const response = await fetch('/api/calendar/local');
+        if (!response.ok) {
+            // Try to trigger a sync if no data available
+            if (response.status === 404) {
+                console.log('Local calendar not synced yet, triggering sync...');
+                await fetch('/api/calendar/local/sync', { method: 'POST' });
+                // Try again after sync
+                const retryResponse = await fetch('/api/calendar/local');
+                if (!retryResponse.ok) return;
+                const data = await retryResponse.json();
+                processLocalEvents(data);
+            }
+            return;
+        }
+
+        const data = await response.json();
+        processLocalEvents(data);
+    } catch (err) {
+        console.log('Local calendar not available:', err);
+    }
+}
+
+function processLocalEvents(data) {
+    if (!data.success || !data.events) return;
+
+    const localEvents = data.events.map(e => {
+        // Parse the local calendar event format
+        let startDate = '', startTime = '';
+
+        if (e.start) {
+            if (e.start.includes(' ')) {
+                const parts = e.start.split(' ');
+                startDate = parts[0];
+                startTime = parts[1]?.substring(0, 5) || '';
+            } else if (e.start.length === 10) {
+                startDate = e.start;
+            } else {
+                startDate = e.start.split('T')[0] || e.start;
+                startTime = e.start.split('T')[1]?.substring(0, 5) || '';
+            }
+        }
+
+        let endDate = '', endTime = '';
+        if (e.end) {
+            if (e.end.includes(' ')) {
+                const parts = e.end.split(' ');
+                endDate = parts[0];
+                endTime = parts[1]?.substring(0, 5) || '';
+            } else if (e.end.length === 10) {
+                endDate = e.end;
+            } else {
+                endDate = e.end.split('T')[0] || e.end;
+                endTime = e.end.split('T')[1]?.substring(0, 5) || '';
+            }
+        }
+
+        return {
+            id: `local_${e.title?.replace(/\s+/g, '_')}_${startDate}`,
+            title: e.title || 'Unbenannt',
+            start_date: startDate,
+            start_time: startTime || null,
+            end_date: endDate || startDate,
+            end_time: endTime || null,
+            location: e.location || '',
+            description: e.notes || '',
+            all_day: e.all_day || !startTime,
+            category: 'personal',
+            source: 'local',
+            calendar: 'Lokaler Kalender',
+            calendar_color: '#9f7aea'  // Purple for local events
+        };
+    }).filter(e => e.start_date);
+
+    events = events.concat(localEvents);
+}
+
+function openAddEventModal() {
+    document.getElementById('eventForm').reset();
+    document.getElementById('eventId').value = '';
+    document.getElementById('eventCalendarId').value = 'primary';
+    document.getElementById('eventModalTitle').textContent = 'Neuer Termin';
+    document.getElementById('deleteEventBtn').style.display = 'none';
+    document.getElementById('eventDate').value = formatLocalDate(selectedDate);
+    openModal('eventModal');
+}
+
+function openEditEventModal(eventId) {
+    const ev = events.find(e => e.id === eventId);
+    if (!ev) return;
+
+    // IServ events are read-only - show info modal instead
+    if (ev.source === 'iserv') {
+        showIServEventInfo(ev);
+        return;
+    }
+
+    // Holiday events are read-only
+    if (ev.source === 'holiday' || ev.category === 'holiday') {
+        alert(`Feiertag: ${ev.title}\n\nDatum: ${ev.start_date}\n\nFeiertage können nicht bearbeitet werden.`);
+        return;
+    }
+
+    document.getElementById('eventId').value = ev.id;
+    document.getElementById('eventCalendarId').value = ev.calendar_id || 'primary';
+    document.getElementById('eventTitle').value = ev.title;
+    document.getElementById('eventDate').value = ev.start_date;
+    document.getElementById('eventTime').value = ev.start_time || '';
+    document.getElementById('eventEndDate').value = ev.end_date || '';
+    document.getElementById('eventEndTime').value = ev.end_time || '';
+    document.getElementById('eventCategory').value = ev.category || 'personal';
+    document.getElementById('eventLocation').value = ev.location || '';
+    document.getElementById('eventDescription').value = ev.description || '';
+    document.getElementById('eventModalTitle').textContent = 'Termin bearbeiten';
+    document.getElementById('deleteEventBtn').style.display = 'block';
+
+    openModal('eventModal');
+}
+
+function showIServEventInfo(ev) {
+    const timeDisplay = ev.start_time ? `${ev.start_time}${ev.end_time ? ' - ' + ev.end_time : ''}` : 'Ganztägig';
+    alert(`IServ Termin\n\n${ev.title}\n\nDatum: ${ev.start_date}\nUhrzeit: ${timeDisplay}${ev.location ? '\nOrt: ' + ev.location : ''}${ev.description ? '\n\nBeschreibung: ' + ev.description : ''}\n\nHinweis: IServ-Termine können nur in IServ bearbeitet werden.`);
+}
+
+async function saveEvent(e) {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const eventId = formData.get('id');
+    const calendarId = formData.get('calendar_id') || 'primary';
+    const savedAccount = localStorage.getItem('nexus-google-calendar-account') || '';
+    const eventData = {
+        title: formData.get('title'),
+        date: formData.get('start_date'),
+        time: formData.get('start_time'),
+        end_date: formData.get('end_date'),
+        end_time: formData.get('end_time'),
+        category: formData.get('category'),
+        location: formData.get('location'),
+        description: formData.get('description'),
+        account: savedAccount,
+        calendar_id: calendarId
+    };
+
+    try {
+        const url = eventId ? `/api/calendar/events/${eventId}` : '/api/calendar/events';
+        const method = eventId ? 'PUT' : 'POST';
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(eventData)
+        });
+        if (response.ok) {
+            closeModal('eventModal');
+            loadEvents();
+        } else {
+            // Offline or error - cache the change
+            cacheEventChange(eventId ? 'update' : 'create', eventData, eventId, calendarId);
+            alert('Änderung wird synchronisiert, sobald eine Verbindung besteht.');
+            closeModal('eventModal');
+            loadEvents();
+        }
+    } catch (err) {
+        // Offline - cache the change
+        cacheEventChange(eventId ? 'update' : 'create', eventData, eventId, calendarId);
+        alert('Keine Verbindung. Änderung wird lokal gespeichert.');
+        closeModal('eventModal');
+    }
+}
+
+async function deleteEvent() {
+    const eventId = document.getElementById('eventId').value;
+    const calendarId = document.getElementById('eventCalendarId').value || 'primary';
+    if (!eventId || !confirm('Termin wirklich löschen?')) return;
+
+    const savedAccount = localStorage.getItem('nexus-google-calendar-account') || '';
+
+    try {
+        const response = await fetch(`/api/calendar/events/${eventId}?account=${encodeURIComponent(savedAccount)}&calendar_id=${encodeURIComponent(calendarId)}`, { method: 'DELETE' });
+        if (response.ok) {
+            closeModal('eventModal');
+            loadEvents();
+        } else {
+            // Offline or error - cache the deletion
+            cacheEventChange('delete', { calendar_id: calendarId }, eventId, calendarId);
+            alert('Löschung wird synchronisiert, sobald eine Verbindung besteht.');
+            closeModal('eventModal');
+            loadEvents();
+        }
+    } catch (err) {
+        // Offline - cache the deletion
+        cacheEventChange('delete', { calendar_id: calendarId }, eventId, calendarId);
+        alert('Keine Verbindung. Löschung wird lokal gespeichert.');
+        closeModal('eventModal');
+    }
+}
+
+function openModal(id) {
+    document.getElementById(id).classList.add('active');
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+}
+
+// ==========================================
+// VBB Route Planning
+// ==========================================
+
+let currentUserLocation = null;
+let currentRouteEvent = null;
+
+function openRouteModal(eventId) {
+    const ev = events.find(e => e.id === eventId);
+    if (!ev || !ev.location) return;
+
+    currentRouteEvent = ev;
+
+    // Set event info
+    const eventStart = ev.start_time || 'Ganztägig';
+    document.getElementById('routeEventInfo').innerHTML = `
+        <div class="route-event-card">
+            <div class="route-event-title">${escapeHtml(ev.title)}</div>
+            <div class="route-event-details">
+                <span>📅 ${ev.start_date} ${eventStart}</span>
+                <span>📍 ${escapeHtml(ev.location)}</span>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('routeModalTitle').textContent = `Route zu: ${ev.title}`;
+    document.getElementById('routeResults').innerHTML = '<div class="empty-state"><span>Warte auf Standort...</span></div>';
+
+    openModal('routeModal');
+
+    // Get user's current location
+    getUserLocation();
+}
+
+function getUserLocation() {
+    const statusEl = document.getElementById('locationStatus');
+
+    if (!navigator.geolocation) {
+        statusEl.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+            </svg>
+            <span style="color: var(--error)">Standortermittlung nicht unterstützt</span>
+        `;
+        return;
+    }
+
+    statusEl.innerHTML = `
+        <svg class="spinner" width="16" height="16" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" opacity="0.3"/>
+            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="2" fill="none"/>
+        </svg>
+        <span>Standort wird ermittelt...</span>
+    `;
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            currentUserLocation = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                name: 'Aktueller Standort'
+            };
+
+            statusEl.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                <span style="color: var(--success)">Standort gefunden</span>
+            `;
+
+            // Now get the route
+            getRouteToEvent();
+        },
+        (error) => {
+            let errorMsg = 'Standort konnte nicht ermittelt werden';
+            if (error.code === 1) errorMsg = 'Standortzugriff verweigert';
+            if (error.code === 2) errorMsg = 'Standort nicht verfügbar';
+            if (error.code === 3) errorMsg = 'Zeitüberschreitung';
+
+            statusEl.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <span style="color: var(--warning)">${errorMsg}</span>
+                <button class="btn-secondary small" onclick="enterManualLocation()" style="margin-left: 10px">Manuell eingeben</button>
+            `;
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+}
+
+function enterManualLocation() {
+    const address = prompt('Gib deinen Startort ein (z.B. Straße, Ort):');
+    if (!address) return;
+
+    document.getElementById('locationStatus').innerHTML = `
+        <svg class="spinner" width="16" height="16" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" opacity="0.3"/>
+            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="2" fill="none"/>
+        </svg>
+        <span>Suche Adresse...</span>
+    `;
+
+    searchAndSetLocation(address);
+}
+
+async function searchAndSetLocation(query) {
+    try {
+        const response = await fetch(`/api/vbb/search?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+
+        if (data.success && data.locations && data.locations.length > 0) {
+            const loc = data.locations[0];
+            currentUserLocation = {
+                id: loc.id,
+                latitude: loc.latitude,
+                longitude: loc.longitude,
+                name: loc.name
+            };
+
+            document.getElementById('locationStatus').innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                <span style="color: var(--success)">Start: ${escapeHtml(loc.name)}</span>
+            `;
+
+            getRouteToEvent();
+        } else {
+            document.getElementById('locationStatus').innerHTML = `
+                <span style="color: var(--error)">Adresse nicht gefunden</span>
+                <button class="btn-secondary small" onclick="enterManualLocation()" style="margin-left: 10px">Erneut versuchen</button>
+            `;
+        }
+    } catch (err) {
+        console.error('Location search error:', err);
+    }
+}
+
+async function getRouteToEvent() {
+    if (!currentUserLocation || !currentRouteEvent) return;
+
+    const resultsEl = document.getElementById('routeResults');
+    resultsEl.innerHTML = `
+        <div class="loading-routes">
+            <svg class="spinner" width="24" height="24" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" opacity="0.3"/>
+                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="2" fill="none"/>
+            </svg>
+            <span>Suche Verbindungen...</span>
+        </div>
+    `;
+
+    try {
+        // Build event start datetime
+        let eventStart = currentRouteEvent.start_date;
+        if (currentRouteEvent.start_time) {
+            eventStart += 'T' + currentRouteEvent.start_time + ':00';
+        } else {
+            eventStart += 'T09:00:00';
+        }
+
+        const response = await fetch('/api/vbb/route-to-event', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                event: {
+                    title: currentRouteEvent.title,
+                    start: eventStart,
+                    location: currentRouteEvent.location
+                },
+                current_location: currentUserLocation,
+                buffer_minutes: 15
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.routes && data.routes.length > 0) {
+            renderRouteResults(data);
+        } else {
+            resultsEl.innerHTML = `
+                <div class="empty-state">
+                    <span>${data.error || 'Keine Verbindungen gefunden'}</span>
+                </div>
+            `;
+        }
+    } catch (err) {
+        console.error('Route error:', err);
+        resultsEl.innerHTML = `
+            <div class="empty-state">
+                <span>Fehler beim Laden der Verbindungen</span>
+            </div>
+        `;
+    }
+}
+
+function renderRouteResults(data) {
+    const resultsEl = document.getElementById('routeResults');
+
+    const routesHtml = data.routes.map((route, idx) => {
+        const departureTime = route.departure ? new Date(route.departure).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+        const arrivalTime = route.arrival ? new Date(route.arrival).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+
+        const legsHtml = route.legs.map(leg => {
+            if (leg.type === 'walk') {
+                const walkInfo = leg.distance ? `${leg.distance}m` : `${leg.duration} Min.`;
+                return `<div class="route-leg walk">
+                    <span class="leg-icon">🚶</span>
+                    <span class="leg-info">${walkInfo} zu Fuß</span>
+                </div>`;
+            } else {
+                const line = leg.line || {};
+                const productEmoji = getProductEmoji(line.product);
+                const delayBadge = leg.departure?.delay > 0 ?
+                    `<span class="delay-badge">+${leg.departure.delay}</span>` : '';
+
+                return `<div class="route-leg transit">
+                    <span class="leg-icon">${productEmoji}</span>
+                    <div class="leg-details">
+                        <div class="leg-line">${line.name || 'Linie'} ${delayBadge}</div>
+                        <div class="leg-stations">${leg.departure?.station || ''} → ${leg.arrival?.station || ''}</div>
+                        ${leg.departure?.platform ? `<div class="leg-platform">Gleis ${leg.departure.platform}</div>` : ''}
+                    </div>
+                </div>`;
+            }
+        }).join('<div class="leg-connector">→</div>');
+
+        const delayWarning = route.has_delay ?
+            `<div class="route-delay-warning">⚠️ Verspätung: +${route.max_delay} Min.</div>` : '';
+
+        return `
+            <div class="route-option ${idx === 0 ? 'recommended' : ''}">
+                ${idx === 0 ? '<div class="route-badge">Empfohlen</div>' : ''}
+                <div class="route-header">
+                    <div class="route-times">
+                        <span class="route-departure">${departureTime}</span>
+                        <span class="route-arrow">→</span>
+                        <span class="route-arrival">${arrivalTime}</span>
+                    </div>
+                    <div class="route-meta">
+                        <span class="route-duration">⏱️ ${route.duration} Min.</span>
+                        ${route.transfers > 0 ? `<span class="route-transfers">🔄 ${route.transfers} Umstieg${route.transfers > 1 ? 'e' : ''}</span>` : ''}
+                    </div>
+                </div>
+                ${delayWarning}
+                <div class="route-legs">${legsHtml}</div>
+            </div>
+        `;
+    }).join('');
+
+    resultsEl.innerHTML = `
+        <div class="route-destination">
+            <strong>Ziel:</strong> ${escapeHtml(data.to)}
+        </div>
+        ${routesHtml}
+    `;
+}
+
+function getProductEmoji(product) {
+    const emojis = {
+        'suburban': '🚆',  // S-Bahn
+        'subway': '🚇',    // U-Bahn
+        'tram': '🚊',
+        'bus': '🚌',
+        'ferry': '⛴️',
+        'express': '🚄',
+        'regional': '🚂'
+    };
+    return emojis[product] || '🚃';
+}
+
+// ==========================================
+// CalDAV Account Management (Samsung, iCloud, etc.)
+// ==========================================
+
+function openAddCalendarAccountModal() {
+    document.getElementById('addCalendarAccountForm').reset();
+    document.getElementById('calAccountError').style.display = 'none';
+    updateCalendarProviderFields();
+    openModal('addCalendarAccountModal');
+}
+
+function updateCalendarProviderFields() {
+    const provider = document.getElementById('calAccountProvider').value;
+    const urlGroup = document.getElementById('calAccountUrlGroup');
+    const hint = document.getElementById('calAccountHint');
+
+    const hints = {
+        'samsung': 'Samsung: Verwende dein Samsung-Konto und Passwort.',
+        'icloud': 'iCloud: Verwende deine Apple-ID und ein App-spezifisches Passwort.',
+        'caldav': 'Gib die CalDAV-URL deines Kalender-Anbieters ein.'
+    };
+
+    hint.textContent = hints[provider] || '';
+    urlGroup.style.display = provider === 'caldav' ? 'block' : 'none';
+}
+
+async function addCalendarAccount(e) {
+    e.preventDefault();
+    const form = e.target;
+    const errorEl = document.getElementById('calAccountError');
+
+    const data = {
+        provider: form.provider.value,
+        name: form.name.value,
+        username: form.username.value,
+        password: form.password.value,
+        url: form.url?.value || ''
+    };
+
+    try {
+        const response = await fetch('/api/calendar/caldav/accounts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            closeModal('addCalendarAccountModal');
+            loadCalendarAccounts();
+            loadEvents();
+        } else {
+            errorEl.textContent = result.error || 'Verbindung fehlgeschlagen';
+            errorEl.style.display = 'block';
+        }
+    } catch (err) {
+        errorEl.textContent = 'Netzwerkfehler. Bitte versuche es erneut.';
+        errorEl.style.display = 'block';
+    }
+}
+
+async function loadCalendarAccounts() {
+    const select = document.getElementById('calendarAccountSelect');
+    const savedFilter = localStorage.getItem('nexus-calendar-filter') || 'all';
+
+    select.innerHTML = '<option value="all">Alle Kalender</option>';
+
+    // Add built-in sources
+    const sourcesGroup = document.createElement('optgroup');
+    sourcesGroup.label = 'Quellen';
+
+    const sourceOptions = [
+        { value: 'google', label: 'Google' },
+        { value: 'iserv', label: 'IServ' },
+        { value: 'holiday', label: 'Feiertage & Ferien' },
+        { value: 'local', label: 'Lokaler Kalender' }
+    ];
+
+    sourceOptions.forEach(src => {
+        const option = document.createElement('option');
+        option.value = src.value;
+        option.textContent = src.label;
+        option.selected = src.value === savedFilter;
+        sourcesGroup.appendChild(option);
+    });
+    select.appendChild(sourcesGroup);
+
+    // Load Google accounts
+    try {
+        const googleResponse = await fetch('/api/email/google/accounts');
+        if (googleResponse.ok) {
+            const googleData = await googleResponse.json();
+            if (googleData.accounts && googleData.accounts.length > 0) {
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = 'Google Konten';
+                googleData.accounts.forEach(acc => {
+                    const option = document.createElement('option');
+                    option.value = acc.email;
+                    option.textContent = acc.email;
+                    option.selected = acc.email === savedFilter;
+                    optgroup.appendChild(option);
+                });
+                select.appendChild(optgroup);
+            }
+        }
+    } catch (err) {}
+
+    // Load CalDAV accounts
+    try {
+        const caldavResponse = await fetch('/api/calendar/caldav/accounts');
+        if (caldavResponse.ok) {
+            const caldavData = await caldavResponse.json();
+            if (caldavData.accounts && caldavData.accounts.length > 0) {
+                const providerGroups = {};
+
+                caldavData.accounts.forEach(acc => {
+                    const provider = acc.provider || 'caldav';
+                    if (!providerGroups[provider]) {
+                        providerGroups[provider] = [];
+                    }
+                    providerGroups[provider].push(acc);
+                });
+
+                const providerLabels = {
+                    'samsung': 'Samsung',
+                    'icloud': 'iCloud',
+                    'caldav': 'CalDAV'
+                };
+
+                Object.keys(providerGroups).forEach(provider => {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = providerLabels[provider] || provider;
+                    providerGroups[provider].forEach(acc => {
+                        const option = document.createElement('option');
+                        option.value = `caldav:${acc.id}`;
+                        option.textContent = acc.name;
+                        option.selected = `caldav:${acc.id}` === savedFilter;
+                        optgroup.appendChild(option);
+                    });
+                    select.appendChild(optgroup);
+                });
+            }
+        }
+    } catch (err) {}
+
+    // Set initial filter value
+    accountFilter = savedFilter;
+    select.value = savedFilter;
+
+    // Add change handler
+    select.onchange = function() {
+        accountFilter = this.value;
+        localStorage.setItem('nexus-calendar-filter', this.value);
+        renderCalendar();
+        updateEventsForDate();
+    };
+}
 </script>
+
+<style>
+.calendar-layout {
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: 20px;
+}
+
+.calendar-widget {
+    padding: 24px;
+}
+
+.events-widget {
+    padding: 20px;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+/* Calendar Day Cells with Event Previews */
+.calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+
+.day-cell {
+    min-height: 80px;
+    padding: 4px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    flex-direction: column;
+}
+
+.day-cell:hover {
+    border-color: var(--accent);
+    background: var(--bg-secondary);
+}
+
+.day-cell.empty {
+    background: transparent;
+    border: none;
+    cursor: default;
+}
+
+.day-cell.today {
+    border-color: var(--accent);
+    background: var(--accent-light);
+}
+
+.day-cell.today .day-number {
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.day-cell.selected {
+    border: 2px solid var(--accent);
+    background: var(--accent-light);
+}
+
+.day-number {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.day-events {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+}
+
+.event-preview {
+    font-size: 10px;
+    font-weight: 500;
+    color: white;
+    padding: 2px 4px;
+    border-radius: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+}
+
+.event-more {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 500;
+    padding: 2px 4px;
+}
+
+.event-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    margin-bottom: 10px;
+    transition: all var(--transition-fast);
+    border-left: 4px solid var(--accent);
+}
+
+.event-item:hover {
+    border-color: var(--accent);
+}
+
+.event-item.category-school {
+    border-left-color: #667eea;
+}
+
+.event-item.category-training {
+    border-left-color: #48bb78;
+}
+
+.event-item.category-personal {
+    border-left-color: #9f7aea;
+}
+
+.event-item.category-work {
+    border-left-color: #ed8936;
+}
+
+.event-item.category-iserv {
+    border-left-color: #3498db;
+}
+
+.event-item.category-holiday {
+    border-left-color: #e74c3c;
+}
+
+.event-time {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    min-width: 60px;
+}
+
+.event-info {
+    flex: 1;
+}
+
+.event-info .event-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.event-location {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.event-count {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.event-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-route {
+    padding: 6px;
+    background: var(--accent-light);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    color: var(--accent);
+    transition: all var(--transition-fast);
+}
+
+.btn-route:hover {
+    background: var(--accent);
+    color: white;
+}
+
+/* Route Modal Styles */
+.modal-large {
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.route-content {
+    padding: 0;
+}
+
+.route-info {
+    padding: 16px 20px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--card-border);
+}
+
+.route-event-card {
+    margin-bottom: 12px;
+}
+
+.route-event-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.route-event-details {
+    display: flex;
+    gap: 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.route-location-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.route-results {
+    padding: 16px 20px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.route-destination {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.route-option {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    margin-bottom: 12px;
+    position: relative;
+}
+
+.route-option.recommended {
+    border-color: var(--accent);
+}
+
+.route-badge {
+    position: absolute;
+    top: -10px;
+    right: 16px;
+    background: var(--accent);
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.route-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.route-times {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.route-departure, .route-arrival {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.route-arrow {
+    color: var(--text-muted);
+}
+
+.route-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.route-delay-warning {
+    background: rgba(237, 137, 54, 0.1);
+    color: #ed8936;
+    padding: 6px 10px;
+    border-radius: var(--radius-xs);
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 12px;
+}
+
+.route-legs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.route-leg {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-xs);
+    font-size: 12px;
+}
+
+.route-leg.walk {
+    background: rgba(107, 114, 128, 0.1);
+}
+
+.route-leg.transit {
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.leg-icon {
+    font-size: 16px;
+}
+
+.leg-details {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.leg-line {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.leg-stations {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.leg-platform {
+    font-size: 10px;
+    color: var(--accent);
+}
+
+.leg-connector {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.delay-badge {
+    background: #ed8936;
+    color: white;
+    font-size: 10px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    margin-left: 4px;
+}
+
+.loading-routes {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 40px;
+    color: var(--text-muted);
+}
+
+/* Spinner animation */
+.spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@media (max-width: 900px) {
+    .calendar-layout {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
 {% endblock %}

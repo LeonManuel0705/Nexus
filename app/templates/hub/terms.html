@@ -1,0 +1,162 @@
+{% extends "hub/base.html" %}
+{% set active_tab = 'settings' %}
+
+{% block title %}Nutzungsbedingungen - Nexus{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <a href="/hub/settings" class="back-link">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 12H5"></path>
+                <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            Einstellungen
+        </a>
+        <h1 class="page-title">Nutzungsbedingungen</h1>
+        <p class="page-subtitle">Stand: Januar 2026</p>
+    </div>
+
+    <div class="legal-content glass-card" style="padding: 32px; line-height: 1.8;">
+        <section class="legal-section">
+            <h2>1. Geltungsbereich</h2>
+            <p>
+                Diese Nutzungsbedingungen gelten für die Nutzung der Nexus-Anwendung
+                ("App"), eines persönlichen Organisations-Tools für Schüler und Studenten.
+            </p>
+        </section>
+
+        <section class="legal-section">
+            <h2>2. Leistungsbeschreibung</h2>
+            <p>Nexus bietet folgende Funktionen:</p>
+            <ul>
+                <li>Aufgaben- und Terminverwaltung</li>
+                <li>Stundenplan-Anzeige mit A/B-Wochen</li>
+                <li>Integration mit IServ (Schulserver)</li>
+                <li>Google Kalender und E-Mail Integration</li>
+                <li>Wetter-Anzeige</li>
+                <li>Trainings-Tracking</li>
+                <li>Projekt- und Wissensverwaltung</li>
+            </ul>
+        </section>
+
+        <section class="legal-section">
+            <h2>3. Datenspeicherung</h2>
+            <p>
+                <strong>Lokale Speicherung:</strong> Die meisten Daten werden ausschließlich
+                lokal auf deinem Gerät gespeichert (Browser LocalStorage und lokale Dateien).
+                Diese Daten verlassen dein Gerät nicht.
+            </p>
+            <p style="margin-top: 12px;">
+                <strong>Drittanbieter-Integrationen:</strong> Bei Nutzung von Google-Diensten
+                oder IServ werden Daten mit diesen Diensten ausgetauscht. Dies geschieht
+                ausschließlich zur Bereitstellung der jeweiligen Funktionen.
+            </p>
+        </section>
+
+        <section class="legal-section">
+            <h2>4. IServ-Integration</h2>
+            <p>
+                Die IServ-Zugangsdaten werden nur für die Authentifizierung verwendet
+                und temporär in einer Session gespeichert. Wir speichern keine Passwörter
+                dauerhaft.
+            </p>
+            <p style="margin-top: 12px;">
+                Die Nutzung von IServ unterliegt den Nutzungsbedingungen deiner Schule.
+            </p>
+        </section>
+
+        <section class="legal-section">
+            <h2>5. Google-Integration</h2>
+            <p>
+                Bei Verbindung mit Google-Diensten:
+            </p>
+            <ul>
+                <li>Wir fordern nur die minimal notwendigen Berechtigungen an</li>
+                <li>Kalender- und E-Mail-Daten werden nur gelesen und angezeigt</li>
+                <li>Du kannst die Verbindung jederzeit in den Einstellungen trennen</li>
+            </ul>
+        </section>
+
+        <section class="legal-section">
+            <h2>6. Haftungsausschluss</h2>
+            <p>
+                Nexus ist ein privates Projekt und wird "wie besehen" bereitgestellt.
+                Es wird keine Garantie für Verfügbarkeit, Richtigkeit oder Vollständigkeit
+                der Daten übernommen.
+            </p>
+            <p style="margin-top: 12px;">
+                Für Schäden, die durch die Nutzung der App entstehen, wird keine Haftung
+                übernommen, soweit gesetzlich zulässig.
+            </p>
+        </section>
+
+        <section class="legal-section">
+            <h2>7. Änderungen</h2>
+            <p>
+                Diese Nutzungsbedingungen können jederzeit geändert werden.
+                Bei wesentlichen Änderungen wird eine Benachrichtigung in der App angezeigt.
+            </p>
+        </section>
+
+        <section class="legal-section">
+            <h2>8. Kontakt</h2>
+            <p>
+                Bei Fragen zu diesen Nutzungsbedingungen wende dich an den Entwickler.
+            </p>
+        </section>
+    </div>
+</div>
+
+<style>
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 14px;
+    margin-bottom: 16px;
+    transition: color 0.2s;
+}
+
+.back-link:hover {
+    color: var(--accent);
+}
+
+.legal-content {
+    max-width: 800px;
+}
+
+.legal-section {
+    margin-bottom: 32px;
+}
+
+.legal-section:last-child {
+    margin-bottom: 0;
+}
+
+.legal-section h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+}
+
+.legal-section p {
+    color: var(--text-secondary);
+    font-size: 15px;
+}
+
+.legal-section ul {
+    color: var(--text-secondary);
+    font-size: 15px;
+    margin-left: 20px;
+    margin-top: 8px;
+}
+
+.legal-section li {
+    margin-bottom: 6px;
+}
+</style>
+{% endblock %}

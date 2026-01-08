@@ -318,7 +318,7 @@ def send_email(from_email: str, to_email: str, subject: str, body: str, reply_to
         return {"success": False, "error": f"Failed to send: {str(e)}"}
 
 def delete_email(email: str, msg_id: str, folder: str = "INBOX") -> Dict:
-    """Delete an email by moving it to Trash."""
+                                                
     config = load_email_config()
     account = next((a for a in config["accounts"] if a["email"] == email), None)
     if not account:
@@ -335,10 +335,8 @@ def delete_email(email: str, msg_id: str, folder: str = "INBOX") -> Dict:
         imap.login(email, password)
         imap.select(folder)
 
-        # Move to Trash (different providers use different folder names)
         trash_folders = ['[Gmail]/Trash', 'Trash', 'Deleted', 'Deleted Items']
 
-        # Try to copy to trash folder
         moved = False
         for trash in trash_folders:
             try:
@@ -349,7 +347,6 @@ def delete_email(email: str, msg_id: str, folder: str = "INBOX") -> Dict:
             except:
                 continue
 
-        # Mark as deleted
         imap.store(msg_id.encode(), '+FLAGS', '\\Deleted')
         imap.expunge()
 
@@ -359,7 +356,6 @@ def delete_email(email: str, msg_id: str, folder: str = "INBOX") -> Dict:
 
     except Exception as e:
         return {"success": False, "error": f"Error: {str(e)}"}
-
 
 def get_folders(email: str) -> Dict:
     config = load_email_config()

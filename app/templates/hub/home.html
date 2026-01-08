@@ -1,155 +1,573 @@
 {% extends "hub/base.html" %}
+{% set active_tab = 'dashboard' %}
 
-{% block title %}Nexus - Dashboard{% endblock %}
+{% block title %}Dashboard - Nexus{% endblock %}
 
 {% block content %}
-<!-- Clock Widget -->
-<section class="widget glass-card clock-widget">
-    <div class="clock-time" id="clockTime">--:--</div>
-    <div class="clock-date" id="clockDate">Loading...</div>
-</section>
-
-<!-- Weather Widget -->
-<section class="widget glass-card">
-    <div class="widget-header">
-        <div>
-            <h2 class="widget-title" data-i18n="weather">Weather</h2>
+<div class="dashboard">
+    
+    <section class="dashboard-hero">
+        <div class="hero-time">
+            <span class="time-display" id="currentTime">--:--</span>
+            <span class="date-display" id="currentDate">--. --- ----</span>
         </div>
-        <button class="refresh-btn" id="refreshWeather" title="Refresh">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M23 4v6h-6"></path>
-                <path d="M1 20v-6h6"></path>
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-            </svg>
-        </button>
-    </div>
-    <div class="weather-content" id="weatherContent">
-        <div class="weather-loading">Loading weather...</div>
-    </div>
-    <div class="weather-location" id="weatherLocation"></div>
-    <div class="weather-updated" id="weatherUpdated"></div>
-</section>
+        <div class="hero-greeting" id="greeting">Guten Tag</div>
+    </section>
 
-<!-- Quick Links -->
-<section class="widget glass-card widget-full">
-    <h2 class="widget-title" style="margin-bottom: 20px;" data-i18n="quick_access">Quick Access</h2>
-    <div class="quick-links-grid">
-        <a href="/hub/pomodoro" class="quick-link-card">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <circle cx="12" cy="12" r="10"></circle>
-                <polyline points="12 6 12 12 16 14"></polyline>
-            </svg>
-            <span data-i18n="pomodoro">Pomodoro</span>
-        </a>
-        <a href="/hub/tasks" class="quick-link-card">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M9 11l3 3L22 4"></path>
-                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-            </svg>
-            <span data-i18n="nav_tasks">Tasks</span>
-        </a>
-        <a href="/hub/calendar" class="quick-link-card">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
-            <span data-i18n="nav_calendar">Calendar</span>
-        </a>
-        <a href="/hub/notes" class="quick-link-card">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-            </svg>
-            <span data-i18n="nav_notes">Notes</span>
-        </a>
-    </div>
-</section>
-
-<!-- Apps Section -->
-<section class="widget glass-card">
-    <h2 class="widget-title" style="margin-bottom: 20px;" data-i18n="apps">Apps</h2>
-    <div class="apps-grid">
-        <a href="/app" class="app-card">
-            <div class="app-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                    <line x1="12" y1="19" x2="12" y2="23"></line>
-                    <line x1="8" y1="23" x2="16" y2="23"></line>
+    <section class="status-bar glass-card">
+        <div class="status-item" id="statusTasks">
+            <span class="status-icon status-ok">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
-            </div>
-            <span class="app-name">VoiceNotes</span>
-        </a>
-        <a href="/app/info/docs" class="app-card">
-            <div class="app-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10 9 9 9 8 9"></polyline>
+            </span>
+            <span class="status-text">Aufgaben laden...</span>
+        </div>
+        <div class="status-item" id="statusDeadlines">
+            <span class="status-icon status-ok">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
                 </svg>
-            </div>
-            <span class="app-name">Docs</span>
-        </a>
-    </div>
-</section>
-
-<!-- Email Widget -->
-<section class="widget glass-card">
-    <div class="widget-header">
-        <h2 class="widget-title" data-i18n="email">Email</h2>
-        <a href="/hub/email" class="icon-btn" title="View all emails">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M5 12h14"></path>
-                <path d="M12 5l7 7-7 7"></path>
-            </svg>
-        </a>
-    </div>
-    <div class="email-preview-list" id="emailPreviewList">
-        <div class="email-connect-prompt">
-            <p data-i18n="no_email_accounts">No email accounts connected.</p>
-            <a href="/hub/email" class="btn-primary" style="display: inline-block; margin-top: 10px;" data-i18n="add_account">Add Account</a>
+            </span>
+            <span class="status-text">Keine Deadlines</span>
         </div>
-    </div>
-</section>
-{% endblock %}
-
-{% block modals %}
-<!-- Location Modal -->
-<div class="modal" id="locationModal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Set Your Location</h3>
+        <div class="status-item" id="statusTraining">
+            <span class="status-icon status-neutral">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+                    <path d="M6 8H5a4 4 0 0 0 0 8h1"></path>
+                    <line x1="6" y1="12" x2="18" y2="12"></line>
+                </svg>
+            </span>
+            <span class="status-text">Training heute</span>
         </div>
-        <form id="locationForm">
-            <p style="color: var(--text-secondary); margin-bottom: 16px;">Could not auto-detect your location. Please enter your city:</p>
-            <div class="form-group">
-                <label for="cityInput">City</label>
-                <input type="text" id="cityInput" placeholder="e.g., Berlin" required>
+    </section>
+
+    <div class="dashboard-grid">
+        
+        <section class="widget glass-card widget-next-event">
+            <div class="widget-header">
+                <h3>Nächster Termin</h3>
             </div>
-            <div class="form-actions">
-                <button type="submit" class="btn-primary">Save Location</button>
+            <div class="next-event-content" id="nextEventContent">
+                <div class="next-event-placeholder">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <span>Keine anstehenden Termine</span>
+                </div>
             </div>
-        </form>
+        </section>
+
+        <section class="widget glass-card widget-tasks">
+            <div class="widget-header">
+                <h3>Heute erledigen</h3>
+                <a href="/hub/tasks" class="widget-link">Alle →</a>
+            </div>
+            <div class="task-list" id="todayTasks">
+                <div class="empty-state">
+                    <span>Keine Aufgaben für heute</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="widget glass-card widget-alerts">
+            <div class="widget-header">
+                <h3>Wichtig</h3>
+            </div>
+            <div class="alerts-list" id="alertsList">
+                <div class="empty-state">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>Alles im Griff</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="widget glass-card widget-stats">
+            <div class="widget-header">
+                <h3>Diese Woche</h3>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-value" id="statTasksDone">0</span>
+                    <span class="stat-label">Erledigt</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="statTasksOpen">0</span>
+                    <span class="stat-label">Offen</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="statTrainingSessions">0</span>
+                    <span class="stat-label">Training</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="statUpcomingExams">0</span>
+                    <span class="stat-label">Klausuren</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="widget glass-card widget-upcoming">
+            <div class="widget-header">
+                <h3>Kommende Tage</h3>
+                <a href="/hub/calendar" class="widget-link">Kalender →</a>
+            </div>
+            <div class="upcoming-list" id="upcomingList">
+                <div class="empty-state">
+                    <span>Keine Termine in den nächsten 3 Tagen</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="widget glass-card widget-weather" id="weatherWidget">
+            <div class="weather-content">
+                <div class="weather-icon" id="weatherIcon">☀️</div>
+                <div class="weather-temp" id="weatherTemp">--°</div>
+                <div class="weather-desc" id="weatherDesc">Wetter laden...</div>
+            </div>
+        </section>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // Initialize home page specific features
-    document.addEventListener('DOMContentLoaded', async () => {
-        HubApp.initClock();
-        HubApp.initWeather();
-        HubApp.initEventListeners();
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize dashboard
+    updateClock();
+    setInterval(updateClock, 1000);
 
-        // Load email preview
-        await HubApp.loadEmailPreview();
+    loadDashboardData();
+    // Theme toggle is handled by HubApp in hub.js
+});
+
+function updateClock() {
+    const now = new Date();
+    const timeEl = document.getElementById('currentTime');
+    const dateEl = document.getElementById('currentDate');
+    const greetingEl = document.getElementById('greeting');
+
+    // Time
+    timeEl.textContent = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+    // Date
+    const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+    dateEl.textContent = now.toLocaleDateString('de-DE', options);
+
+    // Greeting
+    const hour = now.getHours();
+    if (hour < 6) greetingEl.textContent = 'Gute Nacht';
+    else if (hour < 12) greetingEl.textContent = 'Guten Morgen';
+    else if (hour < 18) greetingEl.textContent = 'Guten Tag';
+    else greetingEl.textContent = 'Guten Abend';
+}
+
+async function loadDashboardData() {
+    // Load tasks
+    await loadTodayTasks();
+
+    // Load calendar events
+    await loadNextEvent();
+    await loadUpcomingEvents();
+
+    // Load school data (homework, tests, exams)
+    await loadSchoolAlerts();
+
+    // Load weather
+    loadWeather();
+
+    // Update status bar
+    updateStatusBar();
+}
+
+async function loadTodayTasks() {
+    try {
+        const response = await fetch('/api/hub/tasks?filter=today');
+        if (response.ok) {
+            const data = await response.json();
+            renderTodayTasks(data.tasks || []);
+        }
+    } catch (err) {
+        console.log('Tasks API not available yet');
+    }
+}
+
+function renderTodayTasks(tasks) {
+    const container = document.getElementById('todayTasks');
+
+    if (!tasks || tasks.length === 0) {
+        container.innerHTML = '<div class="empty-state"><span>Keine Aufgaben für heute</span></div>';
+        return;
+    }
+
+    const topTasks = tasks.slice(0, 5);
+    container.innerHTML = topTasks.map(task => `
+        <div class="task-item ${task.completed ? 'completed' : ''}" data-id="${task.id}">
+            <button class="task-checkbox ${task.completed ? 'checked' : ''}" onclick="toggleTask('${task.id}')">
+                ${task.completed ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ''}
+            </button>
+            <span class="task-title">${task.title}</span>
+            ${task.priority === 'high' ? '<span class="task-priority high">!</span>' : ''}
+        </div>
+    `).join('');
+
+    // Update stats
+    document.getElementById('statTasksOpen').textContent = tasks.filter(t => !t.completed).length;
+    document.getElementById('statTasksDone').textContent = tasks.filter(t => t.completed).length;
+}
+
+async function loadNextEvent() {
+    try {
+        const response = await fetch('/api/calendar/events?days=7');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.events && data.events.length > 0) {
+                renderNextEvent(data.events[0]);
+            }
+        }
+    } catch (err) {
+        console.log('Calendar API not available');
+    }
+}
+
+function renderNextEvent(event) {
+    const container = document.getElementById('nextEventContent');
+    const eventDate = new Date(event.start_date + (event.start_time ? 'T' + event.start_time : ''));
+    const now = new Date();
+    const diffMs = eventDate - now;
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    let timeUntil = '';
+    if (diffHours > 24) {
+        const days = Math.floor(diffHours / 24);
+        timeUntil = `in ${days} Tag${days > 1 ? 'en' : ''}`;
+    } else if (diffHours > 0) {
+        timeUntil = `in ${diffHours}h ${diffMins}min`;
+    } else if (diffMins > 0) {
+        timeUntil = `in ${diffMins} Minuten`;
+    } else {
+        timeUntil = 'Jetzt';
+    }
+
+    container.innerHTML = `
+        <div class="next-event">
+            <div class="event-time-until">${timeUntil}</div>
+            <div class="event-title">${event.title}</div>
+            <div class="event-details">
+                ${event.start_time || 'Ganztägig'} ${event.location ? '• ' + event.location : ''}
+            </div>
+        </div>
+    `;
+}
+
+async function loadUpcomingEvents() {
+    try {
+        const response = await fetch('/api/calendar/events?days=3');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.events) {
+                renderUpcomingEvents(data.events);
+            }
+        }
+    } catch (err) {
+        console.log('Calendar API not available');
+    }
+}
+
+function renderUpcomingEvents(events) {
+    const container = document.getElementById('upcomingList');
+
+    if (!events || events.length === 0) {
+        container.innerHTML = '<div class="empty-state"><span>Keine Termine in den nächsten 3 Tagen</span></div>';
+        return;
+    }
+
+    // Group by date
+    const grouped = {};
+    events.forEach(event => {
+        const date = event.start_date;
+        if (!grouped[date]) grouped[date] = [];
+        grouped[date].push(event);
     });
+
+    let html = '';
+    Object.entries(grouped).slice(0, 3).forEach(([date, dayEvents]) => {
+        const dateObj = new Date(date);
+        const isToday = dateObj.toDateString() === new Date().toDateString();
+        const isTomorrow = dateObj.toDateString() === new Date(Date.now() + 86400000).toDateString();
+
+        let dateLabel = dateObj.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
+        if (isToday) dateLabel = 'Heute';
+        if (isTomorrow) dateLabel = 'Morgen';
+
+        html += `<div class="upcoming-day">
+            <div class="upcoming-date">${dateLabel}</div>
+            ${dayEvents.slice(0, 2).map(e => `
+                <div class="upcoming-event">
+                    <span class="event-time">${e.start_time || '○'}</span>
+                    <span class="event-name">${e.title}</span>
+                </div>
+            `).join('')}
+        </div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+async function loadWeather() {
+    try {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const { latitude, longitude } = pos.coords;
+                const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weathercode`);
+                if (response.ok) {
+                    const data = await response.json();
+                    updateWeather(data.current);
+                }
+            }, () => {
+                fetchWeatherByCity();
+            });
+        }
+    } catch (err) {
+        console.log('Weather not available');
+    }
+}
+
+async function fetchWeatherByCity() {
+    try {
+        const response = await fetch('https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m,weathercode');
+        if (response.ok) {
+            const data = await response.json();
+            updateWeather(data.current);
+        }
+    } catch (err) {}
+}
+
+function updateWeather(current) {
+    if (!current) return;
+
+    const temp = Math.round(current.temperature_2m);
+    const code = current.weathercode;
+
+    document.getElementById('weatherTemp').textContent = temp + '°';
+
+    const weatherIcons = {
+        0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️',
+        45: '🌫️', 48: '🌫️',
+        51: '🌦️', 53: '🌧️', 55: '🌧️',
+        61: '🌧️', 63: '🌧️', 65: '🌧️',
+        71: '🌨️', 73: '🌨️', 75: '❄️',
+        80: '🌦️', 81: '🌧️', 82: '⛈️',
+        95: '⛈️', 96: '⛈️', 99: '⛈️'
+    };
+
+    const weatherDescs = {
+        0: 'Klar', 1: 'Heiter', 2: 'Bewölkt', 3: 'Bedeckt',
+        45: 'Nebel', 48: 'Nebel',
+        51: 'Niesel', 53: 'Niesel', 55: 'Niesel',
+        61: 'Regen', 63: 'Regen', 65: 'Starkregen',
+        71: 'Schnee', 73: 'Schnee', 75: 'Schneefall',
+        80: 'Schauer', 81: 'Schauer', 82: 'Starkregen',
+        95: 'Gewitter', 96: 'Gewitter', 99: 'Gewitter'
+    };
+
+    document.getElementById('weatherIcon').textContent = weatherIcons[code] || '🌡️';
+    document.getElementById('weatherDesc').textContent = weatherDescs[code] || '';
+}
+
+function updateStatusBar() {
+    const statusTasks = document.getElementById('statusTasks');
+    const openTasks = parseInt(document.getElementById('statTasksOpen').textContent) || 0;
+
+    if (openTasks === 0) {
+        statusTasks.querySelector('.status-text').textContent = 'Alle Aufgaben erledigt';
+        statusTasks.querySelector('.status-icon').className = 'status-icon status-ok';
+    } else {
+        statusTasks.querySelector('.status-text').textContent = `${openTasks} Aufgabe${openTasks > 1 ? 'n' : ''} offen`;
+        statusTasks.querySelector('.status-icon').className = openTasks > 5 ? 'status-icon status-warning' : 'status-icon status-neutral';
+    }
+}
+
+async function toggleTask(taskId) {
+    try {
+        await fetch(`/api/hub/tasks/${taskId}/toggle`, { method: 'POST' });
+        loadTodayTasks();
+    } catch (err) {}
+}
+
+async function loadSchoolAlerts() {
+    const alerts = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Helper to calculate days until date
+    function daysUntil(dateStr) {
+        const date = new Date(dateStr);
+        date.setHours(0, 0, 0, 0);
+        return Math.ceil((date - today) / (1000 * 60 * 60 * 24));
+    }
+
+    // First load subjects to map subject_id to subject name
+    let subjects = [];
+    try {
+        const subjectsRes = await fetch('/api/hub/school/subjects');
+        if (subjectsRes.ok) {
+            const data = await subjectsRes.json();
+            subjects = data.subjects || [];
+        }
+    } catch (err) {
+        console.log('Subjects API not available');
+    }
+
+    // Helper to get subject name from subject_id
+    function getSubjectName(subjectId) {
+        const subject = subjects.find(s => s.id === subjectId);
+        return subject ? subject.name : 'Unbekannt';
+    }
+
+    try {
+        // Load homework - show if due in 2 days or less
+        const homeworkRes = await fetch('/api/hub/school/homework');
+        if (homeworkRes.ok) {
+            const data = await homeworkRes.json();
+            const homework = data.homework || [];
+            homework.forEach(hw => {
+                if (hw.completed) return;
+                const days = daysUntil(hw.due_date);
+                if (days <= 2 && days >= 0) {
+                    alerts.push({
+                        type: 'homework',
+                        icon: '📝',
+                        title: hw.title,
+                        subject: getSubjectName(hw.subject_id),
+                        days: days,
+                        urgency: days === 0 ? 'urgent' : days === 1 ? 'warning' : 'normal'
+                    });
+                }
+            });
+        }
+    } catch (err) {
+        console.log('Homework API not available');
+    }
+
+    try {
+        // Load tests - show if in 3 days or less
+        const testsRes = await fetch('/api/hub/school/tests');
+        if (testsRes.ok) {
+            const data = await testsRes.json();
+            const tests = data.tests || [];
+            tests.forEach(test => {
+                const days = daysUntil(test.date);
+                if (days <= 3 && days >= 0) {
+                    alerts.push({
+                        type: 'test',
+                        icon: '📋',
+                        title: test.title || 'Test',
+                        subject: getSubjectName(test.subject_id),
+                        days: days,
+                        urgency: days === 0 ? 'urgent' : days === 1 ? 'warning' : 'normal'
+                    });
+                }
+            });
+        }
+    } catch (err) {
+        console.log('Tests API not available');
+    }
+
+    try {
+        // Load exams (Klausuren) - show if in 3 days or less
+        const examsRes = await fetch('/api/hub/school/exams');
+        if (examsRes.ok) {
+            const data = await examsRes.json();
+            const exams = data.exams || [];
+            exams.forEach(exam => {
+                const days = daysUntil(exam.date);
+                if (days <= 3 && days >= 0) {
+                    alerts.push({
+                        type: 'exam',
+                        icon: '📚',
+                        title: exam.title || 'Klausur',
+                        subject: getSubjectName(exam.subject_id),
+                        days: days,
+                        urgency: days === 0 ? 'urgent' : days <= 1 ? 'warning' : 'normal'
+                    });
+                }
+            });
+        }
+    } catch (err) {
+        console.log('Exams API not available');
+    }
+
+    // Sort by urgency (most urgent first)
+    alerts.sort((a, b) => a.days - b.days);
+
+    // Update exam count in stats
+    const examCount = alerts.filter(a => a.type === 'exam' || a.type === 'test').length;
+    document.getElementById('statUpcomingExams').textContent = examCount;
+
+    // Render alerts
+    renderAlerts(alerts);
+
+    // Update deadline status
+    updateDeadlineStatus(alerts);
+}
+
+function renderAlerts(alerts) {
+    const container = document.getElementById('alertsList');
+
+    if (!alerts || alerts.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Alles im Griff</span>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = alerts.slice(0, 5).map(alert => {
+        const daysText = alert.days === 0 ? 'Heute' : alert.days === 1 ? 'Morgen' : `in ${alert.days} Tagen`;
+        const typeLabel = alert.type === 'homework' ? 'Hausaufgabe' : alert.type === 'test' ? 'Test' : 'Klausur';
+
+        return `
+            <div class="alert-item ${alert.urgency}">
+                <span class="alert-icon">${alert.icon}</span>
+                <div class="alert-content">
+                    <span class="alert-title">${alert.subject}: ${alert.title}</span>
+                    <span class="alert-meta">${typeLabel} • ${daysText}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function updateDeadlineStatus(alerts) {
+    const statusEl = document.getElementById('statusDeadlines');
+    const urgentCount = alerts.filter(a => a.urgency === 'urgent').length;
+    const warningCount = alerts.filter(a => a.urgency === 'warning').length;
+
+    if (urgentCount > 0) {
+        statusEl.querySelector('.status-text').textContent = `${urgentCount} dringend heute!`;
+        statusEl.querySelector('.status-icon').className = 'status-icon status-error';
+    } else if (warningCount > 0) {
+        statusEl.querySelector('.status-text').textContent = `${warningCount} morgen fällig`;
+        statusEl.querySelector('.status-icon').className = 'status-icon status-warning';
+    } else if (alerts.length > 0) {
+        statusEl.querySelector('.status-text').textContent = `${alerts.length} bald fällig`;
+        statusEl.querySelector('.status-icon').className = 'status-icon status-neutral';
+    } else {
+        statusEl.querySelector('.status-text').textContent = 'Keine Deadlines';
+        statusEl.querySelector('.status-icon').className = 'status-icon status-ok';
+    }
+}
 </script>
 {% endblock %}

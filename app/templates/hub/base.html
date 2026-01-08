@@ -1,35 +1,202 @@
 <!DOCTYPE html>
-<html lang="en" id="htmlRoot">
+<html lang="de" id="htmlRoot">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Nexus{% endblock %}</title>
+
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Nexus">
+    <link rel="apple-touch-icon" href="/static/images/icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/static/images/icons/icon-152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/images/icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="167x167" href="/static/images/icons/icon-192.png">
+    
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="Nexus Hub">
+    <meta name="msapplication-TileColor" content="#667eea">
+    <meta name="msapplication-TileImage" content="/static/images/icons/icon-144.png">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/hub.css">
+    <link rel="stylesheet" href="/static/css/loading.css">
     {% block head %}{% endblock %}
+    <script>
+        // Apply theme immediately to prevent flash
+        (function() {
+            var theme = localStorage.getItem('nexus-theme') || localStorage.getItem('hub_theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
 </head>
-<body data-theme="light">
+<body>
+    <script>
+        // Apply theme to body as well
+        document.body.setAttribute('data-theme', localStorage.getItem('nexus-theme') || localStorage.getItem('hub_theme') || 'dark');
+    </script>
+    
     <div class="hub-background">
         <div class="gradient-orb orb-1"></div>
         <div class="gradient-orb orb-2"></div>
         <div class="gradient-orb orb-3"></div>
     </div>
 
-    <div class="hub-container">
-        <header class="hub-header glass-card">
-            <div class="hub-title">
-                <img src="/static/images/nexus-logo.png" alt="Nexus" class="hub-logo">
-                <h1>Nexus</h1>
-                <span class="offline-indicator" id="offlineIndicator">Offline</span>
+    <div class="hub-layout">
+        
+        <aside class="sidebar glass-card">
+            <div class="sidebar-header">
+                <img src="/static/images/nexus-logo.png" alt="Nexus" class="sidebar-logo">
+                <h1 class="sidebar-title">Nexus</h1>
             </div>
-            <div class="hub-controls">
-                <div class="lang-selector">
-                    <button id="langEn" data-lang="en">EN</button>
-                    <button id="langDe" data-lang="de">DE</button>
+
+            <nav class="sidebar-nav">
+                <a href="/hub" class="nav-item {% if active_tab == 'dashboard' %}active{% endif %}" data-section="dashboard">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    <span>Dashboard</span>
+                </a>
+
+                <div class="nav-section-label">Alltag</div>
+
+                <a href="/hub/tasks" class="nav-item {% if active_tab == 'tasks' %}active{% endif %}" data-section="tasks">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 11l3 3L22 4"></path>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                    </svg>
+                    <span>Aufgaben</span>
+                </a>
+
+                <a href="/hub/calendar" class="nav-item {% if active_tab == 'calendar' %}active{% endif %}" data-section="calendar">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <span>Kalender</span>
+                </a>
+
+                <div class="nav-section-label">Bereiche</div>
+
+                <a href="/hub/school" class="nav-item {% if active_tab == 'school' %}active{% endif %}" data-section="school">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+                        <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+                    </svg>
+                    <span>Schule</span>
+                </a>
+
+                <a href="/hub/training" class="nav-item {% if active_tab == 'training' %}active{% endif %}" data-section="training">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+                        <path d="M6 8H5a4 4 0 0 0 0 8h1"></path>
+                        <line x1="6" y1="12" x2="18" y2="12"></line>
+                        <line x1="9" y1="8" x2="9" y2="16"></line>
+                        <line x1="15" y1="8" x2="15" y2="16"></line>
+                    </svg>
+                    <span>Training</span>
+                </a>
+
+                <a href="/hub/projects" class="nav-item {% if active_tab == 'projects' %}active{% endif %}" data-section="projects">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>Projekte</span>
+                </a>
+
+                <a href="/hub/knowledge" class="nav-item {% if active_tab == 'knowledge' %}active{% endif %}" data-section="knowledge">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    </svg>
+                    <span>Wissen</span>
+                </a>
+
+                <div class="nav-section-label">System</div>
+
+                <a href="/hub/email" class="nav-item {% if active_tab == 'email' %}active{% endif %}" data-section="email">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                        <polyline points="22,6 12,13 2,6"></polyline>
+                    </svg>
+                    <span>E-Mail</span>
+                    <span class="nav-badge" id="emailBadge" style="display: none;">0</span>
+                </a>
+
+                <a href="/hub/review" class="nav-item {% if active_tab == 'review' %}active{% endif %}" data-section="review">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                    </svg>
+                    <span>Review</span>
+                </a>
+
+                <a href="/hub/mousepad" class="nav-item {% if active_tab == 'mousepad' %}active{% endif %}" data-section="mousepad">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                        <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                        <path d="M2 2l7.586 7.586"></path>
+                        <circle cx="11" cy="11" r="2"></circle>
+                    </svg>
+                    <span>Mousepad</span>
+                </a>
+
+                <a href="/hub/assistant" class="nav-item {% if active_tab == 'assistant' %}active{% endif %}" data-section="assistant">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>Assistent</span>
+                </a>
+
+                <a href="/hub/settings" class="nav-item {% if active_tab == 'settings' %}active{% endif %}" data-section="settings">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <span>Einstellungen</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-account" id="accountSection">
+                <button class="account-button" id="accountButton" onclick="toggleAccountMenu()">
+                    <div class="account-avatar" id="accountAvatar">
+                        <span id="accountInitial">?</span>
+                    </div>
+                    <div class="account-info">
+                        <span class="account-name" id="accountName">Nicht angemeldet</span>
+                        <span class="account-status" id="accountStatus">Konto wählen</span>
+                    </div>
+                    <svg class="account-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </button>
+
+                <div class="account-menu" id="accountMenu">
+                    <div class="account-menu-header">Konten</div>
+                    <div class="account-list" id="accountList">
+                        
+                    </div>
+                    <div class="account-menu-divider"></div>
+                    <button class="account-menu-item" onclick="showCreateAccountModal()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        <span>Neues Konto erstellen</span>
+                    </button>
                 </div>
-                <button class="icon-btn" id="themeToggle" title="Toggle theme">
-                    <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            </div>
+
+            <div class="sidebar-footer">
+                <button class="icon-btn theme-toggle" id="themeToggle" title="Theme wechseln">
+                    <svg class="sun-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="5"></circle>
                         <line x1="12" y1="1" x2="12" y2="3"></line>
                         <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -40,76 +207,663 @@
                         <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
                         <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
                     </svg>
-                    <svg class="moon-icon hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <svg class="moon-icon hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                     </svg>
                 </button>
             </div>
-        </header>
+        </aside>
 
-        <main class="hub-main">
+        <main class="main-content">
             {% block content %}{% endblock %}
         </main>
     </div>
 
-    <nav class="bottom-nav glass-card">
-        <a href="/" class="nav-item {% if active_tab == 'home' %}active{% endif %}">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                <polyline points="9 22 9 12 15 12 15 22"></polyline>
-            </svg>
-            <span data-i18n="nav_home">Home</span>
-        </a>
-        <a href="/hub/tasks" class="nav-item {% if active_tab == 'tasks' %}active{% endif %}">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 11l3 3L22 4"></path>
-                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-            </svg>
-            <span data-i18n="nav_tasks">Tasks</span>
-        </a>
-        <a href="/hub/calendar" class="nav-item {% if active_tab == 'calendar' %}active{% endif %}">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
-            <span data-i18n="nav_calendar">Calendar</span>
-        </a>
-        <a href="/hub/notes" class="nav-item {% if active_tab == 'notes' %}active{% endif %}">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-            </svg>
-            <span data-i18n="nav_notes">Notes</span>
-        </a>
-        <a href="/hub/bookmarks" class="nav-item {% if active_tab == 'bookmarks' %}active{% endif %}">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-            </svg>
-            <span data-i18n="nav_bookmarks">Bookmarks</span>
-        </a>
-        <a href="/hub/email" class="nav-item {% if active_tab == 'email' %}active{% endif %}">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                <polyline points="22,6 12,13 2,6"></polyline>
-            </svg>
-            <span data-i18n="nav_email">Email</span>
-        </a>
-        <a href="/hub/settings" class="nav-item {% if active_tab == 'settings' %}active{% endif %}">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-            <span data-i18n="nav_settings">Settings</span>
-        </a>
-    </nav>
+    <button class="fab-button" id="fabButton" onclick="openQuickNoteModal()" title="Schnelle Notiz">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+    </button>
+
+    <div class="modal" id="quickNoteModal">
+        <div class="modal-content quick-note-modal">
+            <div class="modal-header">
+                <h3>Schnelle Notiz</h3>
+                <button class="modal-close" onclick="closeQuickNoteModal()">&times;</button>
+            </div>
+            <form id="quickNoteForm" onsubmit="saveQuickNote(event)">
+                <div class="form-group">
+                    <label for="quickNoteType">Typ</label>
+                    <select id="quickNoteType" name="type">
+                        <option value="note">Notiz</option>
+                        <option value="homework">Hausaufgabe</option>
+                        <option value="task">Aufgabe</option>
+                        <option value="idea">Idee</option>
+                    </select>
+                </div>
+                <div class="form-group" id="quickNoteSubjectGroup" style="display: none;">
+                    <label for="quickNoteSubject">Fach</label>
+                    <select id="quickNoteSubject" name="subject_id"></select>
+                </div>
+                <div class="form-group">
+                    <label for="quickNoteTitle">Titel</label>
+                    <input type="text" id="quickNoteTitle" name="title" placeholder="Kurze Beschreibung..." required>
+                </div>
+                <div class="form-group">
+                    <label for="quickNoteContent">Inhalt</label>
+                    <textarea id="quickNoteContent" name="content" rows="4" placeholder="Details..."></textarea>
+                </div>
+                <div class="form-group" id="quickNoteDueDateGroup" style="display: none;">
+                    <label for="quickNoteDueDate">Fällig am</label>
+                    <input type="date" id="quickNoteDueDate" name="due_date">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     {% block modals %}{% endblock %}
 
+    <div class="modal" id="welcomeModal">
+        <div class="modal-content welcome-modal">
+            <div class="welcome-header">
+                <img src="/static/images/nexus-logo.png" alt="Nexus" class="welcome-logo">
+                <h2>Willkommen bei Nexus!</h2>
+                <p>Erstelle dein Konto, um zu starten</p>
+            </div>
+            <form id="welcomeForm" onsubmit="createFirstAccount(event)">
+                <div class="form-group">
+                    <label for="welcomeUsername">Benutzername</label>
+                    <input type="text" id="welcomeUsername" name="username" placeholder="Dein Name..." required minlength="2" maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label>Profilfarbe wählen</label>
+                    <div class="color-picker" id="welcomeColorPicker">
+                        <button type="button" class="color-option selected" data-color="#4285f4" style="background: #4285f4"></button>
+                        <button type="button" class="color-option" data-color="#ea4335" style="background: #ea4335"></button>
+                        <button type="button" class="color-option" data-color="#34a853" style="background: #34a853"></button>
+                        <button type="button" class="color-option" data-color="#fbbc04" style="background: #fbbc04"></button>
+                        <button type="button" class="color-option" data-color="#9c27b0" style="background: #9c27b0"></button>
+                        <button type="button" class="color-option" data-color="#e91e63" style="background: #e91e63"></button>
+                        <button type="button" class="color-option" data-color="#00bcd4" style="background: #00bcd4"></button>
+                        <button type="button" class="color-option" data-color="#ff5722" style="background: #ff5722"></button>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary btn-large">Konto erstellen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="createAccountModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Neues Konto erstellen</h3>
+                <button class="modal-close" onclick="closeCreateAccountModal()">&times;</button>
+            </div>
+            <form id="createAccountForm" onsubmit="createNewAccount(event)">
+                <div class="form-group">
+                    <label for="newAccountUsername">Benutzername</label>
+                    <input type="text" id="newAccountUsername" name="username" placeholder="Name eingeben..." required minlength="2" maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label>Profilfarbe</label>
+                    <div class="color-picker" id="newAccountColorPicker">
+                        <button type="button" class="color-option selected" data-color="#4285f4" style="background: #4285f4"></button>
+                        <button type="button" class="color-option" data-color="#ea4335" style="background: #ea4335"></button>
+                        <button type="button" class="color-option" data-color="#34a853" style="background: #34a853"></button>
+                        <button type="button" class="color-option" data-color="#fbbc04" style="background: #fbbc04"></button>
+                        <button type="button" class="color-option" data-color="#9c27b0" style="background: #9c27b0"></button>
+                        <button type="button" class="color-option" data-color="#e91e63" style="background: #e91e63"></button>
+                        <button type="button" class="color-option" data-color="#00bcd4" style="background: #00bcd4"></button>
+                        <button type="button" class="color-option" data-color="#ff5722" style="background: #ff5722"></button>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeCreateAccountModal()">Abbrechen</button>
+                    <button type="submit" class="btn-primary">Erstellen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="accountManageModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Konto verwalten</h3>
+                <button class="modal-close" onclick="closeAccountManageModal()">&times;</button>
+            </div>
+            <div class="account-manage-content">
+                <div class="account-manage-avatar" id="manageAccountAvatar">
+                    <span id="manageAccountInitial">?</span>
+                </div>
+                <form id="manageAccountForm" onsubmit="updateAccountDetails(event)">
+                    <div class="form-group">
+                        <label for="manageAccountUsername">Benutzername</label>
+                        <input type="text" id="manageAccountUsername" name="username" required minlength="2" maxlength="20">
+                    </div>
+                    <div class="form-group">
+                        <label>Profilfarbe</label>
+                        <div class="color-picker" id="manageAccountColorPicker">
+                            <button type="button" class="color-option" data-color="#4285f4" style="background: #4285f4"></button>
+                            <button type="button" class="color-option" data-color="#ea4335" style="background: #ea4335"></button>
+                            <button type="button" class="color-option" data-color="#34a853" style="background: #34a853"></button>
+                            <button type="button" class="color-option" data-color="#fbbc04" style="background: #fbbc04"></button>
+                            <button type="button" class="color-option" data-color="#9c27b0" style="background: #9c27b0"></button>
+                            <button type="button" class="color-option" data-color="#e91e63" style="background: #e91e63"></button>
+                            <button type="button" class="color-option" data-color="#00bcd4" style="background: #00bcd4"></button>
+                            <button type="button" class="color-option" data-color="#ff5722" style="background: #ff5722"></button>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-danger" onclick="confirmDeleteAccount()">Konto löschen</button>
+                        <button type="submit" class="btn-primary">Speichern</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="offline-banner" id="offlineBanner">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="1" y1="1" x2="23" y2="23"></line>
+            <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
+            <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
+            <path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path>
+            <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
+            <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+            <line x1="12" y1="20" x2="12.01" y2="20"></line>
+        </svg>
+        <span>Offline-Modus</span>
+    </div>
+
+    <div class="app-loading-overlay" id="appLoadingOverlay">
+        <div class="app-loading-content">
+            <div class="app-loading-spinner"></div>
+            <div class="app-loading-text" id="appLoadingText">Loading...</div>
+            <div class="app-loading-bar">
+                <div class="app-loading-progress"></div>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/hub.js"></script>
+    <script src="/static/js/nexus-offline.js"></script>
+
+    <script>
+    let managingAccountId = null;
+
+    // Initialize account system when page loads
+    window.addEventListener('nexus-ready', function(e) {
+        const account = e.detail.account;
+        if (account) {
+            updateAccountUI(account);
+        } else {
+            // No account - show welcome modal
+            showWelcomeModal();
+        }
+    });
+
+    // Listen for account changes
+    window.addEventListener('nexus-account-changed', function(e) {
+        const account = e.detail;
+        if (account) {
+            updateAccountUI(account);
+            // Reload page to refresh data for new account
+            location.reload();
+        } else {
+            showWelcomeModal();
+        }
+    });
+
+    // Online/Offline status
+    window.addEventListener('online', () => {
+        document.getElementById('offlineBanner').classList.remove('visible');
+    });
+    window.addEventListener('offline', () => {
+        document.getElementById('offlineBanner').classList.add('visible');
+    });
+    // Check initial state
+    if (!navigator.onLine) {
+        document.getElementById('offlineBanner').classList.add('visible');
+    }
+
+    function updateAccountUI(account) {
+        const avatar = document.getElementById('accountAvatar');
+        const initial = document.getElementById('accountInitial');
+        const name = document.getElementById('accountName');
+        const status = document.getElementById('accountStatus');
+
+        if (account) {
+            avatar.style.background = account.avatar_color || '#4285f4';
+            initial.textContent = account.username.charAt(0).toUpperCase();
+            name.textContent = account.display_name || account.username;
+            status.textContent = 'Angemeldet';
+        }
+    }
+
+    async function loadAccountList() {
+        const accounts = await NexusAccounts.getAllAccounts();
+        const list = document.getElementById('accountList');
+        const currentId = NexusAccounts.getCurrentUserId();
+
+        list.innerHTML = accounts.map(acc => `
+            <div class="account-menu-item account-option ${acc.id === currentId ? 'active' : ''}"
+                 onclick="switchToAccount(${acc.id})" data-account-id="${acc.id}">
+                <div class="account-option-avatar" style="background: ${acc.avatar_color || '#4285f4'}">
+                    ${acc.username.charAt(0).toUpperCase()}
+                </div>
+                <div class="account-option-info">
+                    <span class="account-option-name">${acc.display_name || acc.username}</span>
+                    ${acc.id === currentId ? '<span class="account-option-badge">Aktiv</span>' : ''}
+                </div>
+                <button class="account-option-edit" onclick="event.stopPropagation(); showAccountManageModal(${acc.id})" title="Bearbeiten">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="1"></circle>
+                        <circle cx="19" cy="12" r="1"></circle>
+                        <circle cx="5" cy="12" r="1"></circle>
+                    </svg>
+                </button>
+            </div>
+        `).join('');
+    }
+
+    function toggleAccountMenu() {
+        const menu = document.getElementById('accountMenu');
+        const isOpen = menu.classList.contains('open');
+
+        if (!isOpen) {
+            loadAccountList();
+        }
+
+        menu.classList.toggle('open');
+
+        // Close when clicking outside
+        if (!isOpen) {
+            setTimeout(() => {
+                document.addEventListener('click', closeAccountMenuOnClickOutside);
+            }, 0);
+        }
+    }
+
+    function closeAccountMenuOnClickOutside(e) {
+        const menu = document.getElementById('accountMenu');
+        const button = document.getElementById('accountButton');
+
+        if (!menu.contains(e.target) && !button.contains(e.target)) {
+            menu.classList.remove('open');
+            document.removeEventListener('click', closeAccountMenuOnClickOutside);
+        }
+    }
+
+    async function switchToAccount(accountId) {
+        try {
+            await NexusAccounts.switchAccount(accountId);
+            document.getElementById('accountMenu').classList.remove('open');
+        } catch (err) {
+            alert('Fehler beim Kontowechsel: ' + err.message);
+        }
+    }
+
+    function showWelcomeModal() {
+        document.getElementById('welcomeModal').classList.add('active');
+        document.getElementById('welcomeUsername').focus();
+    }
+
+    async function createFirstAccount(e) {
+        e.preventDefault();
+        const username = document.getElementById('welcomeUsername').value.trim();
+        const colorBtn = document.querySelector('#welcomeColorPicker .color-option.selected');
+        const color = colorBtn ? colorBtn.dataset.color : '#4285f4';
+
+        try {
+            const account = await NexusAccounts.createAccount(username, username, color);
+            await NexusAccounts.switchAccount(account.id);
+            document.getElementById('welcomeModal').classList.remove('active');
+        } catch (err) {
+            alert('Fehler: ' + err.message);
+        }
+    }
+
+    function showCreateAccountModal() {
+        document.getElementById('accountMenu').classList.remove('open');
+        document.getElementById('createAccountModal').classList.add('active');
+        document.getElementById('newAccountUsername').value = '';
+        document.getElementById('newAccountUsername').focus();
+    }
+
+    function closeCreateAccountModal() {
+        document.getElementById('createAccountModal').classList.remove('active');
+    }
+
+    async function createNewAccount(e) {
+        e.preventDefault();
+        const username = document.getElementById('newAccountUsername').value.trim();
+        const colorBtn = document.querySelector('#newAccountColorPicker .color-option.selected');
+        const color = colorBtn ? colorBtn.dataset.color : '#4285f4';
+
+        try {
+            const account = await NexusAccounts.createAccount(username, username, color);
+            closeCreateAccountModal();
+            // Ask if user wants to switch
+            if (confirm(`Konto "${username}" erstellt. Jetzt wechseln?`)) {
+                await NexusAccounts.switchAccount(account.id);
+            }
+        } catch (err) {
+            alert('Fehler: ' + err.message);
+        }
+    }
+
+    async function showAccountManageModal(accountId) {
+        document.getElementById('accountMenu').classList.remove('open');
+        managingAccountId = accountId;
+
+        const account = await NexusDB.get('accounts', accountId);
+        if (!account) return;
+
+        document.getElementById('manageAccountUsername').value = account.username;
+        const avatar = document.getElementById('manageAccountAvatar');
+        avatar.style.background = account.avatar_color || '#4285f4';
+        document.getElementById('manageAccountInitial').textContent = account.username.charAt(0).toUpperCase();
+
+        // Select current color
+        document.querySelectorAll('#manageAccountColorPicker .color-option').forEach(btn => {
+            btn.classList.toggle('selected', btn.dataset.color === account.avatar_color);
+        });
+
+        document.getElementById('accountManageModal').classList.add('active');
+    }
+
+    function closeAccountManageModal() {
+        document.getElementById('accountManageModal').classList.remove('active');
+        managingAccountId = null;
+    }
+
+    async function updateAccountDetails(e) {
+        e.preventDefault();
+        if (!managingAccountId) return;
+
+        const username = document.getElementById('manageAccountUsername').value.trim();
+        const colorBtn = document.querySelector('#manageAccountColorPicker .color-option.selected');
+        const color = colorBtn ? colorBtn.dataset.color : '#4285f4';
+
+        try {
+            await NexusAccounts.updateAccount(managingAccountId, {
+                username: username,
+                display_name: username,
+                avatar_color: color
+            });
+            closeAccountManageModal();
+
+            // Update UI if current account
+            if (NexusAccounts.getCurrentUserId() === managingAccountId) {
+                updateAccountUI(NexusAccounts.currentAccount);
+            }
+        } catch (err) {
+            alert('Fehler: ' + err.message);
+        }
+    }
+
+    async function confirmDeleteAccount() {
+        if (!managingAccountId) return;
+
+        const accounts = await NexusAccounts.getAllAccounts();
+        if (accounts.length <= 1) {
+            alert('Du kannst dein einziges Konto nicht löschen.');
+            return;
+        }
+
+        if (confirm('Konto und alle Daten wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden!')) {
+            try {
+                await NexusAccounts.deleteAccount(managingAccountId);
+                closeAccountManageModal();
+            } catch (err) {
+                alert('Fehler: ' + err.message);
+            }
+        }
+    }
+
+    // Color picker functionality
+    document.querySelectorAll('.color-picker').forEach(picker => {
+        picker.addEventListener('click', function(e) {
+            const btn = e.target.closest('.color-option');
+            if (btn) {
+                picker.querySelectorAll('.color-option').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+
+                // Update avatar preview in manage modal
+                if (picker.id === 'manageAccountColorPicker') {
+                    document.getElementById('manageAccountAvatar').style.background = btn.dataset.color;
+                }
+            }
+        });
+    });
+    </script>
+
+    <script>
+    let quickNoteSubjects = [];
+
+    // Load subjects for homework
+    async function loadQuickNoteSubjects() {
+        try {
+            const res = await fetch('/api/hub/school/subjects');
+            if (res.ok) {
+                const data = await res.json();
+                quickNoteSubjects = data.subjects || [];
+                const select = document.getElementById('quickNoteSubject');
+                select.innerHTML = '<option value="">Fach wählen...</option>' +
+                    quickNoteSubjects.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+            }
+        } catch (e) {}
+    }
+
+    function openQuickNoteModal() {
+        document.getElementById('quickNoteForm').reset();
+        loadQuickNoteSubjects();
+        document.getElementById('quickNoteModal').classList.add('active');
+        document.getElementById('quickNoteTitle').focus();
+    }
+
+    function closeQuickNoteModal() {
+        document.getElementById('quickNoteModal').classList.remove('active');
+    }
+
+    // Show/hide fields based on type
+    document.getElementById('quickNoteType').addEventListener('change', function() {
+        const type = this.value;
+        const subjectGroup = document.getElementById('quickNoteSubjectGroup');
+        const dueDateGroup = document.getElementById('quickNoteDueDateGroup');
+
+        if (type === 'homework') {
+            subjectGroup.style.display = 'block';
+            dueDateGroup.style.display = 'block';
+        } else if (type === 'task') {
+            subjectGroup.style.display = 'none';
+            dueDateGroup.style.display = 'block';
+        } else {
+            subjectGroup.style.display = 'none';
+            dueDateGroup.style.display = 'none';
+        }
+    });
+
+    async function saveQuickNote(e) {
+        e.preventDefault();
+        const type = document.getElementById('quickNoteType').value;
+        const title = document.getElementById('quickNoteTitle').value;
+        const content = document.getElementById('quickNoteContent').value;
+        const subjectId = document.getElementById('quickNoteSubject').value;
+        const dueDate = document.getElementById('quickNoteDueDate').value;
+
+        try {
+            let url, data;
+
+            switch(type) {
+                case 'homework':
+                    url = '/api/hub/school/homework';
+                    data = {
+                        title: title,
+                        subject_id: subjectId,
+                        notes: content,
+                        due_date: dueDate
+                    };
+                    break;
+                case 'task':
+                    url = '/api/hub/tasks';
+                    data = {
+                        title: title,
+                        description: content,
+                        due_date: dueDate
+                    };
+                    break;
+                case 'note':
+                case 'idea':
+                default:
+                    url = '/api/hub/quick-notes';
+                    data = {
+                        type: type,
+                        title: title,
+                        content: content
+                    };
+                    break;
+            }
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                closeQuickNoteModal();
+                // Show success feedback
+                showQuickNoteFeedback('Gespeichert!');
+                // Reload if on relevant page
+                if (window.location.pathname.includes('/hub/tasks') ||
+                    window.location.pathname.includes('/hub/school')) {
+                    setTimeout(() => location.reload(), 500);
+                }
+            }
+        } catch (err) {
+            console.error('Error saving quick note:', err);
+        }
+    }
+
+    function showQuickNoteFeedback(message) {
+        const fab = document.getElementById('fabButton');
+        fab.classList.add('success');
+        setTimeout(() => fab.classList.remove('success'), 1500);
+    }
+
+    // Keyboard shortcut: Ctrl+Shift+N to open quick note
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.shiftKey && e.key === 'N') {
+            e.preventDefault();
+            openQuickNoteModal();
+        }
+    });
+    </script>
+
+    <script>
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', async () => {
+            try {
+                const registration = await navigator.serviceWorker.register('/static/sw.js', {
+                    scope: '/'
+                });
+                console.log('[PWA] Service Worker registered:', registration.scope);
+
+                // Check for updates
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // New version available
+                            if (confirm('Neue Version verfügbar! Jetzt aktualisieren?')) {
+                                newWorker.postMessage({ type: 'SKIP_WAITING' });
+                                window.location.reload();
+                            }
+                        }
+                    });
+                });
+
+                // Listen for messages from service worker
+                navigator.serviceWorker.addEventListener('message', (event) => {
+                    if (event.data && event.data.type === 'SYNC_READY') {
+                        console.log('[PWA] Back online - sync available');
+                        // Could trigger data sync here
+                    }
+                });
+            } catch (error) {
+                console.error('[PWA] Service Worker registration failed:', error);
+            }
+        });
+
+        // Handle controller change (new SW activated)
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            console.log('[PWA] New service worker activated');
+        });
+    }
+
+    // Install prompt for PWA
+    let deferredPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent Chrome 67+ from showing the mini-infobar
+        e.preventDefault();
+        deferredPrompt = e;
+
+        // Show custom install button if not already installed
+        if (!window.matchMedia('(display-mode: standalone)').matches) {
+            showInstallButton();
+        }
+    });
+
+    function showInstallButton() {
+        // Create install button if it doesn't exist
+        if (!document.getElementById('pwaInstallBtn')) {
+            const btn = document.createElement('button');
+            btn.id = 'pwaInstallBtn';
+            btn.className = 'pwa-install-btn';
+            btn.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                App installieren
+            `;
+            btn.onclick = installPWA;
+            document.body.appendChild(btn);
+        }
+    }
+
+    async function installPWA() {
+        if (!deferredPrompt) return;
+
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+
+        if (outcome === 'accepted') {
+            console.log('[PWA] User accepted installation');
+            document.getElementById('pwaInstallBtn')?.remove();
+        }
+
+        deferredPrompt = null;
+    }
+
+    // Hide install button if already in standalone mode
+    window.addEventListener('appinstalled', () => {
+        console.log('[PWA] App installed successfully');
+        document.getElementById('pwaInstallBtn')?.remove();
+        deferredPrompt = null;
+    });
+    </script>
+
     {% block scripts %}{% endblock %}
 </body>
 </html>

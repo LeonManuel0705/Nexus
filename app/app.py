@@ -1,677 +1,37 @@
-from flask import Flask, request, jsonify, send_from_directory, send_file, render_template
+from flask import Flask, request, jsonify, render_template, redirect, url_for
 from flask_cors import CORS
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO
 import os
-import threading
+import uuid
 from datetime import datetime
-from io import BytesIO
+from pathlib import Path
 import json
 import time
-from docx import Document
-from docx.shared import Pt, Inches, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.style import WD_STYLE_TYPE
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import mm
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
-from reportlab.lib.colors import HexColor
 
 import database as db
-from recorder import get_recorder, list_audio_devices, get_default_input_device
-from transcriber import (
-    cleanup_audio_file, get_available_models,
-    preload_model, transcribe_audio_chunk, get_ollama_status,
-    get_correction_status, reset_session, get_text_corrector,
-    apply_ai_correction, get_whisper_model
-)
-from voice_profile import get_profile_manager, verify_teacher_audio
-from quality_feedback import (
-    get_feedback_collector, analyze_transcription, save_feedback,
-    apply_logic_correction, get_analyzer
-)
-from adaptive_system import (
-    get_adaptive_system, set_teacher as adaptive_set_teacher,
-    record_feedback as adaptive_record_feedback, get_param,
-    get_current_params, get_teacher_stats, get_change_log
-)
-import app_logger
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
-realtime_active = False
-realtime_thread = None
-correction_thread = None
-current_transcription = []
-corrected_segments = []
-last_correction_index = 0
-correction_lock = threading.Lock()
-realtime_state_lock = threading.Lock()
-current_language = "de"
-
-voice_filter_enabled = False
-voice_filter_profile_id = None
-voice_filter_mode = "include"
-enrollment_active = False
-chunk_errors = []
-
-CORRECTION_DELAY_SECONDS = 10
-
-models_ready = {
-    'whisper': False,
-    'speaker': False,
-    'mlx': False,
-    'languagetool': False
-}
-models_progress = {
-    'whisper': {'status': 'pending', 'progress': 0, 'message': 'Waiting...'},
-    'speaker': {'status': 'pending', 'progress': 0, 'message': 'Waiting...'},
-    'mlx': {'status': 'pending', 'progress': 0, 'message': 'Waiting...'},
-    'languagetool': {'status': 'pending', 'progress': 0, 'message': 'Waiting...'}
-}
-init_complete = False
-init_lock = threading.Lock()
-
-def initialize_all_models():
-    global models_ready, models_progress, init_complete
-
-    PROGRESS_UPDATE_INTERVAL = 1.0
-
-    MODEL_SIZES = {
-        'whisper': 500,
-        'speaker': 100,
-        'mlx': 400,
-        'languagetool': 200
-    }
-
-    def update_progress(model, status, progress, message, speed_str='', eta=''):
-        with init_lock:
-            progress_data = {
-                'status': status,
-                'progress': progress,
-                'message': message,
-                'speed': speed_str,
-                'eta': eta
-            }
-            models_progress[model] = progress_data
-            socketio.emit('model_progress', {
-                'model': model,
-                'status': status,
-                'progress': progress,
-                'message': message,
-                'speed': speed_str,
-                'eta': eta,
-                'all_progress': models_progress
-            })
-
-    def track_progress(model, message, stop_event, total_size_mb):
-        from model_manager import init_download_stats, update_download_stats, get_download_speed
-        from pathlib import Path
-
-        init_download_stats(model, total_size_mb)
-        cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
-        initial_size = get_dir_size(cache_dir) if cache_dir.exists() else 0
-
-        while not stop_event.is_set():
-            time.sleep(PROGRESS_UPDATE_INTERVAL)
-            if stop_event.is_set():
-                break
-
-            current_size = get_dir_size(cache_dir) if cache_dir.exists() else 0
-            downloaded = current_size - initial_size
-
-            update_download_stats(model, downloaded, int(total_size_mb * 1024 * 1024))
-            speed_info = get_download_speed(model)
-
-            progress = speed_info['progress']
-            if progress < 10:
-                progress = 10
-
-            speed_msg = f" ({speed_info['speed_str']})" if speed_info['speed_str'] else ""
-            eta_msg = f" - ETA: {speed_info['eta']}" if speed_info['eta'] else ""
-
-            update_progress(
-                model, 'loading', progress,
-                f"{message}{speed_msg}{eta_msg}",
-                speed_info['speed_str'],
-                speed_info['eta']
-            )
-
-    def get_dir_size(path):
-        total = 0
-        try:
-            for entry in os.scandir(path):
-                if entry.is_file():
-                    total += entry.stat().st_size
-                elif entry.is_dir():
-                    total += get_dir_size(entry.path)
-        except (PermissionError, OSError):
-            pass
-        return total
-
-    def load_with_progress(model, message, load_func, total_size_mb):
-        stop_event = threading.Event()
-        progress_thread = threading.Thread(
-            target=track_progress,
-            args=(model, message, stop_event, total_size_mb),
-            daemon=True
-        )
-        progress_thread.start()
-
-        try:
-            result = load_func()
-            stop_event.set()
-            progress_thread.join(timeout=2)
-            return result
-        except Exception as e:
-            stop_event.set()
-            progress_thread.join(timeout=1)
-            raise e
-
-    update_progress('whisper', 'loading', 5, 'Initializing Whisper...')
-    try:
-        def load_whisper():
-            preload_model()
-            return True
-        load_with_progress('whisper', 'Loading Whisper model', load_whisper, MODEL_SIZES['whisper'])
-        models_ready['whisper'] = True
-        update_progress('whisper', 'ready', 100, 'Whisper ready')
-    except Exception as e:
-        update_progress('whisper', 'error', 0, f'Error: {str(e)[:50]}')
-
-    update_progress('speaker', 'loading', 5, 'Initializing speaker recognition...')
-    titanet_failed = False
-    try:
-        def load_speaker():
-            nonlocal titanet_failed
-            manager = get_profile_manager()
-            manager._load_model()
-            if hasattr(manager, '_using_titanet') and not manager._using_titanet:
-                titanet_failed = True
-            return manager
-        manager = load_with_progress('speaker', 'Loading speaker recognition', load_speaker, MODEL_SIZES['speaker'])
-        models_ready['speaker'] = True
-
-        if titanet_failed:
-            update_progress('speaker', 'warning', 100, 'Using SpeechBrain (TitaNet unavailable - reduced noise handling)')
-            socketio.emit('model_warning', {
-                'model': 'speaker',
-                'title': 'Optimal Model Unavailable',
-                'message': 'TitaNet installation failed. Using SpeechBrain as fallback. This may result in reduced accuracy in noisy environments like classrooms.',
-                'severity': 'warning'
-            })
-        elif hasattr(manager, 'is_using_titanet') and manager.is_using_titanet():
-            update_progress('speaker', 'ready', 100, 'TitaNet ready (noise-optimized)')
-        else:
-            update_progress('speaker', 'ready', 100, 'Speaker model ready')
-    except Exception as e:
-        update_progress('speaker', 'error', 0, f'Error: {str(e)[:50]}')
-
-    update_progress('mlx', 'loading', 5, 'Initializing AI corrector...')
-    try:
-        def load_mlx():
-            from ai_corrector import get_corrector
-            corrector = get_corrector()
-            corrector._load_model()
-            return corrector
-        corrector = load_with_progress('mlx', 'Loading AI corrector (MLX)', load_mlx, MODEL_SIZES['mlx'])
-        if corrector._mlx_available:
-            models_ready['mlx'] = True
-            update_progress('mlx', 'ready', 100, 'MLX AI corrector ready')
-        else:
-            models_ready['mlx'] = True
-            update_progress('mlx', 'skipped', 100, 'MLX not available (using LanguageTool)')
-    except Exception as e:
-        models_ready['mlx'] = True
-        update_progress('mlx', 'skipped', 100, f'MLX skipped: {str(e)[:30]}')
-
-    update_progress('languagetool', 'loading', 5, 'Initializing LanguageTool...')
-    try:
-        def load_languagetool():
-            from ai_corrector import get_corrector
-            corrector = get_corrector()
-            corrector._get_language_tool('de')
-            return True
-        load_with_progress('languagetool', 'Loading LanguageTool', load_languagetool, MODEL_SIZES['languagetool'])
-        models_ready['languagetool'] = True
-        update_progress('languagetool', 'ready', 100, 'LanguageTool ready')
-    except Exception as e:
-        models_ready['languagetool'] = True
-        update_progress('languagetool', 'skipped', 100, 'LanguageTool skipped')
-
-    with init_lock:
-        init_complete = True
-
-    socketio.emit('models_ready', {
-        'ready': True,
-        'models': models_ready,
-        'progress': models_progress
-    })
-    print("All models initialized!")
-
-threading.Thread(target=initialize_all_models, daemon=True).start()
-
-def analyze_audio_quality(audio_data, sample_rate):
-    import numpy as np
-
-    if len(audio_data) == 0:
-        return {'score': 0, 'issues': ['no_audio'], 'energy': 0, 'snr': 0}
-
-    energy = float(np.sqrt(np.mean(audio_data ** 2)))
-
-    if energy < 0.001:
-        return {'score': 10, 'issues': ['too_quiet'], 'energy': energy, 'snr': 0}
-
-    issues = []
-    score = 100
-
-    if energy < 0.01:
-        issues.append('low_volume')
-        score -= 20
-    elif energy > 0.8:
-        issues.append('clipping')
-        score -= 30
-
-    zero_crossings = np.sum(np.abs(np.diff(np.signbit(audio_data))))
-    zcr = zero_crossings / len(audio_data)
-
-    if zcr > 0.3:
-        issues.append('high_noise')
-        score -= 25
-
-    fft = np.fft.rfft(audio_data)
-    freqs = np.fft.rfftfreq(len(audio_data), 1/sample_rate)
-    magnitude = np.abs(fft)
-
-    speech_band = (freqs >= 300) & (freqs <= 3400)
-    noise_band = (freqs < 300) | (freqs > 3400)
-
-    speech_energy = np.sum(magnitude[speech_band] ** 2) if np.any(speech_band) else 0
-    noise_energy = np.sum(magnitude[noise_band] ** 2) if np.any(noise_band) else 1
-
-    snr = 10 * np.log10(speech_energy / noise_energy + 1e-10) if noise_energy > 0 else 0
-
-    if snr < 5:
-        issues.append('poor_snr')
-        score -= 20
-    elif snr < 10:
-        issues.append('moderate_snr')
-        score -= 10
-
-    score = max(0, min(100, score))
-
-    return {
-        'score': int(score),
-        'issues': issues,
-        'energy': round(float(energy), 4),
-        'snr': round(float(snr), 2),
-        'zcr': round(float(zcr), 4)
-    }
-
-def create_word_document(note):
-    doc = Document()
-
-    style = doc.styles['Normal']
-    style.font.name = 'Calibri'
-    style.font.size = Pt(11)
-
-    title = doc.add_heading(note['title'], level=0)
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    for run in title.runs:
-        run.font.color.rgb = RGBColor(41, 98, 255)
-
-    meta_para = doc.add_paragraph()
-    meta_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-    date_run = meta_para.add_run(f"Created: {note['created_at']}")
-    date_run.font.size = Pt(10)
-    date_run.font.color.rgb = RGBColor(128, 128, 128)
-    date_run.font.italic = True
-
-    if note.get('language'):
-        lang_display = "German" if note['language'] == 'de' else "English"
-        meta_para.add_run("  •  ")
-        lang_run = meta_para.add_run(f"Language: {lang_display}")
-        lang_run.font.size = Pt(10)
-        lang_run.font.color.rgb = RGBColor(128, 128, 128)
-        lang_run.font.italic = True
-
-    if note.get('audio_duration') and note['audio_duration'] > 0:
-        mins = int(note['audio_duration'] // 60)
-        secs = int(note['audio_duration'] % 60)
-        meta_para.add_run("  •  ")
-        dur_run = meta_para.add_run(f"Duration: {mins:02d}:{secs:02d}")
-        dur_run.font.size = Pt(10)
-        dur_run.font.color.rgb = RGBColor(128, 128, 128)
-        dur_run.font.italic = True
-
-    if note.get('tags') and len(note['tags']) > 0:
-        doc.add_paragraph()
-        tags_para = doc.add_paragraph()
-        tags_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        tags_label = tags_para.add_run("Tags: ")
-        tags_label.font.bold = True
-        tags_label.font.size = Pt(10)
-        tags_label.font.color.rgb = RGBColor(100, 100, 100)
-
-        for i, tag in enumerate(note['tags']):
-            tag_run = tags_para.add_run(f" {tag} ")
-            tag_run.font.size = Pt(9)
-            tag_run.font.color.rgb = RGBColor(255, 255, 255)
-            tag_run.font.bold = True
-            if i < len(note['tags']) - 1:
-                tags_para.add_run("  ")
-
-    doc.add_paragraph()
-    doc.add_paragraph("─" * 50)
-    doc.add_paragraph()
-
-    content_heading = doc.add_heading("Transcription", level=1)
-    for run in content_heading.runs:
-        run.font.color.rgb = RGBColor(60, 60, 60)
-
-    paragraphs = note['content'].split('\n\n') if note.get('content') else ['']
-    for para_text in paragraphs:
-        if para_text.strip():
-            content_para = doc.add_paragraph()
-            content_para.paragraph_format.space_after = Pt(12)
-            content_para.paragraph_format.line_spacing = 1.5
-
-            content_run = content_para.add_run(para_text.strip())
-            content_run.font.size = Pt(11)
-            content_run.font.color.rgb = RGBColor(40, 40, 40)
-
-    doc.add_paragraph()
-    doc.add_paragraph()
-
-    footer = doc.add_paragraph()
-    footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    footer_run = footer.add_run("─" * 30)
-    footer_run.font.color.rgb = RGBColor(200, 200, 200)
-
-    footer2 = doc.add_paragraph()
-    footer2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    footer2_run = footer2.add_run("Generated by VoiceNotes")
-    footer2_run.font.size = Pt(9)
-    footer2_run.font.color.rgb = RGBColor(150, 150, 150)
-    footer2_run.font.italic = True
-
-    return doc
-
-def create_folder_word_document(folder, notes):
-    doc = Document()
-
-    style = doc.styles['Normal']
-    style.font.name = 'Calibri'
-    style.font.size = Pt(11)
-
-    title = doc.add_heading(folder['name'], level=0)
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    for run in title.runs:
-        run.font.color.rgb = RGBColor(41, 98, 255)
-
-    subtitle = doc.add_paragraph()
-    subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    sub_run = subtitle.add_run(f"{len(notes)} Voice Notes")
-    sub_run.font.size = Pt(12)
-    sub_run.font.color.rgb = RGBColor(128, 128, 128)
-    sub_run.font.italic = True
-
-    doc.add_paragraph()
-
-    toc_heading = doc.add_heading("Contents", level=1)
-    for run in toc_heading.runs:
-        run.font.color.rgb = RGBColor(60, 60, 60)
-
-    for i, note in enumerate(notes, 1):
-        toc_item = doc.add_paragraph()
-        toc_run = toc_item.add_run(f"{i}. {note['title']}")
-        toc_run.font.size = Pt(10)
-        toc_run.font.color.rgb = RGBColor(80, 80, 80)
-        date_run = toc_item.add_run(f"  ({note['created_at']})")
-        date_run.font.size = Pt(9)
-        date_run.font.color.rgb = RGBColor(150, 150, 150)
-
-    doc.add_page_break()
-
-    for i, note in enumerate(notes):
-        note_title = doc.add_heading(note['title'], level=1)
-        for run in note_title.runs:
-            run.font.color.rgb = RGBColor(41, 98, 255)
-
-        meta_para = doc.add_paragraph()
-        date_run = meta_para.add_run(f"Created: {note['created_at']}")
-        date_run.font.size = Pt(10)
-        date_run.font.color.rgb = RGBColor(128, 128, 128)
-        date_run.font.italic = True
-
-        if note.get('audio_duration') and note['audio_duration'] > 0:
-            mins = int(note['audio_duration'] // 60)
-            secs = int(note['audio_duration'] % 60)
-            meta_para.add_run("  •  ")
-            dur_run = meta_para.add_run(f"Duration: {mins:02d}:{secs:02d}")
-            dur_run.font.size = Pt(10)
-            dur_run.font.color.rgb = RGBColor(128, 128, 128)
-            dur_run.font.italic = True
-
-        if note.get('tags') and len(note['tags']) > 0:
-            tags_para = doc.add_paragraph()
-            tags_label = tags_para.add_run("Tags: ")
-            tags_label.font.bold = True
-            tags_label.font.size = Pt(10)
-            for tag in note['tags']:
-                tag_run = tags_para.add_run(f" {tag} ")
-                tag_run.font.size = Pt(9)
-                tag_run.font.color.rgb = RGBColor(41, 98, 255)
-
-        doc.add_paragraph()
-
-        paragraphs = note['content'].split('\n\n') if note.get('content') else ['']
-        for para_text in paragraphs:
-            if para_text.strip():
-                content_para = doc.add_paragraph()
-                content_para.paragraph_format.space_after = Pt(12)
-                content_para.paragraph_format.line_spacing = 1.5
-                content_run = content_para.add_run(para_text.strip())
-                content_run.font.size = Pt(11)
-                content_run.font.color.rgb = RGBColor(40, 40, 40)
-
-        if i < len(notes) - 1:
-            doc.add_paragraph()
-            divider = doc.add_paragraph()
-            divider.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            div_run = divider.add_run("─" * 40)
-            div_run.font.color.rgb = RGBColor(200, 200, 200)
-            doc.add_paragraph()
-
-    doc.add_paragraph()
-    footer = doc.add_paragraph()
-    footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    footer_run = footer.add_run("Generated by VoiceNotes")
-    footer_run.font.size = Pt(9)
-    footer_run.font.color.rgb = RGBColor(150, 150, 150)
-    footer_run.font.italic = True
-
-    return doc
-
-def create_pdf_document(note):
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4,
-                           rightMargin=25*mm, leftMargin=25*mm,
-                           topMargin=25*mm, bottomMargin=25*mm)
-
-    styles = getSampleStyleSheet()
-
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=24,
-        textColor=HexColor('#2962ff'),
-        spaceAfter=12,
-        alignment=1
-    )
-
-    meta_style = ParagraphStyle(
-        'Meta',
-        parent=styles['Normal'],
-        fontSize=10,
-        textColor=HexColor('#808080'),
-        alignment=1,
-        spaceAfter=20
-    )
-
-    content_style = ParagraphStyle(
-        'Content',
-        parent=styles['Normal'],
-        fontSize=11,
-        leading=18,
-        spaceAfter=12,
-        textColor=HexColor('#282828')
-    )
-
-    footer_style = ParagraphStyle(
-        'Footer',
-        parent=styles['Normal'],
-        fontSize=9,
-        textColor=HexColor('#969696'),
-        alignment=1
-    )
-
-    story = []
-
-    story.append(Paragraph(note['title'], title_style))
-
-    meta_text = f"Created: {note['created_at']}"
-    if note.get('language'):
-        lang_display = "German" if note['language'] == 'de' else "English"
-        meta_text += f" | Language: {lang_display}"
-    if note.get('audio_duration') and note['audio_duration'] > 0:
-        mins = int(note['audio_duration'] // 60)
-        secs = int(note['audio_duration'] % 60)
-        meta_text += f" | Duration: {mins:02d}:{secs:02d}"
-    story.append(Paragraph(meta_text, meta_style))
-
-    if note.get('tags') and len(note['tags']) > 0:
-        tags_text = "Tags: " + ", ".join(note['tags'])
-        story.append(Paragraph(tags_text, meta_style))
-
-    story.append(Spacer(1, 20))
-
-    content = note.get('content', '')
-    paragraphs = content.split('\n\n') if content else ['']
-    for para_text in paragraphs:
-        if para_text.strip():
-            safe_text = para_text.strip().replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            story.append(Paragraph(safe_text, content_style))
-
-    story.append(Spacer(1, 40))
-    story.append(Paragraph("Generated by VoiceNotes", footer_style))
-
-    doc.build(story)
-    buffer.seek(0)
-    return buffer
-
-def create_folder_pdf_document(folder, notes):
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4,
-                           rightMargin=25*mm, leftMargin=25*mm,
-                           topMargin=25*mm, bottomMargin=25*mm)
-
-    styles = getSampleStyleSheet()
-
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=28,
-        textColor=HexColor('#2962ff'),
-        spaceAfter=12,
-        alignment=1
-    )
-
-    subtitle_style = ParagraphStyle(
-        'Subtitle',
-        parent=styles['Normal'],
-        fontSize=12,
-        textColor=HexColor('#808080'),
-        alignment=1,
-        spaceAfter=30
-    )
-
-    note_title_style = ParagraphStyle(
-        'NoteTitle',
-        parent=styles['Heading2'],
-        fontSize=18,
-        textColor=HexColor('#2962ff'),
-        spaceBefore=20,
-        spaceAfter=8
-    )
-
-    meta_style = ParagraphStyle(
-        'Meta',
-        parent=styles['Normal'],
-        fontSize=10,
-        textColor=HexColor('#808080'),
-        spaceAfter=12
-    )
-
-    content_style = ParagraphStyle(
-        'Content',
-        parent=styles['Normal'],
-        fontSize=11,
-        leading=18,
-        spaceAfter=12,
-        textColor=HexColor('#282828')
-    )
-
-    footer_style = ParagraphStyle(
-        'Footer',
-        parent=styles['Normal'],
-        fontSize=9,
-        textColor=HexColor('#969696'),
-        alignment=1
-    )
-
-    story = []
-
-    story.append(Paragraph(folder['name'], title_style))
-    story.append(Paragraph(f"{len(notes)} Voice Notes", subtitle_style))
-
-    for i, note in enumerate(notes):
-        if i > 0:
-            story.append(Spacer(1, 20))
-
-        story.append(Paragraph(note['title'], note_title_style))
-
-        meta_text = f"Created: {note['created_at']}"
-        if note.get('audio_duration') and note['audio_duration'] > 0:
-            mins = int(note['audio_duration'] // 60)
-            secs = int(note['audio_duration'] % 60)
-            meta_text += f" | Duration: {mins:02d}:{secs:02d}"
-        story.append(Paragraph(meta_text, meta_style))
-
-        content = note.get('content', '')
-        paragraphs = content.split('\n\n') if content else ['']
-        for para_text in paragraphs:
-            if para_text.strip():
-                safe_text = para_text.strip().replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                story.append(Paragraph(safe_text, content_style))
-
-    story.append(Spacer(1, 40))
-    story.append(Paragraph("Generated by VoiceNotes", footer_style))
-
-    doc.build(story)
-    buffer.seek(0)
-    return buffer
-
-# ==========================================
-# NEXUS HUB ROUTES
-# ==========================================
-
 @app.route('/')
+def landing():
+                                                              
+    return redirect(url_for('hub_home'))
+
+@app.route('/welcome')
+def welcome_page():
+                                                                    
+    return render_template('landing.html')
+
+@app.route('/apps')
+def apps_selection():
+                             
+    return render_template('apps.html')
+
+@app.route('/hub')
 def hub_home():
-    return render_template('hub/home.html', active_tab='home')
+    return render_template('hub/home.html', active_tab='dashboard')
 
 @app.route('/hub/tasks')
 def hub_tasks():
@@ -681,1302 +41,1324 @@ def hub_tasks():
 def hub_calendar():
     return render_template('hub/calendar.html', active_tab='calendar')
 
-@app.route('/hub/notes')
-def hub_notes():
-    return render_template('hub/notes.html', active_tab='notes')
+@app.route('/hub/school')
+def hub_school():
+    return render_template('hub/school.html', active_tab='school')
 
-@app.route('/hub/bookmarks')
-def hub_bookmarks():
-    return render_template('hub/bookmarks.html', active_tab='bookmarks')
+@app.route('/hub/training')
+def hub_training():
+    return render_template('hub/training.html', active_tab='training')
 
-@app.route('/hub/pomodoro')
-def hub_pomodoro():
-    return render_template('hub/pomodoro.html', active_tab='home')
+@app.route('/hub/projects')
+def hub_projects():
+    return render_template('hub/projects.html', active_tab='projects')
+
+@app.route('/hub/knowledge')
+def hub_knowledge():
+    return render_template('hub/knowledge.html', active_tab='knowledge')
+
+@app.route('/hub/review')
+def hub_review():
+    return render_template('hub/review.html', active_tab='review')
+
+@app.route('/hub/mousepad')
+def hub_mousepad():
+    return render_template('hub/mousepad.html', active_tab='mousepad')
+
+@app.route('/hub/assistant')
+def hub_assistant():
+    return render_template('hub/assistant.html', active_tab='assistant')
 
 @app.route('/hub/settings')
 def hub_settings():
     return render_template('hub/settings.html', active_tab='settings')
 
+@app.route('/hub/terms')
+def hub_terms():
+    return render_template('hub/terms.html', active_tab='settings')
+
+@app.route('/hub/privacy')
+def hub_privacy():
+    return render_template('hub/privacy.html', active_tab='settings')
+
 @app.route('/hub/email')
 def hub_email():
     return render_template('hub/email.html', active_tab='email')
 
-# ==========================================
-# VOICENOTES APP ROUTES
-# ==========================================
-
-@app.route('/app')
-def application():
-    return render_template('app.html')
-
-@app.route('/app/info')
-def app_info_home():
-    return render_template('home.html', active_page='home')
-
-@app.route('/app/info/features')
-def app_features():
-    return render_template('features.html', active_page='features')
-
-@app.route('/app/info/how-it-works')
-def app_how_it_works():
-    return render_template('how_it_works.html', active_page='how-it-works')
-
-@app.route('/app/info/docs')
-def app_docs():
-    return render_template('docs.html', active_page='docs')
-
-@app.route('/app/info/about')
-def app_about():
-    return render_template('about.html', active_page='about')
-
-@app.route('/app/info/terms')
-def app_terms():
-    return render_template('terms.html', active_page='terms')
-
-@app.route('/static/<path:path>')
-def serve_static(path):
-    return send_from_directory('static', path)
-
-def background_correction_worker():
-    global realtime_active, current_transcription, corrected_segments, last_correction_index, current_language
-
-    corrector = get_text_corrector(current_language)
-
-    while realtime_active:
-        time.sleep(2)
-
-        if not realtime_active:
-            break
-
-        with correction_lock:
-            total_segments = len(current_transcription)
-            safe_index = max(0, total_segments - 3)
-
-            if safe_index > last_correction_index:
-                segments_to_correct = current_transcription[last_correction_index:safe_index]
-
-                if segments_to_correct:
-                    text_to_correct = ' '.join(segments_to_correct)
-                    corrected_text = corrector.correct_full(text_to_correct)
-                    corrected_text = apply_ai_correction(corrected_text, current_language)
-
-                    corrected_segments.append(corrected_text)
-                    last_correction_index = safe_index
-
-                    full_corrected = ' '.join(corrected_segments)
-                    remaining = ' '.join(current_transcription[safe_index:])
-                    if remaining:
-                        full_corrected += ' ' + remaining
-
-                    socketio.emit('correction_update', {
-                        'corrected_text': full_corrected,
-                        'segments_corrected': safe_index,
-                        'total_segments': total_segments
-                    })
-
-def realtime_transcription_worker():
-    global realtime_active, current_transcription, current_language, voice_filter_mode
-
-    recorder = get_recorder()
-    corrector = get_text_corrector(current_language)
-
-    voice_manager = get_profile_manager() if voice_filter_enabled else None
-    skipped_chunks = 0
-    accepted_chunks = 0
-    similarity_history = []
-    audio_quality_scores = []
-
-    while realtime_active and recorder.is_recording():
-        chunk = recorder.get_next_chunk(timeout=0.5)
-
-        if chunk is not None:
-            try:
-                audio_quality = analyze_audio_quality(chunk, recorder.sample_rate)
-                audio_quality_scores.append(audio_quality['score'])
-
-                if voice_filter_enabled and voice_manager is not None:
-                    is_match, confidence = voice_manager.verify_audio(chunk)
-                    similarity = voice_manager._current_profile.verify_multi(
-                        voice_manager._extract_embedding(chunk), top_k=5
-                    )[1] if voice_manager._current_profile else 0
-
-                    app_logger.log_voice_filter(
-                        voice_manager._current_profile_id or "unknown",
-                        is_match,
-                        confidence
-                    )
-
-                    similarity_history.append(confidence)
-                    if len(similarity_history) > 100:
-                        similarity_history.pop(0)
-
-                    dashboard_data = {
-                        'similarity': float(confidence),
-                        'threshold': float(get_param('voice_threshold')),
-                        'is_match': bool(is_match),
-                        'mode': voice_filter_mode,
-                        'accepted': int(accepted_chunks),
-                        'rejected': int(skipped_chunks),
-                        'audio_quality': audio_quality,
-                        'similarity_history': [float(x) for x in similarity_history[-20:]],
-                        'avg_quality': float(sum(audio_quality_scores[-20:]) / len(audio_quality_scores[-20:])) if audio_quality_scores else 0.0
-                    }
-                    socketio.emit('voice_filter_dashboard', dashboard_data)
-
-                    if voice_filter_mode == "include":
-                        if not is_match:
-                            skipped_chunks += 1
-                            socketio.emit('voice_filter_status', {
-                                'filtering': True,
-                                'mode': 'include',
-                                'skipped': int(skipped_chunks),
-                                'accepted': int(accepted_chunks),
-                                'last_confidence': float(confidence)
-                            })
-                            continue
-                        accepted_chunks += 1
-                    else:
-                        if is_match:
-                            skipped_chunks += 1
-                            socketio.emit('voice_filter_status', {
-                                'filtering': True,
-                                'mode': 'exclude',
-                                'skipped': int(skipped_chunks),
-                                'accepted': int(accepted_chunks),
-                                'last_confidence': float(confidence)
-                            })
-                            continue
-                        accepted_chunks += 1
-
-                raw_text, corrected_text, confidence = transcribe_audio_chunk(
-                    chunk,
-                    sample_rate=recorder.sample_rate,
-                    language=current_language,
-                    apply_instant_correction=True
-                )
-
-                if corrected_text and corrected_text.strip():
-                    logic_corrected, changes = apply_logic_correction(corrected_text.strip(), current_language)
-
-                    with correction_lock:
-                        current_transcription.append(logic_corrected)
-                        full_text = ' '.join(current_transcription)
-
-                    full_corrected = corrector.correct_instant(full_text)
-                    full_corrected, _ = apply_logic_correction(full_corrected, current_language)
-
-                    socketio.emit('transcription_update', {
-                        'text': logic_corrected,
-                        'raw_text': raw_text.strip() if raw_text else '',
-                        'full_text': full_corrected,
-                        'confidence': confidence,
-                        'is_final': False,
-                        'is_corrected': True,
-                        'voice_verified': voice_filter_enabled,
-                        'logic_corrections': len(changes)
-                    })
-
-            except Exception as e:
-                print(f"Transcription error: {e}")
-                import traceback
-                traceback.print_exc()
-
-@socketio.on('start_realtime')
-def handle_start_realtime(data):
-    global realtime_active, realtime_thread, correction_thread
-    global current_transcription, corrected_segments, last_correction_index, current_language
-
-    folder_id = data.get('folder_id')
-    current_language = data.get('language', 'de')
-    recorder = get_recorder()
-
-    if recorder.is_recording():
-        emit('error', {'message': 'Already recording'})
-        return
-
-    with correction_lock:
-        current_transcription = []
-        corrected_segments = []
-        last_correction_index = 0
-
-    with realtime_state_lock:
-        realtime_active = True
-
-    reset_session()
-
-    subject = None
-    if folder_id:
-        folder = db.get_folder(folder_id)
-        if folder:
-            subject = folder.get('name')
-
-    recorder.start_recording()
-
-    with realtime_state_lock:
-        realtime_thread = threading.Thread(target=realtime_transcription_worker, daemon=True)
-        realtime_thread.start()
-
-        correction_thread = threading.Thread(target=background_correction_worker, daemon=True)
-        correction_thread.start()
-
-    emit('recording_started', {
-        'message': 'Recording started',
-        'language': current_language,
-        'subject': subject
-    })
-
-@socketio.on('stop_realtime')
-def handle_stop_realtime(data):
-    global realtime_active, current_transcription, corrected_segments, last_correction_index, current_language
-
-    folder_id = data.get('folder_id')
-    recorder = get_recorder()
-
-    if not recorder.is_recording():
-        emit('error', {'message': 'Not recording'})
-        return
-
-    with realtime_state_lock:
-        realtime_active = False
-
-    audio_path, duration = recorder.stop_recording()
-
-    emit('recording_stopping', {'message': 'Processing and saving...'})
-
-    raw_segments = list(current_transcription)
-    corrected_segs = list(corrected_segments)
-    last_idx = last_correction_index
-    lang = current_language
-
-    def finalize_and_save():
-        with correction_lock:
-            if last_idx < len(raw_segments):
-                remaining_segments = raw_segments[last_idx:]
-                if remaining_segments:
-                    corrector = get_text_corrector(lang)
-                    remaining_text = ' '.join(remaining_segments)
-                    corrected_remaining = corrector.correct_full(remaining_text)
-                    corrected_remaining = apply_ai_correction(corrected_remaining, lang)
-                    corrected_segs.append(corrected_remaining)
-
-            final_text = ' '.join(corrected_segs)
-
-        if not final_text.strip():
-            final_text = ' '.join(raw_segments)
-            if final_text.strip():
-                corrector = get_text_corrector(lang)
-                final_text = corrector.correct_full(final_text)
-                final_text = apply_ai_correction(final_text, lang)
-
-        if audio_path:
-            cleanup_audio_file(audio_path)
-
-        if final_text.strip():
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-            title = f"Voice Note - {timestamp}"
-
-            note_id = db.create_note(
-                title=title,
-                content=final_text,
-                folder_id=folder_id,
-                language=lang,
-                audio_duration=duration
-            )
-
-            note = db.get_note(note_id)
-
-            socketio.emit('recording_stopped', {
-                'success': True,
-                'note': note,
-                'final_text': final_text,
-                'duration': duration
-            })
-        else:
-            socketio.emit('recording_stopped', {
-                'success': False,
-                'message': 'No speech detected'
-            })
-
-    threading.Thread(target=finalize_and_save, daemon=True).start()
-
-@socketio.on('set_language')
-def handle_set_language(data):
-    global current_language
-    current_language = data.get('language', 'de')
-    emit('language_changed', {'language': current_language})
-
-@socketio.on('set_logging')
-def handle_set_logging(data):
-    enabled = data.get('enabled', False)
-    app_logger.init_logging(enabled)
-    emit('logging_set', {'enabled': enabled})
-
-@app.route('/api/recording/start', methods=['POST'])
-def start_recording():
-    recorder = get_recorder()
-    if recorder.is_recording():
-        return jsonify({'success': False, 'error': 'Already recording'}), 400
-
-    reset_session()
-    success = recorder.start_recording()
-    return jsonify({'success': success})
-
-@app.route('/api/recording/stop', methods=['POST'])
-def stop_recording():
-    global current_language, current_transcription
-    recorder = get_recorder()
-    if not recorder.is_recording():
-        return jsonify({'success': False, 'error': 'Not recording'}), 400
-
-    data = request.get_json() or {}
-    folder_id = data.get('folder_id')
-    language = data.get('language', current_language)
-
-    audio_path, duration = recorder.stop_recording()
-
-    if not audio_path:
-        return jsonify({'success': False, 'error': 'No audio recorded'}), 400
-
-    corrector = get_text_corrector(language)
-    final_text = corrector.correct_full(' '.join(current_transcription))
-    cleanup_audio_file(audio_path)
-
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    title = f"Voice Note - {timestamp}"
-
-    note_id = db.create_note(
-        title=title,
-        content=final_text,
-        folder_id=folder_id,
-        language=language,
-        audio_duration=duration
+@app.route('/api/hub/tasks', methods=['GET'])
+def get_hub_tasks_api():
+                                                    
+    filter_type = request.args.get('filter', 'all')
+    tasks = db.get_hub_tasks(filter_type)
+    return jsonify({'success': True, 'tasks': tasks})
+
+@app.route('/api/hub/tasks', methods=['POST'])
+def create_hub_task_api():
+                                
+    data = request.get_json()
+    if not data or not data.get('title'):
+        return jsonify({'success': False, 'error': 'Title is required'}), 400
+
+    task_id = db.create_hub_task(
+        title=data.get('title'),
+        description=data.get('description'),
+        due_date=data.get('due_date'),
+        due_time=data.get('due_time'),
+        priority=data.get('priority', 'medium'),
+        category=data.get('category')
     )
+    task = db.get_hub_task(task_id)
+    return jsonify({'success': True, 'task': task})
 
-    note = db.get_note(note_id)
+@app.route('/api/hub/tasks/<int:task_id>', methods=['GET'])
+def get_hub_task_api(task_id):
+                                  
+    task = db.get_hub_task(task_id)
+    if not task:
+        return jsonify({'success': False, 'error': 'Task not found'}), 404
+    return jsonify({'success': True, 'task': task})
 
-    return jsonify({
-        'success': True,
-        'note': note,
-        'transcription': {
-            'text': final_text,
-            'language': language,
-            'duration': duration
-        }
-    })
-
-@app.route('/api/recording/status', methods=['GET'])
-def recording_status():
-    recorder = get_recorder()
-    return jsonify({
-        'recording': recorder.is_recording(),
-        'duration': recorder.get_duration()
-    })
-
-@app.route('/api/audio/devices', methods=['GET'])
-def audio_devices():
-    devices = list_audio_devices()
-    default = get_default_input_device()
-    return jsonify({'devices': devices, 'default': default})
-
-@app.route('/api/folders', methods=['GET'])
-def get_folders():
-    parent_id = request.args.get('parent_id', type=int)
-    if request.args.get('all') == 'true':
-        folders = db.get_all_folders()
-    else:
-        folders = db.get_folders(parent_id)
-    return jsonify({'folders': folders})
-
-@app.route('/api/folders', methods=['POST'])
-def create_folder():
-    data = request.get_json()
-    if not data or not data.get('name'):
-        return jsonify({'error': 'Name is required'}), 400
-
-    folder_id = db.create_folder(name=data['name'], parent_id=data.get('parent_id'))
-    folder = db.get_folder(folder_id)
-    return jsonify({'folder': folder}), 201
-
-@app.route('/api/folders/<int:folder_id>', methods=['GET'])
-def get_folder(folder_id):
-    folder = db.get_folder(folder_id)
-    if not folder:
-        return jsonify({'error': 'Folder not found'}), 404
-    return jsonify({'folder': folder})
-
-@app.route('/api/folders/<int:folder_id>', methods=['PUT'])
-def update_folder(folder_id):
-    data = request.get_json()
-    if not data or not data.get('name'):
-        return jsonify({'error': 'Name is required'}), 400
-
-    success = db.rename_folder(folder_id, data['name'])
-    if not success:
-        return jsonify({'error': 'Folder not found'}), 404
-
-    folder = db.get_folder(folder_id)
-    return jsonify({'folder': folder})
-
-@app.route('/api/folders/<int:folder_id>', methods=['DELETE'])
-def delete_folder(folder_id):
-    success = db.delete_folder(folder_id)
-    if not success:
-        return jsonify({'error': 'Folder not found'}), 404
-    return jsonify({'success': True})
-
-@app.route('/api/folders/<int:folder_id>/subfolders', methods=['GET'])
-def get_subfolders(folder_id):
-    subfolders = db.get_folders(folder_id)
-    return jsonify({'folders': subfolders})
-
-@app.route('/api/notes', methods=['GET'])
-def get_notes():
-    folder_id = request.args.get('folder_id', type=int)
-    notes = db.get_notes(folder_id)
-    return jsonify({'notes': notes})
-
-@app.route('/api/notes/<int:note_id>', methods=['GET'])
-def get_note(note_id):
-    note = db.get_note(note_id)
-    if not note:
-        return jsonify({'error': 'Note not found'}), 404
-    return jsonify({'note': note})
-
-@app.route('/api/notes/<int:note_id>', methods=['PUT'])
-def update_note(note_id):
+@app.route('/api/hub/tasks/<int:task_id>', methods=['PUT'])
+def update_hub_task_api(task_id):
+                            
     data = request.get_json()
     if not data:
-        return jsonify({'error': 'No data provided'}), 400
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
 
-    kwargs = {
+    success = db.update_hub_task(
+        task_id,
+        title=data.get('title'),
+        description=data.get('description'),
+        due_date=data.get('due_date'),
+        due_time=data.get('due_time'),
+        priority=data.get('priority'),
+        category=data.get('category')
+    )
+
+    if success:
+        task = db.get_hub_task(task_id)
+        return jsonify({'success': True, 'task': task})
+    return jsonify({'success': False, 'error': 'Task not found or no changes made'}), 404
+
+@app.route('/api/hub/tasks/<int:task_id>', methods=['DELETE'])
+def delete_hub_task_api(task_id):
+                            
+    success = db.delete_hub_task(task_id)
+    if success:
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Task not found'}), 404
+
+@app.route('/api/hub/tasks/<int:task_id>/toggle', methods=['POST'])
+def toggle_hub_task_api(task_id):
+                                        
+    success = db.toggle_hub_task(task_id)
+    if success:
+        task = db.get_hub_task(task_id)
+        return jsonify({'success': True, 'task': task})
+    return jsonify({'success': False, 'error': 'Task not found'}), 404
+
+@app.route('/api/hub/reviews', methods=['GET'])
+def get_reviews():
+                          
+    review_type = request.args.get('type')
+    reviews = db.get_hub_reviews(review_type=review_type)
+    return jsonify({'reviews': reviews})
+
+@app.route('/api/hub/reviews', methods=['POST'])
+def create_review():
+                              
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    review_type = data.get('type', 'daily')
+    date = data.get('date')
+    energy = data.get('energy')
+
+    review_data = {k: v for k, v in data.items() if k not in ['type', 'date', 'energy', 'id']}
+    data_json = json.dumps(review_data) if review_data else None
+
+    review_id = db.create_hub_review(review_type, date, data_json, energy)
+    review = db.get_hub_review(review_id)
+
+    return jsonify({'success': True, 'review': review})
+
+@app.route('/api/hub/reviews/<int:review_id>', methods=['GET'])
+def get_review(review_id):
+                                
+    review = db.get_hub_review(review_id)
+    if not review:
+        return jsonify({'success': False, 'error': 'Review not found'}), 404
+    return jsonify({'success': True, 'review': review})
+
+@app.route('/api/hub/reviews/<int:review_id>', methods=['PUT'])
+def update_review(review_id):
+                                    
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    review = db.get_hub_review(review_id)
+    if not review:
+        return jsonify({'success': False, 'error': 'Review not found'}), 404
+
+    energy = data.get('energy')
+    review_data = {k: v for k, v in data.items() if k not in ['type', 'date', 'energy', 'id']}
+    data_json = json.dumps(review_data) if review_data else None
+
+    db.update_hub_review(review_id, data=data_json, energy=energy)
+    updated_review = db.get_hub_review(review_id)
+
+    return jsonify({'success': True, 'review': updated_review})
+
+@app.route('/api/hub/reviews/<int:review_id>', methods=['DELETE'])
+def delete_review(review_id):
+                          
+    db.delete_hub_review(review_id)
+    return jsonify({'success': True})
+
+@app.route('/api/hub/knowledge', methods=['GET'])
+def get_knowledge():
+                                    
+    topic = request.args.get('topic')
+    search = request.args.get('search')
+    entries = db.get_hub_knowledge(topic=topic, search=search)
+    return jsonify({'entries': entries})
+
+@app.route('/api/hub/knowledge', methods=['POST'])
+def create_knowledge():
+                                       
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    entry_id = db.create_hub_knowledge(
+        title=data.get('title'),
+        topic=data.get('topic', 'general'),
+        content=data.get('content', ''),
+        tags=data.get('tags', '')
+    )
+    entry = db.get_hub_knowledge_entry(entry_id)
+
+    return jsonify({'success': True, 'entry': entry})
+
+@app.route('/api/hub/knowledge/<int:entry_id>', methods=['GET'])
+def get_knowledge_entry(entry_id):
+                                         
+    entry = db.get_hub_knowledge_entry(entry_id)
+    if not entry:
+        return jsonify({'success': False, 'error': 'Entry not found'}), 404
+    return jsonify({'success': True, 'entry': entry})
+
+@app.route('/api/hub/knowledge/<int:entry_id>', methods=['PUT'])
+def update_knowledge(entry_id):
+                                             
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    entry = db.get_hub_knowledge_entry(entry_id)
+    if not entry:
+        return jsonify({'success': False, 'error': 'Entry not found'}), 404
+
+    db.update_hub_knowledge(
+        entry_id,
+        title=data.get('title'),
+        topic=data.get('topic'),
+        content=data.get('content'),
+        tags=data.get('tags')
+    )
+    updated_entry = db.get_hub_knowledge_entry(entry_id)
+
+    return jsonify({'success': True, 'entry': updated_entry})
+
+@app.route('/api/hub/knowledge/<int:entry_id>', methods=['DELETE'])
+def delete_knowledge(entry_id):
+                                   
+    db.delete_hub_knowledge(entry_id)
+    return jsonify({'success': True})
+
+@app.route('/api/hub/projects', methods=['GET'])
+def get_projects():
+                           
+    status = request.args.get('status')
+    projects = db.get_hub_projects(status=status)
+    return jsonify({'projects': projects})
+
+@app.route('/api/hub/projects', methods=['POST'])
+def create_project():
+                               
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    project_id = db.create_hub_project(
+        name=data.get('name'),
+        goal=data.get('goal', ''),
+        status=data.get('status', 'active'),
+        deadline=data.get('deadline'),
+        next_step=data.get('next_step', ''),
+        notes=data.get('notes', ''),
+        progress=data.get('progress', 0)
+    )
+    project = db.get_hub_project(project_id)
+
+    return jsonify({'success': True, 'project': project})
+
+@app.route('/api/hub/projects/<int:project_id>', methods=['GET'])
+def get_project(project_id):
+                                 
+    project = db.get_hub_project(project_id)
+    if not project:
+        return jsonify({'success': False, 'error': 'Project not found'}), 404
+    return jsonify({'success': True, 'project': project})
+
+@app.route('/api/hub/projects/<int:project_id>', methods=['PUT'])
+def update_project(project_id):
+                                     
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    project = db.get_hub_project(project_id)
+    if not project:
+        return jsonify({'success': False, 'error': 'Project not found'}), 404
+
+    db.update_hub_project(
+        project_id,
+        name=data.get('name'),
+        goal=data.get('goal'),
+        status=data.get('status'),
+        deadline=data.get('deadline'),
+        next_step=data.get('next_step'),
+        notes=data.get('notes'),
+        progress=data.get('progress')
+    )
+    updated_project = db.get_hub_project(project_id)
+
+    return jsonify({'success': True, 'project': updated_project})
+
+@app.route('/api/hub/projects/<int:project_id>', methods=['DELETE'])
+def delete_project(project_id):
+                           
+    db.delete_hub_project(project_id)
+    return jsonify({'success': True})
+
+SCHOOL_SUBJECTS_FILE = Path(__file__).parent.parent / 'data' / 'school_subjects.json'
+SCHOOL_HOMEWORK_FILE = Path(__file__).parent.parent / 'data' / 'school_homework.json'
+SCHOOL_TESTS_FILE = Path(__file__).parent.parent / 'data' / 'school_tests.json'
+SCHOOL_EXAMS_FILE = Path(__file__).parent.parent / 'data' / 'school_exams.json'
+SCHOOL_GRADES_FILE = Path(__file__).parent.parent / 'data' / 'school_grades.json'
+SCHOOL_CALENDAR_FILE = Path(__file__).parent.parent / 'data' / 'school_calendar.json'
+
+def load_school_subjects():
+                                         
+    if SCHOOL_SUBJECTS_FILE.exists():
+        try:
+            with open(SCHOOL_SUBJECTS_FILE, 'r') as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def save_school_subjects(subjects):
+                                       
+    SCHOOL_SUBJECTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(SCHOOL_SUBJECTS_FILE, 'w') as f:
+        json.dump(subjects, f, indent=2, ensure_ascii=False)
+
+def load_school_homework():
+                                         
+    if SCHOOL_HOMEWORK_FILE.exists():
+        try:
+            with open(SCHOOL_HOMEWORK_FILE, 'r') as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def save_school_homework(homework):
+                                       
+    SCHOOL_HOMEWORK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(SCHOOL_HOMEWORK_FILE, 'w') as f:
+        json.dump(homework, f, indent=2, ensure_ascii=False)
+
+def load_school_tests():
+                                      
+    if SCHOOL_TESTS_FILE.exists():
+        try:
+            with open(SCHOOL_TESTS_FILE, 'r') as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def save_school_tests(tests):
+                                    
+    SCHOOL_TESTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(SCHOOL_TESTS_FILE, 'w') as f:
+        json.dump(tests, f, indent=2, ensure_ascii=False)
+
+def load_school_exams():
+                                      
+    if SCHOOL_EXAMS_FILE.exists():
+        try:
+            with open(SCHOOL_EXAMS_FILE, 'r') as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def save_school_exams(exams):
+                                    
+    SCHOOL_EXAMS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(SCHOOL_EXAMS_FILE, 'w') as f:
+        json.dump(exams, f, indent=2, ensure_ascii=False)
+
+def load_school_grades():
+                                       
+    if SCHOOL_GRADES_FILE.exists():
+        try:
+            with open(SCHOOL_GRADES_FILE, 'r') as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def save_school_grades(grades):
+                                     
+    SCHOOL_GRADES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(SCHOOL_GRADES_FILE, 'w') as f:
+        json.dump(grades, f, indent=2, ensure_ascii=False)
+
+def load_school_calendar():
+                                                
+    if SCHOOL_CALENDAR_FILE.exists():
+        try:
+            with open(SCHOOL_CALENDAR_FILE, 'r') as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def save_school_calendar(events):
+                                              
+    SCHOOL_CALENDAR_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(SCHOOL_CALENDAR_FILE, 'w') as f:
+        json.dump(events, f, indent=2, ensure_ascii=False)
+
+@app.route('/api/hub/school/subjects', methods=['GET'])
+def get_school_subjects():
+                                  
+    subjects = load_school_subjects()
+    return jsonify({'subjects': subjects})
+
+@app.route('/api/hub/school/subjects', methods=['POST'])
+def create_school_subject():
+                                      
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    subjects = load_school_subjects()
+
+    subject_id = str(uuid.uuid4())[:8]
+
+    subject = {
+        'id': subject_id,
+        'name': data.get('name'),
+        'teacher': data.get('teacher', ''),
+        'room': data.get('room', ''),
+        'color': data.get('color', '#667eea'),
+        'grade': data.get('grade'),
+        'created_at': datetime.now().isoformat()
+    }
+
+    subjects.append(subject)
+    save_school_subjects(subjects)
+
+    return jsonify({'success': True, 'subject': subject})
+
+@app.route('/api/hub/school/subjects/<subject_id>', methods=['PUT'])
+def update_school_subject(subject_id):
+                                            
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    subjects = load_school_subjects()
+    subject_index = next((i for i, s in enumerate(subjects) if s['id'] == subject_id), None)
+
+    if subject_index is None:
+        return jsonify({'success': False, 'error': 'Subject not found'}), 404
+
+    subjects[subject_index].update({
+        'name': data.get('name', subjects[subject_index].get('name')),
+        'teacher': data.get('teacher', subjects[subject_index].get('teacher')),
+        'room': data.get('room', subjects[subject_index].get('room')),
+        'color': data.get('color', subjects[subject_index].get('color')),
+        'grade': data.get('grade', subjects[subject_index].get('grade')),
+        'updated_at': datetime.now().isoformat()
+    })
+
+    save_school_subjects(subjects)
+    return jsonify({'success': True, 'subject': subjects[subject_index]})
+
+@app.route('/api/hub/school/subjects/<subject_id>', methods=['DELETE'])
+def delete_school_subject(subject_id):
+                                  
+    subjects = load_school_subjects()
+    subjects = [s for s in subjects if s['id'] != subject_id]
+    save_school_subjects(subjects)
+    return jsonify({'success': True})
+
+@app.route('/api/hub/school/homework', methods=['GET'])
+def get_school_homework():
+                                  
+    homework = load_school_homework()
+    return jsonify({'homework': homework})
+
+@app.route('/api/hub/school/homework', methods=['POST'])
+def create_school_homework():
+                                      
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    homework_list = load_school_homework()
+
+    homework_id = str(uuid.uuid4())[:8]
+
+    homework = {
+        'id': homework_id,
+        'subject_id': data.get('subject_id'),
         'title': data.get('title'),
-        'content': data.get('content')
+        'due_date': data.get('due_date'),
+        'notes': data.get('notes', ''),
+        'completed': False,
+        'created_at': datetime.now().isoformat()
     }
-    if 'folder_id' in data:
-        kwargs['folder_id'] = data['folder_id']
 
-    success = db.update_note(note_id, **kwargs)
+    homework_list.append(homework)
+    save_school_homework(homework_list)
 
-    if not success:
-        return jsonify({'error': 'Note not found or no changes'}), 404
+    return jsonify({'success': True, 'homework': homework})
 
-    note = db.get_note(note_id)
-    return jsonify({'note': note})
+@app.route('/api/hub/school/homework/<homework_id>', methods=['PUT'])
+def update_school_homework(homework_id):
+                                            
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
 
-@app.route('/api/notes/<int:note_id>', methods=['DELETE'])
-def delete_note(note_id):
-    success = db.delete_note(note_id)
-    if not success:
-        return jsonify({'error': 'Note not found'}), 404
+    homework_list = load_school_homework()
+    homework_index = next((i for i, h in enumerate(homework_list) if h['id'] == homework_id), None)
+
+    if homework_index is None:
+        return jsonify({'success': False, 'error': 'Homework not found'}), 404
+
+    homework_list[homework_index].update({
+        'subject_id': data.get('subject_id', homework_list[homework_index].get('subject_id')),
+        'title': data.get('title', homework_list[homework_index].get('title')),
+        'due_date': data.get('due_date', homework_list[homework_index].get('due_date')),
+        'notes': data.get('notes', homework_list[homework_index].get('notes')),
+        'completed': data.get('completed', homework_list[homework_index].get('completed')),
+        'updated_at': datetime.now().isoformat()
+    })
+
+    save_school_homework(homework_list)
+    return jsonify({'success': True, 'homework': homework_list[homework_index]})
+
+@app.route('/api/hub/school/homework/<homework_id>', methods=['DELETE'])
+def delete_school_homework(homework_id):
+                                  
+    homework_list = load_school_homework()
+    homework_list = [h for h in homework_list if h['id'] != homework_id]
+    save_school_homework(homework_list)
     return jsonify({'success': True})
 
-@app.route('/api/notes/search', methods=['GET'])
-def search_notes():
-    query = request.args.get('q', '')
-    if not query:
-        return jsonify({'notes': []})
-    notes = db.search_notes(query)
-    return jsonify({'notes': notes})
+@app.route('/api/hub/school/homework/<homework_id>/toggle', methods=['POST'])
+def toggle_school_homework(homework_id):
+                                            
+    homework_list = load_school_homework()
+    homework_index = next((i for i, h in enumerate(homework_list) if h['id'] == homework_id), None)
 
-@app.route('/api/tags', methods=['GET'])
-def get_tags():
-    tags = db.get_all_tags()
-    return jsonify({'tags': tags})
+    if homework_index is None:
+        return jsonify({'success': False, 'error': 'Homework not found'}), 404
 
-@app.route('/api/notes/<int:note_id>/tags', methods=['POST'])
-def add_tag(note_id):
+    homework_list[homework_index]['completed'] = not homework_list[homework_index].get('completed', False)
+    homework_list[homework_index]['updated_at'] = datetime.now().isoformat()
+
+    save_school_homework(homework_list)
+    return jsonify({'success': True, 'homework': homework_list[homework_index]})
+
+@app.route('/api/hub/school/tests', methods=['GET'])
+def get_school_tests():
+                               
+    tests = load_school_tests()
+    return jsonify({'tests': tests})
+
+@app.route('/api/hub/school/tests', methods=['POST'])
+def create_school_test():
+                                  
     data = request.get_json()
-    if not data or not data.get('tag'):
-        return jsonify({'error': 'Tag is required'}), 400
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
 
-    success = db.add_tag_to_note(note_id, data['tag'])
-    note = db.get_note(note_id)
-    return jsonify({'note': note, 'added': success})
+    tests = load_school_tests()
 
-@app.route('/api/notes/<int:note_id>/tags/<tag_name>', methods=['DELETE'])
-def remove_tag(note_id, tag_name):
-    success = db.remove_tag_from_note(note_id, tag_name)
-    note = db.get_note(note_id)
-    return jsonify({'note': note, 'removed': success})
+    test_id = str(uuid.uuid4())[:8]
 
-@app.route('/api/tags/<tag_name>/notes', methods=['GET'])
-def get_notes_by_tag(tag_name):
-    notes = db.get_notes_by_tag(tag_name)
-    return jsonify({'notes': notes})
-
-@app.route('/api/notes/<int:note_id>/export', methods=['GET'])
-def export_note(note_id):
-    format_type = request.args.get('format', 'txt')
-    note = db.get_note(note_id)
-
-    if not note:
-        return jsonify({'error': 'Note not found'}), 404
-
-    if format_type == 'docx':
-        doc = create_word_document(note)
-        buffer = BytesIO()
-        doc.save(buffer)
-        buffer.seek(0)
-        safe_title = "".join(c for c in note['title'] if c.isalnum() or c in ' -_').strip()
-        filename = f"{safe_title}.docx"
-        return send_file(buffer, as_attachment=True, download_name=filename,
-                        mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-
-    elif format_type == 'pdf':
-        buffer = create_pdf_document(note)
-        safe_title = "".join(c for c in note['title'] if c.isalnum() or c in ' -_').strip()
-        filename = f"{safe_title}.pdf"
-        return send_file(buffer, as_attachment=True, download_name=filename,
-                        mimetype='application/pdf')
-
-    elif format_type == 'md':
-        content = f"# {note['title']}\n\n"
-        content += f"*Created: {note['created_at']}*\n\n"
-        if note['tags']:
-            content += f"**Tags:** {', '.join(note['tags'])}\n\n"
-        content += "---\n\n"
-        content += note['content']
-        filename = f"{note['title']}.md"
-        mimetype = 'text/markdown'
-    else:
-        content = f"{note['title']}\n"
-        content += f"Created: {note['created_at']}\n"
-        if note['tags']:
-            content += f"Tags: {', '.join(note['tags'])}\n"
-        content += "\n" + "=" * 40 + "\n\n"
-        content += note['content']
-        filename = f"{note['title']}.txt"
-        mimetype = 'text/plain'
-
-    buffer = BytesIO()
-    buffer.write(content.encode('utf-8'))
-    buffer.seek(0)
-
-    return send_file(buffer, as_attachment=True, download_name=filename, mimetype=mimetype)
-
-@app.route('/api/folders/<int:folder_id>/export', methods=['GET'])
-def export_folder(folder_id):
-    format_type = request.args.get('format', 'md')
-    folder = db.get_folder(folder_id)
-    notes = db.get_notes(folder_id)
-
-    if not folder:
-        return jsonify({'error': 'Folder not found'}), 404
-
-    if format_type == 'docx':
-        doc = create_folder_word_document(folder, notes)
-        buffer = BytesIO()
-        doc.save(buffer)
-        buffer.seek(0)
-        safe_name = "".join(c for c in folder['name'] if c.isalnum() or c in ' -_').strip()
-        filename = f"{safe_name}.docx"
-        return send_file(buffer, as_attachment=True, download_name=filename,
-                        mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-
-    elif format_type == 'pdf':
-        buffer = create_folder_pdf_document(folder, notes)
-        safe_name = "".join(c for c in folder['name'] if c.isalnum() or c in ' -_').strip()
-        filename = f"{safe_name}.pdf"
-        return send_file(buffer, as_attachment=True, download_name=filename,
-                        mimetype='application/pdf')
-
-    elif format_type == 'md':
-        content = f"# {folder['name']}\n\n"
-        for note in notes:
-            content += f"## {note['title']}\n\n"
-            content += f"*Created: {note['created_at']}*\n\n"
-            content += note['content'] + "\n\n---\n\n"
-        filename = f"{folder['name']}.md"
-        mimetype = 'text/markdown'
-    else:
-        content = f"{folder['name']}\n{'=' * 40}\n\n"
-        for note in notes:
-            content += f"{note['title']}\n"
-            content += f"Created: {note['created_at']}\n"
-            content += "-" * 20 + "\n"
-            content += note['content'] + "\n\n"
-        filename = f"{folder['name']}.txt"
-        mimetype = 'text/plain'
-
-    buffer = BytesIO()
-    buffer.write(content.encode('utf-8'))
-    buffer.seek(0)
-
-    return send_file(buffer, as_attachment=True, download_name=filename, mimetype=mimetype)
-
-@app.route('/api/export/database', methods=['GET'])
-def export_database():
-    folders = db.get_all_folders()
-    notes = db.get_notes()
-    tags = db.get_all_tags()
-
-    export_data = {
-        'version': '2.0',
-        'exported_at': datetime.now().isoformat(),
-        'folders': folders,
-        'notes': notes,
-        'tags': tags
+    test = {
+        'id': test_id,
+        'subject_id': data.get('subject_id'),
+        'title': data.get('title'),
+        'date': data.get('date'),
+        'time': data.get('time', ''),
+        'topics': data.get('topics', ''),
+        'created_at': datetime.now().isoformat()
     }
 
-    buffer = BytesIO()
-    buffer.write(json.dumps(export_data, indent=2, ensure_ascii=False).encode('utf-8'))
-    buffer.seek(0)
+    tests.append(test)
+    save_school_tests(tests)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"voicenotes_backup_{timestamp}.json"
+    return jsonify({'success': True, 'test': test})
 
-    return send_file(buffer, as_attachment=True, download_name=filename, mimetype='application/json')
+@app.route('/api/hub/school/tests/<test_id>', methods=['PUT'])
+def update_school_test(test_id):
+                                        
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
 
-@app.route('/api/settings/models', methods=['GET'])
-def get_models():
-    models = get_available_models()
-    return jsonify({'models': models})
+    tests = load_school_tests()
+    test_index = next((i for i, t in enumerate(tests) if t['id'] == test_id), None)
 
-@app.route('/api/settings/ollama', methods=['GET'])
-def get_ollama():
-    status = get_ollama_status()
-    return jsonify(status)
+    if test_index is None:
+        return jsonify({'success': False, 'error': 'Test not found'}), 404
 
-@app.route('/api/settings/status', methods=['GET'])
-def get_system_status():
-    correction = get_correction_status()
-
-    return jsonify({
-        'offline_ready': True,
-        'ai_correction': correction['ai_correction'],
-        'speaker_diarization': correction['speaker_diarization'],
-        'whisper': {
-            'realtime_model': 'small',
-            'processing': 'live'
-        }
+    tests[test_index].update({
+        'subject_id': data.get('subject_id', tests[test_index].get('subject_id')),
+        'title': data.get('title', tests[test_index].get('title')),
+        'date': data.get('date', tests[test_index].get('date')),
+        'time': data.get('time', tests[test_index].get('time')),
+        'topics': data.get('topics', tests[test_index].get('topics')),
+        'updated_at': datetime.now().isoformat()
     })
 
-@app.route('/api/models/check', methods=['GET'])
-def check_models():
-    from model_manager import check_all_models
-    return jsonify(check_all_models())
+    save_school_tests(tests)
+    return jsonify({'success': True, 'test': tests[test_index]})
 
-@app.route('/api/models/download/<model_name>', methods=['POST'])
-def start_model_download(model_name):
-    from model_manager import download_model_async
-
-    valid_models = ['whisper', 'mlx', 'speaker']
-    if model_name not in valid_models:
-        return jsonify({'error': 'Invalid model name'}), 400
-
-    download_model_async(model_name)
-    return jsonify({'status': 'started', 'model': model_name})
-
-@app.route('/api/models/progress', methods=['GET'])
-def get_model_progress():
-    from model_manager import get_download_progress
-    return jsonify({'downloads': get_download_progress()})
-
-@app.route('/api/voice-profiles', methods=['GET'])
-def list_voice_profiles():
-    manager = get_profile_manager()
-    profiles = manager.list_profiles()
-    current = manager.get_current_profile()
-    return jsonify({
-        'profiles': profiles,
-        'current_profile': current,
-        'filter_enabled': voice_filter_enabled
-    })
-
-@app.route('/api/voice-profiles/current', methods=['GET'])
-def get_current_voice_profile():
-    manager = get_profile_manager()
-    current = manager.get_current_profile()
-    return jsonify({
-        'profile': current,
-        'filter_enabled': voice_filter_enabled
-    })
-
-@app.route('/api/voice-profiles/<profile_id>', methods=['DELETE'])
-def delete_voice_profile(profile_id):
-    manager = get_profile_manager()
-    success = manager.delete_profile(profile_id)
-    if success:
-        return jsonify({'success': True})
-    return jsonify({'error': 'Profile not found'}), 404
-
-@app.route('/api/voice-profiles/<profile_id>/activate', methods=['POST'])
-def activate_voice_profile(profile_id):
-    global voice_filter_enabled, voice_filter_profile_id
-
-    manager = get_profile_manager()
-    if manager.load_profile(profile_id):
-        voice_filter_profile_id = profile_id
-        voice_filter_enabled = True
-
-        profile = manager.get_current_profile()
-        if profile:
-            adaptive_result = adaptive_set_teacher(profile.get('name', 'Unknown'), profile_id)
-            return jsonify({
-                'success': True,
-                'profile': profile,
-                'adaptive': adaptive_result
-            })
-
-        return jsonify({
-            'success': True,
-            'profile': profile
-        })
-    return jsonify({'error': 'Profile not found'}), 404
-
-@app.route('/api/voice-profiles/deactivate', methods=['POST'])
-def deactivate_voice_filter():
-    global voice_filter_enabled, voice_filter_profile_id
-
-    voice_filter_enabled = False
-    voice_filter_profile_id = None
+@app.route('/api/hub/school/tests/<test_id>', methods=['DELETE'])
+def delete_school_test(test_id):
+                              
+    tests = load_school_tests()
+    tests = [t for t in tests if t['id'] != test_id]
+    save_school_tests(tests)
     return jsonify({'success': True})
 
-@app.route('/api/voice-profiles/filter-status', methods=['GET'])
-def get_voice_filter_status():
-    manager = get_profile_manager()
-    return jsonify({
-        'enabled': voice_filter_enabled,
-        'profile_id': voice_filter_profile_id,
-        'mode': voice_filter_mode,
-        'profile': manager.get_current_profile() if voice_filter_enabled else None
-    })
+@app.route('/api/hub/school/exams', methods=['GET'])
+def get_school_exams():
+                               
+    exams = load_school_exams()
+    return jsonify({'exams': exams})
 
-@app.route('/api/voice-profiles/set-mode', methods=['POST'])
-def set_voice_filter_mode():
-    global voice_filter_mode
+@app.route('/api/hub/school/exams', methods=['POST'])
+def create_school_exam():
+                                  
     data = request.get_json()
-    mode = data.get('mode', 'include')
-    if mode in ['include', 'exclude']:
-        voice_filter_mode = mode
-        return jsonify({'success': True, 'mode': mode})
-    return jsonify({'error': 'Invalid mode. Use "include" or "exclude"'}), 400
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
 
-@app.route('/api/feedback', methods=['POST'])
-def submit_feedback():
-    data = request.get_json()
+    exams = load_school_exams()
 
-    note_id = data.get('note_id')
-    transcription = data.get('transcription', '')
-    rating = data.get('rating', 3)
-    folder_id = data.get('folder_id')
-    teacher_name = data.get('teacher_name')
-    subject = data.get('subject')
-    user_comments = data.get('user_comments')
-    language = data.get('language', 'de')
+    exam_id = str(uuid.uuid4())[:8]
 
-    if not note_id:
-        return jsonify({'error': 'note_id required'}), 400
-
-    feedback_result = save_feedback(
-        note_id=note_id,
-        transcription=transcription,
-        rating=rating,
-        folder_id=folder_id,
-        teacher_name=teacher_name,
-        subject=subject,
-        user_comments=user_comments,
-        language=language
-    )
-
-    adaptive_result = adaptive_record_feedback(
-        rating=rating,
-        teacher_id=voice_filter_profile_id,
-        teacher_name=teacher_name,
-        quality_score=feedback_result.get('analysis', {}).get('quality_score'),
-        issues=feedback_result.get('analysis', {}).get('issues', [])
-    )
-
-    return jsonify({
-        'feedback': feedback_result,
-        'adaptive': adaptive_result
-    })
-
-@app.route('/api/feedback/analyze', methods=['POST'])
-def analyze_text():
-    data = request.get_json()
-    text = data.get('text', '')
-    language = data.get('language', 'de')
-
-    if not text:
-        return jsonify({'error': 'text required'}), 400
-
-    result = analyze_transcription(text, language)
-    return jsonify(result)
-
-@app.route('/api/feedback/stats', methods=['GET'])
-def get_feedback_stats():
-    collector = get_feedback_collector()
-    return jsonify(collector.get_feedback_stats())
-
-@app.route('/api/feedback/reports', methods=['GET'])
-def get_error_reports():
-    collector = get_feedback_collector()
-    return jsonify({'reports': collector.get_pending_reports()})
-
-@app.route('/api/feedback/report/<filename>', methods=['GET'])
-def get_report_content(filename):
-    from pathlib import Path
-    reports_dir = Path(__file__).parent.parent / "error_reports"
-    report_path = reports_dir / filename
-
-    if not report_path.exists():
-        return jsonify({'error': 'Report not found'}), 404
-
-    with open(report_path, 'r', encoding='utf-8') as f:
-        content = f.read()
-
-    return jsonify({'filename': filename, 'content': content})
-
-@app.route('/api/adaptive/params', methods=['GET'])
-def get_adaptive_params():
-    return jsonify({
-        'params': get_current_params(),
-        'teacher_id': voice_filter_profile_id
-    })
-
-@app.route('/api/adaptive/teacher-stats/<profile_id>', methods=['GET'])
-def get_adaptive_teacher_stats(profile_id):
-    manager = get_profile_manager()
-    profiles = manager.list_profiles()
-
-    teacher_name = "Unknown"
-    for p in profiles:
-        if p.get('profile_id') == profile_id:
-            teacher_name = p.get('name', 'Unknown')
-            break
-
-    stats = get_teacher_stats(profile_id, teacher_name)
-    return jsonify(stats)
-
-@app.route('/api/adaptive/log', methods=['GET'])
-def get_adaptive_log():
-    limit = request.args.get('limit', 50, type=int)
-    log = get_change_log(limit)
-    return jsonify({'log': log})
-
-@app.route('/api/adaptive/reset/<profile_id>', methods=['POST'])
-def reset_adaptive_teacher(profile_id):
-    manager = get_profile_manager()
-    profiles = manager.list_profiles()
-
-    teacher_name = "Unknown"
-    for p in profiles:
-        if p.get('profile_id') == profile_id:
-            teacher_name = p.get('name', 'Unknown')
-            break
-
-    system = get_adaptive_system()
-    result = system.reset_teacher(profile_id, teacher_name)
-    return jsonify(result)
-
-@app.route('/api/adaptive/threshold', methods=['POST'])
-def set_threshold_live():
-    data = request.get_json()
-    new_threshold = data.get('threshold')
-
-    if new_threshold is None or not (0.1 <= new_threshold <= 0.8):
-        return jsonify({'error': 'Threshold must be between 0.1 and 0.8'}), 400
-
-    system = get_adaptive_system()
-    old_value = system.get_param('voice_threshold')
-    system._current_params['voice_threshold'] = new_threshold
-    system._log_change('voice_threshold', old_value, new_threshold, 'Manual adjustment via dashboard')
-
-    return jsonify({
-        'success': True,
-        'old_threshold': old_value,
-        'new_threshold': new_threshold
-    })
-
-@app.route('/api/chunk-error', methods=['POST'])
-def mark_chunk_error():
-    global chunk_errors
-    data = request.get_json()
-
-    error_entry = {
-        'timestamp': datetime.now().isoformat(),
-        'chunk_index': data.get('chunk_index'),
-        'text': data.get('text', ''),
-        'error_type': data.get('error_type', 'transcription_error'),
-        'note_id': data.get('note_id'),
-        'teacher_id': voice_filter_profile_id
+    exam = {
+        'id': exam_id,
+        'subject_id': data.get('subject_id'),
+        'title': data.get('title'),
+        'date': data.get('date'),
+        'time': data.get('time', ''),
+        'topics': data.get('topics', ''),
+        'created_at': datetime.now().isoformat()
     }
 
-    chunk_errors.append(error_entry)
-    if len(chunk_errors) > 100:
-        chunk_errors = chunk_errors[-100:]
+    exams.append(exam)
+    save_school_exams(exams)
 
-    system = get_adaptive_system()
-    system.record_feedback(
-        rating=1,
-        teacher_id=voice_filter_profile_id,
-        issues=[{'type': error_entry['error_type']}]
-    )
+    return jsonify({'success': True, 'exam': exam})
 
-    return jsonify({'success': True, 'error_logged': error_entry})
-
-@app.route('/api/chunk-errors', methods=['GET'])
-def get_chunk_errors():
-    return jsonify({'errors': chunk_errors[-50:]})
-
-@app.route('/api/models/init-status', methods=['GET'])
-def get_init_status():
-    with init_lock:
-        return jsonify({
-            'ready': init_complete,
-            'models': models_ready,
-            'progress': models_progress
-        })
-
-@app.route('/api/audio-quality', methods=['POST'])
-def check_audio_quality():
+@app.route('/api/hub/school/exams/<exam_id>', methods=['PUT'])
+def update_school_exam(exam_id):
+                                        
     data = request.get_json()
-    if 'audio' not in data:
-        return jsonify({'error': 'audio data required'}), 400
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
 
-    import numpy as np
-    import base64
+    exams = load_school_exams()
+    exam_index = next((i for i, e in enumerate(exams) if e['id'] == exam_id), None)
 
-    audio_bytes = base64.b64decode(data['audio'])
-    audio_array = np.frombuffer(audio_bytes, dtype=np.float32)
-    sample_rate = data.get('sample_rate', 16000)
+    if exam_index is None:
+        return jsonify({'success': False, 'error': 'Exam not found'}), 404
 
-    quality = analyze_audio_quality(audio_array, sample_rate)
-    return jsonify(quality)
-
-@app.route('/api/notes/<int:note_id>/summarize', methods=['POST'])
-def summarize_note(note_id):
-    from note_intelligence import generate_summary
-
-    note = db.get_note(note_id)
-    if not note:
-        return jsonify({'error': 'Note not found'}), 404
-
-    data = request.get_json() or {}
-    language = data.get('language', current_language)
-    max_length = data.get('max_length', 100)
-
-    summary = generate_summary(note['content'], language, max_length)
-
-    return jsonify({
-        'note_id': note_id,
-        'summary': summary,
-        'language': language
+    exams[exam_index].update({
+        'subject_id': data.get('subject_id', exams[exam_index].get('subject_id')),
+        'title': data.get('title', exams[exam_index].get('title')),
+        'date': data.get('date', exams[exam_index].get('date')),
+        'time': data.get('time', exams[exam_index].get('time')),
+        'topics': data.get('topics', exams[exam_index].get('topics')),
+        'updated_at': datetime.now().isoformat()
     })
 
-@app.route('/api/notes/<int:note_id>/topics', methods=['GET'])
-def get_note_topics(note_id):
-    from note_intelligence import detect_topics
+    save_school_exams(exams)
+    return jsonify({'success': True, 'exam': exams[exam_index]})
 
-    note = db.get_note(note_id)
-    if not note:
-        return jsonify({'error': 'Note not found'}), 404
+@app.route('/api/hub/school/exams/<exam_id>', methods=['DELETE'])
+def delete_school_exam(exam_id):
+                               
+    exams = load_school_exams()
+    exams = [e for e in exams if e['id'] != exam_id]
+    save_school_exams(exams)
+    return jsonify({'success': True})
 
-    language = request.args.get('language', current_language)
-    max_topics = int(request.args.get('max_topics', 3))
+@app.route('/api/hub/school/grades', methods=['GET'])
+def get_school_grades():
+                                
+    grades = load_school_grades()
+    return jsonify({'grades': grades})
 
-    topics = detect_topics(note['content'], language, max_topics)
-
-    return jsonify({
-        'note_id': note_id,
-        'topics': topics,
-        'language': language
-    })
-
-@app.route('/api/notes/<int:note_id>/key-points', methods=['POST'])
-def get_note_key_points(note_id):
-    from note_intelligence import generate_key_points
-
-    note = db.get_note(note_id)
-    if not note:
-        return jsonify({'error': 'Note not found'}), 404
-
-    data = request.get_json() or {}
-    language = data.get('language', current_language)
-    max_points = data.get('max_points', 5)
-
-    key_points = generate_key_points(note['content'], language, max_points)
-
-    return jsonify({
-        'note_id': note_id,
-        'key_points': key_points,
-        'language': language
-    })
-
-@app.route('/api/notes/<int:note_id>/auto-tag', methods=['POST'])
-def auto_tag_note(note_id):
-    from note_intelligence import detect_topics
-
-    note = db.get_note(note_id)
-    if not note:
-        return jsonify({'error': 'Note not found'}), 404
-
-    data = request.get_json() or {}
-    language = data.get('language', current_language)
-
-    topics = detect_topics(note['content'], language, 3)
-
-    existing_tags = note.get('tags', []) or []
-    new_tags = [t for t in topics if t.lower() not in [et.lower() for et in existing_tags]]
-
-    if new_tags:
-        all_tags = existing_tags + new_tags
-        db.update_note_tags(note_id, all_tags)
-
-    return jsonify({
-        'note_id': note_id,
-        'detected_topics': topics,
-        'added_tags': new_tags,
-        'all_tags': existing_tags + new_tags
-    })
-
-@app.route('/api/intelligence/analyze', methods=['POST'])
-def analyze_text_intelligence():
-    from note_intelligence import detect_topics, generate_summary, generate_key_points
-
-    data = request.get_json()
-    if not data or 'text' not in data:
-        return jsonify({'error': 'text required'}), 400
-
-    text = data['text']
-    language = data.get('language', current_language)
-
-    topics = detect_topics(text, language, 3)
-    summary = generate_summary(text, language, 100)
-    key_points = generate_key_points(text, language, 5)
-
-    return jsonify({
-        'topics': topics,
-        'summary': summary,
-        'key_points': key_points,
-        'language': language
-    })
-
-@socketio.on('start_enrollment')
-def handle_start_enrollment(data):
-    global enrollment_active
-
-    teacher_name = data.get('name', 'Teacher')
-    manager = get_profile_manager()
-
-    profile_id = manager.start_enrollment(teacher_name)
-    enrollment_active = True
-
-    emit('enrollment_started', {
-        'profile_id': profile_id,
-        'name': teacher_name,
-        'min_duration': 30
-    })
-
-    recorder = get_recorder()
-    print(f"[Enrollment] Checking recorder state: is_recording={recorder.is_recording()}")
-
-    if recorder.is_recording():
-        print("[Enrollment] ERROR: Already recording")
-        emit('enrollment_error', {'error': 'Recording already in progress. Please stop the current recording first.'})
-        manager.cancel_enrollment()
-        enrollment_active = False
-        return
-
-    print("[Enrollment] Starting recording...")
-    recording_started = recorder.start_recording()
-    print(f"[Enrollment] Recording started: {recording_started}")
-
-    if not recording_started:
-        print(f"[Enrollment] ERROR: Failed to start - {recorder.last_error}")
-        emit('enrollment_error', {'error': f'Failed to start recording: {recorder.last_error or "No audio input device found"}'})
-        manager.cancel_enrollment()
-        enrollment_active = False
-        return
-
-    print(f"[Enrollment] Recording active: {recorder.is_recording()}")
-
-    def enrollment_worker():
-        print("Enrollment worker started")
-        chunks_processed = 0
-        while enrollment_active and recorder.is_recording():
-            chunk = recorder.get_enrollment_chunk(timeout=0.5)
-            if chunk is not None:
-                chunks_processed += 1
-                print(f"Enrollment chunk {chunks_processed}: {len(chunk)} samples, {len(chunk)/16000:.1f}s")
-                result = manager.add_enrollment_audio(chunk)
-                print(f"Enrollment progress: {result}")
-                socketio.emit('enrollment_progress', result)
-        print(f"Enrollment worker stopped after {chunks_processed} chunks")
-
-    threading.Thread(target=enrollment_worker, daemon=True).start()
-    print("Enrollment worker thread started")
-
-@socketio.on('stop_enrollment')
-def handle_stop_enrollment(data):
-    global enrollment_active, voice_filter_enabled, voice_filter_profile_id
-
-    enrollment_active = False
-    recorder = get_recorder()
-
-    if recorder.is_recording():
-        recorder.stop_recording()
-
-    manager = get_profile_manager()
-    result = manager.finish_enrollment()
-
-    if result.get('status') == 'success':
-        voice_filter_profile_id = result['profile_id']
-        manager.load_profile(result['profile_id'])
-        voice_filter_enabled = True
-        result['filter_activated'] = True
-
-    emit('enrollment_complete', result)
-
-@socketio.on('cancel_enrollment')
-def handle_cancel_enrollment():
-    global enrollment_active
-
-    enrollment_active = False
-    recorder = get_recorder()
-
-    if recorder.is_recording():
-        recorder.stop_recording()
-
-    manager = get_profile_manager()
-    manager.cancel_enrollment()
-
-    emit('enrollment_cancelled', {'success': True})
-
-
-@app.route('/api/vocabulary', methods=['GET'])
-def get_vocabulary():
-    from word_training import get_all_words, get_vocabulary_count
-    return jsonify({
-        'words': get_all_words(),
-        'count': get_vocabulary_count()
-    })
-
-@app.route('/api/vocabulary', methods=['POST'])
-def add_vocabulary_word():
-    from word_training import add_word
-    data = request.get_json()
-    phonetic = data.get('phonetic', '')
-    spelling = data.get('spelling', '')
-    if not phonetic or not spelling:
-        return jsonify({'error': 'Both phonetic and spelling are required'}), 400
-    success = add_word(phonetic, spelling)
-    if success:
-        return jsonify({'success': True, 'phonetic': phonetic.lower(), 'spelling': spelling})
-    return jsonify({'error': 'Failed to save word'}), 500
-
-@app.route('/api/vocabulary/<path:phonetic>', methods=['DELETE'])
-def delete_vocabulary_word(phonetic):
-    from word_training import remove_word
-    success = remove_word(phonetic)
-    if success:
-        return jsonify({'success': True})
-    return jsonify({'error': 'Word not found'}), 404
-
-
-@app.route('/api/transcribe-file', methods=['POST'])
-def transcribe_file():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file provided'}), 400
-
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No file selected'}), 400
-
-    language = request.form.get('language', 'de')
-    generate_srt = request.form.get('generate_srt', 'false').lower() == 'true'
-
-    allowed_extensions = {'mp3', 'mp4', 'wav', 'm4a', 'flac', 'ogg', 'webm', 'mpeg', 'mpga'}
-    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
-    if ext not in allowed_extensions:
-        return jsonify({'error': f'Unsupported file format: {ext}'}), 400
-
-    import tempfile
-    import os
-    temp_dir = os.path.expanduser("~/Documents/voice-notes/audio_temp")
-    os.makedirs(temp_dir, exist_ok=True)
-
-    temp_path = os.path.join(temp_dir, f"upload_{int(time.time())}_{file.filename}")
-    file.save(temp_path)
-
+@app.route('/api/hub/school/grades', methods=['POST'])
+def create_school_grade():
+                                    
     try:
-        whisper_model = get_whisper_model()
-        if whisper_model is None:
-            os.remove(temp_path)
-            return jsonify({'error': 'Whisper model not available'}), 500
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
 
-        segments, info = whisper_model.transcribe(
-            temp_path,
-            language=language,
-            beam_size=5,
-            word_timestamps=generate_srt,
-            vad_filter=True
-        )
+        grades = load_school_grades()
 
-        segments_list = list(segments)
-        full_text = ' '.join([s.text.strip() for s in segments_list])
+        grade = {
+            'id': str(uuid.uuid4()),
+            'subject_id': data.get('subject_id'),
+            'points': data.get('points'),
+            'type': data.get('type', 'test'),
+            'date': data.get('date'),
+            'description': data.get('description'),
+            'semester': data.get('semester', 'Q1'),
+            'created_at': datetime.now().isoformat()
+        }
 
-        from word_training import apply_vocabulary
-        full_text = apply_vocabulary(full_text)
-
-        from ai_corrector import correct_transcription
-        full_text = correct_transcription(full_text, language=language)
-
-        srt_content = None
-        if generate_srt and segments_list:
-            srt_lines = []
-            for i, seg in enumerate(segments_list, 1):
-                start = format_srt_time(seg.start)
-                end = format_srt_time(seg.end)
-                text = apply_vocabulary(seg.text.strip())
-                srt_lines.append(f"{i}\n{start} --> {end}\n{text}\n")
-            srt_content = '\n'.join(srt_lines)
-
-        title = os.path.splitext(file.filename)[0]
-        duration = info.duration if hasattr(info, 'duration') else None
-
-        from database import create_note
-        note_id = create_note(
-            title=title,
-            content=full_text,
-            language=language,
-            audio_duration=duration
-        )
-
-        os.remove(temp_path)
-
-        return jsonify({
-            'success': True,
-            'note_id': note_id,
-            'title': title,
-            'content': full_text,
-            'duration': duration,
-            'language': language,
-            'srt': srt_content
-        })
-
+        grades.append(grade)
+        save_school_grades(grades)
+        return jsonify({'grade': grade})
     except Exception as e:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-        print(f"File transcription error: {e}")
+        print(f"Error creating grade: {e}")
         return jsonify({'error': str(e)}), 500
 
-def format_srt_time(seconds):
-    hours = int(seconds // 3600)
-    minutes = int((seconds % 3600) // 60)
-    secs = int(seconds % 60)
-    millis = int((seconds - int(seconds)) * 1000)
-    return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+@app.route('/api/hub/school/grades/<grade_id>', methods=['PUT'])
+def update_school_grade(grade_id):
+                                
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        grades = load_school_grades()
+
+        updated_grade = None
+        for grade in grades:
+            if grade['id'] == grade_id:
+                grade['subject_id'] = data.get('subject_id', grade.get('subject_id'))
+                grade['points'] = data.get('points', grade.get('points'))
+                grade['type'] = data.get('type', grade.get('type'))
+                grade['date'] = data.get('date', grade.get('date'))
+                grade['description'] = data.get('description', grade.get('description'))
+                grade['semester'] = data.get('semester', grade.get('semester', 'Q1'))
+                grade['updated_at'] = datetime.now().isoformat()
+                updated_grade = grade
+                break
+
+        if updated_grade is None:
+            return jsonify({'error': 'Grade not found'}), 404
+
+        save_school_grades(grades)
+        return jsonify({'grade': updated_grade})
+    except Exception as e:
+        print(f"Error updating grade: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/hub/school/grades/<grade_id>', methods=['DELETE'])
+def delete_school_grade(grade_id):
+                                
+    grades = load_school_grades()
+    grades = [g for g in grades if g['id'] != grade_id]
+    save_school_grades(grades)
+    return jsonify({'success': True})
+
+@app.route('/api/hub/school/calendar', methods=['GET'])
+def get_school_calendar():
+                                         
+    events = load_school_calendar()
+    return jsonify({'events': events})
+
+@app.route('/api/hub/school/calendar', methods=['POST'])
+def create_school_calendar_event():
+                                             
+    data = request.json
+    events = load_school_calendar()
+
+    event = {
+        'id': str(uuid.uuid4()),
+        'title': data.get('title'),
+        'date': data.get('date'),
+        'time': data.get('time'),
+        'end_date': data.get('end_date'),
+        'end_time': data.get('end_time'),
+        'category': data.get('category', 'school'),
+        'description': data.get('description'),
+        'created_at': datetime.now().isoformat()
+    }
+
+    events.append(event)
+    save_school_calendar(events)
+    return jsonify({'event': event})
+
+@app.route('/api/hub/school/calendar/<event_id>', methods=['PUT'])
+def update_school_calendar_event(event_id):
+                                         
+    data = request.json
+    events = load_school_calendar()
+
+    for event in events:
+        if event['id'] == event_id:
+            event['title'] = data.get('title', event.get('title'))
+            event['date'] = data.get('date', event.get('date'))
+            event['time'] = data.get('time', event.get('time'))
+            event['end_date'] = data.get('end_date', event.get('end_date'))
+            event['end_time'] = data.get('end_time', event.get('end_time'))
+            event['category'] = data.get('category', event.get('category'))
+            event['description'] = data.get('description', event.get('description'))
+            event['updated_at'] = datetime.now().isoformat()
+            break
+
+    save_school_calendar(events)
+    return jsonify({'event': event})
+
+@app.route('/api/hub/school/calendar/<event_id>', methods=['DELETE'])
+def delete_school_calendar_event(event_id):
+                                         
+    events = load_school_calendar()
+    events = [e for e in events if e['id'] != event_id]
+    save_school_calendar(events)
+    return jsonify({'success': True})
+
+@app.route('/api/hub/school/timetable/settings', methods=['GET'])
+def get_timetable_settings():
+                                 
+    settings = db.get_timetable_settings()
+    if settings:
+        return jsonify({'success': True, 'settings': settings})
+    return jsonify({'success': True, 'settings': None, 'setup_required': True})
+
+@app.route('/api/hub/school/timetable/settings', methods=['POST'])
+def save_timetable_settings():
+                                  
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    settings_id = db.save_timetable_settings(
+        has_ab_weeks=data.get('has_ab_weeks', True),
+        block_count=data.get('block_count', 4),
+        reference_date=data.get('reference_date'),
+        setup_completed=data.get('setup_completed', False)
+    )
+    return jsonify({'success': True, 'settings_id': settings_id})
+
+@app.route('/api/hub/school/timetable/entries', methods=['GET'])
+def get_timetable_entries():
+                                                                     
+    day = request.args.get('day', type=int)
+    week = request.args.get('week')
+    entries = db.get_timetable_entries(day=day, week=week)
+    return jsonify({'success': True, 'entries': entries})
+
+@app.route('/api/hub/school/timetable/entries', methods=['POST'])
+def create_timetable_entry():
+                                       
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    if not data.get('day') or not data.get('block') or not data.get('subject'):
+        return jsonify({'success': False, 'error': 'day, block, and subject are required'}), 400
+
+    entry_id = db.create_timetable_entry(
+        day=data['day'],
+        block=data['block'],
+        subject=data['subject'],
+        week=data.get('week', 'both'),
+        subject_type=data.get('subject_type', 'GK'),
+        room=data.get('room'),
+        teacher=data.get('teacher'),
+        color=data.get('color')
+    )
+    entry = db.get_timetable_entry(entry_id)
+    return jsonify({'success': True, 'entry': entry})
+
+@app.route('/api/hub/school/timetable/entries/<int:entry_id>', methods=['GET'])
+def get_timetable_entry(entry_id):
+                                       
+    entry = db.get_timetable_entry(entry_id)
+    if not entry:
+        return jsonify({'success': False, 'error': 'Entry not found'}), 404
+    return jsonify({'success': True, 'entry': entry})
+
+@app.route('/api/hub/school/timetable/entries/<int:entry_id>', methods=['PUT'])
+def update_timetable_entry(entry_id):
+                                   
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    success = db.update_timetable_entry(
+        entry_id,
+        day=data.get('day'),
+        block=data.get('block'),
+        subject=data.get('subject'),
+        week=data.get('week'),
+        subject_type=data.get('subject_type'),
+        room=data.get('room'),
+        teacher=data.get('teacher'),
+        color=data.get('color')
+    )
+
+    if not success:
+        return jsonify({'success': False, 'error': 'Entry not found'}), 404
+
+    entry = db.get_timetable_entry(entry_id)
+    return jsonify({'success': True, 'entry': entry})
+
+@app.route('/api/hub/school/timetable/entries/<int:entry_id>', methods=['DELETE'])
+def delete_timetable_entry(entry_id):
+                                   
+    success = db.delete_timetable_entry(entry_id)
+    if not success:
+        return jsonify({'success': False, 'error': 'Entry not found'}), 404
+    return jsonify({'success': True})
+
+@app.route('/api/hub/school/timetable/clear', methods=['POST'])
+def clear_timetable():
+                                      
+    count = db.clear_timetable()
+    return jsonify({'success': True, 'deleted': count})
+
+@app.route('/api/hub/school/timetable/import', methods=['POST'])
+def import_timetable_template():
+                                                                 
+    data = request.get_json()
+    if not data or 'entries' not in data:
+        return jsonify({'success': False, 'error': 'No entries provided'}), 400
+
+    if data.get('clear_existing', False):
+        db.clear_timetable()
+
+    count = db.import_timetable_template(data['entries'])
+    return jsonify({'success': True, 'imported': count})
+
+DEFAULT_TIMETABLE_TEMPLATE = [
+                   
+    {'day': 1, 'block': 1, 'week': 'A', 'subject': 'Deutsch', 'subject_type': 'LK', 'room': '226', 'color': '#4285f4'},
+    {'day': 1, 'block': 2, 'week': 'A', 'subject': 'Geschichte', 'subject_type': 'GK', 'room': '124', 'color': '#ea4335'},
+    {'day': 1, 'block': 3, 'week': 'A', 'subject': 'Englisch', 'subject_type': 'GK', 'room': '330', 'color': '#34a853'},
+    {'day': 1, 'block': 4, 'week': 'A', 'subject': 'Sport', 'subject_type': 'GK', 'room': 'TH', 'color': '#ff9800'},
+                    
+    {'day': 2, 'block': 1, 'week': 'A', 'subject': 'Physik', 'subject_type': 'GK', 'room': '310', 'color': '#9c27b0'},
+    {'day': 2, 'block': 2, 'week': 'A', 'subject': 'Mathe', 'subject_type': 'LK', 'room': '420', 'color': '#e91e63'},
+    {'day': 2, 'block': 3, 'week': 'A', 'subject': 'Deutsch', 'subject_type': 'LK', 'room': '226', 'color': '#4285f4'},
+    {'day': 2, 'block': 4, 'week': 'A', 'subject': 'Seminar', 'subject_type': 'SK', 'room': '226', 'color': '#607d8b'},
+                      
+    {'day': 3, 'block': 1, 'week': 'A', 'subject': 'PB', 'subject_type': 'GK', 'room': '124', 'color': '#00bcd4'},
+    {'day': 3, 'block': 2, 'week': 'A', 'subject': 'Geschichte', 'subject_type': 'GK', 'room': '124', 'color': '#ea4335'},
+    {'day': 3, 'block': 3, 'week': 'A', 'subject': 'Mathe', 'subject_type': 'LK', 'room': '420', 'color': '#e91e63'},
+                     
+    {'day': 4, 'block': 1, 'week': 'A', 'subject': 'Informatik', 'subject_type': 'GK', 'room': 'PC1', 'color': '#795548'},
+    {'day': 4, 'block': 2, 'week': 'A', 'subject': 'Mathe', 'subject_type': 'LK', 'room': '420', 'color': '#e91e63'},
+    {'day': 4, 'block': 3, 'week': 'A', 'subject': 'Englisch', 'subject_type': 'GK', 'room': '330', 'color': '#34a853'},
+    {'day': 4, 'block': 4, 'week': 'A', 'subject': 'Chemie', 'subject_type': 'GK', 'room': '301', 'color': '#8bc34a'},
+                   
+    {'day': 5, 'block': 1, 'week': 'A', 'subject': 'Sport', 'subject_type': 'GK', 'room': 'TH', 'color': '#ff9800'},
+    {'day': 5, 'block': 2, 'week': 'A', 'subject': 'Deutsch', 'subject_type': 'LK', 'room': '226', 'color': '#4285f4'},
+    {'day': 5, 'block': 3, 'week': 'A', 'subject': 'Physik', 'subject_type': 'GK', 'room': '310', 'color': '#9c27b0'},
+
+    {'day': 1, 'block': 1, 'week': 'B', 'subject': 'Englisch', 'subject_type': 'GK', 'room': '330', 'color': '#34a853'},
+    {'day': 1, 'block': 2, 'week': 'B', 'subject': 'PB', 'subject_type': 'GK', 'room': '124', 'color': '#00bcd4'},
+    {'day': 1, 'block': 3, 'week': 'B', 'subject': 'Deutsch', 'subject_type': 'LK', 'room': '226', 'color': '#4285f4'},
+    {'day': 1, 'block': 4, 'week': 'B', 'subject': 'Chemie', 'subject_type': 'GK', 'room': '301', 'color': '#8bc34a'},
+                    
+    {'day': 2, 'block': 1, 'week': 'B', 'subject': 'Informatik', 'subject_type': 'GK', 'room': 'PC1', 'color': '#795548'},
+    {'day': 2, 'block': 2, 'week': 'B', 'subject': 'Mathe', 'subject_type': 'LK', 'room': '420', 'color': '#e91e63'},
+    {'day': 2, 'block': 3, 'week': 'B', 'subject': 'Geschichte', 'subject_type': 'GK', 'room': '124', 'color': '#ea4335'},
+    {'day': 2, 'block': 4, 'week': 'B', 'subject': 'Seminar', 'subject_type': 'SK', 'room': '226', 'color': '#607d8b'},
+                      
+    {'day': 3, 'block': 1, 'week': 'B', 'subject': 'Physik', 'subject_type': 'GK', 'room': '310', 'color': '#9c27b0'},
+    {'day': 3, 'block': 2, 'week': 'B', 'subject': 'Mathe', 'subject_type': 'LK', 'room': '420', 'color': '#e91e63'},
+    {'day': 3, 'block': 3, 'week': 'B', 'subject': 'Deutsch', 'subject_type': 'LK', 'room': '226', 'color': '#4285f4'},
+                     
+    {'day': 4, 'block': 1, 'week': 'B', 'subject': 'Sport', 'subject_type': 'GK', 'room': 'TH', 'color': '#ff9800'},
+    {'day': 4, 'block': 2, 'week': 'B', 'subject': 'Englisch', 'subject_type': 'GK', 'room': '330', 'color': '#34a853'},
+    {'day': 4, 'block': 3, 'week': 'B', 'subject': 'Mathe', 'subject_type': 'LK', 'room': '420', 'color': '#e91e63'},
+                   
+    {'day': 5, 'block': 1, 'week': 'B', 'subject': 'Deutsch', 'subject_type': 'LK', 'room': '226', 'color': '#4285f4'},
+    {'day': 5, 'block': 2, 'week': 'B', 'subject': 'Geschichte', 'subject_type': 'GK', 'room': '124', 'color': '#ea4335'},
+]
+
+@app.route('/api/hub/school/timetable/default-template', methods=['GET'])
+def get_default_timetable_template():
+                                                                 
+    return jsonify({'success': True, 'template': DEFAULT_TIMETABLE_TEMPLATE})
+
+QUICK_NOTES_FILE = Path(__file__).parent.parent / 'data' / 'quick_notes.json'
+
+def load_quick_notes():
+    if QUICK_NOTES_FILE.exists():
+        try:
+            with open(QUICK_NOTES_FILE, 'r') as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def save_quick_notes(notes):
+    QUICK_NOTES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(QUICK_NOTES_FILE, 'w') as f:
+        json.dump(notes, f, indent=2, ensure_ascii=False)
+
+@app.route('/api/hub/quick-notes', methods=['GET'])
+def get_quick_notes():
+    notes = load_quick_notes()
+    return jsonify({'notes': notes})
+
+@app.route('/api/hub/quick-notes', methods=['POST'])
+def create_quick_note():
+    data = request.json
+    notes = load_quick_notes()
+
+    note = {
+        'id': str(uuid.uuid4()),
+        'type': data.get('type', 'note'),
+        'title': data.get('title'),
+        'content': data.get('content'),
+        'created_at': datetime.now().isoformat()
+    }
+
+    notes.append(note)
+    save_quick_notes(notes)
+    return jsonify({'note': note})
+
+@app.route('/api/hub/quick-notes/<note_id>', methods=['DELETE'])
+def delete_quick_note(note_id):
+    notes = load_quick_notes()
+    notes = [n for n in notes if n['id'] != note_id]
+    save_quick_notes(notes)
+    return jsonify({'success': True})
+
+@app.route('/api/hub/training/sessions', methods=['GET'])
+def get_training_sessions():
+                                    
+    session_type = request.args.get('type')
+    sessions = db.get_hub_training_sessions(session_type=session_type)
+    return jsonify({'sessions': sessions})
+
+@app.route('/api/hub/training/sessions', methods=['POST'])
+def create_training_session():
+                                        
+    data = request.json
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    exercises = data.get('exercises')
+    if isinstance(exercises, (list, dict)):
+        exercises = json.dumps(exercises)
+
+    session_id = db.create_hub_training_session(
+        session_type=data.get('type'),
+        date=data.get('date'),
+        duration=data.get('duration'),
+        notes=data.get('notes'),
+        calories=data.get('calories'),
+        exercises=exercises
+    )
+    session = db.get_hub_training_session(session_id)
+    return jsonify({'success': True, 'session': session})
+
+@app.route('/api/hub/training/sessions/<int:session_id>', methods=['GET'])
+def get_training_session(session_id):
+                                          
+    session = db.get_hub_training_session(session_id)
+    if not session:
+        return jsonify({'success': False, 'error': 'Session not found'}), 404
+    return jsonify({'success': True, 'session': session})
+
+@app.route('/api/hub/training/sessions/<int:session_id>', methods=['PUT'])
+def update_training_session(session_id):
+                                              
+    data = request.json
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    session = db.get_hub_training_session(session_id)
+    if not session:
+        return jsonify({'success': False, 'error': 'Session not found'}), 404
+
+    exercises = data.get('exercises')
+    if isinstance(exercises, (list, dict)):
+        exercises = json.dumps(exercises)
+
+    db.update_hub_training_session(
+        session_id,
+        session_type=data.get('type'),
+        date=data.get('date'),
+        duration=data.get('duration'),
+        notes=data.get('notes'),
+        calories=data.get('calories'),
+        exercises=exercises
+    )
+    updated_session = db.get_hub_training_session(session_id)
+    return jsonify({'success': True, 'session': updated_session})
+
+@app.route('/api/hub/training/sessions/<int:session_id>', methods=['DELETE'])
+def delete_training_session(session_id):
+                                    
+    db.delete_hub_training_session(session_id)
+    return jsonify({'success': True})
+
+@app.route('/api/hub/training/health', methods=['GET'])
+def get_training_health():
+                          
+    logs = db.get_hub_training_health()
+    return jsonify({'logs': logs})
+
+@app.route('/api/hub/training/health', methods=['POST'])
+def create_training_health():
+                                                   
+    data = request.json
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    date = data.get('date')
+                                         
+    existing = db.get_hub_training_health_by_date(date)
+
+    if existing:
+                             
+        db.update_hub_training_health(
+            existing['id'],
+            sleep=data.get('sleep'),
+            energy=data.get('energy'),
+            stress=data.get('stress'),
+            recovery=data.get('recovery'),
+            weight=data.get('weight'),
+            notes=data.get('notes')
+        )
+    else:
+                        
+        db.create_hub_training_health(
+            date=date,
+            sleep=data.get('sleep'),
+            energy=data.get('energy'),
+            stress=data.get('stress'),
+            recovery=data.get('recovery'),
+            weight=data.get('weight'),
+            notes=data.get('notes')
+        )
+
+    return jsonify({'success': True})
+
+@app.route('/api/hub/training/goals', methods=['GET'])
+def get_training_goals():
+                                 
+    completed = request.args.get('completed')
+    if completed is not None:
+        completed = completed.lower() == 'true'
+    goals = db.get_hub_training_goals(completed=completed)
+    return jsonify({'goals': goals})
+
+@app.route('/api/hub/training/goals', methods=['POST'])
+def create_training_goal():
+                                     
+    data = request.json
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    goal_id = db.create_hub_training_goal(
+        title=data.get('title'),
+        target=data.get('target'),
+        current=data.get('current', 0),
+        unit=data.get('unit'),
+        deadline=data.get('deadline')
+    )
+    goal = db.get_hub_training_goal(goal_id)
+    return jsonify({'success': True, 'goal': goal})
+
+@app.route('/api/hub/training/goals/<int:goal_id>', methods=['GET'])
+def get_training_goal(goal_id):
+                                       
+    goal = db.get_hub_training_goal(goal_id)
+    if not goal:
+        return jsonify({'success': False, 'error': 'Goal not found'}), 404
+    return jsonify({'success': True, 'goal': goal})
+
+@app.route('/api/hub/training/goals/<int:goal_id>', methods=['PUT'])
+def update_training_goal(goal_id):
+                                           
+    data = request.json
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    goal = db.get_hub_training_goal(goal_id)
+    if not goal:
+        return jsonify({'success': False, 'error': 'Goal not found'}), 404
+
+    db.update_hub_training_goal(
+        goal_id,
+        title=data.get('title'),
+        target=data.get('target'),
+        current=data.get('current'),
+        unit=data.get('unit'),
+        deadline=data.get('deadline'),
+        completed=data.get('completed')
+    )
+    updated_goal = db.get_hub_training_goal(goal_id)
+    return jsonify({'success': True, 'goal': updated_goal})
+
+@app.route('/api/hub/training/goals/<int:goal_id>', methods=['DELETE'])
+def delete_training_goal(goal_id):
+                                 
+    db.delete_hub_training_goal(goal_id)
+    return jsonify({'success': True})
+
+@app.route('/api/hub/training/holiday-check', methods=['GET'])
+def check_holiday_mode():
+\
+\
+\
+\
+       
+    from datetime import datetime, timedelta
+
+    today = datetime.now().date()
+    today_str = today.strftime('%Y-%m-%d')
+
+    holiday_keywords = [
+        'ferien',                                        
+        'schulferien',                       
+        'herbstferien',                 
+        'winterferien',                   
+        'osterferien',                    
+        'sommerferien',                   
+        'weihnachtsferien',                  
+        'pfingstferien',                     
+        'frühjahrsferien',                
+        'urlaub',                                
+        'vacation',                           
+        'school holiday',                           
+    ]
+
+    def check_event_is_holiday(event):
+                                                                                       
+        title = (event.get('title') or event.get('summary') or '').lower()
+
+        calendar = (event.get('calendar') or event.get('calendar_id') or '').lower()
+        if 'holiday@group' in calendar or 'feiertage' in calendar:
+            return False
+
+        return any(keyword in title for keyword in holiday_keywords)
+
+    def event_covers_today(event):
+                                                 
+        start = event.get('date') or event.get('start_date') or ''
+        end = event.get('end_date') or event.get('end') or start
+
+        if isinstance(start, dict):
+            start = start.get('date') or start.get('dateTime', '')[:10]
+        if isinstance(end, dict):
+            end = end.get('date') or end.get('dateTime', '')[:10]
+
+        if 'T' in str(start):
+            start = str(start).split('T')[0]
+        if 'T' in str(end):
+            end = str(end).split('T')[0]
+
+        try:
+            return start <= today_str <= (end or start)
+        except:
+            return False
+
+    is_holiday = False
+    source = None
+
+    try:
+        school_events = load_school_calendar()
+        for event in school_events:
+            if event_covers_today(event) and check_event_is_holiday(event):
+                is_holiday = True
+                source = 'school_calendar'
+                break
+    except Exception as e:
+        print(f"School calendar check failed: {e}")
+
+    if not is_holiday:
+        try:
+            from google_oauth import fetch_google_calendar_events, load_tokens
+
+            tokens = load_tokens()
+            if tokens:
+                                                    
+                result = fetch_google_calendar_events(
+                    days_ahead=1,
+                    start_date=today_str,
+                    end_date=today_str
+                )
+
+                if result.get('success'):
+                    for event in result.get('events', []):
+                        if check_event_is_holiday(event):
+                            is_holiday = True
+                            source = 'google_calendar'
+                            break
+        except Exception as e:
+            print(f"Google Calendar check failed: {e}")
+                                                                                   
+    return jsonify({
+        'is_holiday': is_holiday,
+        'source': source,
+        'date': today_str
+    })
 
 @app.route('/api/email/accounts', methods=['GET'])
 def get_email_accounts_route():
     from email_service import get_email_accounts
     from google_oauth import get_google_accounts
-    # Combine IMAP accounts with Google OAuth accounts
+    from iserv_service import get_iserv_service
+                                                                
     imap_accounts = get_email_accounts()
     google_accounts = get_google_accounts()
-    return jsonify(imap_accounts + google_accounts)
+
+    iserv_accounts = []
+    iserv_service = get_iserv_service()
+    status = iserv_service.get_status()
+    if status.get('connected') or status.get('has_credentials'):
+        username = status.get('username', 'IServ')
+        iserv_url = status.get('iserv_url', '')
+        iserv_accounts = [{
+            'email': f'{username}@iserv',
+            'provider': 'iserv',
+            'display_name': f'IServ ({username})'
+        }]
+
+    return jsonify(imap_accounts + google_accounts + iserv_accounts)
 
 @app.route('/api/email/accounts', methods=['POST'])
 def add_email_account_route():
@@ -2002,7 +1384,6 @@ def remove_email_account_route(email):
     from email_service import remove_email_account
     from google_oauth import remove_google_account, get_google_accounts
 
-    # Check if it's a Google OAuth account
     google_accounts = [a['email'] for a in get_google_accounts()]
     if email in google_accounts:
         success = remove_google_account(email)
@@ -2025,8 +1406,31 @@ def get_email_folders_route(email):
 def get_email_messages_route(email):
     from email_service import fetch_emails
     from google_oauth import get_google_accounts, fetch_gmail_messages
+    from iserv_service import get_iserv_service
 
-    # Check if this is a Google OAuth account
+    if email.endswith('@iserv'):
+        iserv_service = get_iserv_service()
+        if not iserv_service.is_connected():
+                                                    
+            iserv_service.connect()
+        result = iserv_service.get_emails(limit=request.args.get('limit', 20, type=int))
+        if result.get('success'):
+                                                       
+            emails = result.get('emails', [])
+            transformed = []
+            for e in emails:
+                transformed.append({
+                    'id': e.get('uid') or e.get('id') or str(hash(e.get('subject', ''))),
+                    'from': e.get('from', e.get('sender', '')),
+                    'from_name': e.get('from_name', e.get('from', '').split('@')[0]),
+                    'subject': e.get('subject', '(Kein Betreff)'),
+                    'date': e.get('date', ''),
+                    'preview': e.get('preview', e.get('snippet', '')),
+                    'read': e.get('read', not e.get('unseen', False))
+                })
+            return jsonify({'success': True, 'emails': transformed})
+        return jsonify(result), 400
+
     google_accounts = [a['email'] for a in get_google_accounts()]
     if email in google_accounts:
         limit = request.args.get('limit', 20, type=int)
@@ -2044,8 +1448,17 @@ def get_email_messages_route(email):
 def get_email_detail_route(email, msg_id):
     from email_service import get_email_detail
     from google_oauth import get_google_accounts, get_gmail_message_detail
+    from iserv_service import get_iserv_service
 
-    # Check if this is a Google OAuth account
+    if email.endswith('@iserv'):
+        iserv_service = get_iserv_service()
+        if not iserv_service.is_connected():
+            iserv_service.connect()
+        result = iserv_service.get_email_detail(msg_id)
+        if result.get('success'):
+            return jsonify(result)
+        return jsonify(result), 400
+
     google_accounts = [a['email'] for a in get_google_accounts()]
     if email in google_accounts:
         result = get_gmail_message_detail(email, msg_id)
@@ -2061,6 +1474,7 @@ def get_email_detail_route(email, msg_id):
 def send_email_route():
     from email_service import send_email
     from google_oauth import get_google_accounts, send_gmail
+    from iserv_service import get_iserv_service
     data = request.get_json()
     if not data:
         return jsonify({'error': 'No data provided'}), 400
@@ -2073,7 +1487,15 @@ def send_email_route():
     if not from_email or not to_email or not subject:
         return jsonify({'error': 'From, to, and subject are required'}), 400
 
-    # Check if this is a Google OAuth account
+    if from_email.endswith('@iserv'):
+        iserv_service = get_iserv_service()
+        if not iserv_service.is_connected():
+            iserv_service.connect()
+        result = iserv_service.send_email(to=to_email, subject=subject, body=body)
+        if result.get('success'):
+            return jsonify(result)
+        return jsonify(result), 400
+
     google_accounts = [a['email'] for a in get_google_accounts()]
     if from_email in google_accounts:
         result = send_gmail(from_email, to_email, subject, body)
@@ -2086,20 +1508,20 @@ def send_email_route():
 
 @app.route('/api/email/google/status', methods=['GET'])
 def google_oauth_status():
-    """Check Google OAuth configuration status."""
+                                                  
     from google_oauth import get_oauth_status
     return jsonify(get_oauth_status())
 
 @app.route('/api/email/google/auth', methods=['POST'])
 def start_google_auth():
-    """Start Google OAuth flow."""
+                                  
     from google_oauth import start_oauth_flow
     result = start_oauth_flow()
     return jsonify(result)
 
 @app.route('/api/email/google/callback', methods=['POST'])
 def complete_google_auth():
-    """Complete Google OAuth with authorization code (manual entry)."""
+                                                                       
     from google_oauth import complete_oauth_flow
     data = request.get_json()
     if not data or not data.get('code'):
@@ -2109,7 +1531,7 @@ def complete_google_auth():
 
 @app.route('/api/email/google/oauth-callback', methods=['GET'])
 def google_oauth_redirect_callback():
-    """Handle OAuth redirect from Google."""
+                                            
     from google_oauth import complete_oauth_flow
 
     code = request.args.get('code')
@@ -2163,38 +1585,51 @@ def google_oauth_redirect_callback():
         </body></html>
         '''
 
+@app.route('/api/email/google/accounts', methods=['GET'])
+def list_google_accounts():
+                                         
+    from google_oauth import get_google_accounts
+    accounts = get_google_accounts()
+    return jsonify({'accounts': accounts})
+
 @app.route('/api/email/google/remove/<path:email>', methods=['DELETE'])
 def remove_google_account_route(email):
-    """Remove a Google OAuth account."""
+                                        
     from google_oauth import remove_google_account
     success = remove_google_account(email)
     return jsonify({'success': success})
 
 @app.route('/api/calendar/events', methods=['GET'])
 def get_calendar_events():
-    """Fetch events from Google Calendar (primary) or macOS Calendar (fallback)."""
+                                                                                   
     from google_oauth import fetch_google_calendar_events, load_tokens
-    days = request.args.get('days', 14, type=int)
-    account = request.args.get('account')  # Optional: specific Google account
 
-    # Try Google Calendar first if user has connected a Google account
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+    days = request.args.get('days', 14, type=int)
+    account = request.args.get('account')                                     
+
     tokens = load_tokens()
     if tokens:
-        result = fetch_google_calendar_events(days, account_email=account)
+        result = fetch_google_calendar_events(
+            days_ahead=days,
+            account_email=account,
+            start_date=start_date,
+            end_date=end_date
+        )
         if result.get('success'):
             return jsonify(result)
-        # If scope error, still return the error so user knows to re-auth
+                                                                         
         if result.get('error') == 'scope_needed':
             return jsonify(result)
 
-    # Fall back to macOS calendar
     from calendar_service import get_macos_calendar_events
     result = get_macos_calendar_events(days)
     return jsonify(result)
 
 @app.route('/api/calendar/macos', methods=['GET'])
 def get_macos_calendar():
-    """Fetch events from macOS Calendar app."""
+                                               
     from calendar_service import get_macos_calendar_events
     days = request.args.get('days', 14, type=int)
     result = get_macos_calendar_events(days)
@@ -2202,24 +1637,22 @@ def get_macos_calendar():
 
 @app.route('/api/calendar/list', methods=['GET'])
 def get_calendar_list():
-    """Get list of available macOS calendars."""
+                                                
     from calendar_service import get_calendars
     result = get_calendars()
     return jsonify(result)
 
-
 @app.route('/api/calendar/google/calendars', methods=['GET'])
 def get_google_calendars_route():
-    """Get list of Google calendars for an account."""
+                                                      
     from google_oauth import get_google_calendars
     account = request.args.get('account')
     result = get_google_calendars(account_email=account)
     return jsonify(result)
 
-
 @app.route('/api/calendar/events', methods=['POST'])
 def create_calendar_event():
-    """Create a new event in Google Calendar."""
+                                                
     from google_oauth import create_google_calendar_event
     data = request.get_json()
 
@@ -2242,10 +1675,9 @@ def create_calendar_event():
         return jsonify(result)
     return jsonify(result), 400
 
-
 @app.route('/api/calendar/events/<event_id>', methods=['PUT'])
 def update_calendar_event(event_id):
-    """Update an existing event in Google Calendar."""
+                                                      
     from google_oauth import update_google_calendar_event
     data = request.get_json()
 
@@ -2269,10 +1701,9 @@ def update_calendar_event(event_id):
         return jsonify(result)
     return jsonify(result), 400
 
-
 @app.route('/api/calendar/events/<event_id>', methods=['DELETE'])
 def delete_calendar_event(event_id):
-    """Delete an event from Google Calendar."""
+                                               
     from google_oauth import delete_google_calendar_event
 
     calendar_id = request.args.get('calendar_id', 'primary')
@@ -2288,31 +1719,652 @@ def delete_calendar_event(event_id):
         return jsonify(result)
     return jsonify(result), 400
 
+@app.route('/api/calendar/caldav/accounts', methods=['GET'])
+def get_caldav_accounts_route():
+                                      
+    from calendar_service import get_caldav_accounts
+    accounts = get_caldav_accounts()
+    return jsonify({'success': True, 'accounts': accounts})
+
+@app.route('/api/calendar/caldav/accounts', methods=['POST'])
+def add_caldav_account_route():
+                                                           
+    from calendar_service import add_caldav_account
+    data = request.get_json()
+
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    result = add_caldav_account(
+        name=data.get('name', ''),
+        url=data.get('url', ''),
+        username=data.get('username', ''),
+        password=data.get('password', ''),
+        provider=data.get('provider', 'caldav')
+    )
+
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/calendar/caldav/accounts/<account_id>', methods=['DELETE'])
+def remove_caldav_account_route(account_id):
+                                  
+    from calendar_service import remove_caldav_account
+    result = remove_caldav_account(account_id)
+    return jsonify(result)
+
+@app.route('/api/calendar/caldav/events', methods=['GET'])
+def get_caldav_events_route():
+                                            
+    from calendar_service import fetch_caldav_events
+
+    account_id = request.args.get('account_id')
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+    days = request.args.get('days', 30, type=int)
+
+    result = fetch_caldav_events(
+        account_id=account_id,
+        days_ahead=days,
+        start_date=start_date,
+        end_date=end_date
+    )
+
+    return jsonify(result)
+
+@app.route('/api/calendar/caldav/events', methods=['POST'])
+def create_caldav_event_route():
+                                               
+    from calendar_service import create_caldav_event
+    data = request.get_json()
+
+    if not data or not data.get('account_id') or not data.get('calendar_url'):
+        return jsonify({'success': False, 'error': 'Account ID and calendar URL required'}), 400
+
+    result = create_caldav_event(
+        account_id=data['account_id'],
+        calendar_url=data['calendar_url'],
+        title=data.get('title', 'Untitled'),
+        start_date=data.get('date'),
+        start_time=data.get('time'),
+        end_date=data.get('end_date'),
+        end_time=data.get('end_time'),
+        description=data.get('description', ''),
+        location=data.get('location', '')
+    )
+
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
 
 @app.route('/api/email/message/<path:email>/<msg_id>', methods=['DELETE'])
 def delete_email_message(email, msg_id):
-    """Delete an email message."""
+                                  
     from google_oauth import get_google_accounts, delete_gmail_message
     from email_service import delete_email
 
     permanent = request.args.get('permanent', 'false').lower() == 'true'
 
-    # Check if it's a Google OAuth account
     google_accounts = [a['email'] for a in get_google_accounts()]
     if email in google_accounts:
         result = delete_gmail_message(email, msg_id, permanent=permanent)
     else:
-        # For IMAP accounts, use the email_service
+                                                  
         result = delete_email(email, msg_id)
 
     if result.get('success'):
         return jsonify(result)
     return jsonify(result), 400
 
+@app.route('/api/iserv/status', methods=['GET'])
+def iserv_status():
+                                      
+    from iserv_service import get_iserv_service
+    service = get_iserv_service()
+    return jsonify(service.get_status())
+
+@app.route('/api/iserv/connect', methods=['POST'])
+def iserv_connect():
+                                            
+    from iserv_service import get_iserv_service
+    data = request.get_json() or {}
+    service = get_iserv_service()
+
+    result = service.connect(
+        username=data.get('username'),
+        password=data.get('password'),
+        iserv_url=data.get('iserv_url')
+    )
+
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/iserv/disconnect', methods=['POST'])
+def iserv_disconnect():
+                                                      
+    from iserv_service import get_iserv_service
+    service = get_iserv_service()
+    service.delete_credentials()
+    return jsonify({'success': True})
+
+@app.route('/api/iserv/notifications', methods=['GET'])
+def iserv_notifications():
+                                  
+    from iserv_service import get_iserv_service
+    service = get_iserv_service()
+    result = service.get_notifications()
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/iserv/badges', methods=['GET'])
+def iserv_badges():
+                                        
+    from iserv_service import get_iserv_service
+    service = get_iserv_service()
+    result = service.get_badges()
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/iserv/emails', methods=['GET'])
+def iserv_emails():
+                                
+    from iserv_service import get_iserv_service
+    service = get_iserv_service()
+    folder = request.args.get('folder', 'INBOX')
+    limit = int(request.args.get('limit', 20))
+    result = service.get_emails(folder=folder, limit=limit)
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/iserv/emails/send', methods=['POST'])
+def iserv_send_email():
+                                  
+    from iserv_service import get_iserv_service
+    data = request.get_json() or {}
+    service = get_iserv_service()
+
+    result = service.send_email(
+        to=data.get('to'),
+        subject=data.get('subject'),
+        body=data.get('body')
+    )
+
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/iserv/mail-folders', methods=['GET'])
+def iserv_mail_folders():
+                                 
+    from iserv_service import get_iserv_service
+    service = get_iserv_service()
+    result = service.get_mail_folders()
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/iserv/events', methods=['GET'])
+def iserv_events():
+                                             
+    from iserv_service import get_iserv_service
+    service = get_iserv_service()
+    result = service.get_upcoming_events()
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/iserv/events', methods=['POST'])
+def iserv_create_event():
+                                         
+    from iserv_service import get_iserv_service
+    from datetime import datetime
+    data = request.get_json() or {}
+    service = get_iserv_service()
+
+    start = datetime.fromisoformat(data.get('start'))
+    end = datetime.fromisoformat(data.get('end')) if data.get('end') else None
+
+    result = service.create_event(
+        title=data.get('title'),
+        start=start,
+        end=end,
+        description=data.get('description', ''),
+        location=data.get('location', '')
+    )
+
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/iserv/exercises', methods=['GET'])
+def iserv_exercises():
+                                       
+    from iserv_service import get_iserv_service
+    service = get_iserv_service()
+    result = service.get_exercises()
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/iserv/storage', methods=['GET'])
+def iserv_storage():
+                                 
+    from iserv_service import get_iserv_service
+    service = get_iserv_service()
+    result = service.get_storage_info()
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/iserv/files', methods=['GET'])
+def iserv_files():
+                              
+    from iserv_service import get_iserv_service
+    service = get_iserv_service()
+    path = request.args.get('path', '/')
+    result = service.list_files(path=path)
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/iserv/users/search', methods=['GET'])
+def iserv_search_users():
+                                    
+    from iserv_service import get_iserv_service
+    service = get_iserv_service()
+    query = request.args.get('q', '')
+    result = service.search_users(query=query)
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/iserv/vertretungsplan', methods=['GET'])
+def iserv_get_vertretungsplan():
+                                                     
+    from iserv_service import get_iserv_service
+    service = get_iserv_service()
+    display_id = request.args.get('display_id', 3, type=int)
+    refresh = request.args.get('refresh', 'false').lower() == 'true'
+
+    if refresh and service.is_connected():
+                                          
+        service.connect()
+
+    result = service.get_vertretungsplan(display_id=display_id)
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/iserv/vertretungsplan/analyze', methods=['GET'])
+def iserv_analyze_vertretungsplan():
+                                                                      
+    from iserv_service import get_iserv_service
+    import base64
+    import io
+
+    service = get_iserv_service()
+    display_id = request.args.get('display_id', 3, type=int)
+    grade_filter = request.args.get('grade', '11')                              
+
+    result = service.get_vertretungsplan(display_id=display_id)
+
+    if not result.get('success'):
+        return jsonify(result), 400
+
+    if result.get('type') == 'image':
+                                                                      
+        return jsonify({
+            'success': True,
+            'type': 'image',
+            'message': 'Vertretungsplan als Bild empfangen. OCR-Analyse erforderlich.',
+            'data': result.get('data'),
+            'content_type': result.get('content_type')
+        })
+    elif result.get('type') == 'html':
+                                                     
+        text = result.get('text', '')
+        lines = text.split('\n')
+
+        substitutions = []
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+                                                       
+            if grade_filter in line or 'Jg.' in line or 'Klasse' in line:
+                substitutions.append(line)
+
+        return jsonify({
+            'success': True,
+            'type': 'parsed',
+            'substitutions': substitutions,
+            'raw_text': text[:2000],
+            'grade_filter': grade_filter
+        })
+
+    return jsonify(result)
+
+@app.route('/api/vbb/search', methods=['GET'])
+def vbb_search_location():
+                                        
+    from vbb_service import get_vbb_service
+    service = get_vbb_service()
+    query = request.args.get('q', '')
+    if not query:
+        return jsonify({'success': False, 'error': 'Suchbegriff fehlt'}), 400
+    result = service.search_location(query)
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/vbb/nearby', methods=['GET'])
+def vbb_nearby_stops():
+                                      
+    from vbb_service import get_vbb_service
+    service = get_vbb_service()
+    try:
+        lat = float(request.args.get('lat', 0))
+        lng = float(request.args.get('lng', 0))
+        radius = int(request.args.get('radius', 1000))
+    except ValueError:
+        return jsonify({'success': False, 'error': 'Ungültige Koordinaten'}), 400
+
+    if lat == 0 or lng == 0:
+        return jsonify({'success': False, 'error': 'Koordinaten fehlen'}), 400
+
+    result = service.search_nearby_stops(lat, lng, radius)
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/vbb/route', methods=['POST'])
+def vbb_get_route():
+                                          
+    from vbb_service import get_vbb_service
+    from datetime import datetime
+    service = get_vbb_service()
+
+    data = request.get_json() or {}
+
+    from_location = data.get('from')
+    to_location = data.get('to')
+
+    if not from_location or not to_location:
+        return jsonify({'success': False, 'error': 'Start und Ziel erforderlich'}), 400
+
+    arrival_time = None
+    departure_time = None
+
+    if data.get('arrival'):
+        try:
+            arrival_time = datetime.fromisoformat(data['arrival'].replace('Z', '+00:00'))
+        except ValueError:
+            pass
+
+    if data.get('departure'):
+        try:
+            departure_time = datetime.fromisoformat(data['departure'].replace('Z', '+00:00'))
+        except ValueError:
+            pass
+
+    result = service.get_route(
+        from_location=from_location,
+        to_location=to_location,
+        arrival_time=arrival_time,
+        departure_time=departure_time,
+        num_results=data.get('results', 5)
+    )
+
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/vbb/route-to-event', methods=['POST'])
+def vbb_route_to_event():
+                                        
+    from vbb_service import get_vbb_service
+    service = get_vbb_service()
+
+    data = request.get_json() or {}
+
+    event = data.get('event')
+    current_location = data.get('current_location')
+    buffer_minutes = data.get('buffer_minutes', 15)
+
+    if not event:
+        return jsonify({'success': False, 'error': 'Event erforderlich'}), 400
+
+    if not current_location:
+        return jsonify({'success': False, 'error': 'Aktueller Standort erforderlich'}), 400
+
+    result = service.get_route_to_event(
+        event=event,
+        current_location=current_location,
+        buffer_minutes=buffer_minutes
+    )
+
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/vbb/departures/<stop_id>', methods=['GET'])
+def vbb_departures(stop_id):
+                                     
+    from vbb_service import get_vbb_service
+    service = get_vbb_service()
+    duration = int(request.args.get('duration', 30))
+    result = service.get_departures(stop_id, duration)
+    if result.get('success'):
+        return jsonify(result)
+    return jsonify(result), 400
+
+@app.route('/api/vbb/locations', methods=['GET'])
+def vbb_get_known_locations():
+                                    
+    from vbb_service import get_vbb_service
+    service = get_vbb_service()
+    return jsonify(service.get_known_locations())
+
+@app.route('/api/vbb/locations', methods=['POST'])
+def vbb_save_location():
+                                
+    from vbb_service import get_vbb_service
+    service = get_vbb_service()
+    data = request.get_json() or {}
+
+    name = data.get('name')
+    location = data.get('location')
+
+    if not name or not location:
+        return jsonify({'success': False, 'error': 'Name und Ort erforderlich'}), 400
+
+    result = service.save_known_location(name, location)
+    return jsonify(result)
+
+SYNCED_CALENDAR_FILE = Path(__file__).parent.parent / 'data' / 'synced_calendar.json'
+
+@app.route('/api/calendar/local', methods=['GET'])
+def get_local_calendar_events():
+                                                            
+    if not SYNCED_CALENDAR_FILE.exists():
+        return jsonify({
+            'success': False,
+            'error': 'Kalender nicht synchronisiert. Führe calendar_sync.py aus.'
+        }), 404
+
+    try:
+        with open(SYNCED_CALENDAR_FILE, 'r') as f:
+            data = json.load(f)
+
+        return jsonify({
+            'success': True,
+            'last_sync': data.get('last_sync'),
+            'event_count': data.get('event_count', 0),
+            'events': data.get('events', [])
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/calendar/local/sync', methods=['POST'])
+def trigger_local_calendar_sync():
+                                           
+    import subprocess
+
+    try:
+                             
+        script_path = Path(__file__).parent.parent / 'calendar_sync.py'
+        if not script_path.exists():
+            return jsonify({'success': False, 'error': 'Sync-Skript nicht gefunden'}), 404
+
+        result = subprocess.run(
+            ['python3', str(script_path), '--sync'],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+        if result.returncode == 0:
+            return jsonify({'success': True, 'message': 'Synchronisation abgeschlossen'})
+        else:
+            return jsonify({'success': False, 'error': result.stderr or 'Sync fehlgeschlagen'}), 500
+
+    except subprocess.TimeoutExpired:
+        return jsonify({'success': False, 'error': 'Timeout bei der Synchronisation'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/calendar/local/status', methods=['GET'])
+def get_local_calendar_status():
+                                                           
+    import subprocess
+
+    try:
+        script_path = Path(__file__).parent.parent / 'calendar_sync.py'
+        pid_file = Path(__file__).parent.parent / 'data' / 'calendar_sync.pid'
+
+        daemon_running = False
+        daemon_pid = None
+
+        if pid_file.exists():
+            try:
+                with open(pid_file, 'r') as f:
+                    daemon_pid = int(f.read().strip())
+                                             
+                import os
+                os.kill(daemon_pid, 0)
+                daemon_running = True
+            except (ValueError, OSError, ProcessLookupError):
+                daemon_running = False
+
+        last_sync = None
+        event_count = 0
+
+        if SYNCED_CALENDAR_FILE.exists():
+            with open(SYNCED_CALENDAR_FILE, 'r') as f:
+                data = json.load(f)
+                last_sync = data.get('last_sync')
+                event_count = data.get('event_count', 0)
+
+        return jsonify({
+            'success': True,
+            'daemon_running': daemon_running,
+            'daemon_pid': daemon_pid,
+            'last_sync': last_sync,
+            'event_count': event_count
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+WEATHER_CACHE_FILE = Path(__file__).parent.parent / 'data' / 'weather_cache.json'
+
+@app.route('/api/hub/weather', methods=['GET'])
+def get_weather():
+                                                                 
+    import requests
+
+    lat = request.args.get('lat', '52.52')                   
+    lon = request.args.get('lon', '13.41')
+    city = request.args.get('city', 'Berlin')
+
+    try:
+                                         
+        response = requests.get(
+            f'https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto',
+            timeout=10
+        )
+
+        if response.ok:
+            data = response.json()
+            weather_data = {
+                'current': data.get('current'),
+                'daily': data.get('daily'),
+                'location': {'lat': lat, 'lon': lon, 'city': city},
+                'timestamp': datetime.now().isoformat(),
+                'fetched_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+
+            WEATHER_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(WEATHER_CACHE_FILE, 'w') as f:
+                json.dump(weather_data, f)
+
+            return jsonify({
+                'success': True,
+                'from_cache': False,
+                **weather_data
+            })
+        else:
+            raise Exception('Weather API error')
+
+    except Exception as e:
+                                            
+        if WEATHER_CACHE_FILE.exists():
+            try:
+                with open(WEATHER_CACHE_FILE, 'r') as f:
+                    cached_data = json.load(f)
+                return jsonify({
+                    'success': True,
+                    'from_cache': True,
+                    'cached_at': cached_data.get('timestamp'),
+                    **cached_data
+                })
+            except:
+                pass
+
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'offline': True
+        }), 503
+
+BRANDENBURG_HOLIDAYS_FILE = Path(__file__).parent.parent / 'data' / 'brandenburg_holidays.json'
+
+@app.route('/api/calendar/holidays', methods=['GET'])
+def get_holidays():
+                                                        
+    try:
+        if not BRANDENBURG_HOLIDAYS_FILE.exists():
+            return jsonify({'success': True, 'holidays': []})
+
+        with open(BRANDENBURG_HOLIDAYS_FILE, 'r') as f:
+            data = json.load(f)
+
+        return jsonify({
+            'success': True,
+            'source': data.get('source', 'Brandenburg Schulferien'),
+            'holidays': data.get('holidays', [])
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     print("\n" + "=" * 50)
-    print("  Voice Notes - Real-time Transcription")
+    print("  Nexus Hub - Personal Dashboard")
     print("  Open http://localhost:5050 in your browser")
     print("=" * 50 + "\n")
     socketio.run(app, host='127.0.0.1', port=5050, debug=False, allow_unsafe_werkzeug=True)

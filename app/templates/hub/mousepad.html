@@ -1,0 +1,720 @@
+{% extends "hub/base.html" %}
+{% set active_tab = 'mousepad' %}
+
+{% block title %}Mousepad - Nexus{% endblock %}
+
+{% block content %}
+<div class="page-container mousepad-page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Mousepad</h1>
+            <p class="page-subtitle">Schreibe mit dem Finger oder Stift</p>
+        </div>
+        <div class="page-actions">
+            <button class="btn-secondary" onclick="clearCanvas()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Leeren
+            </button>
+            <button class="btn-secondary" onclick="undoStroke()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 7v6h6"></path>
+                    <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+                </svg>
+                Undo
+            </button>
+            <button class="btn-primary" onclick="saveDrawing()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+                Speichern
+            </button>
+        </div>
+    </div>
+
+    <div class="drawing-toolbar glass-card">
+        <div class="tool-group">
+            <span class="tool-label">Werkzeug:</span>
+            <button class="tool-btn active" data-tool="pen" onclick="setTool('pen')" title="Stift">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                    <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                    <path d="M2 2l7.586 7.586"></path>
+                    <circle cx="11" cy="11" r="2"></circle>
+                </svg>
+            </button>
+            <button class="tool-btn" data-tool="highlighter" onclick="setTool('highlighter')" title="Textmarker">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 11l-6 6v3h9l3-3"></path>
+                    <path d="M22 12l-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"></path>
+                </svg>
+            </button>
+            <button class="tool-btn" data-tool="eraser" onclick="setTool('eraser')" title="Radierer">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 20H7L3 16c-.6-.6-.6-1.5 0-2.1l10-10c.6-.6 1.5-.6 2.1 0l7 7c.6.6.6 1.5 0 2.1L16 19"></path>
+                    <path d="M6 11l7.5 7.5"></path>
+                </svg>
+            </button>
+        </div>
+
+        <div class="tool-group">
+            <span class="tool-label">Farbe:</span>
+            <div class="color-picker">
+                <button class="color-btn active" data-color="#ffffff" style="background: #ffffff;" onclick="setColor('#ffffff')"></button>
+                <button class="color-btn" data-color="#3b82f6" style="background: #3b82f6;" onclick="setColor('#3b82f6')"></button>
+                <button class="color-btn" data-color="#22c55e" style="background: #22c55e;" onclick="setColor('#22c55e')"></button>
+                <button class="color-btn" data-color="#eab308" style="background: #eab308;" onclick="setColor('#eab308')"></button>
+                <button class="color-btn" data-color="#ef4444" style="background: #ef4444;" onclick="setColor('#ef4444')"></button>
+                <button class="color-btn" data-color="#a855f7" style="background: #a855f7;" onclick="setColor('#a855f7')"></button>
+            </div>
+        </div>
+
+        <div class="tool-group">
+            <span class="tool-label">Dicke:</span>
+            <input type="range" id="strokeWidth" min="1" max="20" value="3" oninput="setStrokeWidth(this.value)">
+            <span id="strokeWidthValue">3px</span>
+        </div>
+
+        <div class="tool-group">
+            <span class="tool-label">Hintergrund:</span>
+            <select id="backgroundType" onchange="setBackground(this.value)">
+                <option value="blank">Leer</option>
+                <option value="lines">Liniert</option>
+                <option value="grid">Kariert</option>
+                <option value="dots">Punkte</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="canvas-container glass-card">
+        <canvas id="drawingCanvas"></canvas>
+        <div class="canvas-hint" id="canvasHint">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+            </svg>
+            <span>Hier schreiben oder zeichnen</span>
+        </div>
+    </div>
+
+    <div class="saved-drawings glass-card">
+        <div class="section-header">
+            <h3>Gespeicherte Zeichnungen</h3>
+        </div>
+        <div class="drawings-grid" id="savedDrawings">
+            <div class="empty-state">
+                <span>Noch keine Zeichnungen gespeichert</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.mousepad-page {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.drawing-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    padding: 16px 24px;
+    align-items: center;
+}
+
+.tool-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tool-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.tool-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tool-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.tool-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.color-picker {
+    display: flex;
+    gap: 6px;
+}
+
+.color-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--card-border);
+    cursor: pointer;
+    transition: transform 0.2s, border-color 0.2s;
+}
+
+.color-btn:hover {
+    transform: scale(1.1);
+}
+
+.color-btn.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+#strokeWidth {
+    width: 80px;
+    cursor: pointer;
+}
+
+#strokeWidthValue {
+    font-size: 12px;
+    color: var(--text-muted);
+    min-width: 30px;
+}
+
+#backgroundType {
+    padding: 6px 12px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-xs);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.canvas-container {
+    position: relative;
+    padding: 0;
+    overflow: hidden;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    touch-action: none;
+}
+
+#drawingCanvas {
+    display: block;
+    width: 100%;
+    height: 500px;
+    cursor: crosshair;
+    background: var(--bg-tertiary);
+}
+
+.canvas-hint {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-muted);
+    opacity: 0.5;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+.canvas-hint.hidden {
+    opacity: 0;
+}
+
+.saved-drawings {
+    padding: 20px;
+}
+
+.section-header {
+    margin-bottom: 16px;
+}
+
+.section-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.drawings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.drawing-card {
+    position: relative;
+    aspect-ratio: 4/3;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    cursor: pointer;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--card-border);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.drawing-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.drawing-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.drawing-card .drawing-actions {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 8px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.7));
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.drawing-card:hover .drawing-actions {
+    opacity: 1;
+}
+
+.drawing-card .drawing-date {
+    font-size: 11px;
+    color: rgba(255,255,255,0.8);
+}
+
+.drawing-card .drawing-btns {
+    display: flex;
+    gap: 6px;
+}
+
+.drawing-card .drawing-btns button {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    border: none;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.drawing-card .drawing-btns button:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+.empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 40px;
+    color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+    .drawing-toolbar {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    #drawingCanvas {
+        height: 400px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Drawing state
+let canvas, ctx;
+let isDrawing = false;
+let currentTool = 'pen';
+let currentColor = '#ffffff';
+let strokeWidth = 3;
+let lastX = 0;
+let lastY = 0;
+let strokes = [];
+let currentStroke = [];
+let backgroundType = 'blank';
+
+document.addEventListener('DOMContentLoaded', () => {
+    initCanvas();
+    loadSavedDrawings();
+});
+
+function initCanvas() {
+    canvas = document.getElementById('drawingCanvas');
+    ctx = canvas.getContext('2d');
+
+    // Set canvas size
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Mouse events
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseout', stopDrawing);
+
+    // Touch events
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', stopDrawing);
+    canvas.addEventListener('touchcancel', stopDrawing);
+
+    // Prevent scrolling while drawing
+    canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+}
+
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const rect = container.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+
+    canvas.width = rect.width * dpr;
+    canvas.height = 500 * dpr;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = '500px';
+
+    ctx.scale(dpr, dpr);
+
+    // Redraw content
+    drawBackground();
+    redrawStrokes();
+}
+
+function drawBackground() {
+    ctx.fillStyle = 'var(--bg-tertiary)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const isDark = document.body.dataset.theme === 'dark';
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+    ctx.lineWidth = 1;
+
+    const width = canvas.width / (window.devicePixelRatio || 1);
+    const height = canvas.height / (window.devicePixelRatio || 1);
+
+    if (backgroundType === 'lines') {
+        const lineSpacing = 30;
+        for (let y = lineSpacing; y < height; y += lineSpacing) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(width, y);
+            ctx.stroke();
+        }
+    } else if (backgroundType === 'grid') {
+        const gridSize = 25;
+        for (let x = gridSize; x < width; x += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+            ctx.stroke();
+        }
+        for (let y = gridSize; y < height; y += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(width, y);
+            ctx.stroke();
+        }
+    } else if (backgroundType === 'dots') {
+        const dotSpacing = 25;
+        ctx.fillStyle = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)';
+        for (let x = dotSpacing; x < width; x += dotSpacing) {
+            for (let y = dotSpacing; y < height; y += dotSpacing) {
+                ctx.beginPath();
+                ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+    }
+}
+
+function getCanvasCoords(e) {
+    const rect = canvas.getBoundingClientRect();
+    if (e.touches) {
+        return {
+            x: e.touches[0].clientX - rect.left,
+            y: e.touches[0].clientY - rect.top
+        };
+    }
+    return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+    };
+}
+
+function startDrawing(e) {
+    isDrawing = true;
+    const coords = getCanvasCoords(e);
+    lastX = coords.x;
+    lastY = coords.y;
+    currentStroke = [{x: lastX, y: lastY, tool: currentTool, color: currentColor, width: strokeWidth}];
+
+    document.getElementById('canvasHint').classList.add('hidden');
+}
+
+function handleTouchStart(e) {
+    e.preventDefault();
+    startDrawing(e);
+}
+
+function draw(e) {
+    if (!isDrawing) return;
+
+    const coords = getCanvasCoords(e);
+
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(coords.x, coords.y);
+
+    if (currentTool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.strokeStyle = 'rgba(0,0,0,1)';
+        ctx.lineWidth = strokeWidth * 3;
+    } else if (currentTool === 'highlighter') {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = currentColor;
+        ctx.globalAlpha = 0.3;
+        ctx.lineWidth = strokeWidth * 4;
+    } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = currentColor;
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = strokeWidth;
+    }
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+
+    currentStroke.push({x: coords.x, y: coords.y, tool: currentTool, color: currentColor, width: strokeWidth});
+
+    lastX = coords.x;
+    lastY = coords.y;
+}
+
+function handleTouchMove(e) {
+    e.preventDefault();
+    draw(e);
+}
+
+function stopDrawing() {
+    if (isDrawing && currentStroke.length > 1) {
+        strokes.push([...currentStroke]);
+    }
+    isDrawing = false;
+    currentStroke = [];
+}
+
+function redrawStrokes() {
+    strokes.forEach(stroke => {
+        if (stroke.length < 2) return;
+
+        for (let i = 1; i < stroke.length; i++) {
+            const prev = stroke[i - 1];
+            const curr = stroke[i];
+
+            ctx.beginPath();
+            ctx.moveTo(prev.x, prev.y);
+            ctx.lineTo(curr.x, curr.y);
+
+            if (curr.tool === 'eraser') {
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.strokeStyle = 'rgba(0,0,0,1)';
+                ctx.lineWidth = curr.width * 3;
+            } else if (curr.tool === 'highlighter') {
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.strokeStyle = curr.color;
+                ctx.globalAlpha = 0.3;
+                ctx.lineWidth = curr.width * 4;
+            } else {
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.strokeStyle = curr.color;
+                ctx.globalAlpha = 1;
+                ctx.lineWidth = curr.width;
+            }
+
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+        }
+    });
+
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+}
+
+function setTool(tool) {
+    currentTool = tool;
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tool === tool);
+    });
+}
+
+function setColor(color) {
+    currentColor = color;
+    document.querySelectorAll('.color-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.color === color);
+    });
+}
+
+function setStrokeWidth(width) {
+    strokeWidth = parseInt(width);
+    document.getElementById('strokeWidthValue').textContent = width + 'px';
+}
+
+function setBackground(type) {
+    backgroundType = type;
+    drawBackground();
+    redrawStrokes();
+}
+
+function clearCanvas() {
+    if (!confirm('Zeichnung wirklich leeren?')) return;
+    strokes = [];
+    drawBackground();
+    document.getElementById('canvasHint').classList.remove('hidden');
+}
+
+function undoStroke() {
+    if (strokes.length > 0) {
+        strokes.pop();
+        drawBackground();
+        redrawStrokes();
+    }
+}
+
+function saveDrawing() {
+    if (strokes.length === 0) {
+        alert('Nichts zum Speichern vorhanden');
+        return;
+    }
+
+    const dataUrl = canvas.toDataURL('image/png');
+    const drawings = JSON.parse(localStorage.getItem('nexus_drawings') || '[]');
+
+    drawings.unshift({
+        id: Date.now(),
+        image: dataUrl,
+        strokes: strokes,
+        background: backgroundType,
+        date: new Date().toISOString()
+    });
+
+    // Keep only last 20 drawings
+    if (drawings.length > 20) {
+        drawings.pop();
+    }
+
+    localStorage.setItem('nexus_drawings', JSON.stringify(drawings));
+    loadSavedDrawings();
+
+    // Clear canvas after save
+    strokes = [];
+    drawBackground();
+    document.getElementById('canvasHint').classList.remove('hidden');
+}
+
+function loadSavedDrawings() {
+    const drawings = JSON.parse(localStorage.getItem('nexus_drawings') || '[]');
+    const container = document.getElementById('savedDrawings');
+
+    if (drawings.length === 0) {
+        container.innerHTML = '<div class="empty-state"><span>Noch keine Zeichnungen gespeichert</span></div>';
+        return;
+    }
+
+    container.innerHTML = drawings.map(drawing => `
+        <div class="drawing-card" onclick="loadDrawing(${drawing.id})">
+            <img src="${drawing.image}" alt="Zeichnung">
+            <div class="drawing-actions">
+                <span class="drawing-date">${new Date(drawing.date).toLocaleDateString('de-DE')}</span>
+                <div class="drawing-btns">
+                    <button onclick="event.stopPropagation(); downloadDrawing(${drawing.id})" title="Download">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                    </button>
+                    <button onclick="event.stopPropagation(); deleteDrawing(${drawing.id})" title="Löschen">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function loadDrawing(id) {
+    const drawings = JSON.parse(localStorage.getItem('nexus_drawings') || '[]');
+    const drawing = drawings.find(d => d.id === id);
+
+    if (drawing) {
+        strokes = drawing.strokes || [];
+        backgroundType = drawing.background || 'blank';
+        document.getElementById('backgroundType').value = backgroundType;
+
+        drawBackground();
+        redrawStrokes();
+        document.getElementById('canvasHint').classList.add('hidden');
+    }
+}
+
+function downloadDrawing(id) {
+    const drawings = JSON.parse(localStorage.getItem('nexus_drawings') || '[]');
+    const drawing = drawings.find(d => d.id === id);
+
+    if (drawing) {
+        const link = document.createElement('a');
+        link.download = `nexus-drawing-${new Date(drawing.date).toISOString().slice(0,10)}.png`;
+        link.href = drawing.image;
+        link.click();
+    }
+}
+
+function deleteDrawing(id) {
+    if (!confirm('Zeichnung wirklich löschen?')) return;
+
+    let drawings = JSON.parse(localStorage.getItem('nexus_drawings') || '[]');
+    drawings = drawings.filter(d => d.id !== id);
+    localStorage.setItem('nexus_drawings', JSON.stringify(drawings));
+    loadSavedDrawings();
+}
+</script>
+{% endblock %}

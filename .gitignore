@@ -1,9 +1,7 @@
-# Virtual environment
 venv/
 .venv/
 env/
 
-# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -13,31 +11,30 @@ __pycache__/
 dist/
 build/
 
-# IDE
 .vscode/
 .idea/
 
-# Claude
 .claude/
 
-# Temporary files
 audio_temp/
 *.tmp
 *.log
 
-# Environment variables (secrets)
 .env
 
-# Data (contains database with recordings)
 data/
 
-# Voice profiles (user-specific data, keep folder structure)
 voice_profiles/*
 !voice_profiles/.gitkeep
 
-# Logs (user diagnostic data)
 app/logs/
+postprocessor_logs/
+error_reports/
+feedback_logs/
+learning_data/
+models/
 
-# OS files
+archive/
+
 .DS_Store
 Thumbs.db

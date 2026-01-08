@@ -2,3 +2,4 @@
 {"timestamp": "2025-12-27T23:56:21.450244", "teacher": "58a651157e19", "parameter": "voice_threshold", "old_value": 0.25, "new_value": 0.1, "reason": "Manual adjustment via dashboard"}
 {"timestamp": "2025-12-28T00:04:56.911525", "teacher": "58a651157e19", "parameter": "voice_threshold", "old_value": 0.3, "new_value": 0.2, "reason": "Manual adjustment via dashboard"}
 {"timestamp": "2025-12-28T00:05:16.445399", "teacher": "58a651157e19", "parameter": "voice_threshold", "old_value": 0.2, "new_value": 0.1, "reason": "Manual adjustment via dashboard"}
+{"timestamp": "2025-12-28T00:33:55.429416", "teacher": "58a651157e19", "parameter": "voice_threshold", "old_value": 0.3, "new_value": 0.2, "reason": "Manual adjustment via dashboard"}
