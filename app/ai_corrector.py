@@ -256,7 +256,7 @@ class AICorrector:
             system_msg = """Du bist ein Experte für die Korrektur von Sprachtranskriptionen.
 Deine Aufgabe ist es, fehlerhafte Transkriptionen zu korrigieren und dabei:
 - Falsch erkannte Wörter zu korrigieren
-- Grammatik und Satzstruktur zu verbessern
+- Grammatik und Satzstruktur zu verbessern indem du den Kontext berücksichtigst
 - Den gemeinten Sinn beizubehalten
 - NUR den korrigierten Text auszugeben, keine Erklärungen"""
 

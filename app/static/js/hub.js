@@ -1,15 +1,7 @@
-/**
- * Nexus Hub Application
- * Life management dashboard
- */
-
-// ==========================================
-// TRANSLATIONS (du-form German)
-// ==========================================
 
 const translations = {
     en: {
-        // Navigation
+
         nav_home: 'Home',
         nav_tasks: 'Tasks',
         nav_calendar: 'Calendar',
@@ -18,14 +10,12 @@ const translations = {
         nav_email: 'Email',
         nav_settings: 'Settings',
 
-        // Home
         weather: 'Weather',
         quick_access: 'Quick Access',
         apps: 'Apps',
         email: 'Email',
         pomodoro: 'Pomodoro',
 
-        // Tasks
         tasks: 'Tasks',
         tasks_subtitle: 'Stay organized',
         all: 'All',
@@ -44,7 +34,6 @@ const translations = {
         save: 'Save',
         no_tasks: 'No tasks',
 
-        // Calendar
         calendar: 'Calendar',
         calendar_subtitle: 'Your schedule at a glance',
         upcoming_events: 'Upcoming Events',
@@ -59,7 +48,6 @@ const translations = {
         calendar_connect_google: 'Connect your Google account in Email to sync your calendar.',
         calendar_reauth_needed: 'Calendar access not granted. Please sign out and sign in again in Email settings.',
 
-        // Notes
         notes: 'Notes',
         notes_subtitle: 'Quick notes and thoughts',
         words: 'words',
@@ -68,7 +56,6 @@ const translations = {
         rename_note: 'Rename note:',
         cannot_delete_last: 'Cannot delete the last note',
 
-        // Bookmarks
         bookmarks: 'Bookmarks',
         bookmarks_subtitle: 'Your saved links',
         add_bookmark: 'Add Bookmark',
@@ -78,7 +65,6 @@ const translations = {
         category: 'Category',
         no_bookmarks: 'No bookmarks yet. Click + to add one.',
 
-        // Pomodoro
         pomodoro_title: 'Pomodoro Timer',
         sessions_today: 'sessions today',
         session_today: 'session today',
@@ -94,7 +80,6 @@ const translations = {
         work_duration: 'Work Duration (min)',
         break_duration: 'Break Duration (min)',
 
-        // Email
         email_subtitle: 'Your connected email accounts',
         no_email_accounts: 'No email accounts connected. Click + to add one.',
         loading_emails: 'Loading emails...',
@@ -123,7 +108,6 @@ const translations = {
         connect_account: 'Connect Account',
         or: 'or',
 
-        // Settings
         settings: 'Settings',
         settings_subtitle: 'Configure your Nexus hub',
         appearance: 'Appearance',
@@ -151,7 +135,6 @@ const translations = {
         about_features: 'Manage tasks, calendar, notes, and more - all in one place.',
         about_storage: 'All data is stored locally in your browser.',
 
-        // Common
         loading: 'Loading...',
         error: 'Error',
         offline: 'Offline',
@@ -160,7 +143,7 @@ const translations = {
         ago: 'ago'
     },
     de: {
-        // Navigation
+
         nav_home: 'Start',
         nav_tasks: 'Aufgaben',
         nav_calendar: 'Kalender',
@@ -169,14 +152,12 @@ const translations = {
         nav_email: 'E-Mail',
         nav_settings: 'Einstellungen',
 
-        // Home
         weather: 'Wetter',
         quick_access: 'Schnellzugriff',
         apps: 'Apps',
         email: 'E-Mail',
         pomodoro: 'Pomodoro',
 
-        // Tasks
         tasks: 'Aufgaben',
         tasks_subtitle: 'Bleib organisiert',
         all: 'Alle',
@@ -195,7 +176,6 @@ const translations = {
         save: 'Speichern',
         no_tasks: 'Keine Aufgaben',
 
-        // Calendar
         calendar: 'Kalender',
         calendar_subtitle: 'Dein Terminplan auf einen Blick',
         upcoming_events: 'Kommende Termine',
@@ -210,7 +190,6 @@ const translations = {
         calendar_connect_google: 'Verbinde dein Google-Konto unter E-Mail, um deinen Kalender zu synchronisieren.',
         calendar_reauth_needed: 'Kalenderzugriff nicht erteilt. Bitte melde dich ab und wieder an in den E-Mail-Einstellungen.',
 
-        // Notes
         notes: 'Notizen',
         notes_subtitle: 'Schnelle Notizen und Gedanken',
         words: 'Wörter',
@@ -219,7 +198,6 @@ const translations = {
         rename_note: 'Notiz umbenennen:',
         cannot_delete_last: 'Du kannst die letzte Notiz nicht löschen',
 
-        // Bookmarks
         bookmarks: 'Lesezeichen',
         bookmarks_subtitle: 'Deine gespeicherten Links',
         add_bookmark: 'Lesezeichen hinzufügen',
@@ -229,7 +207,6 @@ const translations = {
         category: 'Kategorie',
         no_bookmarks: 'Noch keine Lesezeichen. Klick auf + um eins hinzuzufügen.',
 
-        // Pomodoro
         pomodoro_title: 'Pomodoro-Timer',
         sessions_today: 'Sitzungen heute',
         session_today: 'Sitzung heute',
@@ -245,7 +222,6 @@ const translations = {
         work_duration: 'Arbeitszeit (Min)',
         break_duration: 'Pausenzeit (Min)',
 
-        // Email
         email_subtitle: 'Deine verbundenen E-Mail-Konten',
         no_email_accounts: 'Keine E-Mail-Konten verbunden. Klick auf + um eins hinzuzufügen.',
         loading_emails: 'Lade E-Mails...',
@@ -274,7 +250,6 @@ const translations = {
         connect_account: 'Konto verbinden',
         or: 'oder',
 
-        // Settings
         settings: 'Einstellungen',
         settings_subtitle: 'Konfiguriere deinen Nexus-Hub',
         appearance: 'Aussehen',
@@ -302,7 +277,6 @@ const translations = {
         about_features: 'Verwalte Aufgaben, Kalender, Notizen und mehr - alles an einem Ort.',
         about_storage: 'Alle Daten werden lokal in deinem Browser gespeichert.',
 
-        // Common
         loading: 'Lädt...',
         error: 'Fehler',
         offline: 'Offline',
@@ -314,7 +288,7 @@ const translations = {
 
 const HubApp = {
     state: {
-        theme: localStorage.getItem('hub_theme') || 'light',
+        theme: localStorage.getItem('nexus-theme') || localStorage.getItem('hub_theme') || 'dark',
         language: localStorage.getItem('hub_language') || 'en',
         currentDate: new Date(),
         viewDate: new Date(),
@@ -345,12 +319,47 @@ const HubApp = {
         selectedCalendarAccount: null
     },
 
-    // ==========================================
-    // THEME
-    // ==========================================
+    init() {
+        this.initTheme();
+        this.initEventListeners();
+        this.initVisibilityHandler();
+    },
+
+    initVisibilityHandler() {
+        this.clockIntervalId = null;
+        this.pomodoroWasPaused = false;
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.pauseBackgroundTasks();
+            } else {
+                this.resumeBackgroundTasks();
+            }
+        });
+    },
+
+    pauseBackgroundTasks() {
+
+        if (this.clockIntervalId) {
+            clearInterval(this.clockIntervalId);
+            this.clockIntervalId = null;
+        }
+
+        this.pomodoroWasPaused = this.state.pomodoroRunning;
+    },
+
+    resumeBackgroundTasks() {
+
+        this.updateClock();
+        if (!this.clockIntervalId) {
+            this.clockIntervalId = setInterval(() => this.updateClock(), 1000);
+        }
+
+    },
 
     initTheme() {
         document.body.setAttribute('data-theme', this.state.theme);
+        document.documentElement.setAttribute('data-theme', this.state.theme);
         this.updateThemeIcon();
     },
 
@@ -371,13 +380,11 @@ const HubApp = {
     toggleTheme() {
         this.state.theme = this.state.theme === 'dark' ? 'light' : 'dark';
         document.body.setAttribute('data-theme', this.state.theme);
+        document.documentElement.setAttribute('data-theme', this.state.theme);
+        localStorage.setItem('nexus-theme', this.state.theme);
         localStorage.setItem('hub_theme', this.state.theme);
         this.updateThemeIcon();
     },
-
-    // ==========================================
-    // TRANSLATION
-    // ==========================================
 
     t(key) {
         const lang = this.state.language;
@@ -413,16 +420,11 @@ const HubApp = {
             }
         });
 
-        // Update placeholders
         document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
             const key = el.getAttribute('data-i18n-placeholder');
             el.placeholder = this.t(key);
         });
     },
-
-    // ==========================================
-    // EMAIL
-    // ==========================================
 
     async initEmail() {
         await this.loadEmailAccounts();
@@ -466,20 +468,18 @@ const HubApp = {
             </button>
         `).join('');
 
-        // Handle tab clicks for switching accounts
         bar.querySelectorAll('.email-account-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
-                // Ignore if clicking on remove button
+
                 if (!e.target.classList.contains('remove-account')) {
                     this.switchEmailAccount(tab.dataset.email);
                 }
             });
         });
 
-        // Handle remove button clicks separately
         bar.querySelectorAll('.remove-account').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent tab switch
+                e.stopPropagation();
                 e.preventDefault();
                 this.removeEmailAccount(btn.dataset.email);
             });
@@ -510,26 +510,26 @@ const HubApp = {
 
             if (data.success && data.emails) {
                 this.state.emails = data.emails;
-                // Cache the last 10 emails for offline use
+
                 try {
                     const toCache = data.emails.slice(0, 10);
                     localStorage.setItem(cacheKey, JSON.stringify(toCache));
-                } catch (e) { /* localStorage full or unavailable */ }
+                } catch (e) {  }
                 this.renderEmailList();
             } else {
                 if (list) list.innerHTML = `<p class="no-items">${data.error || this.t('no_emails')}</p>`;
             }
         } catch (err) {
             if (loading) loading.style.display = 'none';
-            // Try to load from cache when offline
+
             try {
                 const cached = localStorage.getItem(cacheKey);
                 if (cached) {
                     this.state.emails = JSON.parse(cached);
-                    this.renderEmailList(true); // true = offline mode
+                    this.renderEmailList(true);
                     return;
                 }
-            } catch (e) { /* no cache */ }
+            } catch (e) {  }
             if (list) list.innerHTML = `<p class="no-items">${this.t('offline')}</p>`;
         }
     },
@@ -717,7 +717,7 @@ const HubApp = {
     },
 
     initEmailEventListeners() {
-        // Compose button
+
         const composeEmailBtn = document.getElementById('composeEmailBtn');
         if (composeEmailBtn) {
             composeEmailBtn.addEventListener('click', () => {
@@ -725,7 +725,6 @@ const HubApp = {
             });
         }
 
-        // Delete email button
         const deleteEmailBtn = document.getElementById('deleteEmailBtn');
         if (deleteEmailBtn) {
             deleteEmailBtn.addEventListener('click', () => {
@@ -733,7 +732,6 @@ const HubApp = {
             });
         }
 
-        // Add account button
         const addAccountBtn = document.getElementById('addAccountBtn');
         if (addAccountBtn) {
             addAccountBtn.addEventListener('click', () => {
@@ -741,7 +739,6 @@ const HubApp = {
             });
         }
 
-        // Add account modal close
         const addAccountModalClose = document.getElementById('addAccountModalClose');
         if (addAccountModalClose) {
             addAccountModalClose.addEventListener('click', () => {
@@ -749,7 +746,6 @@ const HubApp = {
             });
         }
 
-        // Add account form
         const addAccountForm = document.getElementById('addAccountForm');
         if (addAccountForm) {
             addAccountForm.addEventListener('submit', (e) => {
@@ -761,13 +757,11 @@ const HubApp = {
             });
         }
 
-        // Back button
         const backBtn = document.getElementById('emailBackBtn');
         if (backBtn) {
             backBtn.addEventListener('click', () => this.closeEmailDetail());
         }
 
-        // Compose modal
         const composeModalClose = document.getElementById('composeModalClose');
         if (composeModalClose) {
             composeModalClose.addEventListener('click', () => {
@@ -803,7 +797,6 @@ const HubApp = {
             });
         }
 
-        // Reply button
         const replyBtn = document.getElementById('replyEmailBtn');
         if (replyBtn) {
             replyBtn.addEventListener('click', () => {
@@ -815,7 +808,6 @@ const HubApp = {
             });
         }
 
-        // Modal backdrop close
         ['addAccountModal', 'composeModal'].forEach(id => {
             const modal = document.getElementById(id);
             if (modal) {
@@ -835,10 +827,9 @@ const HubApp = {
             const accounts = await response.json();
 
             if (!accounts || accounts.length === 0) {
-                return; // Keep the default "no accounts" message
+                return;
             }
 
-            // Fetch emails from first account
             const account = accounts[0];
             const emailResponse = await fetch(`/api/email/messages/${encodeURIComponent(account.email)}?limit=3`);
             const data = await emailResponse.json();
@@ -859,13 +850,9 @@ const HubApp = {
         }
     },
 
-    // ==========================================
-    // CLOCK
-    // ==========================================
-
     initClock() {
         this.updateClock();
-        setInterval(() => this.updateClock(), 1000);
+        this.clockIntervalId = setInterval(() => this.updateClock(), 1000);
     },
 
     updateClock() {
@@ -890,10 +877,6 @@ const HubApp = {
         }
     },
 
-    // ==========================================
-    // POMODORO
-    // ==========================================
-
     initPomodoro() {
         const today = new Date().toISOString().split('T')[0];
         if (this.state.pomodoro.lastSessionDate !== today) {
@@ -905,7 +888,6 @@ const HubApp = {
         this.updatePomodoroDisplay();
         this.updatePomodoroSessions();
 
-        // Load settings into inputs if they exist
         const workInput = document.getElementById('workDuration');
         const breakInput = document.getElementById('breakDuration');
         if (workInput) workInput.value = this.state.pomodoro.workDuration;
@@ -1025,10 +1007,6 @@ const HubApp = {
     savePomodoro() {
         localStorage.setItem('hub_pomodoro', JSON.stringify(this.state.pomodoro));
     },
-
-    // ==========================================
-    // TODOS
-    // ==========================================
 
     initTodos() {
         this.renderTodos();
@@ -1178,10 +1156,6 @@ const HubApp = {
         localStorage.setItem('hub_todos', JSON.stringify(this.state.todos));
     },
 
-    // ==========================================
-    // NOTES
-    // ==========================================
-
     initNotes() {
         if (!this.state.notes.find(n => n.id === this.state.activeNoteId)) {
             this.state.activeNoteId = this.state.notes[0]?.id || 'default';
@@ -1288,10 +1262,6 @@ const HubApp = {
         localStorage.setItem('hub_notes', JSON.stringify(this.state.notes));
     },
 
-    // ==========================================
-    // BOOKMARKS
-    // ==========================================
-
     initBookmarks() {
         this.renderBookmarks();
     },
@@ -1390,10 +1360,6 @@ const HubApp = {
         localStorage.setItem('hub_bookmarks', JSON.stringify(this.state.bookmarks));
     },
 
-    // ==========================================
-    // CALENDAR
-    // ==========================================
-
     async initCalendar() {
         await this.loadCalendarAccounts();
         this.renderCalendar();
@@ -1402,7 +1368,7 @@ const HubApp = {
     },
 
     async loadCalendarAccounts() {
-        // Load Google accounts (same as email accounts)
+
         try {
             const response = await fetch('/api/email/accounts');
             const accounts = await response.json();
@@ -1420,7 +1386,6 @@ const HubApp = {
                     select.disabled = false;
                     this.state.selectedCalendarAccount = googleAccounts[0].email;
 
-                    // Load calendars for the account
                     await this.loadGoogleCalendars();
                 }
 
@@ -1445,7 +1410,6 @@ const HubApp = {
             if (data.success && data.calendars) {
                 this.state.googleCalendars = data.calendars;
 
-                // Update calendar selector in event modal
                 const calSelect = document.getElementById('eventCalendar');
                 if (calSelect) {
                     calSelect.innerHTML = data.calendars
@@ -1472,11 +1436,11 @@ const HubApp = {
                 this.renderCalendar();
                 this.renderEvents();
             } else if (data.error === 'not_authenticated') {
-                // No Google account - show hint to connect
+
                 this.state.calendarError = this.t('calendar_connect_google');
                 this.renderEvents();
             } else if (data.error === 'scope_needed') {
-                // Need to re-auth for calendar scope
+
                 this.state.calendarError = data.message || this.t('calendar_reauth_needed');
                 this.renderEvents();
             } else if (data.error === 'no_calendars' || data.error === 'permission_needed' || data.error === 'no_permission') {
@@ -1495,12 +1459,11 @@ const HubApp = {
         const eventMap = new Map();
         localEvents.forEach(e => eventMap.set(e.id, { ...e, source: 'local' }));
 
-        // Normalize external events (Google/macOS) to have consistent date/time fields
         externalEvents.forEach(e => {
             if (!eventMap.has(e.id)) {
                 eventMap.set(e.id, {
                     ...e,
-                    // Normalize: Google uses start_date/start_time, ensure date/time exist
+
                     date: e.date || e.start_date,
                     time: e.time || e.start_time || null,
                     source: e.source || 'external'
@@ -1551,7 +1514,6 @@ const HubApp = {
         const list = document.getElementById('eventsList');
         if (!list) return;
 
-        // Show calendar error if any
         if (this.state.calendarError) {
             const errorHtml = `<div class="calendar-error">${this.state.calendarError}</div>`;
             list.insertAdjacentHTML('beforebegin', errorHtml);
@@ -1594,14 +1556,14 @@ const HubApp = {
                 if (!event) return;
 
                 if (source === 'google') {
-                    // Allow editing Google Calendar events
+
                     this.openEventModal(event.date || event.start_date, event);
                 } else if (source === 'macos' || source === 'external') {
-                    // macOS events are read-only - show info
+
                     const sourceText = source === 'macos' ? 'macOS Calendar' : 'External Calendar';
                     alert(`📅 ${event.title}\n📆 ${event.date || event.start_date} ${event.time || event.start_time || ''}\n${event.location ? '📍 ' + event.location : ''}\n${event.description ? '\n' + event.description : ''}\n\n(From ${sourceText} - read only)`);
                 } else {
-                    // Local events
+
                     this.openEventModal(event.date, event);
                 }
             });
@@ -1612,7 +1574,6 @@ const HubApp = {
         const modal = document.getElementById('eventModal');
         if (!modal) return;
 
-        // Clear any previous errors
         const errorEl = document.getElementById('eventError');
         if (errorEl) errorEl.style.display = 'none';
 
@@ -1668,19 +1629,18 @@ const HubApp = {
             account: this.state.selectedCalendarAccount
         };
 
-        // If we have a Google account, save to Google Calendar
         if (this.state.selectedCalendarAccount) {
             try {
                 let response;
                 if (this.state.editingEventId && (this.state.editingEventSource === 'google' || this.state.editingEventSource === 'external')) {
-                    // Update existing Google event
+
                     response = await fetch(`/api/calendar/events/${this.state.editingEventId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(eventData)
                     });
                 } else if (this.state.editingEventId && this.state.editingEventSource === 'local') {
-                    // Update local event (existing behavior)
+
                     const event = { ...eventData, id: this.state.editingEventId };
                     const idx = this.state.events.findIndex(e => e.id === this.state.editingEventId);
                     if (idx !== -1) this.state.events[idx] = event;
@@ -1690,7 +1650,7 @@ const HubApp = {
                     this.renderEvents();
                     return;
                 } else {
-                    // Create new Google event
+
                     response = await fetch('/api/calendar/events', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1718,7 +1678,7 @@ const HubApp = {
                 }
             }
         } else {
-            // Save locally (existing behavior)
+
             const event = {
                 id: this.state.editingEventId || Date.now().toString(),
                 ...eventData
@@ -1743,7 +1703,6 @@ const HubApp = {
 
         const errorEl = document.getElementById('eventError');
 
-        // Check if it's a Google Calendar event
         if (this.state.editingEventSource === 'google' || this.state.editingEventSource === 'external') {
             if (!confirm('Delete this event from Google Calendar?')) return;
 
@@ -1774,7 +1733,7 @@ const HubApp = {
                 }
             }
         } else {
-            // Delete local event
+
             this.state.events = this.state.events.filter(e => e.id !== this.state.editingEventId);
             localStorage.setItem('hub_events', JSON.stringify(this.state.events));
             document.getElementById('eventModal').classList.remove('active');
@@ -1782,10 +1741,6 @@ const HubApp = {
             this.renderEvents();
         }
     },
-
-    // ==========================================
-    // WEATHER
-    // ==========================================
 
     async initWeather() {
         if (this.state.weather && this.state.location) {
@@ -1825,7 +1780,7 @@ const HubApp = {
         if (modal) modal.classList.remove('active');
 
         try {
-            const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`);
+            const response = await fetch(`https:
             const data = await response.json();
             if (!data.results?.length) throw new Error('City not found');
             const result = data.results[0];
@@ -1845,29 +1800,37 @@ const HubApp = {
             await this.detectLocation();
             return;
         }
-        if (!navigator.onLine) {
-            if (this.state.weather) this.renderWeather();
-            else {
-                const content = document.getElementById('weatherContent');
-                if (content) content.innerHTML = '<div class="weather-error">Offline</div>';
-            }
-            return;
-        }
 
         const content = document.getElementById('weatherContent');
         if (content) content.innerHTML = '<div class="weather-loading">Loading...</div>';
 
         try {
-            const { lat, lon } = this.state.location;
-            const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto`);
-            if (!response.ok) throw new Error('Weather fetch failed');
+            const { lat, lon, city } = this.state.location;
+
+            const response = await fetch(`/api/hub/weather?lat=${lat}&lon=${lon}&city=${encodeURIComponent(city || 'Unknown')}`);
             const data = await response.json();
-            this.state.weather = { current: data.current, daily: data.daily, timestamp: new Date().toISOString() };
-            localStorage.setItem('hub_weather', JSON.stringify(this.state.weather));
-            this.renderWeather();
+
+            if (data.success) {
+                this.state.weather = {
+                    current: data.current,
+                    daily: data.daily,
+                    timestamp: data.timestamp,
+                    from_cache: data.from_cache,
+                    cached_at: data.cached_at || data.fetched_at
+                };
+                localStorage.setItem('hub_weather', JSON.stringify(this.state.weather));
+                this.renderWeather();
+            } else {
+                throw new Error(data.error || 'Weather fetch failed');
+            }
         } catch (err) {
-            if (this.state.weather) this.renderWeather();
-            else if (content) content.innerHTML = '<div class="weather-error">Error</div>';
+
+            if (this.state.weather) {
+                this.state.weather.from_cache = true;
+                this.renderWeather();
+            } else if (content) {
+                content.innerHTML = '<div class="weather-error">Offline - Keine Daten</div>';
+            }
         }
     },
 
@@ -1904,14 +1867,29 @@ const HubApp = {
         if (locationEl) locationEl.textContent = location.city;
 
         if (updatedEl) {
-            const diffMins = Math.round((Date.now() - new Date(weather.timestamp)) / 60000);
-            updatedEl.textContent = diffMins < 1 ? 'Just now' : diffMins < 60 ? `${diffMins}m ago` : new Date(weather.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+            if (weather.from_cache) {
+                updatedEl.innerHTML = `<span class="weather-cache-badge" title="Offline-Version">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    Offline
+                </span>`;
+            } else {
+                const diffMins = Math.round((Date.now() - new Date(weather.timestamp)) / 60000);
+                const timeText = diffMins < 1 ? 'Jetzt' : diffMins < 60 ? `${diffMins}m` : new Date(weather.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                updatedEl.innerHTML = `<span class="weather-live-badge" title="Aktuell">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    ${timeText}
+                </span>`;
+            }
         }
     },
-
-    // ==========================================
-    // ONLINE STATUS
-    // ==========================================
 
     updateOnlineStatus() {
         const indicator = document.getElementById('offlineIndicator');
@@ -1920,10 +1898,6 @@ const HubApp = {
         }
         this.state.isOnline = navigator.onLine;
     },
-
-    // ==========================================
-    // DATA EXPORT/IMPORT
-    // ==========================================
 
     exportData() {
         const data = {};
@@ -1956,44 +1930,29 @@ const HubApp = {
         reader.readAsText(file);
     },
 
-    // ==========================================
-    // UTILITIES
-    // ==========================================
-
     escapeHtml(str) {
         const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
     },
 
-    // ==========================================
-    // EVENT LISTENERS
-    // ==========================================
-
     initEventListeners() {
-        // Theme toggle
+
         const themeToggle = document.getElementById('themeToggle');
         if (themeToggle) {
             themeToggle.addEventListener('click', () => this.toggleTheme());
         }
 
-        // Initialize theme
-        this.initTheme();
-
-        // Language selector
         document.querySelectorAll('.lang-selector button').forEach(btn => {
             btn.addEventListener('click', () => this.setLanguage(btn.dataset.lang));
         });
 
-        // Initialize language
         this.initLanguage();
 
-        // Online status
         window.addEventListener('online', () => this.updateOnlineStatus());
         window.addEventListener('offline', () => this.updateOnlineStatus());
         this.updateOnlineStatus();
 
-        // Calendar navigation
         const prevMonth = document.getElementById('prevMonth');
         const nextMonth = document.getElementById('nextMonth');
         if (prevMonth) {
@@ -2009,13 +1968,11 @@ const HubApp = {
             });
         }
 
-        // Add event button
         const addEventBtn = document.getElementById('addEventBtn');
         if (addEventBtn) {
             addEventBtn.addEventListener('click', () => this.openEventModal(new Date().toISOString().split('T')[0]));
         }
 
-        // Event modal
         const eventModalClose = document.getElementById('eventModalClose');
         const eventForm = document.getElementById('eventForm');
         const deleteEventBtn = document.getElementById('deleteEvent');
@@ -2029,13 +1986,11 @@ const HubApp = {
             deleteEventBtn.addEventListener('click', () => this.deleteEvent());
         }
 
-        // Weather refresh
         const refreshWeather = document.getElementById('refreshWeather');
         if (refreshWeather) {
             refreshWeather.addEventListener('click', () => this.refreshWeather());
         }
 
-        // Location form
         const locationForm = document.getElementById('locationForm');
         if (locationForm) {
             locationForm.addEventListener('submit', (e) => {
@@ -2044,7 +1999,6 @@ const HubApp = {
             });
         }
 
-        // Pomodoro controls
         const pomodoroStart = document.getElementById('pomodoroStart');
         const pomodoroPause = document.getElementById('pomodoroPause');
         const pomodoroReset = document.getElementById('pomodoroReset');
@@ -2052,7 +2006,6 @@ const HubApp = {
         if (pomodoroPause) pomodoroPause.addEventListener('click', () => this.pausePomodoro());
         if (pomodoroReset) pomodoroReset.addEventListener('click', () => this.resetPomodoro());
 
-        // Pomodoro settings
         const workDuration = document.getElementById('workDuration');
         const breakDuration = document.getElementById('breakDuration');
         if (workDuration) {
@@ -2069,7 +2022,6 @@ const HubApp = {
             });
         }
 
-        // Todo filters
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -2079,7 +2031,6 @@ const HubApp = {
             });
         });
 
-        // Todo input
         const todoInput = document.getElementById('todoInput');
         const addTodoBtn = document.getElementById('addTodoBtn');
         if (todoInput) {
@@ -2091,7 +2042,6 @@ const HubApp = {
             addTodoBtn.addEventListener('click', () => this.addQuickTodo());
         }
 
-        // Todo modal
         const todoModalClose = document.getElementById('todoModalClose');
         const todoForm = document.getElementById('todoForm');
         const deleteTodoBtn = document.getElementById('deleteTodo');
@@ -2105,7 +2055,6 @@ const HubApp = {
             deleteTodoBtn.addEventListener('click', () => this.deleteTodo());
         }
 
-        // Notes
         const noteContent = document.getElementById('noteContent');
         const addNoteBtn = document.getElementById('addNoteBtn');
         const deleteNoteBtn = document.getElementById('deleteNoteBtn');
@@ -2122,7 +2071,6 @@ const HubApp = {
             deleteNoteBtn.addEventListener('click', () => this.deleteCurrentNote());
         }
 
-        // Bookmarks
         const addBookmarkBtn = document.getElementById('addBookmarkBtn');
         const bookmarkModalClose = document.getElementById('bookmarkModalClose');
         const bookmarkForm = document.getElementById('bookmarkForm');
@@ -2140,7 +2088,6 @@ const HubApp = {
             deleteBookmarkBtn.addEventListener('click', () => this.deleteBookmark());
         }
 
-        // Modal backdrop close
         document.querySelectorAll('.modal').forEach(modal => {
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) modal.classList.remove('active');
@@ -2149,7 +2096,10 @@ const HubApp = {
     }
 };
 
-// Export for use
+document.addEventListener('DOMContentLoaded', () => {
+    HubApp.init();
+});
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = HubApp;
 }

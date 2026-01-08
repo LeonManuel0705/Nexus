@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        /* Gradient background */
+        .gradient-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 0;
+            overflow: hidden;
+            background: #000;
+        }
+
+        .gradient-container {
+            position: absolute;
+            inset: 0;
+            filter: blur(30px);
+            mix-blend-mode: screen;
+        }
+
+        .gradient-purple {
+            position: absolute;
+            width: 70%;
+            height: 60%;
+            top: -10%;
+            left: -10%;
+            background: radial-gradient(ellipse at center,
+                rgba(102, 126, 234, 0.2) 0%,
+                rgba(118, 75, 162, 0.1) 50%,
+                transparent 70%);
+            animation: drift1 25s ease-in-out infinite;
+        }
+
+        .gradient-pink {
+            position: absolute;
+            width: 55%;
+            height: 55%;
+            top: 20%;
+            right: -15%;
+            background: radial-gradient(ellipse at center,
+                rgba(240, 147, 251, 0.15) 0%,
+                rgba(245, 87, 108, 0.08) 45%,
+                transparent 70%);
+            animation: drift2 22s ease-in-out infinite;
+        }
+
+        .gradient-blue {
+            position: absolute;
+            width: 60%;
+            height: 50%;
+            bottom: -5%;
+            left: 30%;
+            background: radial-gradient(ellipse at center,
+                rgba(127, 156, 245, 0.18) 0%,
+                rgba(159, 122, 234, 0.1) 40%,
+                transparent 65%);
+            animation: drift3 28s ease-in-out infinite;
+        }
+
+        @keyframes drift1 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(5%, 8%) scale(1.05); }
+            66% { transform: translate(-3%, 4%) scale(0.98); }
+        }
+
+        @keyframes drift2 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            40% { transform: translate(-6%, 10%) scale(1.03); }
+            70% { transform: translate(4%, -5%) scale(0.97); }
+        }
+
+        @keyframes drift3 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(8%, -3%) scale(1.02); }
+            75% { transform: translate(-5%, 5%) scale(1.05); }
+        }
+
+        .noise {
+            position: absolute;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            opacity: 0.02;
+            pointer-events: none;
+        }
+
+        /* Content */
+        .apps-container {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .app-card {
+            position: relative;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            padding: 48px;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.4s ease;
+            overflow: hidden;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .app-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.05);
+            box-shadow: 0 20px 60px rgba(102, 126, 234, 0.2),
+                        0 0 40px rgba(118, 75, 162, 0.15);
+        }
+
+        .app-logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .app-logo img {
+            width: 80%;
+            height: 80%;
+            border-radius: 14px;
+            object-fit: contain;
+        }
+
+        .app-logo svg {
+            width: 40px;
+            height: 40px;
+            stroke: rgba(255, 255, 255, 0.8);
+        }
+
+        .app-name {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.8) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .app-slogan {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.5);
+            line-height: 1.7;
+            margin-bottom: 32px;
+        }
+
+        .app-arrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 100px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .app-arrow svg {
+            width: 16px;
+            height: 16px;
+            transition: transform 0.3s ease;
+        }
+
+        .app-card:hover .app-arrow {
+            color: #fff;
+            background: rgba(102, 126, 234, 0.2);
+            border-color: rgba(102, 126, 234, 0.3);
+        }
+
+        .app-card:hover .app-arrow svg {
+            transform: translateX(4px);
+        }
+
+        .app-subtitle {
+            margin-top: 48px;
+            color: rgba(255, 255, 255, 0.3);
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="gradient-background">
+        <div class="gradient-container">
+            <div class="gradient-purple"></div>
+            <div class="gradient-pink"></div>
+            <div class="gradient-blue"></div>
+        </div>
+        <div class="noise"></div>
+    </div>
+
+    <main class="apps-container">
+        <a href="/hub" class="app-card">
+            <div class="app-logo">
+                <img src="/static/images/nexus-logo.png" alt="Nexus Logo" onerror="this.parentElement.innerHTML='<svg viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'1.5\'><rect x=\'3\' y=\'3\' width=\'7\' height=\'7\'/><rect x=\'14\' y=\'3\' width=\'7\' height=\'7\'/><rect x=\'14\' y=\'14\' width=\'7\' height=\'7\'/><rect x=\'3\' y=\'14\' width=\'7\' height=\'7\'/></svg>'">
+            </div>
+            <h1 class="app-name">Nexus Hub</h1>
+            <p class="app-slogan">Your personal productivity dashboard. Manage school, tasks, calendar, training, and more in one unified hub.</p>
+            <span class="app-arrow">
+                Open Nexus
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+            </span>
+        </a>
+
+        <p class="app-subtitle">Installable PWA - Works Offline</p>
+    </main>
+</body>
+</html>

@@ -1,19 +1,283 @@
 import subprocess
 import json
+import os
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import re
 
-# Try to use EventKit (native macOS calendar API)
 try:
     import EventKit
     EVENTKIT_AVAILABLE = True
 except ImportError:
     EVENTKIT_AVAILABLE = False
 
+try:
+    import caldav
+    from icalendar import Calendar as ICalendar
+    CALDAV_AVAILABLE = True
+except ImportError:
+    CALDAV_AVAILABLE = False
+
+CALDAV_ACCOUNTS_FILE = os.path.join(os.path.dirname(__file__), '..', 'caldav_accounts.json')
+
+def load_caldav_accounts() -> List[Dict]:
+                                     
+    try:
+        if os.path.exists(CALDAV_ACCOUNTS_FILE):
+            with open(CALDAV_ACCOUNTS_FILE, 'r') as f:
+                return json.load(f)
+    except:
+        pass
+    return []
+
+def save_caldav_accounts(accounts: List[Dict]):
+                               
+    with open(CALDAV_ACCOUNTS_FILE, 'w') as f:
+        json.dump(accounts, f)
+
+def add_caldav_account(name: str, url: str, username: str, password: str, provider: str = 'caldav') -> Dict:
+                                                                       
+    if not CALDAV_AVAILABLE:
+        return {
+            "success": False,
+            "error": "CalDAV not available. Install with: pip install caldav icalendar"
+        }
+
+    provider_urls = {
+        'samsung': 'https://caldav.samsung.com/caldav/',
+        'icloud': 'https://caldav.icloud.com/',
+        'fastmail': 'https://caldav.fastmail.com/dav/calendars/user/{username}/',
+        'google': 'https://www.googleapis.com/caldav/v2/{username}/events/',
+    }
+
+    if not url and provider in provider_urls:
+        url = provider_urls[provider].format(username=username)
+
+    if not url:
+        return {"success": False, "error": "CalDAV URL is required"}
+
+    try:
+        client = caldav.DAVClient(url=url, username=username, password=password)
+        principal = client.principal()
+        calendars = principal.calendars()
+
+        account = {
+            "id": f"caldav_{len(load_caldav_accounts())}_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            "name": name or username,
+            "url": url,
+            "username": username,
+            "password": password,                                
+            "provider": provider,
+            "calendars": [{"name": cal.name, "url": str(cal.url)} for cal in calendars]
+        }
+
+        accounts = load_caldav_accounts()
+        accounts.append(account)
+        save_caldav_accounts(accounts)
+
+        return {
+            "success": True,
+            "account": {
+                "id": account["id"],
+                "name": account["name"],
+                "provider": provider,
+                "calendars": account["calendars"]
+            }
+        }
+    except Exception as e:
+        return {"success": False, "error": f"Failed to connect: {str(e)}"}
+
+def remove_caldav_account(account_id: str) -> Dict:
+                                  
+    accounts = load_caldav_accounts()
+    accounts = [a for a in accounts if a.get('id') != account_id]
+    save_caldav_accounts(accounts)
+    return {"success": True}
+
+def get_caldav_accounts() -> List[Dict]:
+                                                          
+    accounts = load_caldav_accounts()
+    return [
+        {
+            "id": a.get("id"),
+            "name": a.get("name"),
+            "provider": a.get("provider"),
+            "calendars": a.get("calendars", [])
+        }
+        for a in accounts
+    ]
+
+def fetch_caldav_events(account_id: str = None, days_ahead: int = 30,
+                        start_date: str = None, end_date: str = None) -> Dict:
+                                            
+    if not CALDAV_AVAILABLE:
+        return {
+            "success": False,
+            "error": "caldav_not_available",
+            "message": "CalDAV not available. Install with: pip install caldav icalendar",
+            "events": []
+        }
+
+    accounts = load_caldav_accounts()
+    if account_id:
+        accounts = [a for a in accounts if a.get('id') == account_id]
+
+    if not accounts:
+        return {"success": True, "events": [], "message": "No CalDAV accounts configured"}
+
+    if start_date and end_date:
+        start = datetime.strptime(start_date, '%Y-%m-%d')
+        end = datetime.strptime(end_date, '%Y-%m-%d')
+    else:
+        start = datetime.now()
+        end = start + timedelta(days=days_ahead)
+
+    all_events = []
+
+    for account in accounts:
+        try:
+            client = caldav.DAVClient(
+                url=account['url'],
+                username=account['username'],
+                password=account['password']
+            )
+            principal = client.principal()
+            calendars = principal.calendars()
+
+            for cal in calendars:
+                try:
+                                                
+                    events = cal.date_search(start=start, end=end, expand=True)
+
+                    for event in events:
+                        try:
+                            ical = event.icalendar_component
+                            vevent = ical.walk('VEVENT')[0] if ical.walk('VEVENT') else None
+
+                            if not vevent:
+                                continue
+
+                            dtstart = vevent.get('dtstart')
+                            dtend = vevent.get('dtend')
+
+                            if dtstart:
+                                dt = dtstart.dt
+                                if hasattr(dt, 'date'):
+                                    start_date_str = dt.strftime('%Y-%m-%d')
+                                    start_time_str = dt.strftime('%H:%M') if hasattr(dt, 'hour') else ''
+                                else:
+                                    start_date_str = dt.strftime('%Y-%m-%d')
+                                    start_time_str = ''
+                            else:
+                                continue
+
+                            if dtend:
+                                dt = dtend.dt
+                                if hasattr(dt, 'date'):
+                                    end_date_str = dt.strftime('%Y-%m-%d')
+                                    end_time_str = dt.strftime('%H:%M') if hasattr(dt, 'hour') else ''
+                                else:
+                                    end_date_str = dt.strftime('%Y-%m-%d')
+                                    end_time_str = ''
+                            else:
+                                end_date_str = start_date_str
+                                end_time_str = ''
+
+                            provider_colors = {
+                                'samsung': '#1428A0',
+                                'icloud': '#007AFF',
+                                'caldav': '#6366f1'
+                            }
+
+                            all_events.append({
+                                "id": f"caldav_{str(vevent.get('uid', ''))[:20]}",
+                                "title": str(vevent.get('summary', 'No title')),
+                                "start_date": start_date_str,
+                                "start_time": start_time_str,
+                                "end_date": end_date_str,
+                                "end_time": end_time_str,
+                                "all_day": not start_time_str,
+                                "location": str(vevent.get('location', '')),
+                                "description": str(vevent.get('description', '')),
+                                "calendar": cal.name,
+                                "calendar_id": str(cal.url),
+                                "calendar_color": provider_colors.get(account.get('provider'), '#6366f1'),
+                                "source": account.get('provider', 'caldav'),
+                                "account_id": account.get('id')
+                            })
+                        except Exception as e:
+                            continue
+                except Exception as e:
+                    continue
+        except Exception as e:
+            continue
+
+    all_events.sort(key=lambda e: (e.get('start_date', ''), e.get('start_time', '00:00')))
+
+    return {"success": True, "events": all_events}
+
+def create_caldav_event(account_id: str, calendar_url: str, title: str,
+                        start_date: str, start_time: str = None,
+                        end_date: str = None, end_time: str = None,
+                        description: str = '', location: str = '') -> Dict:
+                                               
+    if not CALDAV_AVAILABLE:
+        return {"success": False, "error": "CalDAV not available"}
+
+    accounts = load_caldav_accounts()
+    account = next((a for a in accounts if a.get('id') == account_id), None)
+
+    if not account:
+        return {"success": False, "error": "Account not found"}
+
+    try:
+        client = caldav.DAVClient(
+            url=account['url'],
+            username=account['username'],
+            password=account['password']
+        )
+
+        cal = caldav.Calendar(client=client, url=calendar_url)
+
+        uid = f"{datetime.now().strftime('%Y%m%d%H%M%S')}-nexus@local"
+
+        if start_time:
+            dtstart = datetime.strptime(f"{start_date} {start_time}", '%Y-%m-%d %H:%M')
+            if end_date and end_time:
+                dtend = datetime.strptime(f"{end_date} {end_time}", '%Y-%m-%d %H:%M')
+            else:
+                dtend = dtstart + timedelta(hours=1)
+            dtstart_str = dtstart.strftime('%Y%m%dT%H%M%S')
+            dtend_str = dtend.strftime('%Y%m%dT%H%M%S')
+        else:
+            dtstart_str = start_date.replace('-', '')
+            if end_date:
+                dtend_str = end_date.replace('-', '')
+            else:
+                dtend_str = dtstart_str
+
+        ical_str = f"""BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Nexus//CalDAV Client//EN
+BEGIN:VEVENT
+UID:{uid}
+DTSTAMP:{datetime.now().strftime('%Y%m%dT%H%M%SZ')}
+DTSTART:{dtstart_str}
+DTEND:{dtend_str}
+SUMMARY:{title}
+DESCRIPTION:{description}
+LOCATION:{location}
+END:VEVENT
+END:VCALENDAR"""
+
+        cal.add_event(ical_str)
+
+        return {"success": True, "event_id": uid}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 def get_macos_calendar_events_eventkit(days_ahead: int = 14) -> Dict:
-    """Fetch events from macOS Calendar using EventKit (native API)."""
+                                                                       
     if not EVENTKIT_AVAILABLE:
         return {
             "success": False,
@@ -25,25 +289,20 @@ def get_macos_calendar_events_eventkit(days_ahead: int = 14) -> Dict:
     try:
         store = EventKit.EKEventStore.alloc().init()
 
-        # Request access - this will prompt for permission if needed
-        # Note: In a GUI app, this would show a dialog. In a server context,
-        # it relies on existing permissions
-
-        # Check authorization status
         status = EventKit.EKEventStore.authorizationStatusForEntityType_(EventKit.EKEntityTypeEvent)
 
         if status == EventKit.EKAuthorizationStatusNotDetermined:
-            # Request access - this triggers a permission dialog on first run
+                                                                             
             try:
-                # macOS 14+ API
+                               
                 store.requestFullAccessToEventsWithCompletion_(lambda granted, error: None)
             except:
-                # Legacy API
+                            
                 store.requestAccessToEntityType_completion_(
                     EventKit.EKEntityTypeEvent,
                     lambda granted, error: None
                 )
-            # Return a message telling user to grant permission
+                                                               
             return {
                 "success": False,
                 "error": "permission_needed",
@@ -58,11 +317,9 @@ def get_macos_calendar_events_eventkit(days_ahead: int = 14) -> Dict:
                 "events": []
             }
 
-        # Get date range
         start_date = EventKit.NSDate.date()
         end_date = EventKit.NSDate.dateWithTimeIntervalSinceNow_(days_ahead * 24 * 60 * 60)
 
-        # Get all calendars
         calendars = store.calendarsForEntityType_(EventKit.EKEntityTypeEvent)
 
         if not calendars or len(calendars) == 0:
@@ -73,21 +330,19 @@ def get_macos_calendar_events_eventkit(days_ahead: int = 14) -> Dict:
                 "events": []
             }
 
-        # Create predicate for events
         predicate = store.predicateForEventsWithStartDate_endDate_calendars_(
             start_date, end_date, calendars
         )
 
-        # Fetch events
         ek_events = store.eventsMatchingPredicate_(predicate)
 
         events = []
         for ek_event in ek_events:
             try:
-                # Get start date
+                                
                 start = ek_event.startDate()
                 if start:
-                    # Convert NSDate to Python datetime
+                                                       
                     timestamp = start.timeIntervalSince1970()
                     dt = datetime.fromtimestamp(timestamp)
                     date_str = dt.strftime("%Y-%m-%d")
@@ -108,10 +363,9 @@ def get_macos_calendar_events_eventkit(days_ahead: int = 14) -> Dict:
                 }
                 events.append(event)
             except Exception as e:
-                # Skip problematic events
+                                         
                 continue
 
-        # Sort by date and time
         events.sort(key=lambda e: (e.get('date', ''), e.get('time', '')))
 
         return {
@@ -128,9 +382,8 @@ def get_macos_calendar_events_eventkit(days_ahead: int = 14) -> Dict:
             "events": []
         }
 
-
 def get_macos_calendar_events_icalbuddy(days_ahead: int = 14) -> Dict:
-    """Fetch events from macOS Calendar using icalBuddy (fallback)."""
+                                                                      
     try:
         cmd = [
             'icalBuddy',
@@ -193,21 +446,17 @@ def get_macos_calendar_events_icalbuddy(days_ahead: int = 14) -> Dict:
             "events": []
         }
 
-
 def get_macos_calendar_events(days_ahead: int = 14) -> Dict:
-    """Fetch events from macOS Calendar. Tries EventKit first, falls back to icalBuddy."""
-    # Try EventKit first (native API, more reliable)
+                                                                                          
     if EVENTKIT_AVAILABLE:
         result = get_macos_calendar_events_eventkit(days_ahead)
         if result["success"] or result.get("error") in ["no_permission", "no_calendars"]:
             return result
 
-    # Fall back to icalBuddy
     return get_macos_calendar_events_icalbuddy(days_ahead)
 
-
 def parse_icalbuddy_output(output: str) -> List[Dict]:
-    """Parse icalBuddy output into structured events."""
+                                                        
     events = []
 
     if not output.strip():
@@ -244,10 +493,8 @@ def parse_icalbuddy_output(output: str) -> List[Dict]:
 
     return events
 
-
 def get_calendars() -> Dict:
-    """Get list of available calendars."""
-    # Try EventKit first
+                                          
     if EVENTKIT_AVAILABLE:
         try:
             store = EventKit.EKEventStore.alloc().init()
@@ -263,9 +510,8 @@ def get_calendars() -> Dict:
 
             return {"success": True, "calendars": cal_list}
         except Exception as e:
-            pass  # Fall through to icalBuddy
+            pass                             
 
-    # Fall back to icalBuddy
     try:
         result = subprocess.run(['icalBuddy', 'calendars'], capture_output=True, text=True, timeout=5)
 
@@ -286,9 +532,8 @@ def get_calendars() -> Dict:
     except Exception as e:
         return {"success": False, "calendars": [], "error": str(e)}
 
-
 def merge_events(macos_events: List[Dict], local_events: List[Dict]) -> List[Dict]:
-    """Merge macOS calendar events with local Nexus events."""
+                                                              
     all_events = []
     seen_ids = set()
 

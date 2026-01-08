@@ -1,0 +1,853 @@
+{% extends "hub/base.html" %}
+{% set active_tab = 'training' %}
+
+{% block title %}Training - Nexus{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Training & Gesundheit</h1>
+            <p class="page-subtitle">Trainingsplan, Sessions & Wohlbefinden</p>
+        </div>
+        <div class="page-actions">
+            <button class="btn-primary" onclick="openAddSessionModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Training planen
+            </button>
+        </div>
+    </div>
+
+    <div class="holiday-alert" id="holidayAlert" style="display: none;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+        </svg>
+        <span id="holidayMessage">Ferienplan aktiv</span>
+    </div>
+
+    <section class="content-section">
+        <div class="section-header">
+            <h3 class="section-title">Diese Woche</h3>
+            <div class="week-nav">
+                <button onclick="changeWeek(-1)">&lt;</button>
+                <span id="weekLabel">KW 1</span>
+                <button onclick="changeWeek(1)">&gt;</button>
+            </div>
+        </div>
+        <div class="training-week" id="weekView"></div>
+    </section>
+
+    <section class="content-section">
+        <div class="section-header">
+            <h3 class="section-title">Trainingsplan</h3>
+            <span class="tag" id="scheduleType">Normaler Plan</span>
+        </div>
+        <div class="schedule-cards">
+            <div class="schedule-card swimming">
+                <div class="schedule-icon">🏊</div>
+                <div class="schedule-info">
+                    <span class="schedule-name">DLRG Schwimmen</span>
+                    <span class="schedule-time">Montag 19:15 - 20:15</span>
+                </div>
+            </div>
+            <div class="gym-schedule" id="gymSchedule"></div>
+        </div>
+    </section>
+
+    <section class="content-section">
+        <div class="section-header">
+            <h3 class="section-title" id="sessionTitle">Heutiges Training</h3>
+        </div>
+        <div id="todaySession">
+            <div class="empty-state">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+                    <path d="M6 8H5a4 4 0 0 0 0 8h1"></path>
+                    <line x1="6" y1="12" x2="18" y2="12"></line>
+                </svg>
+                <span>Kein Training für heute geplant</span>
+                <button class="btn-primary small" onclick="openAddSessionModal()">Training hinzufügen</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="content-section">
+        <div class="section-header">
+            <h3 class="section-title">Wohlbefinden</h3>
+            <button class="btn-primary small" onclick="openLogHealthModal()">Eintragen</button>
+        </div>
+        <div class="health-stats" id="healthStats">
+            <div class="health-stat">
+                <span class="health-value" id="sleepValue">-</span>
+                <span class="health-label">Schlaf (h)</span>
+            </div>
+            <div class="health-stat">
+                <span class="health-value" id="energyValue">-</span>
+                <span class="health-label">Energie</span>
+            </div>
+            <div class="health-stat">
+                <span class="health-value" id="stressValue">-</span>
+                <span class="health-label">Stress</span>
+            </div>
+            <div class="health-stat">
+                <span class="health-value" id="recoveryValue">-</span>
+                <span class="health-label">Erholung</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="content-section">
+        <div class="section-header">
+            <h3 class="section-title">Ziele</h3>
+            <button class="btn-primary small" onclick="openAddGoalModal()">+ Ziel</button>
+        </div>
+        <div class="goals-list" id="goalsList">
+            <div class="empty-state">
+                <span>Keine Trainingsziele gesetzt</span>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block modals %}
+
+<div class="modal" id="sessionModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="sessionModalTitle">Training planen</h3>
+            <button class="modal-close" onclick="closeModal('sessionModal')">&times;</button>
+        </div>
+        <form id="sessionForm" onsubmit="saveSession(event)">
+            <input type="hidden" id="sessionId" name="id">
+            <div class="form-group">
+                <label for="sessionType">Art des Trainings</label>
+                <select id="sessionType" name="type" required>
+                    <option value="strength">Krafttraining</option>
+                    <option value="cardio">Ausdauer</option>
+                    <option value="flexibility">Beweglichkeit</option>
+                    <option value="sports">Sport/Spiel</option>
+                    <option value="rest">Ruhetag</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="sessionDate">Datum</label>
+                <input type="date" id="sessionDate" name="date" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="sessionTime">Uhrzeit</label>
+                    <input type="time" id="sessionTime" name="time">
+                </div>
+                <div class="form-group">
+                    <label for="sessionDuration">Dauer (min)</label>
+                    <input type="number" id="sessionDuration" name="duration" placeholder="60">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="sessionExercises">Übungen</label>
+                <textarea id="sessionExercises" name="exercises" rows="4" placeholder="Übung 1: 3x10&#10;Übung 2: 4x8&#10;..."></textarea>
+            </div>
+            <div class="form-group">
+                <label for="sessionNotes">Notizen</label>
+                <textarea id="sessionNotes" name="notes" rows="2" placeholder="Besonderheiten..."></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-secondary btn-danger" id="deleteSessionBtn" style="display:none" onclick="deleteSession()">Löschen</button>
+                <button type="submit" class="btn-primary">Speichern</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal" id="healthModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Wohlbefinden eintragen</h3>
+            <button class="modal-close" onclick="closeModal('healthModal')">&times;</button>
+        </div>
+        <form id="healthForm" onsubmit="saveHealthLog(event)">
+            <div class="form-group">
+                <label for="healthDate">Datum</label>
+                <input type="date" id="healthDate" name="date" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="healthSleep">Schlaf (Stunden)</label>
+                    <input type="number" id="healthSleep" name="sleep" min="0" max="24" step="0.5" placeholder="8">
+                </div>
+                <div class="form-group">
+                    <label for="healthEnergy">Energie (1-10)</label>
+                    <input type="number" id="healthEnergy" name="energy" min="1" max="10" placeholder="7">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="healthStress">Stress (1-10)</label>
+                    <input type="number" id="healthStress" name="stress" min="1" max="10" placeholder="5">
+                </div>
+                <div class="form-group">
+                    <label for="healthRecovery">Erholung (1-10)</label>
+                    <input type="number" id="healthRecovery" name="recovery" min="1" max="10" placeholder="7">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="healthNotes">Notizen</label>
+                <textarea id="healthNotes" name="notes" rows="2" placeholder="Wie fühlst du dich?"></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">Speichern</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal" id="goalModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Trainingsziel</h3>
+            <button class="modal-close" onclick="closeModal('goalModal')">&times;</button>
+        </div>
+        <form id="goalForm" onsubmit="saveGoal(event)">
+            <input type="hidden" id="goalId" name="id">
+            <div class="form-group">
+                <label for="goalTitle">Ziel</label>
+                <input type="text" id="goalTitle" name="title" placeholder="z.B. 5km laufen" required>
+            </div>
+            <div class="form-group">
+                <label for="goalTarget">Zielwert</label>
+                <input type="text" id="goalTarget" name="target" placeholder="z.B. unter 25 Minuten">
+            </div>
+            <div class="form-group">
+                <label for="goalDeadline">Bis wann?</label>
+                <input type="date" id="goalDeadline" name="deadline">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">Speichern</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let sessions = [];
+let healthLogs = [];
+let goals = [];
+let currentWeekStart = getWeekStart(new Date());
+let selectedDate = new Date();
+let isHolidayMode = false;
+let calendarEvents = [];
+
+// LocalStorage keys for offline caching
+const CACHE_KEYS = {
+    sessions: 'nexus-training-sessions',
+    health: 'nexus-training-health',
+    goals: 'nexus-training-goals',
+    holidayMode: 'nexus-training-holiday-mode',
+    lastSync: 'nexus-training-last-sync'
+};
+
+// Load cached data immediately
+function loadCachedData() {
+    try {
+        const cachedSessions = localStorage.getItem(CACHE_KEYS.sessions);
+        const cachedHealth = localStorage.getItem(CACHE_KEYS.health);
+        const cachedGoals = localStorage.getItem(CACHE_KEYS.goals);
+        const cachedHoliday = localStorage.getItem(CACHE_KEYS.holidayMode);
+
+        if (cachedSessions) sessions = JSON.parse(cachedSessions);
+        if (cachedHealth) healthLogs = JSON.parse(cachedHealth);
+        if (cachedGoals) goals = JSON.parse(cachedGoals);
+        if (cachedHoliday) isHolidayMode = JSON.parse(cachedHoliday);
+
+        return true;
+    } catch (e) {
+        console.log('No cached training data');
+        return false;
+    }
+}
+
+// Save data to cache
+function cacheData() {
+    try {
+        localStorage.setItem(CACHE_KEYS.sessions, JSON.stringify(sessions));
+        localStorage.setItem(CACHE_KEYS.health, JSON.stringify(healthLogs));
+        localStorage.setItem(CACHE_KEYS.goals, JSON.stringify(goals));
+        localStorage.setItem(CACHE_KEYS.holidayMode, JSON.stringify(isHolidayMode));
+        localStorage.setItem(CACHE_KEYS.lastSync, new Date().toISOString());
+    } catch (e) {
+        console.log('Could not cache training data');
+    }
+}
+
+// Check if cache is fresh (less than 5 minutes old)
+function isCacheFresh() {
+    try {
+        const lastSync = localStorage.getItem(CACHE_KEYS.lastSync);
+        if (!lastSync) return false;
+        const syncTime = new Date(lastSync);
+        const now = new Date();
+        return (now - syncTime) < 5 * 60 * 1000; // 5 minutes
+    } catch (e) {
+        return false;
+    }
+}
+
+// Regular gym plan (school days)
+const regularGymPlan = {
+    1: { name: 'Ruhetag', icon: '😴', reason: 'DLRG Schwimmen' },  // Monday
+    2: { name: 'Chestday', icon: '🏋️', muscles: 'Brustmuskulatur' },   // Tuesday
+    3: { name: 'Backday + Schultern', icon: '🎯', muscles: 'Rücken & Schultern' },  // Wednesday
+    4: { name: 'Armday', icon: '💪', muscles: 'Bizeps & Trizeps' },  // Thursday
+    5: { name: 'Legday', icon: '🦵', muscles: 'Beinmuskulatur' },      // Friday
+    6: { name: 'Backday', icon: '🎯', muscles: 'Rücken (optional)' },  // Saturday
+    0: { name: 'Ruhetag', icon: '😴', reason: 'Regeneration' }        // Sunday
+};
+
+// Holiday gym plan (Ferien)
+const holidayGymPlan = {
+    1: { name: 'Chestday', icon: '🏋️', muscles: 'Brustmuskulatur' },  // Monday
+    2: { name: 'Backday', icon: '🎯', muscles: 'Rücken' },             // Tuesday
+    3: { name: 'Schulter + Trizep', icon: '💪', muscles: 'Schultern & Trizeps' },  // Wednesday
+    4: { name: 'Legday', icon: '🦵', muscles: 'Beinmuskulatur' },      // Thursday
+    5: { name: 'Brust + Bizep', icon: '🏋️', muscles: 'Brust & Bizeps' },  // Friday
+    6: { name: 'Backday + Schultern', icon: '🎯', muscles: 'Rücken & Schultern' },  // Saturday
+    0: { name: 'Leichtes Cardio', icon: '🏃', muscles: 'Ausdauer' }    // Sunday
+};
+
+// Helper function to format date as YYYY-MM-DD in local timezone
+function formatLocalDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Load cached data immediately for fast render
+    const hasCached = loadCachedData();
+
+    // Render immediately with cached data (except holiday - always check fresh)
+    if (hasCached) {
+        renderWeekView();
+        renderTodaySession();
+        renderHealthStats();
+        renderGoals();
+        // Don't render gym schedule from cache - wait for fresh holiday check
+    }
+
+    // Then fetch fresh data in background
+    loadTrainingData();
+
+    // Always check holiday mode - the endpoint is fast (2s timeout, defaults to school)
+    // This ensures we don't use stale holiday data
+    checkHolidayMode();
+});
+
+function getWeekStart(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(d.setDate(diff));
+}
+
+async function loadTrainingData() {
+    try {
+        const [sessionsRes, healthRes, goalsRes] = await Promise.all([
+            fetch('/api/hub/training/sessions'),
+            fetch('/api/hub/training/health'),
+            fetch('/api/hub/training/goals')
+        ]);
+
+        if (sessionsRes.ok) sessions = (await sessionsRes.json()).sessions || [];
+        if (healthRes.ok) healthLogs = (await healthRes.json()).logs || [];
+        if (goalsRes.ok) goals = (await goalsRes.json()).goals || [];
+
+        // Cache the fresh data
+        cacheData();
+
+        renderWeekView();
+        renderTodaySession();
+        renderHealthStats();
+        renderGoals();
+    } catch (err) {
+        console.log('Training API not available - using cached data');
+        // Data already loaded from cache, just render
+        renderWeekView();
+        renderTodaySession();
+        renderHealthStats();
+        renderGoals();
+    }
+}
+
+function renderWeekView() {
+    const container = document.getElementById('weekView');
+    const weekNumber = getWeekNumber(currentWeekStart);
+    document.getElementById('weekLabel').textContent = `KW ${weekNumber}`;
+
+    const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+    const today = new Date();
+
+    let html = '';
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(currentWeekStart);
+        date.setDate(date.getDate() + i);
+        const dateStr = formatLocalDate(date);
+        const daySession = sessions.find(s => s.date === dateStr);
+        const isToday = date.toDateString() === today.toDateString();
+        const isSelected = date.toDateString() === selectedDate.toDateString();
+
+        let classes = 'training-day';
+        if (isToday) classes += ' active';
+        if (isSelected) classes += ' selected';
+        if (daySession) classes += daySession.type === 'rest' ? ' rest-day' : ' has-session';
+
+        html += `
+            <div class="${classes}" onclick="selectDay('${dateStr}')">
+                <span class="day-name">${days[i]}</span>
+                <span class="day-date">${date.getDate()}</span>
+                ${daySession ? `<span class="day-session">${getSessionLabel(daySession.type)}</span>` : ''}
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+}
+
+function getWeekNumber(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
+    const week1 = new Date(d.getFullYear(), 0, 4);
+    return 1 + Math.round(((d - week1) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+}
+
+function getSessionLabel(type) {
+    const labels = { 'strength': 'Kraft', 'cardio': 'Ausdauer', 'flexibility': 'Mobility', 'sports': 'Sport', 'rest': 'Ruhe' };
+    return labels[type] || type;
+}
+
+function selectDay(dateStr) {
+    selectedDate = new Date(dateStr);
+    renderWeekView();
+    renderTodaySession();
+}
+
+function renderTodaySession() {
+    const container = document.getElementById('todaySession');
+    const dateStr = formatLocalDate(selectedDate);
+    const session = sessions.find(s => s.date === dateStr);
+    const today = new Date();
+
+    let title = 'Training';
+    if (selectedDate.toDateString() === today.toDateString()) {
+        title = 'Heutiges Training';
+    } else {
+        title = selectedDate.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+    }
+    document.getElementById('sessionTitle').textContent = title;
+
+    if (!session) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+                    <path d="M6 8H5a4 4 0 0 0 0 8h1"></path>
+                    <line x1="6" y1="12" x2="18" y2="12"></line>
+                </svg>
+                <span>Kein Training geplant</span>
+                <button class="btn-primary small" onclick="openAddSessionModal()">Training hinzufügen</button>
+            </div>
+        `;
+        return;
+    }
+
+    const exercises = session.exercises ? session.exercises.split('\n').filter(e => e.trim()) : [];
+
+    container.innerHTML = `
+        <div class="training-session" onclick="openEditSessionModal('${session.id}')">
+            <div class="session-header">
+                <span class="session-type">${getSessionLabel(session.type)}</span>
+                <span class="session-duration">${session.duration ? session.duration + ' min' : ''} ${session.time ? '• ' + session.time : ''}</span>
+            </div>
+            ${exercises.length ? `
+                <div class="exercise-list">
+                    ${exercises.map(ex => `<div class="exercise-item"><span class="exercise-name">${ex}</span></div>`).join('')}
+                </div>
+            ` : ''}
+            ${session.notes ? `<p style="color: var(--text-muted); font-size: 13px; margin-top: 12px;">${session.notes}</p>` : ''}
+        </div>
+    `;
+}
+
+function renderHealthStats() {
+    const today = formatLocalDate(new Date());
+    const todayLog = healthLogs.find(l => l.date === today);
+
+    document.getElementById('sleepValue').textContent = todayLog?.sleep || '-';
+    document.getElementById('energyValue').textContent = todayLog?.energy || '-';
+    document.getElementById('stressValue').textContent = todayLog?.stress || '-';
+    document.getElementById('recoveryValue').textContent = todayLog?.recovery || '-';
+}
+
+function renderGoals() {
+    const container = document.getElementById('goalsList');
+    if (!goals.length) {
+        container.innerHTML = '<div class="empty-state"><span>Keine Trainingsziele gesetzt</span></div>';
+        return;
+    }
+
+    container.innerHTML = goals.map(g => `
+        <div class="project-card" onclick="openEditGoalModal('${g.id}')">
+            <div class="project-header">
+                <span class="project-name">${g.title}</span>
+                ${g.completed ? '<span class="tag success">Erreicht</span>' : ''}
+            </div>
+            ${g.target ? `<p class="project-goal">Ziel: ${g.target}</p>` : ''}
+            ${g.deadline ? `<p style="font-size: 12px; color: var(--text-muted);">Bis: ${new Date(g.deadline).toLocaleDateString('de-DE')}</p>` : ''}
+        </div>
+    `).join('');
+}
+
+function changeWeek(delta) {
+    currentWeekStart.setDate(currentWeekStart.getDate() + (delta * 7));
+    renderWeekView();
+}
+
+// Modal functions
+function openAddSessionModal() {
+    document.getElementById('sessionForm').reset();
+    document.getElementById('sessionId').value = '';
+    document.getElementById('sessionDate').value = formatLocalDate(selectedDate);
+    document.getElementById('sessionModalTitle').textContent = 'Training planen';
+    document.getElementById('deleteSessionBtn').style.display = 'none';
+    openModal('sessionModal');
+}
+
+function openEditSessionModal(id) {
+    const s = sessions.find(ses => ses.id === id);
+    if (!s) return;
+    document.getElementById('sessionId').value = s.id;
+    document.getElementById('sessionType').value = s.type;
+    document.getElementById('sessionDate').value = s.date;
+    document.getElementById('sessionTime').value = s.time || '';
+    document.getElementById('sessionDuration').value = s.duration || '';
+    document.getElementById('sessionExercises').value = s.exercises || '';
+    document.getElementById('sessionNotes').value = s.notes || '';
+    document.getElementById('sessionModalTitle').textContent = 'Training bearbeiten';
+    document.getElementById('deleteSessionBtn').style.display = 'block';
+    openModal('sessionModal');
+}
+
+function openLogHealthModal() {
+    document.getElementById('healthForm').reset();
+    document.getElementById('healthDate').value = formatLocalDate(new Date());
+    openModal('healthModal');
+}
+
+function openAddGoalModal() {
+    document.getElementById('goalForm').reset();
+    document.getElementById('goalId').value = '';
+    openModal('goalModal');
+}
+
+function openEditGoalModal(id) {
+    const g = goals.find(go => go.id === id);
+    if (!g) return;
+    document.getElementById('goalId').value = g.id;
+    document.getElementById('goalTitle').value = g.title;
+    document.getElementById('goalTarget').value = g.target || '';
+    document.getElementById('goalDeadline').value = g.deadline || '';
+    openModal('goalModal');
+}
+
+async function saveSession(e) {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const id = formData.get('id');
+    const data = { type: formData.get('type'), date: formData.get('date'), time: formData.get('time'), duration: formData.get('duration'), exercises: formData.get('exercises'), notes: formData.get('notes') };
+    try {
+        await fetch(id ? `/api/hub/training/sessions/${id}` : '/api/hub/training/sessions', {
+            method: id ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        closeModal('sessionModal');
+        loadTrainingData();
+    } catch (err) {}
+}
+
+async function deleteSession() {
+    if (!confirm('Training löschen?')) return;
+    const id = document.getElementById('sessionId').value;
+    try {
+        await fetch(`/api/hub/training/sessions/${id}`, { method: 'DELETE' });
+        closeModal('sessionModal');
+        loadTrainingData();
+    } catch (err) {}
+}
+
+async function saveHealthLog(e) {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = { date: formData.get('date'), sleep: formData.get('sleep'), energy: formData.get('energy'), stress: formData.get('stress'), recovery: formData.get('recovery'), notes: formData.get('notes') };
+    try {
+        await fetch('/api/hub/training/health', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        closeModal('healthModal');
+        loadTrainingData();
+    } catch (err) {}
+}
+
+async function saveGoal(e) {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const id = formData.get('id');
+    const data = { title: formData.get('title'), target: formData.get('target'), deadline: formData.get('deadline') };
+    try {
+        await fetch(id ? `/api/hub/training/goals/${id}` : '/api/hub/training/goals', {
+            method: id ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        closeModal('goalModal');
+        loadTrainingData();
+    } catch (err) {}
+}
+
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+// Check if today is a holiday by looking at calendar events
+// Uses fast backend endpoint with short timeout - defaults to school mode if offline
+async function checkHolidayMode() {
+    // If offline, assume school mode (not holiday)
+    if (!navigator.onLine) {
+        console.log('Offline - using school mode (not holiday)');
+        isHolidayMode = false;
+        cacheData();
+        updateHolidayUI();
+        renderGymSchedule();
+        return;
+    }
+
+    try {
+        // Use the fast holiday-check endpoint with a 2 second timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+        const response = await fetch('/api/hub/training/holiday-check', {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+            const data = await response.json();
+            isHolidayMode = data.is_holiday === true;
+            console.log(`Holiday check: ${isHolidayMode ? 'HOLIDAY MODE' : 'school mode'} (source: ${data.source || 'none'})`);
+        } else {
+            // API error - default to school mode
+            console.log('Holiday check failed - using school mode');
+            isHolidayMode = false;
+        }
+
+        // Cache the result
+        cacheData();
+        updateHolidayUI();
+        renderGymSchedule();
+    } catch (err) {
+        // Timeout or network error - default to school mode
+        if (err.name === 'AbortError') {
+            console.log('Holiday check timed out - using school mode');
+        } else {
+            console.log('Holiday check error - using school mode:', err.message);
+        }
+        isHolidayMode = false;
+        cacheData();
+        updateHolidayUI();
+        renderGymSchedule();
+    }
+}
+
+function updateHolidayUI() {
+    const alertEl = document.getElementById('holidayAlert');
+    const scheduleType = document.getElementById('scheduleType');
+
+    if (isHolidayMode) {
+        alertEl.style.display = 'flex';
+        scheduleType.textContent = 'Ferienplan';
+        scheduleType.style.background = 'var(--success)';
+        scheduleType.style.color = 'white';
+    } else {
+        alertEl.style.display = 'none';
+        scheduleType.textContent = 'Normaler Plan';
+    }
+}
+
+function renderGymSchedule() {
+    const container = document.getElementById('gymSchedule');
+    const plan = isHolidayMode ? holidayGymPlan : regularGymPlan;
+    const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+    const fullDays = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+    const today = new Date().getDay();
+
+    // Render from Monday to Sunday (1-0)
+    const dayOrder = [1, 2, 3, 4, 5, 6, 0];
+
+    container.innerHTML = dayOrder.map(dayNum => {
+        const workout = plan[dayNum];
+        const isToday = dayNum === today;
+        const isRest = workout.name.includes('Ruhetag');
+
+        return `
+            <div class="schedule-card gym ${isToday ? 'today' : ''} ${isRest ? 'rest' : ''}">
+                <div class="schedule-day">${days[dayNum]}</div>
+                <div class="schedule-icon">${workout.icon}</div>
+                <div class="schedule-info">
+                    <span class="schedule-name">${workout.name}</span>
+                    <span class="schedule-time">${workout.muscles || workout.reason || ''}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Also render today's suggested workout in the week view
+function getSuggestedWorkout(date) {
+    const dayNum = date.getDay();
+    const plan = isHolidayMode ? holidayGymPlan : regularGymPlan;
+    return plan[dayNum];
+}
+</script>
+
+<style>
+.training-day.selected {
+    border-color: var(--accent);
+    background: var(--accent-light);
+}
+.week-nav {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.week-nav button {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-xs);
+    padding: 6px 12px;
+    cursor: pointer;
+    color: var(--text-primary);
+}
+.week-nav button:hover {
+    background: var(--accent-light);
+    border-color: var(--accent);
+}
+
+/* Holiday Alert */
+.holiday-alert {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    background: linear-gradient(135deg, #38a169, #48bb78);
+    border-radius: var(--radius-sm);
+    color: white;
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+/* Schedule Cards */
+.schedule-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.schedule-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.schedule-card.swimming {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(56, 189, 248, 0.05));
+    border-color: #38bdf8;
+}
+
+.schedule-card.gym.today {
+    background: linear-gradient(135deg, var(--accent-light), transparent);
+    border-color: var(--accent);
+}
+
+.schedule-card.gym.rest {
+    opacity: 0.7;
+}
+
+.schedule-day {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text-muted);
+    min-width: 28px;
+}
+
+.schedule-icon {
+    font-size: 24px;
+    min-width: 36px;
+    text-align: center;
+}
+
+.schedule-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.schedule-name {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text-primary);
+}
+
+.schedule-time {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.gym-schedule {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+}
+
+@media (max-width: 768px) {
+    .training-week {
+        grid-template-columns: repeat(7, 1fr);
+        gap: 6px;
+    }
+    .training-day {
+        padding: 10px 4px;
+    }
+    .day-name { font-size: 10px; }
+    .day-date { font-size: 14px; }
+    .day-session { font-size: 9px; }
+
+    .gym-schedule {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}

@@ -1,15 +1,14 @@
-"""
-Google OAuth2 authentication for Gmail and Calendar access.
-
-To use this, you need to:
-1. Go to Google Cloud Console (https://console.cloud.google.com)
-2. Create a new project (or select existing)
-3. Enable the Gmail API and Google Calendar API
-4. Create OAuth 2.0 credentials (Web application type)
-5. Add redirect URI: http://localhost:5050/api/email/google/oauth-callback
-6. Set credentials in .env file (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
-"""
-
+\
+\
+\
+\
+\
+\
+\
+\
+\
+\
+   
 import os
 import json
 import base64
@@ -18,11 +17,9 @@ from typing import Dict, List, Optional
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# Load environment variables from .env file
 from dotenv import load_dotenv
 load_dotenv(os.path.expanduser("~/Documents/voice-notes/.env"))
 
-# Google API imports
 try:
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import Flow
@@ -36,30 +33,25 @@ DATA_DIR = os.path.expanduser("~/Documents/voice-notes/data")
 CREDENTIALS_FILE = os.path.join(DATA_DIR, "google_credentials.json")
 TOKENS_FILE = os.path.join(DATA_DIR, "google_tokens.json")
 
-# OAuth settings from environment
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
 GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET')
 GOOGLE_REDIRECT_URI = os.getenv('GOOGLE_REDIRECT_URI', 'http://localhost:5050/api/email/google/oauth-callback')
 
-# Google API scopes (Gmail + Calendar with full access)
 SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/gmail.send',
     'https://www.googleapis.com/auth/gmail.modify',
-    'https://www.googleapis.com/auth/calendar'  # Full calendar access (read/write/delete)
+    'https://www.googleapis.com/auth/calendar'                                            
 ]
 
-
 def is_google_oauth_configured() -> bool:
-    """Check if Google OAuth credentials are set up."""
-    # Check for env variables first, then fall back to credentials file
+                                                       
     if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
         return GOOGLE_API_AVAILABLE
     return GOOGLE_API_AVAILABLE and os.path.exists(CREDENTIALS_FILE)
 
-
 def get_oauth_status() -> Dict:
-    """Get the current OAuth configuration status."""
+                                                     
     if not GOOGLE_API_AVAILABLE:
         return {
             "configured": False,
@@ -67,7 +59,6 @@ def get_oauth_status() -> Dict:
             "error": "Google API libraries not installed"
         }
 
-    # Check for env variables or credentials file
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         if not os.path.exists(CREDENTIALS_FILE):
             return {
@@ -85,9 +76,8 @@ def get_oauth_status() -> Dict:
         "accounts": list(tokens.keys()) if tokens else []
     }
 
-
 def load_tokens() -> Dict:
-    """Load saved OAuth tokens."""
+                                  
     if not os.path.exists(TOKENS_FILE):
         return {}
     try:
@@ -96,9 +86,8 @@ def load_tokens() -> Dict:
     except:
         return {}
 
-
 def save_tokens(tokens: Dict) -> bool:
-    """Save OAuth tokens."""
+                            
     os.makedirs(DATA_DIR, exist_ok=True)
     try:
         with open(TOKENS_FILE, 'w') as f:
@@ -107,9 +96,8 @@ def save_tokens(tokens: Dict) -> bool:
     except:
         return False
 
-
 def get_credentials(email: str) -> Optional[Credentials]:
-    """Get valid credentials for an email account."""
+                                                     
     tokens = load_tokens()
     token_data = tokens.get(email)
 
@@ -125,11 +113,10 @@ def get_credentials(email: str) -> Optional[Credentials]:
         scopes=SCOPES
     )
 
-    # Refresh if expired
     if creds.expired and creds.refresh_token:
         try:
             creds.refresh(Request())
-            # Save refreshed token
+                                  
             tokens[email] = {
                 'token': creds.token,
                 'refresh_token': creds.refresh_token,
@@ -143,10 +130,8 @@ def get_credentials(email: str) -> Optional[Credentials]:
 
     return creds
 
-
 def _get_oauth_client_config() -> Dict:
-    """Get OAuth client configuration from env vars or credentials file."""
-    # Prefer environment variables
+                                                                           
     if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
         return {
             "web": {
@@ -158,11 +143,10 @@ def _get_oauth_client_config() -> Dict:
             }
         }
 
-    # Fall back to credentials file
     if os.path.exists(CREDENTIALS_FILE):
         with open(CREDENTIALS_FILE, 'r') as f:
             creds_data = json.load(f)
-            # Convert "installed" to "web" format if needed
+                                                           
             if "installed" in creds_data:
                 installed = creds_data["installed"]
                 return {
@@ -178,9 +162,8 @@ def _get_oauth_client_config() -> Dict:
 
     return None
 
-
 def start_oauth_flow() -> Dict:
-    """Start the OAuth flow and return the authorization URL."""
+                                                                
     if not GOOGLE_API_AVAILABLE:
         return {"success": False, "error": "Google API not available"}
 
@@ -200,7 +183,6 @@ def start_oauth_flow() -> Dict:
             prompt='consent'
         )
 
-        # Store the state for verification
         return {
             "success": True,
             "auth_url": auth_url,
@@ -210,9 +192,8 @@ def start_oauth_flow() -> Dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-
 def complete_oauth_flow(auth_code: str) -> Dict:
-    """Complete OAuth flow with the authorization code."""
+                                                          
     if not GOOGLE_API_AVAILABLE:
         return {"success": False, "error": "Google API not available"}
 
@@ -230,7 +211,6 @@ def complete_oauth_flow(auth_code: str) -> Dict:
         flow.fetch_token(code=auth_code)
         creds = flow.credentials
 
-        # Get user's email address
         service = build('gmail', 'v1', credentials=creds)
         profile = service.users().getProfile(userId='me').execute()
         email = profile.get('emailAddress', '')
@@ -238,7 +218,6 @@ def complete_oauth_flow(auth_code: str) -> Dict:
         if not email:
             return {"success": False, "error": "Could not get email address"}
 
-        # Save tokens
         tokens = load_tokens()
         tokens[email] = {
             'token': creds.token,
@@ -258,9 +237,8 @@ def complete_oauth_flow(auth_code: str) -> Dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-
 def remove_google_account(email: str) -> bool:
-    """Remove a Google account."""
+                                  
     tokens = load_tokens()
     if email in tokens:
         del tokens[email]
@@ -268,15 +246,13 @@ def remove_google_account(email: str) -> bool:
         return True
     return False
 
-
 def get_google_accounts() -> List[Dict]:
-    """Get list of connected Google accounts."""
+                                                
     tokens = load_tokens()
     return [{"email": email, "provider": "gmail_oauth"} for email in tokens.keys()]
 
-
 def fetch_gmail_messages(email: str, max_results: int = 20) -> Dict:
-    """Fetch emails from Gmail using OAuth."""
+                                              
     creds = get_credentials(email)
     if not creds:
         return {"success": False, "error": "Not authenticated. Please sign in again."}
@@ -284,7 +260,6 @@ def fetch_gmail_messages(email: str, max_results: int = 20) -> Dict:
     try:
         service = build('gmail', 'v1', credentials=creds)
 
-        # Get message list
         results = service.users().messages().list(
             userId='me',
             maxResults=max_results,
@@ -305,12 +280,10 @@ def fetch_gmail_messages(email: str, max_results: int = 20) -> Dict:
 
                 headers = {h['name']: h['value'] for h in msg_data.get('payload', {}).get('headers', [])}
 
-                # Parse sender
                 from_header = headers.get('From', '')
                 from_name = from_header.split('<')[0].strip().strip('"') if '<' in from_header else from_header.split('@')[0]
                 from_email = from_header.split('<')[1].rstrip('>') if '<' in from_header else from_header
 
-                # Parse date
                 date_str = headers.get('Date', '')
                 try:
                     from email.utils import parsedate_to_datetime
@@ -319,10 +292,8 @@ def fetch_gmail_messages(email: str, max_results: int = 20) -> Dict:
                 except:
                     date_formatted = date_str[:20]
 
-                # Get snippet as preview
                 preview = msg_data.get('snippet', '')[:200]
 
-                # Check if read
                 is_read = 'UNREAD' not in msg_data.get('labelIds', [])
 
                 emails.append({
@@ -342,9 +313,8 @@ def fetch_gmail_messages(email: str, max_results: int = 20) -> Dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-
 def get_gmail_message_detail(email: str, msg_id: str) -> Dict:
-    """Get full email content."""
+                                 
     creds = get_credentials(email)
     if not creds:
         return {"success": False, "error": "Not authenticated"}
@@ -360,12 +330,10 @@ def get_gmail_message_detail(email: str, msg_id: str) -> Dict:
 
         headers = {h['name']: h['value'] for h in msg_data.get('payload', {}).get('headers', [])}
 
-        # Parse sender
         from_header = headers.get('From', '')
         from_name = from_header.split('<')[0].strip().strip('"') if '<' in from_header else from_header.split('@')[0]
         from_email = from_header.split('<')[1].rstrip('>') if '<' in from_header else from_header
 
-        # Parse date
         date_str = headers.get('Date', '')
         try:
             from email.utils import parsedate_to_datetime
@@ -374,7 +342,6 @@ def get_gmail_message_detail(email: str, msg_id: str) -> Dict:
         except:
             date_formatted = date_str
 
-        # Get body
         body = ""
         payload = msg_data.get('payload', {})
 
@@ -395,7 +362,6 @@ def get_gmail_message_detail(email: str, msg_id: str) -> Dict:
         elif payload.get('body', {}).get('data'):
             body = base64.urlsafe_b64decode(payload['body']['data']).decode('utf-8', errors='replace')
 
-        # Mark as read
         try:
             service.users().messages().modify(
                 userId='me',
@@ -421,9 +387,8 @@ def get_gmail_message_detail(email: str, msg_id: str) -> Dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-
 def send_gmail(from_email: str, to_email: str, subject: str, body: str) -> Dict:
-    """Send email via Gmail."""
+                               
     creds = get_credentials(from_email)
     if not creds:
         return {"success": False, "error": "Not authenticated"}
@@ -448,14 +413,16 @@ def send_gmail(from_email: str, to_email: str, subject: str, body: str) -> Dict:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-
-def fetch_google_calendar_events(days_ahead: int = 30, account_email: str = None) -> Dict:
-    """Fetch calendar events from ALL Google Calendars.
-
-    Args:
-        days_ahead: Number of days to look ahead
-        account_email: Specific Google account to use, or None to use first available
-    """
+def fetch_google_calendar_events(days_ahead: int = 30, account_email: str = None,
+                                  start_date: str = None, end_date: str = None) -> Dict:
+\
+\
+\
+\
+\
+\
+\
+       
     tokens = load_tokens()
 
     if not tokens:
@@ -466,7 +433,6 @@ def fetch_google_calendar_events(days_ahead: int = 30, account_email: str = None
             "events": []
         }
 
-    # Use specified account or fall back to first available
     if account_email and account_email in tokens:
         email = account_email
     else:
@@ -485,18 +451,20 @@ def fetch_google_calendar_events(days_ahead: int = 30, account_email: str = None
     try:
         service = build('calendar', 'v3', credentials=creds)
 
-        # Get events from now to days_ahead
-        now = datetime.utcnow()
-        time_min = now.isoformat() + 'Z'
-        time_max = (now + timedelta(days=days_ahead)).isoformat() + 'Z'
+        if start_date and end_date:
+                                                                        
+            time_min = f"{start_date}T00:00:00Z"
+            time_max = f"{end_date}T23:59:59Z"
+        else:
+            now = datetime.utcnow()
+            time_min = now.isoformat() + 'Z'
+            time_max = (now + timedelta(days=days_ahead)).isoformat() + 'Z'
 
-        # First, get ALL calendars the user has access to
         calendar_list = service.calendarList().list().execute()
         calendars = calendar_list.get('items', [])
 
         all_events = []
 
-        # Fetch events from each calendar
         for cal in calendars:
             cal_id = cal.get('id')
             cal_name = cal.get('summary', 'Calendar')
@@ -516,16 +484,15 @@ def fetch_google_calendar_events(days_ahead: int = 30, account_email: str = None
                     start = event.get('start', {})
                     end = event.get('end', {})
 
-                    # Handle all-day events vs timed events
                     if 'date' in start:
-                        # All-day event
+                                       
                         start_date = start['date']
                         start_time = None
                         end_date = end.get('date', start_date)
                         end_time = None
                         all_day = True
                     else:
-                        # Timed event
+                                     
                         start_dt = start.get('dateTime', '')
                         end_dt = end.get('dateTime', '')
                         start_date = start_dt[:10] if start_dt else ''
@@ -545,14 +512,14 @@ def fetch_google_calendar_events(days_ahead: int = 30, account_email: str = None
                         "location": event.get('location', ''),
                         "description": event.get('description', ''),
                         "calendar": cal_name,
+                        "calendar_id": cal_id,
                         "calendar_color": cal_color,
                         "source": "google"
                     })
             except Exception as cal_err:
-                # Skip calendars we can't access
+                                                
                 continue
 
-        # Sort all events by date/time
         all_events.sort(key=lambda e: (e['start_date'], e['start_time'] or '00:00'))
 
         return {
@@ -578,9 +545,8 @@ def fetch_google_calendar_events(days_ahead: int = 30, account_email: str = None
             "events": []
         }
 
-
 def get_google_calendars(account_email: str = None) -> Dict:
-    """Get list of calendars for a Google account."""
+                                                     
     tokens = load_tokens()
 
     if not tokens:
@@ -615,7 +581,6 @@ def get_google_calendars(account_email: str = None) -> Dict:
     except Exception as e:
         return {"success": False, "error": str(e), "calendars": []}
 
-
 def create_google_calendar_event(
     title: str,
     start_date: str,
@@ -627,7 +592,7 @@ def create_google_calendar_event(
     calendar_id: str = 'primary',
     account_email: str = None
 ) -> Dict:
-    """Create a new event in Google Calendar."""
+                                                
     tokens = load_tokens()
 
     if not tokens:
@@ -645,16 +610,14 @@ def create_google_calendar_event(
     try:
         service = build('calendar', 'v3', credentials=creds)
 
-        # Build event body
         event = {
             'summary': title,
             'description': description or '',
             'location': location or ''
         }
 
-        # Handle all-day vs timed events
         if start_time:
-            # Timed event
+                         
             start_datetime = f"{start_date}T{start_time}:00"
             end_date = end_date or start_date
             end_time = end_time or start_time
@@ -663,7 +626,7 @@ def create_google_calendar_event(
             event['start'] = {'dateTime': start_datetime, 'timeZone': 'Europe/Berlin'}
             event['end'] = {'dateTime': end_datetime, 'timeZone': 'Europe/Berlin'}
         else:
-            # All-day event
+                           
             end_date = end_date or start_date
             event['start'] = {'date': start_date}
             event['end'] = {'date': end_date}
@@ -683,7 +646,6 @@ def create_google_calendar_event(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-
 def update_google_calendar_event(
     event_id: str,
     title: str = None,
@@ -696,7 +658,7 @@ def update_google_calendar_event(
     calendar_id: str = 'primary',
     account_email: str = None
 ) -> Dict:
-    """Update an existing event in Google Calendar."""
+                                                      
     tokens = load_tokens()
 
     if not tokens:
@@ -714,13 +676,11 @@ def update_google_calendar_event(
     try:
         service = build('calendar', 'v3', credentials=creds)
 
-        # Get the existing event first
         existing_event = service.events().get(
             calendarId=calendar_id,
             eventId=event_id
         ).execute()
 
-        # Update fields if provided
         if title is not None:
             existing_event['summary'] = title
         if description is not None:
@@ -728,7 +688,6 @@ def update_google_calendar_event(
         if location is not None:
             existing_event['location'] = location
 
-        # Update date/time if provided
         if start_date:
             if start_time:
                 start_datetime = f"{start_date}T{start_time}:00"
@@ -758,13 +717,12 @@ def update_google_calendar_event(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-
 def delete_google_calendar_event(
     event_id: str,
     calendar_id: str = 'primary',
     account_email: str = None
 ) -> Dict:
-    """Delete an event from Google Calendar."""
+                                               
     tokens = load_tokens()
 
     if not tokens:
@@ -792,9 +750,8 @@ def delete_google_calendar_event(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-
 def delete_gmail_message(email: str, msg_id: str, permanent: bool = False) -> Dict:
-    """Delete or trash an email message."""
+                                           
     creds = get_credentials(email)
     if not creds:
         return {"success": False, "error": "Not authenticated"}
@@ -803,13 +760,13 @@ def delete_gmail_message(email: str, msg_id: str, permanent: bool = False) -> Di
         service = build('gmail', 'v1', credentials=creds)
 
         if permanent:
-            # Permanently delete
+                                
             service.users().messages().delete(
                 userId='me',
                 id=msg_id
             ).execute()
         else:
-            # Move to trash
+                           
             service.users().messages().trash(
                 userId='me',
                 id=msg_id

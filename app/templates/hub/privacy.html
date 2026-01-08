@@ -1,0 +1,186 @@
+{% extends "hub/base.html" %}
+{% set active_tab = 'settings' %}
+
+{% block title %}Datenschutz - Nexus{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <a href="/hub/settings" class="back-link">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 12H5"></path>
+                <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            Einstellungen
+        </a>
+        <h1 class="page-title">Datenschutzerklärung</h1>
+        <p class="page-subtitle">Stand: Januar 2026</p>
+    </div>
+
+    <div class="legal-content glass-card" style="padding: 32px; line-height: 1.8;">
+        <section class="legal-section">
+            <h2>1. Überblick</h2>
+            <p>
+                Der Schutz deiner persönlichen Daten ist uns wichtig. Diese Datenschutzerklärung
+                informiert dich darüber, welche Daten bei der Nutzung von Nexus erhoben und
+                wie sie verwendet werden.
+            </p>
+        </section>
+
+        <section class="legal-section">
+            <h2>2. Lokale Datenspeicherung</h2>
+            <p>
+                Die meisten deiner Daten werden <strong>ausschließlich lokal</strong> auf
+                deinem Gerät gespeichert:
+            </p>
+            <ul>
+                <li>Aufgaben und To-Dos</li>
+                <li>Kalender-Einträge (lokal erstellt)</li>
+                <li>Notizen und Projekte</li>
+                <li>Trainings-Daten</li>
+                <li>Einstellungen und Präferenzen</li>
+                <li>Wetter-Cache</li>
+            </ul>
+            <p style="margin-top: 12px;">
+                Diese Daten werden im Browser (LocalStorage) und in lokalen Dateien
+                auf dem Server gespeichert. Sie werden <strong>nicht</strong> an externe
+                Server übertragen.
+            </p>
+        </section>
+
+        <section class="legal-section">
+            <h2>3. Drittanbieter-Dienste</h2>
+
+            <h3 style="font-size: 16px; margin-top: 20px; margin-bottom: 8px;">Google-Dienste</h3>
+            <p>Bei Verbindung mit Google werden folgende Daten verarbeitet:</p>
+            <ul>
+                <li><strong>Google Kalender:</strong> Termine werden von Google abgerufen und angezeigt</li>
+                <li><strong>Gmail:</strong> E-Mails werden abgerufen und angezeigt (nur Lesen)</li>
+                <li><strong>OAuth-Token:</strong> Wird lokal gespeichert für die Authentifizierung</li>
+            </ul>
+            <p style="margin-top: 8px;">
+                Für Google-Dienste gelten die
+                <a href="https://policies.google.com/privacy" target="_blank" style="color: var(--accent);">
+                    Datenschutzbestimmungen von Google
+                </a>.
+            </p>
+
+            <h3 style="font-size: 16px; margin-top: 20px; margin-bottom: 8px;">IServ</h3>
+            <p>Bei Verbindung mit IServ:</p>
+            <ul>
+                <li>Zugangsdaten werden nur für die Authentifizierung verwendet</li>
+                <li>Passwörter werden <strong>nicht</strong> dauerhaft gespeichert</li>
+                <li>Vertretungsplan-Daten werden lokal gecached</li>
+            </ul>
+
+            <h3 style="font-size: 16px; margin-top: 20px; margin-bottom: 8px;">Open-Meteo (Wetter)</h3>
+            <p>
+                Für Wetter-Daten wird der kostenlose Dienst Open-Meteo verwendet.
+                Dabei werden deine Standort-Koordinaten an deren Server übermittelt.
+                <a href="https://open-meteo.com/en/terms" target="_blank" style="color: var(--accent);">
+                    Open-Meteo Datenschutz
+                </a>
+            </p>
+        </section>
+
+        <section class="legal-section">
+            <h2>4. Deine Rechte</h2>
+            <p>Du hast jederzeit das Recht:</p>
+            <ul>
+                <li><strong>Auskunft:</strong> Zu erfahren, welche Daten gespeichert sind</li>
+                <li><strong>Löschung:</strong> Alle Daten über "Einstellungen > Alle Daten löschen" zu entfernen</li>
+                <li><strong>Widerruf:</strong> Drittanbieter-Verbindungen jederzeit zu trennen</li>
+                <li><strong>Export:</strong> Deine Daten zu exportieren (Backup-Funktion)</li>
+            </ul>
+        </section>
+
+        <section class="legal-section">
+            <h2>5. Cookies und Tracking</h2>
+            <p>
+                Nexus verwendet <strong>keine</strong> Tracking-Cookies oder Analyse-Tools.
+                Es werden nur technisch notwendige Cookies für die Session-Verwaltung verwendet.
+            </p>
+        </section>
+
+        <section class="legal-section">
+            <h2>6. Datensicherheit</h2>
+            <p>
+                Da die meisten Daten lokal gespeichert werden, liegt die Sicherheit
+                in deiner Hand. Empfehlungen:
+            </p>
+            <ul>
+                <li>Halte dein Gerät mit Updates aktuell</li>
+                <li>Nutze regelmäßig die Backup-Funktion</li>
+                <li>Teile keine Login-Daten mit anderen</li>
+            </ul>
+        </section>
+
+        <section class="legal-section">
+            <h2>7. Änderungen</h2>
+            <p>
+                Diese Datenschutzerklärung kann bei Bedarf aktualisiert werden.
+                Die aktuelle Version ist immer hier einsehbar.
+            </p>
+        </section>
+
+        <section class="legal-section">
+            <h2>8. Kontakt</h2>
+            <p>
+                Bei Fragen zum Datenschutz wende dich an den Entwickler.
+            </p>
+        </section>
+    </div>
+</div>
+
+<style>
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 14px;
+    margin-bottom: 16px;
+    transition: color 0.2s;
+}
+
+.back-link:hover {
+    color: var(--accent);
+}
+
+.legal-content {
+    max-width: 800px;
+}
+
+.legal-section {
+    margin-bottom: 32px;
+}
+
+.legal-section:last-child {
+    margin-bottom: 0;
+}
+
+.legal-section h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+}
+
+.legal-section p {
+    color: var(--text-secondary);
+    font-size: 15px;
+}
+
+.legal-section ul {
+    color: var(--text-secondary);
+    font-size: 15px;
+    margin-left: 20px;
+    margin-top: 8px;
+}
+
+.legal-section li {
+    margin-bottom: 6px;
+}
+</style>
+{% endblock %}

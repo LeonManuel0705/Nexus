@@ -1,4 +1,5 @@
 {% extends "hub/base.html" %}
+{% set active_tab = 'email' %}
 
 {% block title %}Nexus - Email{% endblock %}
 
@@ -20,14 +21,12 @@
         </div>
     </div>
 
-    <!-- Account Tabs -->
     <div class="email-accounts-bar" id="emailAccountsBar">
         <div class="no-accounts-msg" id="noAccountsMsg">
             <p data-i18n="no_email_accounts">No email accounts connected. Click + to add one.</p>
         </div>
     </div>
 
-    <!-- Email List -->
     <div class="email-list" id="emailList">
         <div class="email-loading" id="emailLoading" style="display: none;">
             <div class="spinner"></div>
@@ -36,7 +35,6 @@
     </div>
 </section>
 
-<!-- Email Detail Panel -->
 <section class="widget glass-card widget-full email-detail-panel" id="emailDetailPanel" style="display: none;">
     <div class="widget-header">
         <button class="back-btn" id="emailBackBtn">
@@ -67,7 +65,7 @@
 {% endblock %}
 
 {% block modals %}
-<!-- Add Account Modal -->
+
 <div class="modal" id="addAccountModal">
     <div class="modal-content">
         <div class="modal-header">
@@ -75,7 +73,6 @@
             <button class="modal-close" id="addAccountModalClose">&times;</button>
         </div>
 
-        <!-- Google Sign-In Button -->
         <div class="google-signin-section">
             <button type="button" class="btn-google" id="googleSignInBtn">
                 <svg width="18" height="18" viewBox="0 0 24 24">
@@ -91,7 +88,6 @@
 
         <div class="divider-text"><span data-i18n="or">or</span></div>
 
-        <!-- Manual IMAP/SMTP form -->
         <form id="addAccountForm">
             <div class="form-group">
                 <label for="accountEmail" data-i18n="email_address">Email Address</label>
@@ -119,7 +115,6 @@
     </div>
 </div>
 
-<!-- Google Auth Code Modal -->
 <div class="modal" id="googleAuthModal">
     <div class="modal-content">
         <div class="modal-header">
@@ -143,7 +138,6 @@
     </div>
 </div>
 
-<!-- Compose Modal -->
 <div class="modal" id="composeModal">
     <div class="modal-content modal-large">
         <div class="modal-header">
