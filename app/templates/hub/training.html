@@ -60,10 +60,10 @@
 
         <div class="edit-mode-controls glass-card" id="editModeControls" style="display: none;">
             <div class="edit-mode-info">
-                <span>Bearbeitungsmodus: Klicke auf einen Tag, um Training hinzuzufugen oder zu bearbeiten</span>
+                <span>Bearbeitungsmodus: Klicke auf einen Tag, um Training hinzuzufügen oder zu bearbeiten</span>
             </div>
             <div class="edit-mode-actions">
-                <button class="btn-secondary small" onclick="openModal('clearScheduleModal')">Alles loschen</button>
+                <button class="btn-secondary small" onclick="openModal('clearScheduleModal')">Alles löschen</button>
                 <button class="btn-secondary small" onclick="loadDefaultTemplate()">Standard laden</button>
                 <button class="btn-primary small" onclick="toggleEditMode()">Fertig</button>
             </div>
@@ -94,7 +94,7 @@
     <section class="content-section">
         <div class="section-header">
             <h3 class="section-title">Wohlbefinden</h3>
-            <button class="btn-primary small" onclick="openLogHealthModal()">Eintragen</button>
+            <button class="btn-primary small" onclick="openLogHealthModal()">Einträgen</button>
         </div>
         <div class="health-stats" id="healthStats">
             <div class="health-stat">
@@ -252,7 +252,7 @@
 <div class="modal" id="trainingEntryModal">
     <div class="modal-content">
         <div class="modal-header">
-            <h3 id="trainingEntryModalTitle">Training hinzufugen</h3>
+            <h3 id="trainingEntryModalTitle">Training hinzufügen</h3>
             <button class="modal-close" onclick="closeModal('trainingEntryModal')">&times;</button>
         </div>
         <form id="trainingEntryForm" onsubmit="saveTrainingEntry(event)">
@@ -332,7 +332,7 @@
             </div>
 
             <div class="form-actions">
-                <button type="button" class="btn-secondary btn-danger" id="deleteTrainingEntryBtn" style="display:none" onclick="deleteTrainingEntry()">Loschen</button>
+                <button type="button" class="btn-secondary btn-danger" id="deleteTrainingEntryBtn" style="display:none" onclick="deleteTrainingEntry()">Löschen</button>
                 <button type="submit" class="btn-primary">Speichern</button>
             </div>
         </form>
@@ -342,15 +342,15 @@
 <div class="modal" id="clearScheduleModal">
     <div class="modal-content modal-small">
         <div class="modal-header">
-            <h3>Trainingsplan loschen?</h3>
+            <h3>Trainingsplan löschen?</h3>
             <button class="modal-close" onclick="closeModal('clearScheduleModal')">&times;</button>
         </div>
         <div class="modal-body">
-            <p>Mochtest du wirklich den gesamten Trainingsplan loschen?</p>
+            <p>Mochtest du wirklich den gesamten Trainingsplan löschen?</p>
         </div>
         <div class="form-actions">
             <button class="btn-secondary" onclick="closeModal('clearScheduleModal')">Abbrechen</button>
-            <button class="btn-primary btn-danger" onclick="confirmClearSchedule()">Loschen</button>
+            <button class="btn-primary btn-danger" onclick="confirmClearSchedule()">Löschen</button>
         </div>
     </div>
 </div>
@@ -1002,7 +1002,7 @@ function openTrainingEntryModal(day, scheduleType) {
         const typeRadio = document.querySelector(`input[name="training_type"][value="${existingEntry.training_type}"]`);
         if (typeRadio) typeRadio.checked = true;
     } else {
-        title.textContent = `${FULL_DAY_NAMES[day]} - Training hinzufugen`;
+        title.textContent = `${FULL_DAY_NAMES[day]} - Training hinzufügen`;
         deleteBtn.style.display = 'none';
     }
 
@@ -1053,8 +1053,6 @@ async function saveTrainingEntry(event) {
             : '/api/hub/training/schedule/entries';
         const method = entryId && entryId !== '' ? 'PUT' : 'POST';
 
-        console.log('Saving training entry:', { url, method, entryData });
-
         const response = await fetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
@@ -1078,7 +1076,7 @@ async function saveTrainingEntry(event) {
 // Delete training entry
 async function deleteTrainingEntry() {
     const entryId = document.getElementById('trainingEntryId').value;
-    if (!entryId || !confirm('Training wirklich loschen?')) return;
+    if (!entryId || !confirm('Training wirklich löschen?')) return;
 
     try {
         await fetch(`/api/hub/training/schedule/entries/${entryId}`, { method: 'DELETE' });
@@ -1091,7 +1089,7 @@ async function deleteTrainingEntry() {
 
 // Load default template
 async function loadDefaultTemplate() {
-    if (!confirm('Standard-Trainingsplan laden? Bestehende Eintrage werden uberschrieben.')) return;
+    if (!confirm('Standard-Trainingsplan laden? Bestehende Einträge werden überschrieben.')) return;
 
     const scheduleType = getEffectiveScheduleType();
     const template = scheduleType === 'holiday' ? DEFAULT_HOLIDAY_TEMPLATE : DEFAULT_REGULAR_TEMPLATE;

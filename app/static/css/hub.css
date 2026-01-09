@@ -2081,16 +2081,16 @@ body {
     font-size: 15px;
     font-weight: 600;
     cursor: pointer;
-    background: white;
-    border: 2px solid #e0e0e0;
-    color: #444;
+    background: var(--bg-secondary);
+    border: 2px solid var(--card-border);
+    color: var(--text-primary);
     transition: all var(--transition-fast);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .btn-google:hover {
-    background: #f8f9fa;
-    border-color: #d0d0d0;
+    background: var(--bg-tertiary);
+    border-color: var(--accent);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
     transform: translateY(-1px);
 }
@@ -2099,6 +2099,19 @@ body {
     flex-shrink: 0;
 }
 
+/* Light theme - explicit styling */
+[data-theme="light"] .btn-google {
+    background: #ffffff;
+    border-color: #e0e0e0;
+    color: #333333;
+}
+
+[data-theme="light"] .btn-google:hover {
+    background: #f8f9fa;
+    border-color: #d0d0d0;
+}
+
+/* Dark theme - explicit styling */
 [data-theme="dark"] .btn-google {
     background: var(--bg-tertiary);
     border-color: var(--card-border);

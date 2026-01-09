@@ -677,7 +677,6 @@ const HubApp = {
         try {
             const response = await fetch(`/api/email/accounts/${encodeURIComponent(email)}`, { method: 'DELETE' });
             const data = await response.json();
-            console.log('Remove account response:', data);
 
             await this.loadEmailAccounts();
             this.renderEmailAccountsBar();
