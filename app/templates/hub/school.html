@@ -986,7 +986,8 @@ const BLOCK_TIMES = [
 ];
 
 // Reference date for A/B week calculation - loaded from API or default
-let REFERENCE_A_WEEK = new Date(2025, 11, 29); // December 29, 2025 = A-week (default)
+// Default: January 12, 2026 = A-week, so current week (Jan 5-11) = B-week
+let REFERENCE_A_WEEK = new Date(2026, 0, 12);
 
 // Dynamic timetable data - loaded from API
 let TIMETABLE_A = { 1: [null, null, null, null], 2: [null, null, null, null], 3: [null, null, null, null], 4: [null, null, null, null], 5: [null, null, null, null] };
@@ -1025,14 +1026,19 @@ async function loadTimetableSettings() {
         const response = await fetch('/api/hub/school/timetable/settings');
         if (response.ok) {
             const data = await response.json();
-            timetableSettings = data;
+            // Merge with defaults to ensure all properties exist
+            timetableSettings = {
+                has_ab_weeks: data.has_ab_weeks !== undefined ? Boolean(data.has_ab_weeks) : true,
+                setup_completed: Boolean(data.setup_completed),
+                reference_date: data.reference_date || null
+            };
 
             // Update reference date if provided
             if (data.reference_date) {
                 REFERENCE_A_WEEK = new Date(data.reference_date);
             }
 
-            return data;
+            return timetableSettings;
         }
     } catch (error) {
         console.error('Error loading timetable settings:', error);
@@ -1274,9 +1280,25 @@ async function startSetup() {
     btn.textContent = 'Wird eingerichtet...';
 
     try {
+        // Calculate reference date for A/B weeks
+        // Set current week as B-week by making NEXT Monday the A-week reference
+        let referenceDate = null;
+        if (hasAbWeeks) {
+            const now = new Date();
+            const dayOfWeek = now.getDay();
+            // Get next Monday (if today is Monday, get the Monday after)
+            const daysUntilNextMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
+            const nextMonday = new Date(now);
+            nextMonday.setDate(now.getDate() + daysUntilNextMonday);
+            nextMonday.setHours(0, 0, 0, 0);
+            referenceDate = nextMonday.toISOString().split('T')[0];
+            REFERENCE_A_WEEK = nextMonday;
+        }
+
         // Save settings
         await saveTimetableSettings({
             has_ab_weeks: hasAbWeeks,
+            reference_date: referenceDate,
             setup_completed: true
         });
 
@@ -1421,6 +1443,42 @@ function updateSubjectSuggestions() {
         option.value = subject;
         datalist.appendChild(option);
     });
+}
+
+function autoFillFromExistingSubject() {
+    // Only auto-fill when adding new entry, not editing
+    const lessonId = document.getElementById('lessonId').value;
+    if (lessonId) return;
+
+    const subjectInput = document.getElementById('lessonSubject');
+    const subjectName = subjectInput.value.trim();
+    if (!subjectName) return;
+
+    // Find existing entry with this subject
+    const existingEntry = timetableEntries.find(e =>
+        e.subject.toLowerCase() === subjectName.toLowerCase()
+    );
+
+    if (existingEntry) {
+        // Auto-fill teacher
+        if (existingEntry.teacher) {
+            document.getElementById('lessonTeacher').value = existingEntry.teacher;
+        }
+        // Auto-fill room
+        if (existingEntry.room) {
+            document.getElementById('lessonRoom').value = existingEntry.room;
+        }
+        // Auto-fill color
+        if (existingEntry.color) {
+            document.getElementById('lessonColor').value = existingEntry.color;
+            updateLessonColorPreview();
+        }
+        // Auto-fill subject type
+        if (existingEntry.subject_type) {
+            const typeRadio = document.querySelector(`input[name="subject_type"][value="${existingEntry.subject_type}"]`);
+            if (typeRadio) typeRadio.checked = true;
+        }
+    }
 }
 
 function updateLessonColorPreview() {
@@ -2644,6 +2702,13 @@ document.addEventListener('DOMContentLoaded', () => {
     initTimetable();
     // Auto-load Vertretungsplan with cache-first approach
     preloadVertretungsplan();
+
+    // Auto-fill lesson details when subject is selected from existing entries
+    const lessonSubjectInput = document.getElementById('lessonSubject');
+    if (lessonSubjectInput) {
+        lessonSubjectInput.addEventListener('input', autoFillFromExistingSubject);
+        lessonSubjectInput.addEventListener('change', autoFillFromExistingSubject);
+    }
 });
 
 // Preload Vertretungsplan from cache immediately, then refresh if online

@@ -1,7 +1,3 @@
-\
-\
-\
-   
 import os
 import json
 import logging
@@ -70,7 +66,6 @@ class IServService:
             return {'success': False, 'error': 'Keine Anmeldedaten vorhanden'}
 
         try:
-                                                   
             iserv_url = iserv_url.replace('https://', '').replace('http://', '').strip('/')
 
             self.api = IServAPI(
@@ -84,7 +79,6 @@ class IServService:
             try:
                 self.user_info = self.api.get_own_user_info()
             except Exception:
-                                                               
                 self.user_info = {'name': username}
 
             self.connected = True
@@ -99,9 +93,24 @@ class IServService:
                     'class': self.user_info.get('class', '') if isinstance(self.user_info, dict) else ''
                 }
             }
+        except ConnectionError as e:
+            self.connected = False
+            logging.error(f"IServ connection error: {e}")
+            return {'success': False, 'error': 'Server nicht erreichbar. Bitte URL überprüfen.'}
         except Exception as e:
             self.connected = False
-            return {'success': False, 'error': str(e)}
+            error_str = str(e).lower()
+            logging.error(f"IServ error: {e}")
+            if 'authentication' in error_str or 'login' in error_str or 'password' in error_str or '401' in error_str or 'unauthorized' in error_str:
+                return {'success': False, 'error': 'Falscher Benutzername oder Passwort'}
+            elif 'timeout' in error_str or 'timed out' in error_str:
+                return {'success': False, 'error': 'Zeitüberschreitung. Server antwortet nicht.'}
+            elif 'connection' in error_str or 'network' in error_str or 'resolve' in error_str:
+                return {'success': False, 'error': 'Server nicht erreichbar. Bitte URL überprüfen.'}
+            elif 'ssl' in error_str or 'certificate' in error_str:
+                return {'success': False, 'error': 'SSL-Zertifikatfehler'}
+            else:
+                return {'success': False, 'error': f'Verbindungsfehler: {str(e)}'}
 
     def disconnect(self):
                                     
