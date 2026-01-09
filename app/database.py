@@ -221,6 +221,19 @@ def init_db():
             except sqlite3.OperationalError:
                 pass  # Column already exists
 
+        # Add repeat columns to hub_tasks for task repetition feature
+        repeat_columns = [
+            ('repeat_type', "TEXT DEFAULT 'none'"),
+            ('repeat_days', 'TEXT'),
+            ('repeat_end_date', 'TEXT'),
+            ('parent_task_id', 'INTEGER')
+        ]
+        for col_name, col_def in repeat_columns:
+            try:
+                cursor.execute(f'ALTER TABLE hub_tasks ADD COLUMN {col_name} {col_def}')
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
     pk = 'SERIAL PRIMARY KEY' if _use_postgres else 'INTEGER PRIMARY KEY AUTOINCREMENT'
 
     cursor.execute(f'''
@@ -272,7 +285,11 @@ def init_db():
             completed INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            completed_at TIMESTAMP
+            completed_at TIMESTAMP,
+            repeat_type TEXT DEFAULT 'none',
+            repeat_days TEXT,
+            repeat_end_date TEXT,
+            parent_task_id INTEGER
         )
     ''')
 
@@ -1023,14 +1040,17 @@ def get_hub_task(task_id: int) -> Optional[Dict[str, Any]]:
 
 def create_hub_task(title: str, description: str = None, due_date: str = None,
                     due_time: str = None, priority: str = 'medium', category: str = None,
-                    user_id: str = None) -> int:
-    """Create a hub task with optional user_id"""
+                    user_id: str = None, repeat_type: str = 'none', repeat_days: str = None,
+                    repeat_end_date: str = None, parent_task_id: int = None) -> int:
+    """Create a hub task with optional user_id and repeat settings"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO hub_tasks (title, description, due_date, due_time, priority, category, user_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (title, description, due_date, due_time, priority, category, user_id))
+        INSERT INTO hub_tasks (title, description, due_date, due_time, priority, category, user_id,
+                              repeat_type, repeat_days, repeat_end_date, parent_task_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (title, description, due_date, due_time, priority, category, user_id,
+          repeat_type, repeat_days, repeat_end_date, parent_task_id))
     task_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -1038,8 +1058,9 @@ def create_hub_task(title: str, description: str = None, due_date: str = None,
 
 def update_hub_task(task_id: int, title: str = None, description: str = None,
                     due_date: str = None, due_time: str = None, priority: str = None,
-                    category: str = None) -> bool:
-                                      
+                    category: str = None, repeat_type: str = None, repeat_days: str = None,
+                    repeat_end_date: str = None) -> bool:
+    """Update a hub task"""
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -1064,6 +1085,15 @@ def update_hub_task(task_id: int, title: str = None, description: str = None,
     if category is not None:
         updates.append('category = ?')
         params.append(category)
+    if repeat_type is not None:
+        updates.append('repeat_type = ?')
+        params.append(repeat_type)
+    if repeat_days is not None:
+        updates.append('repeat_days = ?')
+        params.append(repeat_days)
+    if repeat_end_date is not None:
+        updates.append('repeat_end_date = ?')
+        params.append(repeat_end_date if repeat_end_date != '' else None)
 
     if not updates:
         conn.close()
@@ -1080,18 +1110,22 @@ def update_hub_task(task_id: int, title: str = None, description: str = None,
     conn.close()
     return affected > 0
 
-def toggle_hub_task(task_id: int) -> bool:
-                                        
+def toggle_hub_task(task_id: int) -> dict:
+    """Toggle task completion. Returns dict with success status and next_task_id if created."""
+    from datetime import timedelta
+    import json
+
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute('SELECT completed FROM hub_tasks WHERE id = ?', (task_id,))
+    cursor.execute('SELECT * FROM hub_tasks WHERE id = ?', (task_id,))
     row = cursor.fetchone()
     if not row:
         conn.close()
-        return False
+        return {'success': False}
 
-    new_status = 0 if row['completed'] else 1
+    task = dict(row)
+    new_status = 0 if task['completed'] else 1
     completed_at = datetime.now().isoformat() if new_status else None
 
     cursor.execute('''
@@ -1099,9 +1133,89 @@ def toggle_hub_task(task_id: int) -> bool:
         SET completed = ?, completed_at = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
     ''', (new_status, completed_at, task_id))
+
+    next_task_id = None
+
+    # If completing a repeating task, create the next occurrence
+    if new_status == 1 and task.get('repeat_type') and task['repeat_type'] != 'none':
+        next_due_date = calculate_next_due_date(
+            task.get('due_date'),
+            task['repeat_type'],
+            task.get('repeat_days')
+        )
+
+        # Check if next date is within end date (if set)
+        should_create = True
+        if task.get('repeat_end_date') and next_due_date:
+            if next_due_date > task['repeat_end_date']:
+                should_create = False
+
+        if should_create and next_due_date:
+            cursor.execute('''
+                INSERT INTO hub_tasks (title, description, due_date, due_time, priority, category, user_id,
+                                      repeat_type, repeat_days, repeat_end_date, parent_task_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (task['title'], task.get('description'), next_due_date, task.get('due_time'),
+                  task.get('priority', 'medium'), task.get('category'), task.get('user_id'),
+                  task['repeat_type'], task.get('repeat_days'), task.get('repeat_end_date'),
+                  task.get('parent_task_id') or task_id))
+            next_task_id = cursor.lastrowid
+
     conn.commit()
     conn.close()
-    return True
+    return {'success': True, 'next_task_id': next_task_id}
+
+
+def calculate_next_due_date(current_due: str, repeat_type: str, repeat_days: str = None) -> str:
+    """Calculate the next due date based on repeat settings."""
+    from datetime import timedelta
+    import json
+
+    if not current_due:
+        # No due date, use today
+        current_date = datetime.now().date()
+    else:
+        current_date = datetime.strptime(current_due[:10], '%Y-%m-%d').date()
+
+    if repeat_type == 'daily':
+        next_date = current_date + timedelta(days=1)
+    elif repeat_type == 'weekly':
+        next_date = current_date + timedelta(weeks=1)
+    elif repeat_type == 'monthly':
+        # Add one month
+        month = current_date.month + 1
+        year = current_date.year
+        if month > 12:
+            month = 1
+            year += 1
+        day = min(current_date.day, 28)  # Avoid day overflow issues
+        next_date = current_date.replace(year=year, month=month, day=day)
+    elif repeat_type == 'yearly':
+        next_date = current_date.replace(year=current_date.year + 1)
+    elif repeat_type == 'custom' and repeat_days:
+        # repeat_days is a JSON array of weekday numbers (0=Sunday, 1=Monday, etc.)
+        try:
+            days = json.loads(repeat_days) if isinstance(repeat_days, str) else repeat_days
+            if days:
+                # Find the next day that matches
+                for i in range(1, 8):  # Check next 7 days
+                    check_date = current_date + timedelta(days=i)
+                    # Python weekday: 0=Monday, 6=Sunday
+                    # JavaScript weekday: 0=Sunday, 6=Saturday
+                    js_weekday = (check_date.weekday() + 1) % 7
+                    if js_weekday in days:
+                        next_date = check_date
+                        break
+                else:
+                    next_date = current_date + timedelta(weeks=1)
+            else:
+                next_date = current_date + timedelta(weeks=1)
+        except (json.JSONDecodeError, TypeError):
+            next_date = current_date + timedelta(weeks=1)
+    else:
+        return None
+
+    return next_date.isoformat()
 
 def delete_hub_task(task_id: int) -> bool:
                             

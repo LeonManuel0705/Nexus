@@ -43,7 +43,38 @@
     --transition-bounce: 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
-[data-theme="dark"] {
+/* Explicit light theme - ensures light mode works when selected */
+[data-theme="light"],
+html[data-theme="light"],
+body[data-theme="light"] {
+    color-scheme: light;
+    --bg-primary: #fafbfc;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f5f7fa;
+
+    --card-bg: rgba(255, 255, 255, 0.85);
+    --card-border: rgba(0, 0, 0, 0.06);
+    --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    --card-shadow-hover: 0 12px 40px rgba(0, 0, 0, 0.12);
+
+    --text-primary: #1a1a2e;
+    --text-secondary: #4a5568;
+    --text-muted: #a0aec0;
+
+    --accent-1: #667eea;
+    --accent-2: #764ba2;
+    --accent-3: #f093fb;
+    --accent: #667eea;
+    --accent-light: rgba(102, 126, 234, 0.12);
+    --accent-hover: #5a67d8;
+
+    --nav-bg: rgba(255, 255, 255, 0.9);
+    --nav-border: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"],
+html[data-theme="dark"],
+body[data-theme="dark"] {
     color-scheme: dark;
     --bg-primary: #0f0f1a;
     --bg-secondary: #1a1a2e;
@@ -107,6 +138,10 @@ body {
     opacity: 0.4;
     animation: float 20s ease-in-out infinite;
     transition: opacity var(--transition-smooth);
+}
+
+[data-theme="light"] .gradient-orb {
+    opacity: 0.4;
 }
 
 [data-theme="dark"] .gradient-orb {

@@ -526,8 +526,8 @@ async function loadSchoolAlerts() {
     // Sort by urgency (most urgent first)
     alerts.sort((a, b) => a.days - b.days);
 
-    // Update exam count in stats
-    const examCount = alerts.filter(a => a.type === 'exam' || a.type === 'test').length;
+    // Update exam count in stats (only count Klausuren, not tests)
+    const examCount = alerts.filter(a => a.type === 'exam').length;
     document.getElementById('statUpcomingExams').textContent = examCount;
 
     // Render alerts

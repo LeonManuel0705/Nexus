@@ -515,6 +515,23 @@
                 </div>
             </div>
             <div class="form-group">
+                <label>Kursart</label>
+                <div class="radio-button-group">
+                    <label class="radio-button">
+                        <input type="radio" name="subject_course_type" value="GK" checked>
+                        <span class="radio-button-label type-gk">GK</span>
+                    </label>
+                    <label class="radio-button">
+                        <input type="radio" name="subject_course_type" value="LK">
+                        <span class="radio-button-label type-lk">LK</span>
+                    </label>
+                    <label class="radio-button">
+                        <input type="radio" name="subject_course_type" value="SK">
+                        <span class="radio-button-label type-sk">SK</span>
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
                 <label for="subjectColor">Farbe</label>
                 <div class="color-select-wrapper">
                     <select id="subjectColor" name="color" onchange="updateColorPreview()">
@@ -3058,6 +3075,10 @@ function openEditSubjectModal(id) {
     document.getElementById('subjectTeacher').value = s.teacher || '';
     document.getElementById('subjectRoom').value = s.room || '';
     document.getElementById('subjectColor').value = s.color || '#667eea';
+    // Set course type radio
+    const courseType = s.course_type || 'GK';
+    const courseTypeRadio = document.querySelector(`input[name="subject_course_type"][value="${courseType}"]`);
+    if (courseTypeRadio) courseTypeRadio.checked = true;
     updateColorPreview();
     document.getElementById('subjectModalTitle').textContent = 'Fach bearbeiten';
     openModal('subjectModal');
@@ -3133,7 +3154,8 @@ async function saveSubject(e) {
     e.preventDefault();
     const formData = new FormData(e.target);
     const id = formData.get('id');
-    const data = { name: formData.get('name'), teacher: formData.get('teacher'), room: formData.get('room'), color: formData.get('color') };
+    const courseType = document.querySelector('input[name="subject_course_type"]:checked')?.value || 'GK';
+    const data = { name: formData.get('name'), teacher: formData.get('teacher'), room: formData.get('room'), color: formData.get('color'), course_type: courseType };
     try {
         await fetch(id ? `/api/hub/school/subjects/${id}` : '/api/hub/school/subjects', {
             method: id ? 'PUT' : 'POST',
@@ -3657,6 +3679,9 @@ async function loadIServData() {
     } catch (err) {
         document.getElementById('iservNotifications').innerHTML = '<div class="empty-state small">Fehler beim Laden</div>';
     }
+
+    // Also load IServ calendar events for Schulkalender
+    await loadIServCalendarEvents();
 }
 
 function formatDate(dateStr) {
@@ -3844,15 +3869,25 @@ async function loadIServCalendarEvents() {
 
     try {
         const response = await fetch('/api/iserv/events');
-        if (response.ok) {
-            const data = await response.json();
-            iservCalendarEvents = data.events || [];
+        const data = await response.json();
+
+        if (data.success && data.events) {
+            iservCalendarEvents = data.events;
+            console.log('IServ calendar events loaded:', iservCalendarEvents.length, 'events');
             renderIServCalendarEvents();
             renderCalendar(); // Re-render to show IServ events
             document.getElementById('iservCalendarSection').style.display = 'block';
+        } else {
+            console.log('IServ events response:', data);
+            // Still show the section but with appropriate message
+            iservCalendarEvents = [];
+            renderIServCalendarEvents();
+            document.getElementById('iservCalendarSection').style.display = 'block';
         }
     } catch (err) {
-        console.log('Could not load IServ calendar events');
+        console.error('Could not load IServ calendar events:', err);
+        iservCalendarEvents = [];
+        renderIServCalendarEvents();
     }
 }
 
@@ -4270,15 +4305,22 @@ function renderGrades() {
         return { avg, klausurAvg, otherAvg };
     }
 
-    // Calculate overall averages
-    const subjectAverages = [];
+    // Calculate overall averages (LK counts double)
+    let totalWeightedSum = 0;
+    let totalWeight = 0;
     let totalKlausurSum = 0, totalKlausurCount = 0;
     let totalOtherSum = 0, totalOtherCount = 0;
 
-    Object.values(gradesBySubject).forEach(subjectGrades => {
+    Object.entries(gradesBySubject).forEach(([subjectId, subjectGrades]) => {
         const result = calculateSubjectAverage(subjectGrades);
+        const subject = subjects.find(s => s.id === subjectId);
+        const courseType = subject?.course_type || 'GK';
+        // LK counts double (weight 2), GK and SK count once (weight 1)
+        const weight = courseType === 'LK' ? 2 : 1;
+
         if (result.avg !== null) {
-            subjectAverages.push(result.avg);
+            totalWeightedSum += result.avg * weight;
+            totalWeight += weight;
         }
         if (result.klausurAvg !== null) {
             totalKlausurSum += result.klausurAvg;
@@ -4290,8 +4332,8 @@ function renderGrades() {
         }
     });
 
-    const overallAvg = subjectAverages.length > 0
-        ? (subjectAverages.reduce((a, b) => a + b, 0) / subjectAverages.length).toFixed(1)
+    const overallAvg = totalWeight > 0
+        ? (totalWeightedSum / totalWeight).toFixed(1)
         : '--';
     document.getElementById('overallAverage').textContent = overallAvg !== '--' ? overallAvg + 'P' : '--';
 
