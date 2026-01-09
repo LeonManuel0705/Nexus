@@ -20,3 +20,6 @@ requests>=2.31.0
 
 mlx>=0.5.0
 mlx-lm>=0.5.0
+
+IServAPI>=1.0.0
+beautifulsoup4>=4.12.0

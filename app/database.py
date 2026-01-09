@@ -434,8 +434,7 @@ def create_note(title: str, content: str, folder_id: Optional[int] = None,
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-    \
-                                    ,
+        'INSERT INTO notes (title, content, folder_id, language, audio_duration) VALUES (?, ?, ?, ?, ?)',
         (title, content, folder_id, language, audio_duration)
     )
     note_id = cursor.lastrowid
@@ -631,12 +630,10 @@ def get_notes_by_tag(tag_name: str) -> List[Dict[str, Any]]:
     return notes
 
 def create_template(name: str, description: str, content_structure: str, icon: str = None) -> int:
-                                     
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-    \
-                                 ,
+        'INSERT INTO note_templates (name, description, content_structure, icon) VALUES (?, ?, ?, ?)',
         (name, description, content_structure, icon)
     )
     template_id = cursor.lastrowid
@@ -706,7 +703,6 @@ def delete_template(template_id: int) -> bool:
     return affected > 0
 
 def create_note_version(note_id: int, content: str, title: str, change_summary: str = None) -> int:
-                                                               
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -717,8 +713,7 @@ def create_note_version(note_id: int, content: str, title: str, change_summary: 
     version_number = cursor.fetchone()[0]
 
     cursor.execute(
-    \
-                                    ,
+        'INSERT INTO note_versions (note_id, content, title, version_number, change_summary) VALUES (?, ?, ?, ?, ?)',
         (note_id, content, title, version_number, change_summary)
     )
     version_id = cursor.lastrowid
@@ -843,12 +838,10 @@ def clear_session(note_id: int) -> bool:
 def create_smart_note(title: str, content: str, note_type: str = 'smart_note',
                      source: str = 'text', template_id: int = None,
                      folder_id: int = None, language: str = None) -> int:
-                                                       
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-    \
-                                          ,
+        'INSERT INTO notes (title, content, folder_id, language, note_type, source, template_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
         (title, content, folder_id, language, note_type, source, template_id)
     )
     note_id = cursor.lastrowid
