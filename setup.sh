@@ -272,9 +272,9 @@ print_check "SQLite Datenbank..."
 ((CHECKS_TOTAL++))
 
 # Initialize database by importing the module
-cd "$APP_DIR"
+cd "$SCRIPT_DIR"
 print_install "Datenbank wird initialisiert..."
-python3 -c "import database; print('Database initialized')" 2>/dev/null && print_ok "Datenbank initialisiert" || print_warn "Datenbank-Check übersprungen"
+python3 -c "from app import database; print('Database initialized')" 2>/dev/null && print_ok "Datenbank initialisiert" || print_warn "Datenbank-Check übersprungen"
 
 # ============================================
 # SETUP COMPLETE
