@@ -8,6 +8,36 @@
   "theme_color": "#667eea",
   "orientation": "any",
   "scope": "/",
+  "shortcuts": [
+    {
+      "name": "Aufgaben",
+      "short_name": "Tasks",
+      "description": "Aufgaben verwalten",
+      "url": "/hub/tasks",
+      "icons": [{ "src": "/static/images/icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Kalender",
+      "short_name": "Calendar",
+      "description": "Kalender anzeigen",
+      "url": "/hub/calendar",
+      "icons": [{ "src": "/static/images/icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Schule",
+      "short_name": "School",
+      "description": "Stundenplan & IServ",
+      "url": "/hub/school",
+      "icons": [{ "src": "/static/images/icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Training",
+      "short_name": "Training",
+      "description": "Trainingsplan",
+      "url": "/hub/training",
+      "icons": [{ "src": "/static/images/icons/icon-96.png", "sizes": "96x96" }]
+    }
+  ],
   "icons": [
     {
       "src": "/static/images/icons/icon-72.png",

@@ -130,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadKnowledge() {
     try {
-        const response = await fetch('/api/hub/knowledge');
+        const response = await fetch(buildApiUrl('/api/hub/knowledge'));
         if (response.ok) {
             const data = await response.json();
             entries = data.entries || [];
@@ -271,12 +271,12 @@ async function saveEntry(e) {
     e.preventDefault();
     const formData = new FormData(e.target);
     const id = formData.get('id');
-    const data = {
+    const data = addUserIdToBody({
         title: formData.get('title'),
         topic: formData.get('topic'),
         content: formData.get('content'),
         tags: formData.get('tags')
-    };
+    });
 
     try {
         await fetch(id ? `/api/hub/knowledge/${id}` : '/api/hub/knowledge', {

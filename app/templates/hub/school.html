@@ -1023,7 +1023,7 @@ let timetableLoaded = false;
 // Load timetable settings from API
 async function loadTimetableSettings() {
     try {
-        const response = await fetch('/api/hub/school/timetable/settings');
+        const response = await fetch(buildApiUrl('/api/hub/school/timetable/settings'));
         if (response.ok) {
             const data = await response.json();
             // Merge with defaults to ensure all properties exist
@@ -1049,7 +1049,7 @@ async function loadTimetableSettings() {
 // Load timetable entries from API
 async function loadTimetableEntries() {
     try {
-        const response = await fetch('/api/hub/school/timetable/entries');
+        const response = await fetch(buildApiUrl('/api/hub/school/timetable/entries'));
         if (response.ok) {
             const data = await response.json();
             timetableEntries = data.entries || [];
@@ -1133,7 +1133,7 @@ async function saveTimetableSettings(settings) {
         const response = await fetch('/api/hub/school/timetable/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(settings)
+            body: JSON.stringify(addUserIdToBody(settings))
         });
         if (response.ok) {
             const data = await response.json();
@@ -1152,7 +1152,7 @@ async function createTimetableEntry(entry) {
         const response = await fetch('/api/hub/school/timetable/entries', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(entry)
+            body: JSON.stringify(addUserIdToBody(entry))
         });
         if (response.ok) {
             const data = await response.json();
@@ -1204,7 +1204,9 @@ async function deleteTimetableEntry(id) {
 async function clearAllTimetableEntries() {
     try {
         const response = await fetch('/api/hub/school/timetable/clear', {
-            method: 'POST'
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(addUserIdToBody({}))
         });
         if (response.ok) {
             timetableEntries = [];
@@ -1231,7 +1233,7 @@ async function importDefaultTemplate() {
         const importRes = await fetch('/api/hub/school/timetable/import', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ entries: templateData.entries })
+            body: JSON.stringify(addUserIdToBody({ entries: templateData.entries }))
         });
 
         if (importRes.ok) {
@@ -2695,13 +2697,28 @@ function updateImportBanner() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Load school data (always available locally)
     loadSchoolData();
-    checkIServConnection();
+
     // Initialize timetable from API (this calls initStundenplan after loading)
     initTimetable();
-    // Auto-load Vertretungsplan with cache-first approach
-    preloadVertretungsplan();
+
+    // Wait for connection manager to be ready before IServ checks
+    if (!NexusConnection.state.lastCheck) {
+        await NexusConnection.init();
+    }
+
+    // Only check IServ if connection manager says it should be available
+    // or if we're on school network (where IServ always works)
+    if (NexusConnection.shouldCallIServ() || NexusConnection.isOnSchoolNetwork()) {
+        checkIServConnection();
+        // Auto-load Vertretungsplan with cache-first approach
+        preloadVertretungsplan();
+    } else if (!NexusConnection.isOffline()) {
+        // We have internet but no IServ - might still try if credentials exist
+        checkIServConnection();
+    }
 
     // Auto-fill lesson details when subject is selected from existing entries
     const lessonSubjectInput = document.getElementById('lessonSubject');
@@ -3221,35 +3238,73 @@ function closeModal(id) { document.getElementById(id).classList.remove('active')
 // ==========================================
 
 async function checkIServConnection() {
+    // Check for cached IServ status (1 minute cache)
+    const cachedStatus = sessionStorage.getItem('iserv_status');
+    if (cachedStatus) {
+        try {
+            const parsed = JSON.parse(cachedStatus);
+            if (Date.now() - parsed.timestamp < 60000) {
+                // Use cached status
+                applyIServStatus(parsed.data);
+                return;
+            }
+        } catch (e) {}
+    }
+
     try {
         const response = await fetch('/api/iserv/status');
         const data = await response.json();
 
-        if (data.connected) {
-            iservConnected = true;
-            document.getElementById('iservBanner').style.display = 'flex';
-            document.getElementById('iservBannerText').textContent =
-                `IServ verbunden (${data.user_info?.name || data.username || 'Benutzer'})`;
-            // Load IServ data when connected
-            loadIServData();
-        } else if (data.has_credentials) {
-            // Try to connect
-            const connectRes = await fetch('/api/iserv/connect', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({})
-            });
-            const connectData = await connectRes.json();
-            if (connectData.success) {
-                iservConnected = true;
-                document.getElementById('iservBanner').style.display = 'flex';
-                document.getElementById('iservBannerText').textContent = 'IServ verbunden';
-                // Load IServ data when connected
-                loadIServData();
-            }
-        }
+        // Cache the result
+        sessionStorage.setItem('iserv_status', JSON.stringify({
+            data: data,
+            timestamp: Date.now()
+        }));
+
+        applyIServStatus(data);
     } catch (err) {
         console.log('IServ not available');
+    }
+}
+
+function applyIServStatus(data) {
+    if (data.connected) {
+        iservConnected = true;
+        document.getElementById('iservBanner').style.display = 'flex';
+        document.getElementById('iservBannerText').textContent =
+            `IServ verbunden (${data.user_info?.name || data.username || 'Benutzer'})`;
+        // Load IServ data when connected
+        loadIServData();
+    } else if (data.has_credentials) {
+        // Try to connect (but don't cache this attempt)
+        connectToIServ();
+    }
+}
+
+async function connectToIServ() {
+    try {
+        const connectRes = await fetch('/api/iserv/connect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        const connectData = await connectRes.json();
+        if (connectData.success) {
+            iservConnected = true;
+            document.getElementById('iservBanner').style.display = 'flex';
+            document.getElementById('iservBannerText').textContent = 'IServ verbunden';
+
+            // Update cache with connected status
+            sessionStorage.setItem('iserv_status', JSON.stringify({
+                data: { connected: true },
+                timestamp: Date.now()
+            }));
+
+            // Load IServ data when connected
+            loadIServData();
+        }
+    } catch (err) {
+        console.log('IServ connection failed');
     }
 }
 

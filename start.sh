@@ -1,59 +1,60 @@
 #!/bin/bash
 
-# Voice Notes App Startup Script
-# ==============================
+# ============================================
+# Nexus Hub - Start Script
+# ============================================
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_DIR="$SCRIPT_DIR/app"
 VENV_DIR="$SCRIPT_DIR/venv"
 
-echo ""
-echo "=============================================="
-echo "          Voice Notes App"
-echo "=============================================="
-echo ""
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+BOLD='\033[1m'
 
-# Check if Python 3 is installed
-if ! command -v python3 &> /dev/null; then
-    echo "❌ Error: Python 3 is not installed."
-    echo "   Please install Python 3 from https://www.python.org/downloads/"
-    exit 1
-fi
+echo ""
+echo -e "${CYAN}${BOLD}"
+echo "╔════════════════════════════════════════════╗"
+echo "║            🏠 NEXUS HUB                   ║"
+echo "╚════════════════════════════════════════════╝"
+echo -e "${NC}"
 
-# Create virtual environment if it doesn't exist
+# Check if setup has been run
 if [ ! -d "$VENV_DIR" ]; then
-    echo "📦 Creating virtual environment..."
-    python3 -m venv "$VENV_DIR"
+    echo -e "${YELLOW}⚠️  Nexus Hub ist noch nicht eingerichtet!${NC}"
+    echo ""
+    echo "   Bitte führe zuerst das Setup aus:"
+    echo -e "   ${CYAN}./setup.sh${NC}"
+    echo ""
+    exit 1
 fi
 
 # Activate virtual environment
 source "$VENV_DIR/bin/activate"
 
-# Install/upgrade dependencies
-echo "📦 Checking dependencies..."
-pip install --quiet --upgrade pip
-pip install --quiet -r "$APP_DIR/requirements.txt"
+# Quick dependency check (silent)
+pip install --quiet -r "$SCRIPT_DIR/requirements.txt" 2>/dev/null
 
-# Check if ffmpeg is installed (required for Whisper)
-if ! command -v ffmpeg &> /dev/null; then
+echo -e "🚀 ${BOLD}Server wird gestartet...${NC}"
+echo ""
+
+# Get local IP for mobile access
+LOCAL_IP=$(python3 -c "import socket; s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.connect(('8.8.8.8',80)); print(s.getsockname()[0]); s.close()" 2>/dev/null)
+
+echo -e "   ${BOLD}Desktop:${NC}  ${GREEN}http://localhost:5050${NC}"
+if [ -n "$LOCAL_IP" ]; then
+    echo -e "   ${BOLD}Mobile:${NC}   ${GREEN}http://${LOCAL_IP}:5050${NC}"
     echo ""
-    echo "⚠️  Warning: ffmpeg is not installed."
-    echo "   Whisper requires ffmpeg for audio processing."
-    echo ""
-    echo "   Install it with Homebrew:"
-    echo "   brew install ffmpeg"
-    echo ""
-    read -p "   Press Enter to continue anyway, or Ctrl+C to exit..."
+    echo -e "   📱 ${CYAN}Auf Android/iOS: URL im Browser eingeben${NC}"
+    echo -e "      ${CYAN}und 'Zum Home-Bildschirm hinzufügen'${NC}"
 fi
-
 echo ""
-echo "🚀 Starting Voice Notes server..."
+echo -e "   ${YELLOW}Ctrl+C${NC} zum Beenden"
 echo ""
-echo "   Open your browser at: http://localhost:5050"
-echo ""
-echo "   Press Ctrl+C to stop the server"
-echo ""
-echo "=============================================="
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
 # Run the app
