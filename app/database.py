@@ -4,7 +4,11 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
-DATABASE_PATH = os.path.expanduser("~/Documents/Nexus/data/nexus.db")
+
+# Use project data directory for SQLite (fallback when no PostgreSQL)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+DATABASE_PATH = os.path.join(DATA_DIR, "nexus.db")
 
 _use_postgres = False
 if DATABASE_URL:

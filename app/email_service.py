@@ -11,7 +11,11 @@ from typing import Dict, List, Optional
 from datetime import datetime
 import re
 
-EMAIL_CONFIG_PATH = os.path.expanduser("~/Documents/voice-notes/data/email_config.json")
+# Use project data directory
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+EMAIL_CONFIG_PATH = os.path.join(DATA_DIR, "email_config.json")
 
 PROVIDER_SETTINGS = {
     "gmail": {

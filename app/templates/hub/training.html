@@ -1015,13 +1015,30 @@ async function saveTrainingEntry(event) {
     const form = document.getElementById('trainingEntryForm');
     const formData = new FormData(form);
 
+    // Get day from hidden field or form data
+    const dayValue = formData.get('day');
+    const dayNum = parseInt(dayValue, 10);
+
+    // Validate required fields
+    const title = formData.get('title')?.trim();
+    if (!title) {
+        alert('Bitte einen Titel eingeben');
+        return;
+    }
+
+    if (isNaN(dayNum) || dayNum < 0 || dayNum > 6) {
+        console.error('Invalid day value:', dayValue);
+        alert('Fehler: Ungueltiger Tag');
+        return;
+    }
+
     const entryData = addUserIdToBody({
-        day: parseInt(formData.get('day')),
-        schedule_type: formData.get('schedule_type'),
+        day: dayNum,
+        schedule_type: formData.get('schedule_type') || 'regular',
         training_type: document.querySelector('input[name="training_type"]:checked')?.value || 'strength',
-        title: formData.get('title'),
+        title: title,
         time: formData.get('time') || null,
-        duration: formData.get('duration') ? parseInt(formData.get('duration')) : null,
+        duration: formData.get('duration') ? parseInt(formData.get('duration'), 10) : null,
         location: formData.get('location') || null,
         muscle_groups: formData.get('muscle_groups') || null,
         notes: formData.get('notes') || null,
@@ -1031,10 +1048,12 @@ async function saveTrainingEntry(event) {
     const entryId = formData.get('id');
 
     try {
-        const url = entryId
+        const url = entryId && entryId !== ''
             ? `/api/hub/training/schedule/entries/${entryId}`
             : '/api/hub/training/schedule/entries';
-        const method = entryId ? 'PUT' : 'POST';
+        const method = entryId && entryId !== '' ? 'PUT' : 'POST';
+
+        console.log('Saving training entry:', { url, method, entryData });
 
         const response = await fetch(url, {
             method,
@@ -1045,9 +1064,14 @@ async function saveTrainingEntry(event) {
         if (response.ok) {
             closeModal('trainingEntryModal');
             await loadScheduleData();
+        } else {
+            const errorData = await response.json().catch(() => ({}));
+            console.error('Server error:', response.status, errorData);
+            alert('Fehler beim Speichern: ' + (errorData.error || 'Unbekannter Fehler'));
         }
     } catch (err) {
         console.error('Error saving entry:', err);
+        alert('Fehler beim Speichern: ' + err.message);
     }
 }
 
