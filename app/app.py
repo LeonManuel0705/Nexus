@@ -94,7 +94,7 @@ def ping():
 @app.route('/api/iserv/ping', methods=['HEAD', 'GET'])
 def iserv_ping():
     """Fast IServ availability check"""
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
     service = get_iserv_service()
     status = service.get_status()
     if status.get('connected') or status.get('has_credentials'):
@@ -1497,7 +1497,7 @@ def import_training_schedule_route():
 def get_email_accounts_route():
     from email_service import get_email_accounts
     from google_oauth import get_google_accounts
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
                                                                 
     imap_accounts = get_email_accounts()
     google_accounts = get_google_accounts()
@@ -1562,7 +1562,7 @@ def get_email_folders_route(email):
 def get_email_messages_route(email):
     from email_service import fetch_emails
     from google_oauth import get_google_accounts, fetch_gmail_messages
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
 
     if email.endswith('@iserv'):
         iserv_service = get_iserv_service()
@@ -1604,7 +1604,7 @@ def get_email_messages_route(email):
 def get_email_detail_route(email, msg_id):
     from email_service import get_email_detail
     from google_oauth import get_google_accounts, get_gmail_message_detail
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
 
     if email.endswith('@iserv'):
         iserv_service = get_iserv_service()
@@ -1630,7 +1630,7 @@ def get_email_detail_route(email, msg_id):
 def send_email_route():
     from email_service import send_email
     from google_oauth import get_google_accounts, send_gmail
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
     data = request.get_json()
     if not data:
         return jsonify({'error': 'No data provided'}), 400
@@ -1976,14 +1976,14 @@ def delete_email_message(email, msg_id):
 @app.route('/api/iserv/status', methods=['GET'])
 def iserv_status():
                                       
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
     service = get_iserv_service()
     return jsonify(service.get_status())
 
 @app.route('/api/iserv/connect', methods=['POST'])
 def iserv_connect():
                                             
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
     data = request.get_json() or {}
     service = get_iserv_service()
 
@@ -2000,7 +2000,7 @@ def iserv_connect():
 @app.route('/api/iserv/disconnect', methods=['POST'])
 def iserv_disconnect():
                                                       
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
     service = get_iserv_service()
     service.delete_credentials()
     return jsonify({'success': True})
@@ -2008,7 +2008,7 @@ def iserv_disconnect():
 @app.route('/api/iserv/notifications', methods=['GET'])
 def iserv_notifications():
                                   
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
     service = get_iserv_service()
     result = service.get_notifications()
     if result.get('success'):
@@ -2018,7 +2018,7 @@ def iserv_notifications():
 @app.route('/api/iserv/badges', methods=['GET'])
 def iserv_badges():
                                         
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
     service = get_iserv_service()
     result = service.get_badges()
     if result.get('success'):
@@ -2028,7 +2028,7 @@ def iserv_badges():
 @app.route('/api/iserv/emails', methods=['GET'])
 def iserv_emails():
                                 
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
     service = get_iserv_service()
     folder = request.args.get('folder', 'INBOX')
     limit = int(request.args.get('limit', 20))
@@ -2040,7 +2040,7 @@ def iserv_emails():
 @app.route('/api/iserv/emails/send', methods=['POST'])
 def iserv_send_email():
                                   
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
     data = request.get_json() or {}
     service = get_iserv_service()
 
@@ -2057,7 +2057,7 @@ def iserv_send_email():
 @app.route('/api/iserv/mail-folders', methods=['GET'])
 def iserv_mail_folders():
                                  
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
     service = get_iserv_service()
     result = service.get_mail_folders()
     if result.get('success'):
@@ -2067,7 +2067,7 @@ def iserv_mail_folders():
 @app.route('/api/iserv/events', methods=['GET'])
 def iserv_events():
                                              
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
     service = get_iserv_service()
     result = service.get_upcoming_events()
     if result.get('success'):
@@ -2077,7 +2077,7 @@ def iserv_events():
 @app.route('/api/iserv/events', methods=['POST'])
 def iserv_create_event():
                                          
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
     from datetime import datetime
     data = request.get_json() or {}
     service = get_iserv_service()
@@ -2100,7 +2100,7 @@ def iserv_create_event():
 @app.route('/api/iserv/exercises', methods=['GET'])
 def iserv_exercises():
                                        
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
     service = get_iserv_service()
     result = service.get_exercises()
     if result.get('success'):
@@ -2110,7 +2110,7 @@ def iserv_exercises():
 @app.route('/api/iserv/storage', methods=['GET'])
 def iserv_storage():
                                  
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
     service = get_iserv_service()
     result = service.get_storage_info()
     if result.get('success'):
@@ -2120,7 +2120,7 @@ def iserv_storage():
 @app.route('/api/iserv/files', methods=['GET'])
 def iserv_files():
                               
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
     service = get_iserv_service()
     path = request.args.get('path', '/')
     result = service.list_files(path=path)
@@ -2131,7 +2131,7 @@ def iserv_files():
 @app.route('/api/iserv/users/search', methods=['GET'])
 def iserv_search_users():
                                     
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
     service = get_iserv_service()
     query = request.args.get('q', '')
     result = service.search_users(query=query)
@@ -2142,7 +2142,7 @@ def iserv_search_users():
 @app.route('/api/iserv/vertretungsplan', methods=['GET'])
 def iserv_get_vertretungsplan():
                                                      
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
     service = get_iserv_service()
     display_id = request.args.get('display_id', 3, type=int)
     refresh = request.args.get('refresh', 'false').lower() == 'true'
@@ -2159,7 +2159,7 @@ def iserv_get_vertretungsplan():
 @app.route('/api/iserv/vertretungsplan/analyze', methods=['GET'])
 def iserv_analyze_vertretungsplan():
                                                                       
-    from iserv_service import get_iserv_service
+    from .iserv_service import get_iserv_service
     import base64
     import io
 
