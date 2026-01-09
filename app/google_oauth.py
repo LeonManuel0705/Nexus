@@ -18,7 +18,10 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 from dotenv import load_dotenv
-load_dotenv(os.path.expanduser("~/Documents/voice-notes/.env"))
+
+# Load .env from project root (one level up from app/)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
 try:
     from google.oauth2.credentials import Credentials
@@ -29,7 +32,9 @@ try:
 except ImportError:
     GOOGLE_API_AVAILABLE = False
 
-DATA_DIR = os.path.expanduser("~/Documents/voice-notes/data")
+# Use project data directory
+DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+os.makedirs(DATA_DIR, exist_ok=True)
 CREDENTIALS_FILE = os.path.join(DATA_DIR, "google_credentials.json")
 TOKENS_FILE = os.path.join(DATA_DIR, "google_tokens.json")
 

@@ -23,7 +23,9 @@ services:
         sync: false
       - key: GOOGLE_PROJECT_ID
         sync: false
-    healthCheckPath: /hub
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+    healthCheckPath: /api/ping
 
 databases:
   - name: nexus-db
