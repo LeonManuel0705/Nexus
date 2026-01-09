@@ -18,7 +18,9 @@ BOLD='\033[1m'
 echo ""
 echo -e "${CYAN}${BOLD}"
 echo "╔════════════════════════════════════════════╗"
-echo "║            🏠 NEXUS HUB                   ║"
+echo "║                NEXUS HUB                   ║"
+echo "║            Dein persönlicher Hub           ║"
+echo "║               Developer: Leon              ║"
 echo "╚════════════════════════════════════════════╝"
 echo -e "${NC}"
 
