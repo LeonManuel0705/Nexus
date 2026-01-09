@@ -43,8 +43,32 @@
     <section class="content-section">
         <div class="section-header">
             <h3 class="section-title">Trainingsplan</h3>
-            <span class="tag" id="scheduleType">Normaler Plan</span>
+            <div class="schedule-controls">
+                <span class="tag" id="scheduleType">Normaler Plan</span>
+                <button class="btn-secondary small" onclick="toggleScheduleType()" id="toggleScheduleBtn">
+                    <span id="toggleScheduleText">Ferienplan zeigen</span>
+                </button>
+                <button class="btn-secondary small" onclick="toggleEditMode()" id="editModeBtn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                    <span id="editModeText">Bearbeiten</span>
+                </button>
+            </div>
         </div>
+
+        <div class="edit-mode-controls glass-card" id="editModeControls" style="display: none;">
+            <div class="edit-mode-info">
+                <span>Bearbeitungsmodus: Klicke auf einen Tag, um Training hinzuzufugen oder zu bearbeiten</span>
+            </div>
+            <div class="edit-mode-actions">
+                <button class="btn-secondary small" onclick="openModal('clearScheduleModal')">Alles loschen</button>
+                <button class="btn-secondary small" onclick="loadDefaultTemplate()">Standard laden</button>
+                <button class="btn-primary small" onclick="toggleEditMode()">Fertig</button>
+            </div>
+        </div>
+
         <div class="schedule-cards">
             <div class="schedule-card swimming">
                 <div class="schedule-icon">🏊</div>
@@ -231,6 +255,112 @@
         </form>
     </div>
 </div>
+
+<div class="modal" id="trainingEntryModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="trainingEntryModalTitle">Training hinzufugen</h3>
+            <button class="modal-close" onclick="closeModal('trainingEntryModal')">&times;</button>
+        </div>
+        <form id="trainingEntryForm" onsubmit="saveTrainingEntry(event)">
+            <input type="hidden" id="trainingEntryId" name="id">
+            <input type="hidden" id="trainingEntryDay" name="day">
+            <input type="hidden" id="trainingEntryScheduleType" name="schedule_type">
+
+            <div class="form-group">
+                <label for="trainingTitle">Titel</label>
+                <input type="text" id="trainingTitle" name="title" placeholder="z.B. Chestday" required>
+            </div>
+
+            <div class="form-group">
+                <label>Trainingsart</label>
+                <div class="radio-button-group">
+                    <label class="radio-button">
+                        <input type="radio" name="training_type" value="strength" checked>
+                        <span class="radio-button-label">Kraft</span>
+                    </label>
+                    <label class="radio-button">
+                        <input type="radio" name="training_type" value="cardio">
+                        <span class="radio-button-label">Ausdauer</span>
+                    </label>
+                    <label class="radio-button">
+                        <input type="radio" name="training_type" value="swim">
+                        <span class="radio-button-label">Schwimmen</span>
+                    </label>
+                    <label class="radio-button">
+                        <input type="radio" name="training_type" value="rest">
+                        <span class="radio-button-label">Ruhetag</span>
+                    </label>
+                    <label class="radio-button">
+                        <input type="radio" name="training_type" value="flexibility">
+                        <span class="radio-button-label">Mobility</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="trainingTime">Uhrzeit (optional)</label>
+                    <input type="time" id="trainingTime" name="time">
+                </div>
+                <div class="form-group">
+                    <label for="trainingDuration">Dauer (min)</label>
+                    <input type="number" id="trainingDuration" name="duration" placeholder="60">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="trainingLocation">Ort (optional)</label>
+                <input type="text" id="trainingLocation" name="location" placeholder="z.B. Gym, Zuhause">
+            </div>
+
+            <div class="form-group">
+                <label for="trainingMuscles">Muskelgruppen (optional)</label>
+                <input type="text" id="trainingMuscles" name="muscle_groups" placeholder="z.B. Brust & Bizeps">
+            </div>
+
+            <div class="form-group">
+                <label for="trainingNotes">Notizen</label>
+                <textarea id="trainingNotes" name="notes" rows="2" placeholder="Besonderheiten..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="trainingIcon">Icon</label>
+                <select id="trainingIcon" name="icon">
+                    <option value="🏋️">🏋️ Kraft</option>
+                    <option value="🎯">🎯 Rucken</option>
+                    <option value="💪">💪 Arme</option>
+                    <option value="🦵">🦵 Beine</option>
+                    <option value="🏃">🏃 Cardio</option>
+                    <option value="🏊">🏊 Schwimmen</option>
+                    <option value="😴">😴 Ruhetag</option>
+                    <option value="🧘">🧘 Mobility</option>
+                </select>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn-secondary btn-danger" id="deleteTrainingEntryBtn" style="display:none" onclick="deleteTrainingEntry()">Loschen</button>
+                <button type="submit" class="btn-primary">Speichern</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal" id="clearScheduleModal">
+    <div class="modal-content modal-small">
+        <div class="modal-header">
+            <h3>Trainingsplan loschen?</h3>
+            <button class="modal-close" onclick="closeModal('clearScheduleModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Mochtest du wirklich den gesamten Trainingsplan loschen?</p>
+        </div>
+        <div class="form-actions">
+            <button class="btn-secondary" onclick="closeModal('clearScheduleModal')">Abbrechen</button>
+            <button class="btn-primary btn-danger" onclick="confirmClearSchedule()">Loschen</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -243,14 +373,46 @@ let selectedDate = new Date();
 let isHolidayMode = false;
 let calendarEvents = [];
 
+// New: Schedule entries from database
+let scheduleSettings = null;
+let scheduleEntries = [];
+let isEditMode = false;
+let viewingScheduleType = null;  // null = auto-detect, 'regular', or 'holiday'
+
+// Day names for display
+const DAY_NAMES = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+const FULL_DAY_NAMES = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
 // LocalStorage keys for offline caching
 const CACHE_KEYS = {
     sessions: 'nexus-training-sessions',
     health: 'nexus-training-health',
     goals: 'nexus-training-goals',
     holidayMode: 'nexus-training-holiday-mode',
+    scheduleEntries: 'nexus-training-schedule-entries',
     lastSync: 'nexus-training-last-sync'
 };
+
+// Default templates (migration from hardcoded values)
+const DEFAULT_REGULAR_TEMPLATE = [
+    { day: 1, schedule_type: 'regular', training_type: 'rest', title: 'Ruhetag', icon: '😴', notes: 'DLRG Schwimmen' },
+    { day: 2, schedule_type: 'regular', training_type: 'strength', title: 'Chestday', icon: '🏋️', muscle_groups: 'Brustmuskulatur' },
+    { day: 3, schedule_type: 'regular', training_type: 'strength', title: 'Backday + Schultern', icon: '🎯', muscle_groups: 'Rucken & Schultern' },
+    { day: 4, schedule_type: 'regular', training_type: 'strength', title: 'Armday', icon: '💪', muscle_groups: 'Bizeps & Trizeps' },
+    { day: 5, schedule_type: 'regular', training_type: 'strength', title: 'Legday', icon: '🦵', muscle_groups: 'Beinmuskulatur' },
+    { day: 6, schedule_type: 'regular', training_type: 'strength', title: 'Backday', icon: '🎯', muscle_groups: 'Rucken (optional)' },
+    { day: 0, schedule_type: 'regular', training_type: 'rest', title: 'Ruhetag', icon: '😴', notes: 'Regeneration' }
+];
+
+const DEFAULT_HOLIDAY_TEMPLATE = [
+    { day: 1, schedule_type: 'holiday', training_type: 'strength', title: 'Chestday', icon: '🏋️', muscle_groups: 'Brustmuskulatur' },
+    { day: 2, schedule_type: 'holiday', training_type: 'strength', title: 'Backday', icon: '🎯', muscle_groups: 'Rucken' },
+    { day: 3, schedule_type: 'holiday', training_type: 'strength', title: 'Schulter + Trizep', icon: '💪', muscle_groups: 'Schultern & Trizeps' },
+    { day: 4, schedule_type: 'holiday', training_type: 'strength', title: 'Legday', icon: '🦵', muscle_groups: 'Beinmuskulatur' },
+    { day: 5, schedule_type: 'holiday', training_type: 'strength', title: 'Brust + Bizep', icon: '🏋️', muscle_groups: 'Brust & Bizeps' },
+    { day: 6, schedule_type: 'holiday', training_type: 'strength', title: 'Backday + Schultern', icon: '🎯', muscle_groups: 'Rucken & Schultern' },
+    { day: 0, schedule_type: 'holiday', training_type: 'cardio', title: 'Leichtes Cardio', icon: '🏃', muscle_groups: 'Ausdauer' }
+];
 
 // Load cached data immediately
 function loadCachedData() {
@@ -259,11 +421,13 @@ function loadCachedData() {
         const cachedHealth = localStorage.getItem(CACHE_KEYS.health);
         const cachedGoals = localStorage.getItem(CACHE_KEYS.goals);
         const cachedHoliday = localStorage.getItem(CACHE_KEYS.holidayMode);
+        const cachedSchedule = localStorage.getItem(CACHE_KEYS.scheduleEntries);
 
         if (cachedSessions) sessions = JSON.parse(cachedSessions);
         if (cachedHealth) healthLogs = JSON.parse(cachedHealth);
         if (cachedGoals) goals = JSON.parse(cachedGoals);
         if (cachedHoliday) isHolidayMode = JSON.parse(cachedHoliday);
+        if (cachedSchedule) scheduleEntries = JSON.parse(cachedSchedule);
 
         return true;
     } catch (e) {
@@ -279,6 +443,7 @@ function cacheData() {
         localStorage.setItem(CACHE_KEYS.health, JSON.stringify(healthLogs));
         localStorage.setItem(CACHE_KEYS.goals, JSON.stringify(goals));
         localStorage.setItem(CACHE_KEYS.holidayMode, JSON.stringify(isHolidayMode));
+        localStorage.setItem(CACHE_KEYS.scheduleEntries, JSON.stringify(scheduleEntries));
         localStorage.setItem(CACHE_KEYS.lastSync, new Date().toISOString());
     } catch (e) {
         console.log('Could not cache training data');
@@ -298,28 +463,6 @@ function isCacheFresh() {
     }
 }
 
-// Regular gym plan (school days)
-const regularGymPlan = {
-    1: { name: 'Ruhetag', icon: '😴', reason: 'DLRG Schwimmen' },  // Monday
-    2: { name: 'Chestday', icon: '🏋️', muscles: 'Brustmuskulatur' },   // Tuesday
-    3: { name: 'Backday + Schultern', icon: '🎯', muscles: 'Rücken & Schultern' },  // Wednesday
-    4: { name: 'Armday', icon: '💪', muscles: 'Bizeps & Trizeps' },  // Thursday
-    5: { name: 'Legday', icon: '🦵', muscles: 'Beinmuskulatur' },      // Friday
-    6: { name: 'Backday', icon: '🎯', muscles: 'Rücken (optional)' },  // Saturday
-    0: { name: 'Ruhetag', icon: '😴', reason: 'Regeneration' }        // Sunday
-};
-
-// Holiday gym plan (Ferien)
-const holidayGymPlan = {
-    1: { name: 'Chestday', icon: '🏋️', muscles: 'Brustmuskulatur' },  // Monday
-    2: { name: 'Backday', icon: '🎯', muscles: 'Rücken' },             // Tuesday
-    3: { name: 'Schulter + Trizep', icon: '💪', muscles: 'Schultern & Trizeps' },  // Wednesday
-    4: { name: 'Legday', icon: '🦵', muscles: 'Beinmuskulatur' },      // Thursday
-    5: { name: 'Brust + Bizep', icon: '🏋️', muscles: 'Brust & Bizeps' },  // Friday
-    6: { name: 'Backday + Schultern', icon: '🎯', muscles: 'Rücken & Schultern' },  // Saturday
-    0: { name: 'Leichtes Cardio', icon: '🏃', muscles: 'Ausdauer' }    // Sunday
-};
-
 // Helper function to format date as YYYY-MM-DD in local timezone
 function formatLocalDate(date) {
     const year = date.getFullYear();
@@ -332,17 +475,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load cached data immediately for fast render
     const hasCached = loadCachedData();
 
-    // Render immediately with cached data (except holiday - always check fresh)
+    // Render immediately with cached data
     if (hasCached) {
         renderWeekView();
         renderTodaySession();
         renderHealthStats();
         renderGoals();
-        // Don't render gym schedule from cache - wait for fresh holiday check
+        // Render gym schedule from cache if we have entries
+        if (scheduleEntries.length > 0) {
+            renderGymSchedule();
+        }
     }
 
     // Then fetch fresh data in background
     loadTrainingData();
+
+    // Load schedule data from API
+    loadScheduleData();
 
     // Always check holiday mode - the endpoint is fast (2s timeout, defaults to school)
     // This ensures we don't use stale holiday data
@@ -679,51 +828,302 @@ async function checkHolidayMode() {
 function updateHolidayUI() {
     const alertEl = document.getElementById('holidayAlert');
     const scheduleType = document.getElementById('scheduleType');
+    const toggleText = document.getElementById('toggleScheduleText');
+    const effectiveType = getEffectiveScheduleType();
 
-    if (isHolidayMode) {
+    if (effectiveType === 'holiday') {
         alertEl.style.display = 'flex';
         scheduleType.textContent = 'Ferienplan';
         scheduleType.style.background = 'var(--success)';
         scheduleType.style.color = 'white';
+        toggleText.textContent = 'Normalen Plan zeigen';
     } else {
         alertEl.style.display = 'none';
         scheduleType.textContent = 'Normaler Plan';
+        scheduleType.style.background = '';
+        scheduleType.style.color = '';
+        toggleText.textContent = 'Ferienplan zeigen';
     }
 }
 
+// Get the effective schedule type (auto-detect or manual override)
+function getEffectiveScheduleType() {
+    if (viewingScheduleType) return viewingScheduleType;
+    return isHolidayMode ? 'holiday' : 'regular';
+}
+
+// Load schedule data from API
+async function loadScheduleData() {
+    try {
+        const [settingsRes, entriesRes] = await Promise.all([
+            fetch(buildApiUrl('/api/hub/training/schedule/settings')),
+            fetch(buildApiUrl('/api/hub/training/schedule/entries'))
+        ]);
+
+        if (settingsRes.ok) {
+            const settingsData = await settingsRes.json();
+            scheduleSettings = settingsData.settings;
+
+            // If no setup completed, import default templates
+            if (!scheduleSettings || !scheduleSettings.setup_completed) {
+                await initializeDefaultSchedules();
+            }
+        }
+
+        if (entriesRes.ok) {
+            const entriesData = await entriesRes.json();
+            scheduleEntries = entriesData.entries || [];
+        }
+
+        cacheData();
+        renderGymSchedule();
+    } catch (err) {
+        console.log('Error loading schedule:', err);
+        // Fallback to cached/default
+        renderGymSchedule();
+    }
+}
+
+// Initialize with default schedules on first use
+async function initializeDefaultSchedules() {
+    try {
+        // Import both regular and holiday templates
+        await fetch('/api/hub/training/schedule/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(addUserIdToBody({ entries: [...DEFAULT_REGULAR_TEMPLATE, ...DEFAULT_HOLIDAY_TEMPLATE] }))
+        });
+
+        // Mark setup as completed
+        await fetch('/api/hub/training/schedule/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(addUserIdToBody({ setup_completed: true, auto_detect_holiday: true }))
+        });
+
+        // Reload entries
+        const entriesRes = await fetch(buildApiUrl('/api/hub/training/schedule/entries'));
+        if (entriesRes.ok) {
+            const data = await entriesRes.json();
+            scheduleEntries = data.entries || [];
+        }
+    } catch (err) {
+        console.log('Error initializing schedules:', err);
+    }
+}
+
+// Render gym schedule from database entries
 function renderGymSchedule() {
     const container = document.getElementById('gymSchedule');
-    const plan = isHolidayMode ? holidayGymPlan : regularGymPlan;
-    const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
-    const fullDays = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+    const scheduleType = getEffectiveScheduleType();
+    const entries = scheduleEntries.filter(e => e.schedule_type === scheduleType);
     const today = new Date().getDay();
-
-    // Render from Monday to Sunday (1-0)
-    const dayOrder = [1, 2, 3, 4, 5, 6, 0];
+    const dayOrder = [1, 2, 3, 4, 5, 6, 0]; // Monday to Sunday
 
     container.innerHTML = dayOrder.map(dayNum => {
-        const workout = plan[dayNum];
+        const entry = entries.find(e => e.day === dayNum);
         const isToday = dayNum === today;
-        const isRest = workout.name.includes('Ruhetag');
+        const isRest = entry?.training_type === 'rest';
+        const clickHandler = isEditMode ? `onclick="openTrainingEntryModal(${dayNum}, '${scheduleType}')"` : '';
+        const editableClass = isEditMode ? 'editable' : '';
 
-        return `
-            <div class="schedule-card gym ${isToday ? 'today' : ''} ${isRest ? 'rest' : ''}">
-                <div class="schedule-day">${days[dayNum]}</div>
-                <div class="schedule-icon">${workout.icon}</div>
-                <div class="schedule-info">
-                    <span class="schedule-name">${workout.name}</span>
-                    <span class="schedule-time">${workout.muscles || workout.reason || ''}</span>
+        if (entry) {
+            return `
+                <div class="schedule-card gym ${isToday ? 'today' : ''} ${isRest ? 'rest' : ''} ${editableClass}" ${clickHandler}>
+                    <div class="schedule-day">${DAY_NAMES[dayNum]}</div>
+                    <div class="schedule-icon">${entry.icon || '🏋️'}</div>
+                    <div class="schedule-info">
+                        <span class="schedule-name">${entry.title}</span>
+                        <span class="schedule-time">${entry.muscle_groups || entry.notes || ''}</span>
+                    </div>
+                    ${isEditMode ? '<span class="edit-indicator">✏️</span>' : ''}
                 </div>
-            </div>
-        `;
+            `;
+        } else {
+            return `
+                <div class="schedule-card gym empty ${isToday ? 'today' : ''} ${editableClass}" ${clickHandler}>
+                    <div class="schedule-day">${DAY_NAMES[dayNum]}</div>
+                    ${isEditMode
+                        ? '<div class="schedule-icon">+</div><div class="schedule-info"><span class="schedule-name">Hinzufugen</span></div>'
+                        : '<div class="schedule-icon">-</div><div class="schedule-info"><span class="schedule-name">Kein Training</span></div>'}
+                </div>
+            `;
+        }
     }).join('');
+}
+
+// Toggle edit mode
+function toggleEditMode() {
+    isEditMode = !isEditMode;
+    const btn = document.getElementById('editModeBtn');
+    const controls = document.getElementById('editModeControls');
+    const textEl = document.getElementById('editModeText');
+
+    if (isEditMode) {
+        btn.classList.add('active');
+        textEl.textContent = 'Fertig';
+        controls.style.display = 'flex';
+    } else {
+        btn.classList.remove('active');
+        textEl.textContent = 'Bearbeiten';
+        controls.style.display = 'none';
+    }
+
+    renderGymSchedule();
+}
+
+// Toggle between viewing regular and holiday schedule
+function toggleScheduleType() {
+    const effectiveType = getEffectiveScheduleType();
+    viewingScheduleType = effectiveType === 'regular' ? 'holiday' : 'regular';
+
+    updateHolidayUI();
+    renderGymSchedule();
+}
+
+// Open modal for training entry
+function openTrainingEntryModal(day, scheduleType) {
+    const existingEntry = scheduleEntries.find(e => e.day === day && e.schedule_type === scheduleType);
+    const form = document.getElementById('trainingEntryForm');
+    const title = document.getElementById('trainingEntryModalTitle');
+    const deleteBtn = document.getElementById('deleteTrainingEntryBtn');
+
+    form.reset();
+    document.getElementById('trainingEntryDay').value = day;
+    document.getElementById('trainingEntryScheduleType').value = scheduleType;
+    document.getElementById('trainingEntryId').value = '';
+
+    if (existingEntry) {
+        title.textContent = `${FULL_DAY_NAMES[day]} bearbeiten`;
+        deleteBtn.style.display = 'block';
+
+        document.getElementById('trainingEntryId').value = existingEntry.id;
+        document.getElementById('trainingTitle').value = existingEntry.title;
+        document.getElementById('trainingTime').value = existingEntry.time || '';
+        document.getElementById('trainingDuration').value = existingEntry.duration || '';
+        document.getElementById('trainingLocation').value = existingEntry.location || '';
+        document.getElementById('trainingMuscles').value = existingEntry.muscle_groups || '';
+        document.getElementById('trainingNotes').value = existingEntry.notes || '';
+        document.getElementById('trainingIcon').value = existingEntry.icon || '🏋️';
+
+        const typeRadio = document.querySelector(`input[name="training_type"][value="${existingEntry.training_type}"]`);
+        if (typeRadio) typeRadio.checked = true;
+    } else {
+        title.textContent = `${FULL_DAY_NAMES[day]} - Training hinzufugen`;
+        deleteBtn.style.display = 'none';
+    }
+
+    openModal('trainingEntryModal');
+}
+
+// Save training entry
+async function saveTrainingEntry(event) {
+    event.preventDefault();
+    const form = document.getElementById('trainingEntryForm');
+    const formData = new FormData(form);
+
+    const entryData = addUserIdToBody({
+        day: parseInt(formData.get('day')),
+        schedule_type: formData.get('schedule_type'),
+        training_type: document.querySelector('input[name="training_type"]:checked')?.value || 'strength',
+        title: formData.get('title'),
+        time: formData.get('time') || null,
+        duration: formData.get('duration') ? parseInt(formData.get('duration')) : null,
+        location: formData.get('location') || null,
+        muscle_groups: formData.get('muscle_groups') || null,
+        notes: formData.get('notes') || null,
+        icon: formData.get('icon') || '🏋️'
+    });
+
+    const entryId = formData.get('id');
+
+    try {
+        const url = entryId
+            ? `/api/hub/training/schedule/entries/${entryId}`
+            : '/api/hub/training/schedule/entries';
+        const method = entryId ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(entryData)
+        });
+
+        if (response.ok) {
+            closeModal('trainingEntryModal');
+            await loadScheduleData();
+        }
+    } catch (err) {
+        console.error('Error saving entry:', err);
+    }
+}
+
+// Delete training entry
+async function deleteTrainingEntry() {
+    const entryId = document.getElementById('trainingEntryId').value;
+    if (!entryId || !confirm('Training wirklich loschen?')) return;
+
+    try {
+        await fetch(`/api/hub/training/schedule/entries/${entryId}`, { method: 'DELETE' });
+        closeModal('trainingEntryModal');
+        await loadScheduleData();
+    } catch (err) {
+        console.error('Error deleting entry:', err);
+    }
+}
+
+// Load default template
+async function loadDefaultTemplate() {
+    if (!confirm('Standard-Trainingsplan laden? Bestehende Eintrage werden uberschrieben.')) return;
+
+    const scheduleType = getEffectiveScheduleType();
+    const template = scheduleType === 'holiday' ? DEFAULT_HOLIDAY_TEMPLATE : DEFAULT_REGULAR_TEMPLATE;
+
+    try {
+        // Clear existing entries for this schedule type
+        await fetch('/api/hub/training/schedule/clear', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(addUserIdToBody({ schedule_type: scheduleType }))
+        });
+
+        // Import template
+        await fetch('/api/hub/training/schedule/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(addUserIdToBody({ entries: template }))
+        });
+
+        await loadScheduleData();
+    } catch (err) {
+        console.error('Error loading template:', err);
+    }
+}
+
+// Confirm clear schedule
+async function confirmClearSchedule() {
+    const scheduleType = getEffectiveScheduleType();
+
+    try {
+        await fetch('/api/hub/training/schedule/clear', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(addUserIdToBody({ schedule_type: scheduleType }))
+        });
+
+        closeModal('clearScheduleModal');
+        await loadScheduleData();
+    } catch (err) {
+        console.error('Error clearing schedule:', err);
+    }
 }
 
 // Also render today's suggested workout in the week view
 function getSuggestedWorkout(date) {
     const dayNum = date.getDay();
-    const plan = isHolidayMode ? holidayGymPlan : regularGymPlan;
-    return plan[dayNum];
+    const scheduleType = getEffectiveScheduleType();
+    const entry = scheduleEntries.find(e => e.day === dayNum && e.schedule_type === scheduleType);
+    return entry || { title: 'Kein Training', icon: '-' };
 }
 </script>
 
@@ -848,6 +1248,115 @@ function getSuggestedWorkout(date) {
     .gym-schedule {
         grid-template-columns: 1fr;
     }
+}
+
+/* Schedule Controls */
+.schedule-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Edit Mode Controls */
+.edit-mode-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-sm);
+    margin-bottom: 16px;
+}
+
+.edit-mode-info {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.edit-mode-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* Editable Schedule Card */
+.schedule-card.editable {
+    cursor: pointer;
+    position: relative;
+}
+
+.schedule-card.editable:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.schedule-card.empty {
+    opacity: 0.6;
+    border-style: dashed;
+}
+
+.schedule-card.empty.editable:hover {
+    opacity: 1;
+    background: var(--accent-light);
+}
+
+.edit-indicator {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 14px;
+}
+
+/* Radio Button Group for Training Type */
+.radio-button-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.radio-button {
+    display: flex;
+    cursor: pointer;
+}
+
+.radio-button input[type="radio"] {
+    display: none;
+}
+
+.radio-button-label {
+    padding: 8px 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    transition: all var(--transition-fast);
+}
+
+.radio-button input[type="radio"]:checked + .radio-button-label {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.radio-button:hover .radio-button-label {
+    border-color: var(--accent);
+}
+
+/* Active edit button */
+#editModeBtn.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+/* Modal small variant */
+.modal-content.modal-small {
+    max-width: 400px;
+}
+
+.modal-body {
+    padding: 16px 0;
 }
 </style>
 {% endblock %}

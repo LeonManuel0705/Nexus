@@ -4609,6 +4609,15 @@ body {
     stroke: #000;
 }
 
+.offline-banner.school-network {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+}
+
+.offline-banner.school-network svg {
+    stroke: #fff;
+}
+
 @media (max-width: 768px) {
     .sidebar-account {
         padding: 8px;
@@ -4632,5 +4641,112 @@ body {
         left: 8px;
         right: auto;
         width: 280px;
+    }
+}
+
+/* ============================================
+   Mobile & PWA Optimizations
+   ============================================ */
+
+/* Safe area insets for notched devices (iPhone X+) */
+@supports (padding: env(safe-area-inset-top)) {
+    body {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+
+    .sidebar {
+        padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
+
+    .bottom-nav {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .main-content {
+        padding-bottom: calc(24px + env(safe-area-inset-bottom));
+    }
+
+    .modal-content {
+        margin-bottom: env(safe-area-inset-bottom);
+    }
+
+    .floating-btn {
+        bottom: calc(24px + env(safe-area-inset-bottom));
+        right: calc(24px + env(safe-area-inset-right));
+    }
+}
+
+/* Touch optimizations for mobile */
+@media (hover: none) and (pointer: coarse) {
+    /* Larger touch targets */
+    .btn-primary,
+    .btn-secondary,
+    .nav-item,
+    .card,
+    .task-item,
+    .event-item {
+        min-height: 44px;
+    }
+
+    /* Remove hover effects on touch devices */
+    .card:hover,
+    .btn-primary:hover,
+    .btn-secondary:hover,
+    .nav-item:hover {
+        transform: none;
+    }
+
+    /* Prevent text selection on interactive elements */
+    button,
+    .btn-primary,
+    .btn-secondary,
+    .nav-item,
+    .card {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+    }
+
+    /* Smooth scrolling */
+    .main-content,
+    .modal-content,
+    .sidebar {
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+    }
+
+    /* Prevent pull-to-refresh on content areas */
+    .main-content {
+        overscroll-behavior-y: contain;
+    }
+}
+
+/* PWA standalone mode adjustments */
+@media (display-mode: standalone) {
+    /* Hide browser-specific elements in PWA mode */
+    .install-prompt {
+        display: none !important;
+    }
+
+    /* Adjust for status bar in standalone */
+    body {
+        padding-top: max(env(safe-area-inset-top), 20px);
+    }
+}
+
+/* Prevent zoom on input focus (iOS) */
+@media screen and (max-width: 768px) {
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="date"],
+    input[type="time"],
+    textarea,
+    select {
+        font-size: 16px;
     }
 }

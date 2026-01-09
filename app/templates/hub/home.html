@@ -169,18 +169,36 @@ function updateClock() {
 }
 
 async function loadDashboardData() {
-    // Load tasks
+    // Wait for connection manager if not ready
+    if (!NexusConnection.state.lastCheck) {
+        await NexusConnection.init();
+    }
+
+    const conn = NexusConnection.state;
+
+    // Always load local data (tasks from API)
     await loadTodayTasks();
 
-    // Load calendar events
-    await loadNextEvent();
-    await loadUpcomingEvents();
+    // Load calendar events (only if we have internet or IServ)
+    if (conn.internetAvailable || conn.iservAvailable) {
+        await loadNextEvent();
+        await loadUpcomingEvents();
+    }
 
-    // Load school data (homework, tests, exams)
-    await loadSchoolAlerts();
+    // Load school data (only if IServ is available)
+    if (conn.iservAvailable) {
+        await loadSchoolAlerts();
+    }
 
-    // Load weather
-    loadWeather();
+    // Load weather (only if we have internet and NOT on school network)
+    if (conn.internetAvailable && !conn.isSchoolNetwork) {
+        loadWeather();
+    } else if (conn.isSchoolNetwork) {
+        // Show school network message instead of weather
+        document.getElementById('weatherDesc').textContent = 'Schulnetzwerk';
+        document.getElementById('weatherTemp').textContent = '--';
+        document.getElementById('weatherIcon').textContent = '🏫';
+    }
 
     // Update status bar
     updateStatusBar();

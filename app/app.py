@@ -85,16 +85,33 @@ def hub_privacy():
 def hub_email():
     return render_template('hub/email.html', active_tab='email')
 
+# Fast ping endpoints for connection checking
+@app.route('/api/ping', methods=['HEAD', 'GET'])
+def ping():
+    """Fast ping endpoint for connection checking - minimal overhead"""
+    return '', 204
+
+@app.route('/api/iserv/ping', methods=['HEAD', 'GET'])
+def iserv_ping():
+    """Fast IServ availability check"""
+    from iserv_service import get_iserv_service
+    service = get_iserv_service()
+    status = service.get_status()
+    if status.get('connected') or status.get('has_credentials'):
+        return '', 204
+    return '', 503
+
 @app.route('/api/hub/tasks', methods=['GET'])
 def get_hub_tasks_api():
-                                                    
+    """Get hub tasks, optionally filtered by user_id"""
     filter_type = request.args.get('filter', 'all')
-    tasks = db.get_hub_tasks(filter_type)
+    user_id = request.args.get('user_id')
+    tasks = db.get_hub_tasks(filter_type, user_id=user_id)
     return jsonify({'success': True, 'tasks': tasks})
 
 @app.route('/api/hub/tasks', methods=['POST'])
 def create_hub_task_api():
-                                
+    """Create a new hub task with optional user_id"""
     data = request.get_json()
     if not data or not data.get('title'):
         return jsonify({'success': False, 'error': 'Title is required'}), 400
@@ -105,7 +122,8 @@ def create_hub_task_api():
         due_date=data.get('due_date'),
         due_time=data.get('due_time'),
         priority=data.get('priority', 'medium'),
-        category=data.get('category')
+        category=data.get('category'),
+        user_id=data.get('user_id')
     )
     task = db.get_hub_task(task_id)
     return jsonify({'success': True, 'task': task})
@@ -219,15 +237,16 @@ def delete_review(review_id):
 
 @app.route('/api/hub/knowledge', methods=['GET'])
 def get_knowledge():
-                                    
+    """Get knowledge entries, optionally filtered by user_id"""
     topic = request.args.get('topic')
     search = request.args.get('search')
-    entries = db.get_hub_knowledge(topic=topic, search=search)
+    user_id = request.args.get('user_id')
+    entries = db.get_hub_knowledge(topic=topic, search=search, user_id=user_id)
     return jsonify({'entries': entries})
 
 @app.route('/api/hub/knowledge', methods=['POST'])
 def create_knowledge():
-                                       
+    """Create a knowledge entry with optional user_id"""
     data = request.get_json()
     if not data:
         return jsonify({'success': False, 'error': 'No data provided'}), 400
@@ -236,7 +255,8 @@ def create_knowledge():
         title=data.get('title'),
         topic=data.get('topic', 'general'),
         content=data.get('content', ''),
-        tags=data.get('tags', '')
+        tags=data.get('tags', ''),
+        user_id=data.get('user_id')
     )
     entry = db.get_hub_knowledge_entry(entry_id)
 
@@ -280,14 +300,15 @@ def delete_knowledge(entry_id):
 
 @app.route('/api/hub/projects', methods=['GET'])
 def get_projects():
-                           
+    """Get projects, optionally filtered by user_id"""
     status = request.args.get('status')
-    projects = db.get_hub_projects(status=status)
+    user_id = request.args.get('user_id')
+    projects = db.get_hub_projects(status=status, user_id=user_id)
     return jsonify({'projects': projects})
 
 @app.route('/api/hub/projects', methods=['POST'])
 def create_project():
-                               
+    """Create a project with optional user_id"""
     data = request.get_json()
     if not data:
         return jsonify({'success': False, 'error': 'No data provided'}), 400
@@ -299,7 +320,8 @@ def create_project():
         deadline=data.get('deadline'),
         next_step=data.get('next_step', ''),
         notes=data.get('notes', ''),
-        progress=data.get('progress', 0)
+        progress=data.get('progress', 0),
+        user_id=data.get('user_id')
     )
     project = db.get_hub_project(project_id)
 
@@ -855,15 +877,16 @@ def delete_school_calendar_event(event_id):
 
 @app.route('/api/hub/school/timetable/settings', methods=['GET'])
 def get_timetable_settings():
-                                 
-    settings = db.get_timetable_settings()
+    """Get timetable settings, optionally filtered by user_id"""
+    user_id = request.args.get('user_id')
+    settings = db.get_timetable_settings(user_id=user_id)
     if settings:
         return jsonify({'success': True, 'settings': settings})
     return jsonify({'success': True, 'settings': None, 'setup_required': True})
 
 @app.route('/api/hub/school/timetable/settings', methods=['POST'])
 def save_timetable_settings():
-                                  
+    """Save timetable settings with optional user_id"""
     data = request.get_json()
     if not data:
         return jsonify({'success': False, 'error': 'No data provided'}), 400
@@ -872,21 +895,23 @@ def save_timetable_settings():
         has_ab_weeks=data.get('has_ab_weeks', True),
         block_count=data.get('block_count', 4),
         reference_date=data.get('reference_date'),
-        setup_completed=data.get('setup_completed', False)
+        setup_completed=data.get('setup_completed', False),
+        user_id=data.get('user_id')
     )
     return jsonify({'success': True, 'settings_id': settings_id})
 
 @app.route('/api/hub/school/timetable/entries', methods=['GET'])
 def get_timetable_entries():
-                                                                     
+    """Get timetable entries, optionally filtered by user_id"""
     day = request.args.get('day', type=int)
     week = request.args.get('week')
-    entries = db.get_timetable_entries(day=day, week=week)
+    user_id = request.args.get('user_id')
+    entries = db.get_timetable_entries(day=day, week=week, user_id=user_id)
     return jsonify({'success': True, 'entries': entries})
 
 @app.route('/api/hub/school/timetable/entries', methods=['POST'])
 def create_timetable_entry():
-                                       
+    """Create timetable entry with optional user_id"""
     data = request.get_json()
     if not data:
         return jsonify({'success': False, 'error': 'No data provided'}), 400
@@ -902,7 +927,8 @@ def create_timetable_entry():
         subject_type=data.get('subject_type', 'GK'),
         room=data.get('room'),
         teacher=data.get('teacher'),
-        color=data.get('color')
+        color=data.get('color'),
+        user_id=data.get('user_id')
     )
     entry = db.get_timetable_entry(entry_id)
     return jsonify({'success': True, 'entry': entry})
@@ -950,21 +976,24 @@ def delete_timetable_entry(entry_id):
 
 @app.route('/api/hub/school/timetable/clear', methods=['POST'])
 def clear_timetable():
-                                      
-    count = db.clear_timetable()
+    """Clear timetable entries, optionally filtered by user_id"""
+    data = request.get_json() or {}
+    user_id = data.get('user_id')
+    count = db.clear_timetable(user_id=user_id)
     return jsonify({'success': True, 'deleted': count})
 
 @app.route('/api/hub/school/timetable/import', methods=['POST'])
 def import_timetable_template():
-                                                                 
+    """Import timetable template with optional user_id"""
     data = request.get_json()
     if not data or 'entries' not in data:
         return jsonify({'success': False, 'error': 'No entries provided'}), 400
 
+    user_id = data.get('user_id')
     if data.get('clear_existing', False):
-        db.clear_timetable()
+        db.clear_timetable(user_id=user_id)
 
-    count = db.import_timetable_template(data['entries'])
+    count = db.import_timetable_template(data['entries'], user_id=user_id)
     return jsonify({'success': True, 'imported': count})
 
 DEFAULT_TIMETABLE_TEMPLATE = [
@@ -1336,6 +1365,120 @@ def check_holiday_mode():
         'source': source,
         'date': today_str
     })
+
+# Training Schedule API Endpoints
+@app.route('/api/hub/training/schedule/settings', methods=['GET'])
+def get_training_schedule_settings_route():
+    """Get training schedule settings, optionally filtered by user_id"""
+    user_id = request.args.get('user_id')
+    settings = db.get_training_schedule_settings(user_id=user_id)
+    if settings:
+        return jsonify({'success': True, 'settings': settings})
+    return jsonify({'success': True, 'settings': None, 'setup_required': True})
+
+@app.route('/api/hub/training/schedule/settings', methods=['POST'])
+def save_training_schedule_settings_route():
+    """Save training schedule settings with optional user_id"""
+    data = request.get_json()
+    settings_id = db.save_training_schedule_settings(
+        schedule_mode=data.get('schedule_mode', 'regular'),
+        auto_detect_holiday=data.get('auto_detect_holiday', True),
+        setup_completed=data.get('setup_completed', False),
+        user_id=data.get('user_id')
+    )
+    return jsonify({'success': True, 'settings_id': settings_id})
+
+@app.route('/api/hub/training/schedule/entries', methods=['GET'])
+def get_training_schedule_entries_route():
+    """Get training schedule entries, optionally filtered by user_id"""
+    day = request.args.get('day', type=int)
+    schedule_type = request.args.get('schedule_type')
+    user_id = request.args.get('user_id')
+    entries = db.get_training_schedule_entries(day=day, schedule_type=schedule_type, user_id=user_id)
+    return jsonify({'success': True, 'entries': entries})
+
+@app.route('/api/hub/training/schedule/entries', methods=['POST'])
+def create_training_schedule_entry_route():
+    """Create training schedule entry with optional user_id"""
+    data = request.get_json()
+    if data.get('day') is None or not data.get('training_type') or not data.get('title'):
+        return jsonify({'success': False, 'error': 'day, training_type, and title are required'}), 400
+
+    entry_id = db.create_training_schedule_entry(
+        day=data['day'],
+        training_type=data['training_type'],
+        title=data['title'],
+        schedule_type=data.get('schedule_type', 'regular'),
+        time=data.get('time'),
+        duration=data.get('duration'),
+        location=data.get('location'),
+        muscle_groups=data.get('muscle_groups'),
+        notes=data.get('notes'),
+        icon=data.get('icon'),
+        color=data.get('color'),
+        user_id=data.get('user_id')
+    )
+    entry = db.get_training_schedule_entry(entry_id)
+    return jsonify({'success': True, 'entry': entry})
+
+@app.route('/api/hub/training/schedule/entries/<int:entry_id>', methods=['GET'])
+def get_training_schedule_entry_route(entry_id):
+    entry = db.get_training_schedule_entry(entry_id)
+    if entry:
+        return jsonify({'success': True, 'entry': entry})
+    return jsonify({'success': False, 'error': 'Entry not found'}), 404
+
+@app.route('/api/hub/training/schedule/entries/<int:entry_id>', methods=['PUT'])
+def update_training_schedule_entry_route(entry_id):
+    data = request.get_json()
+    success = db.update_training_schedule_entry(
+        entry_id=entry_id,
+        day=data.get('day'),
+        schedule_type=data.get('schedule_type'),
+        training_type=data.get('training_type'),
+        title=data.get('title'),
+        time=data.get('time'),
+        duration=data.get('duration'),
+        location=data.get('location'),
+        muscle_groups=data.get('muscle_groups'),
+        notes=data.get('notes'),
+        icon=data.get('icon'),
+        color=data.get('color')
+    )
+    if success:
+        entry = db.get_training_schedule_entry(entry_id)
+        return jsonify({'success': True, 'entry': entry})
+    return jsonify({'success': False, 'error': 'Entry not found'}), 404
+
+@app.route('/api/hub/training/schedule/entries/<int:entry_id>', methods=['DELETE'])
+def delete_training_schedule_entry_route(entry_id):
+    success = db.delete_training_schedule_entry(entry_id)
+    if success:
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Entry not found'}), 404
+
+@app.route('/api/hub/training/schedule/clear', methods=['POST'])
+def clear_training_schedule_route():
+    """Clear training schedule, optionally filtered by user_id"""
+    data = request.get_json() or {}
+    schedule_type = data.get('schedule_type')
+    user_id = data.get('user_id')
+    count = db.clear_training_schedule(schedule_type, user_id=user_id)
+    return jsonify({'success': True, 'deleted': count})
+
+@app.route('/api/hub/training/schedule/import', methods=['POST'])
+def import_training_schedule_route():
+    """Import training schedule template with optional user_id"""
+    data = request.get_json()
+    if not data or not data.get('entries'):
+        return jsonify({'success': False, 'error': 'entries required'}), 400
+
+    user_id = data.get('user_id')
+    if data.get('clear_existing', False):
+        db.clear_training_schedule(data.get('schedule_type'), user_id=user_id)
+
+    count = db.import_training_schedule_template(data['entries'], user_id=user_id)
+    return jsonify({'success': True, 'imported': count})
 
 @app.route('/api/email/accounts', methods=['GET'])
 def get_email_accounts_route():
@@ -2363,8 +2506,30 @@ def get_holidays():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
+    import socket
+
+    # Get local IP for network access
+    def get_local_ip():
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except:
+            return None
+
+    local_ip = get_local_ip()
+
     print("\n" + "=" * 50)
     print("  Nexus Hub - Personal Dashboard")
-    print("  Open http://localhost:5050 in your browser")
+    print("=" * 50)
+    print(f"\n  Desktop:  http://localhost:5050")
+    if local_ip:
+        print(f"  Mobile:   http://{local_ip}:5050")
+    print("\n  Tipp: Auf dem Handy die Mobile-URL eingeben")
+    print("        und 'Zum Home-Bildschirm' hinzufugen!")
     print("=" * 50 + "\n")
-    socketio.run(app, host='127.0.0.1', port=5050, debug=False, allow_unsafe_werkzeug=True)
+
+    # Bind to 0.0.0.0 to allow network access from mobile devices
+    socketio.run(app, host='0.0.0.0', port=5050, debug=False, allow_unsafe_werkzeug=True)

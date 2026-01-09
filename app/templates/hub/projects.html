@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadProjects() {
     try {
-        const response = await fetch('/api/hub/projects');
+        const response = await fetch(buildApiUrl('/api/hub/projects'));
         if (response.ok) {
             const data = await response.json();
             projects = data.projects || [];
@@ -204,14 +204,14 @@ async function saveProject(e) {
     e.preventDefault();
     const formData = new FormData(e.target);
     const id = formData.get('id');
-    const data = {
+    const data = addUserIdToBody({
         name: formData.get('name'),
         goal: formData.get('goal'),
         status: formData.get('status'),
         deadline: formData.get('deadline'),
         next_step: formData.get('next_step'),
         notes: formData.get('notes')
-    };
+    });
 
     try {
         await fetch(id ? `/api/hub/projects/${id}` : '/api/hub/projects', {

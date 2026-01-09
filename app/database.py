@@ -201,6 +201,26 @@ def init_db():
         except sqlite3.OperationalError:
             pass
 
+        # Add user_id columns to all hub_* tables for multi-user support
+        hub_tables_needing_user_id = [
+            'hub_tasks',
+            'hub_projects',
+            'hub_knowledge',
+            'hub_reviews',
+            'hub_training_sessions',
+            'hub_training_health',
+            'hub_training_goals',
+            'hub_training_schedule_settings',
+            'hub_training_schedule_entries',
+            'hub_timetable_settings',
+            'hub_timetable_entries'
+        ]
+        for table in hub_tables_needing_user_id:
+            try:
+                cursor.execute(f'ALTER TABLE {table} ADD COLUMN user_id TEXT')
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
     pk = 'SERIAL PRIMARY KEY' if _use_postgres else 'INTEGER PRIMARY KEY AUTOINCREMENT'
 
     cursor.execute(f'''
@@ -334,6 +354,42 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
+    ''')
+
+    # Training schedule tables (persistent weekly training plan)
+    cursor.execute(f'''
+        CREATE TABLE IF NOT EXISTS hub_training_schedule_settings (
+            id {pk},
+            schedule_mode TEXT DEFAULT 'regular',
+            auto_detect_holiday INTEGER DEFAULT 1,
+            setup_completed INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    cursor.execute(f'''
+        CREATE TABLE IF NOT EXISTS hub_training_schedule_entries (
+            id {pk},
+            day INTEGER NOT NULL,
+            schedule_type TEXT DEFAULT 'regular',
+            training_type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            time TEXT,
+            duration INTEGER,
+            location TEXT,
+            muscle_groups TEXT,
+            notes TEXT,
+            icon TEXT,
+            color TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_training_schedule_day_type
+        ON hub_training_schedule_entries(day, schedule_type)
     ''')
 
     cursor.execute(f'''
@@ -910,43 +966,47 @@ def get_recent_smart_notes(limit: int = 10) -> List[Dict[str, Any]]:
 
     return notes
 
-def get_hub_tasks(filter_type: str = 'all') -> List[Dict[str, Any]]:
-                                                
+def get_hub_tasks(filter_type: str = 'all', user_id: str = None) -> List[Dict[str, Any]]:
+    """Get hub tasks, optionally filtered by user_id"""
     conn = get_connection()
     cursor = conn.cursor()
 
+    user_filter = 'AND user_id = ?' if user_id else 'AND (user_id IS NULL OR user_id = "")'
+    user_param = (user_id,) if user_id else ()
+
     if filter_type == 'today':
         today = datetime.now().strftime('%Y-%m-%d')
-        cursor.execute('''
+        cursor.execute(f'''
             SELECT * FROM hub_tasks
-            WHERE due_date = ? AND completed = 0
+            WHERE due_date = ? AND completed = 0 {user_filter}
             ORDER BY due_time ASC, priority DESC, created_at DESC
-        ''', (today,))
+        ''', (today,) + user_param)
     elif filter_type == 'upcoming':
         today = datetime.now().strftime('%Y-%m-%d')
-        cursor.execute('''
+        cursor.execute(f'''
             SELECT * FROM hub_tasks
-            WHERE due_date > ? AND completed = 0
+            WHERE due_date > ? AND completed = 0 {user_filter}
             ORDER BY due_date ASC, due_time ASC, priority DESC
-        ''', (today,))
+        ''', (today,) + user_param)
     elif filter_type == 'overdue':
         today = datetime.now().strftime('%Y-%m-%d')
-        cursor.execute('''
+        cursor.execute(f'''
             SELECT * FROM hub_tasks
-            WHERE due_date < ? AND completed = 0
+            WHERE due_date < ? AND completed = 0 {user_filter}
             ORDER BY due_date ASC, priority DESC
-        ''', (today,))
+        ''', (today,) + user_param)
     elif filter_type == 'completed':
-        cursor.execute('''
+        cursor.execute(f'''
             SELECT * FROM hub_tasks
-            WHERE completed = 1
+            WHERE completed = 1 {user_filter}
             ORDER BY completed_at DESC
-        ''')
-    else:         
-        cursor.execute('''
+        ''', user_param)
+    else:
+        cursor.execute(f'''
             SELECT * FROM hub_tasks
+            WHERE 1=1 {user_filter}
             ORDER BY completed ASC, due_date ASC, due_time ASC, priority DESC, created_at DESC
-        ''')
+        ''', user_param)
 
     tasks = [dict(row) for row in cursor.fetchall()]
     conn.close()
@@ -962,14 +1022,15 @@ def get_hub_task(task_id: int) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 def create_hub_task(title: str, description: str = None, due_date: str = None,
-                    due_time: str = None, priority: str = 'medium', category: str = None) -> int:
-                                
+                    due_time: str = None, priority: str = 'medium', category: str = None,
+                    user_id: str = None) -> int:
+    """Create a hub task with optional user_id"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO hub_tasks (title, description, due_date, due_time, priority, category)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (title, description, due_date, due_time, priority, category))
+        INSERT INTO hub_tasks (title, description, due_date, due_time, priority, category, user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (title, description, due_date, due_time, priority, category, user_id))
     task_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -1052,21 +1113,25 @@ def delete_hub_task(task_id: int) -> bool:
     conn.close()
     return affected > 0
 
-def get_hub_projects(status: str = None) -> List[Dict[str, Any]]:
-                                                          
+def get_hub_projects(status: str = None, user_id: str = None) -> List[Dict[str, Any]]:
+    """Get hub projects, optionally filtered by user_id"""
     conn = get_connection()
     cursor = conn.cursor()
 
+    user_filter = 'AND user_id = ?' if user_id else 'AND (user_id IS NULL OR user_id = "")'
+    user_param = (user_id,) if user_id else ()
+
     if status:
-        cursor.execute('''
-            SELECT * FROM hub_projects WHERE status = ?
+        cursor.execute(f'''
+            SELECT * FROM hub_projects WHERE status = ? {user_filter}
             ORDER BY deadline ASC, created_at DESC
-        ''', (status,))
+        ''', (status,) + user_param)
     else:
-        cursor.execute('''
+        cursor.execute(f'''
             SELECT * FROM hub_projects
+            WHERE 1=1 {user_filter}
             ORDER BY status ASC, deadline ASC, created_at DESC
-        ''')
+        ''', user_param)
 
     projects = [dict(row) for row in cursor.fetchall()]
     conn.close()
@@ -1083,14 +1148,14 @@ def get_hub_project(project_id: int) -> Optional[Dict[str, Any]]:
 
 def create_hub_project(name: str, goal: str = None, status: str = 'active',
                        deadline: str = None, next_step: str = None, notes: str = None,
-                       progress: int = 0) -> int:
-                                   
+                       progress: int = 0, user_id: str = None) -> int:
+    """Create a hub project with optional user_id"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO hub_projects (name, goal, status, deadline, next_step, notes, progress)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (name, goal, status, deadline, next_step, notes, progress))
+        INSERT INTO hub_projects (name, goal, status, deadline, next_step, notes, progress, user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (name, goal, status, deadline, next_step, notes, progress, user_id))
     project_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -1153,28 +1218,32 @@ def delete_hub_project(project_id: int) -> bool:
     conn.close()
     return affected > 0
 
-def get_hub_knowledge(topic: str = None, search: str = None) -> List[Dict[str, Any]]:
-                                                        
+def get_hub_knowledge(topic: str = None, search: str = None, user_id: str = None) -> List[Dict[str, Any]]:
+    """Get hub knowledge entries, optionally filtered by user_id"""
     conn = get_connection()
     cursor = conn.cursor()
 
+    user_filter = 'AND user_id = ?' if user_id else 'AND (user_id IS NULL OR user_id = "")'
+    user_param = (user_id,) if user_id else ()
+
     if search:
         search_term = f'%{search}%'
-        cursor.execute('''
+        cursor.execute(f'''
             SELECT * FROM hub_knowledge
-            WHERE title LIKE ? OR content LIKE ? OR tags LIKE ?
+            WHERE (title LIKE ? OR content LIKE ? OR tags LIKE ?) {user_filter}
             ORDER BY updated_at DESC
-        ''', (search_term, search_term, search_term))
+        ''', (search_term, search_term, search_term) + user_param)
     elif topic and topic != 'all':
-        cursor.execute('''
-            SELECT * FROM hub_knowledge WHERE topic = ?
+        cursor.execute(f'''
+            SELECT * FROM hub_knowledge WHERE topic = ? {user_filter}
             ORDER BY updated_at DESC
-        ''', (topic,))
+        ''', (topic,) + user_param)
     else:
-        cursor.execute('''
+        cursor.execute(f'''
             SELECT * FROM hub_knowledge
+            WHERE 1=1 {user_filter}
             ORDER BY updated_at DESC
-        ''')
+        ''', user_param)
 
     entries = [dict(row) for row in cursor.fetchall()]
     conn.close()
@@ -1190,14 +1259,14 @@ def get_hub_knowledge_entry(entry_id: int) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 def create_hub_knowledge(title: str, topic: str = 'general', content: str = None,
-                         tags: str = None) -> int:
-                                       
+                         tags: str = None, user_id: str = None) -> int:
+    """Create a hub knowledge entry with optional user_id"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO hub_knowledge (title, topic, content, tags)
-        VALUES (?, ?, ?, ?)
-    ''', (title, topic, content, tags))
+        INSERT INTO hub_knowledge (title, topic, content, tags, user_id)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (title, topic, content, tags, user_id))
     entry_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -1614,22 +1683,29 @@ def delete_hub_training_goal(goal_id: int) -> bool:
     conn.close()
     return affected > 0
 
-def get_timetable_settings() -> Optional[Dict[str, Any]]:
-                                 
+def get_timetable_settings(user_id: str = None) -> Optional[Dict[str, Any]]:
+    """Get timetable settings, optionally filtered by user_id"""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM hub_timetable_settings ORDER BY id DESC LIMIT 1')
+    if user_id:
+        cursor.execute('SELECT * FROM hub_timetable_settings WHERE user_id = ? ORDER BY id DESC LIMIT 1', (user_id,))
+    else:
+        cursor.execute('SELECT * FROM hub_timetable_settings WHERE (user_id IS NULL OR user_id = "") ORDER BY id DESC LIMIT 1')
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
 
 def save_timetable_settings(has_ab_weeks: bool = True, block_count: int = 4,
-                            reference_date: str = None, setup_completed: bool = False) -> int:
-                                            
+                            reference_date: str = None, setup_completed: bool = False,
+                            user_id: str = None) -> int:
+    """Save timetable settings with optional user_id"""
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute('SELECT id FROM hub_timetable_settings LIMIT 1')
+    if user_id:
+        cursor.execute('SELECT id FROM hub_timetable_settings WHERE user_id = ? LIMIT 1', (user_id,))
+    else:
+        cursor.execute('SELECT id FROM hub_timetable_settings WHERE (user_id IS NULL OR user_id = "") LIMIT 1')
     existing = cursor.fetchone()
 
     if existing:
@@ -1643,22 +1719,28 @@ def save_timetable_settings(has_ab_weeks: bool = True, block_count: int = 4,
         settings_id = existing['id']
     else:
         cursor.execute('''
-            INSERT INTO hub_timetable_settings (has_ab_weeks, block_count, reference_date, setup_completed)
-            VALUES (?, ?, ?, ?)
-        ''', (1 if has_ab_weeks else 0, block_count, reference_date, 1 if setup_completed else 0))
+            INSERT INTO hub_timetable_settings (has_ab_weeks, block_count, reference_date, setup_completed, user_id)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (1 if has_ab_weeks else 0, block_count, reference_date, 1 if setup_completed else 0, user_id))
         settings_id = cursor.lastrowid
 
     conn.commit()
     conn.close()
     return settings_id
 
-def get_timetable_entries(day: int = None, week: str = None) -> List[Dict[str, Any]]:
-                                                                     
+def get_timetable_entries(day: int = None, week: str = None, user_id: str = None) -> List[Dict[str, Any]]:
+    """Get timetable entries, optionally filtered by user_id"""
     conn = get_connection()
     cursor = conn.cursor()
 
     query = 'SELECT * FROM hub_timetable_entries WHERE 1=1'
     params = []
+
+    if user_id:
+        query += ' AND user_id = ?'
+        params.append(user_id)
+    else:
+        query += ' AND (user_id IS NULL OR user_id = "")'
 
     if day is not None:
         query += ' AND day = ?'
@@ -1685,14 +1767,14 @@ def get_timetable_entry(entry_id: int) -> Optional[Dict[str, Any]]:
 
 def create_timetable_entry(day: int, block: int, subject: str, week: str = 'both',
                            subject_type: str = 'GK', room: str = None,
-                           teacher: str = None, color: str = None) -> int:
-                                       
+                           teacher: str = None, color: str = None, user_id: str = None) -> int:
+    """Create timetable entry with optional user_id"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO hub_timetable_entries (day, block, week, subject, subject_type, room, teacher, color)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (day, block, week, subject, subject_type, room, teacher, color))
+        INSERT INTO hub_timetable_entries (day, block, week, subject, subject_type, room, teacher, color, user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (day, block, week, subject, subject_type, room, teacher, color, user_id))
     entry_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -1758,26 +1840,29 @@ def delete_timetable_entry(entry_id: int) -> bool:
     conn.close()
     return affected > 0
 
-def clear_timetable() -> int:
-                                       
+def clear_timetable(user_id: str = None) -> int:
+    """Clear timetable entries, optionally filtered by user_id"""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM hub_timetable_entries')
+    if user_id:
+        cursor.execute('DELETE FROM hub_timetable_entries WHERE user_id = ?', (user_id,))
+    else:
+        cursor.execute('DELETE FROM hub_timetable_entries WHERE (user_id IS NULL OR user_id = "")')
     affected = cursor.rowcount
     conn.commit()
     conn.close()
     return affected
 
-def import_timetable_template(entries: List[Dict[str, Any]]) -> int:
-                                                                    
+def import_timetable_template(entries: List[Dict[str, Any]], user_id: str = None) -> int:
+    """Import timetable template entries with optional user_id"""
     conn = get_connection()
     cursor = conn.cursor()
 
     count = 0
     for entry in entries:
         cursor.execute('''
-            INSERT INTO hub_timetable_entries (day, block, week, subject, subject_type, room, teacher, color)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO hub_timetable_entries (day, block, week, subject, subject_type, room, teacher, color, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             entry.get('day'),
             entry.get('block'),
@@ -1786,7 +1871,231 @@ def import_timetable_template(entries: List[Dict[str, Any]]) -> int:
             entry.get('subject_type', 'GK'),
             entry.get('room'),
             entry.get('teacher'),
-            entry.get('color')
+            entry.get('color'),
+            user_id
+        ))
+        count += 1
+
+    conn.commit()
+    conn.close()
+    return count
+
+# Training Schedule Functions
+
+def get_training_schedule_settings(user_id: str = None) -> Optional[Dict[str, Any]]:
+    """Get training schedule settings, optionally filtered by user_id"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    if user_id:
+        cursor.execute('SELECT * FROM hub_training_schedule_settings WHERE user_id = ? ORDER BY id DESC LIMIT 1', (user_id,))
+    else:
+        cursor.execute('SELECT * FROM hub_training_schedule_settings WHERE (user_id IS NULL OR user_id = "") ORDER BY id DESC LIMIT 1')
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def save_training_schedule_settings(schedule_mode: str = 'regular',
+                                    auto_detect_holiday: bool = True,
+                                    setup_completed: bool = False,
+                                    user_id: str = None) -> int:
+    """Save training schedule settings with optional user_id"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if user_id:
+        cursor.execute('SELECT id FROM hub_training_schedule_settings WHERE user_id = ? LIMIT 1', (user_id,))
+    else:
+        cursor.execute('SELECT id FROM hub_training_schedule_settings WHERE (user_id IS NULL OR user_id = "") LIMIT 1')
+    existing = cursor.fetchone()
+
+    if existing:
+        cursor.execute('''
+            UPDATE hub_training_schedule_settings
+            SET schedule_mode = ?, auto_detect_holiday = ?,
+                setup_completed = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ''', (schedule_mode, 1 if auto_detect_holiday else 0,
+              1 if setup_completed else 0, existing['id']))
+        settings_id = existing['id']
+    else:
+        cursor.execute('''
+            INSERT INTO hub_training_schedule_settings (schedule_mode, auto_detect_holiday, setup_completed, user_id)
+            VALUES (?, ?, ?, ?)
+        ''', (schedule_mode, 1 if auto_detect_holiday else 0, 1 if setup_completed else 0, user_id))
+        settings_id = cursor.lastrowid
+
+    conn.commit()
+    conn.close()
+    return settings_id
+
+def get_training_schedule_entries(day: int = None, schedule_type: str = None, user_id: str = None) -> List[Dict[str, Any]]:
+    """Get training schedule entries, optionally filtered by user_id"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = 'SELECT * FROM hub_training_schedule_entries WHERE 1=1'
+    params = []
+
+    if user_id:
+        query += ' AND user_id = ?'
+        params.append(user_id)
+    else:
+        query += ' AND (user_id IS NULL OR user_id = "")'
+
+    if day is not None:
+        query += ' AND day = ?'
+        params.append(day)
+
+    if schedule_type is not None:
+        query += ' AND schedule_type = ?'
+        params.append(schedule_type)
+
+    query += ' ORDER BY day'
+    cursor.execute(query, params)
+    entries = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return entries
+
+def get_training_schedule_entry(entry_id: int) -> Optional[Dict[str, Any]]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM hub_training_schedule_entries WHERE id = ?', (entry_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def create_training_schedule_entry(day: int, training_type: str, title: str,
+                                   schedule_type: str = 'regular', time: str = None,
+                                   duration: int = None, location: str = None,
+                                   muscle_groups: str = None, notes: str = None,
+                                   icon: str = None, color: str = None, user_id: str = None) -> int:
+    """Create training schedule entry with optional user_id"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO hub_training_schedule_entries
+        (day, schedule_type, training_type, title, time, duration, location, muscle_groups, notes, icon, color, user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (day, schedule_type, training_type, title, time, duration, location, muscle_groups, notes, icon, color, user_id))
+    entry_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return entry_id
+
+def update_training_schedule_entry(entry_id: int, day: int = None, schedule_type: str = None,
+                                   training_type: str = None, title: str = None,
+                                   time: str = None, duration: int = None,
+                                   location: str = None, muscle_groups: str = None,
+                                   notes: str = None, icon: str = None, color: str = None) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    updates = []
+    params = []
+
+    if day is not None:
+        updates.append('day = ?')
+        params.append(day)
+    if schedule_type is not None:
+        updates.append('schedule_type = ?')
+        params.append(schedule_type)
+    if training_type is not None:
+        updates.append('training_type = ?')
+        params.append(training_type)
+    if title is not None:
+        updates.append('title = ?')
+        params.append(title)
+    if time is not None:
+        updates.append('time = ?')
+        params.append(time)
+    if duration is not None:
+        updates.append('duration = ?')
+        params.append(duration)
+    if location is not None:
+        updates.append('location = ?')
+        params.append(location)
+    if muscle_groups is not None:
+        updates.append('muscle_groups = ?')
+        params.append(muscle_groups)
+    if notes is not None:
+        updates.append('notes = ?')
+        params.append(notes)
+    if icon is not None:
+        updates.append('icon = ?')
+        params.append(icon)
+    if color is not None:
+        updates.append('color = ?')
+        params.append(color)
+
+    if not updates:
+        conn.close()
+        return False
+
+    updates.append('updated_at = CURRENT_TIMESTAMP')
+    params.append(entry_id)
+
+    cursor.execute(f'''
+        UPDATE hub_training_schedule_entries SET {', '.join(updates)} WHERE id = ?
+    ''', params)
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return affected > 0
+
+def delete_training_schedule_entry(entry_id: int) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM hub_training_schedule_entries WHERE id = ?', (entry_id,))
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return affected > 0
+
+def clear_training_schedule(schedule_type: str = None, user_id: str = None) -> int:
+    """Clear training schedule entries, optionally filtered by user_id"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if user_id:
+        if schedule_type:
+            cursor.execute('DELETE FROM hub_training_schedule_entries WHERE schedule_type = ? AND user_id = ?', (schedule_type, user_id))
+        else:
+            cursor.execute('DELETE FROM hub_training_schedule_entries WHERE user_id = ?', (user_id,))
+    else:
+        if schedule_type:
+            cursor.execute('DELETE FROM hub_training_schedule_entries WHERE schedule_type = ? AND (user_id IS NULL OR user_id = "")', (schedule_type,))
+        else:
+            cursor.execute('DELETE FROM hub_training_schedule_entries WHERE (user_id IS NULL OR user_id = "")')
+
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return affected
+
+def import_training_schedule_template(entries: List[Dict[str, Any]], user_id: str = None) -> int:
+    """Import training schedule template entries with optional user_id"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    count = 0
+    for entry in entries:
+        cursor.execute('''
+            INSERT INTO hub_training_schedule_entries
+            (day, schedule_type, training_type, title, time, duration, location, muscle_groups, notes, icon, color, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            entry.get('day'),
+            entry.get('schedule_type', 'regular'),
+            entry.get('training_type'),
+            entry.get('title'),
+            entry.get('time'),
+            entry.get('duration'),
+            entry.get('location'),
+            entry.get('muscle_groups'),
+            entry.get('notes'),
+            entry.get('icon'),
+            entry.get('color'),
+            user_id
         ))
         count += 1
 

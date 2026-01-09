@@ -2,7 +2,7 @@
 <html lang="de" id="htmlRoot">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>{% block title %}Nexus{% endblock %}</title>
 
     <link rel="manifest" href="/static/manifest.json">
@@ -393,9 +393,54 @@
 
     <script src="/static/js/hub.js"></script>
     <script src="/static/js/nexus-offline.js"></script>
+    <script src="/static/js/connection-manager.js"></script>
 
     <script>
     let managingAccountId = null;
+
+    /**
+     * Get the current user ID from NexusAccounts
+     * Returns null if no account is logged in
+     */
+    function getCurrentUserId() {
+        if (NexusAccounts && NexusAccounts.currentAccount) {
+            return NexusAccounts.currentAccount.id;
+        }
+        return null;
+    }
+
+    /**
+     * Build a URL with user_id query parameter
+     * @param {string} baseUrl - The base API URL
+     * @param {Object} params - Additional query parameters
+     * @returns {string} URL with user_id and other params
+     */
+    function buildApiUrl(baseUrl, params = {}) {
+        const userId = getCurrentUserId();
+        const url = new URL(baseUrl, window.location.origin);
+        if (userId) {
+            url.searchParams.set('user_id', userId);
+        }
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+                url.searchParams.set(key, value);
+            }
+        });
+        return url.toString();
+    }
+
+    /**
+     * Add user_id to a request body object
+     * @param {Object} data - The request body data
+     * @returns {Object} Data with user_id added
+     */
+    function addUserIdToBody(data = {}) {
+        const userId = getCurrentUserId();
+        if (userId) {
+            return { ...data, user_id: userId };
+        }
+        return data;
+    }
 
     // Initialize account system when page loads
     window.addEventListener('nexus-ready', function(e) {
@@ -420,17 +465,44 @@
         }
     });
 
-    // Online/Offline status
+    // Connection state management with NexusConnection
+    function updateOfflineBanner() {
+        const banner = document.getElementById('offlineBanner');
+        const bannerText = banner.querySelector('span');
+        const state = NexusConnection.state;
+
+        if (NexusConnection.isOffline()) {
+            // Fully offline
+            bannerText.textContent = 'Offline-Modus';
+            banner.classList.remove('school-network');
+            banner.classList.add('visible');
+        } else if (state.isSchoolNetwork) {
+            // School network - IServ only, no external internet
+            bannerText.textContent = 'Schulnetzwerk (nur IServ)';
+            banner.classList.add('visible', 'school-network');
+        } else {
+            banner.classList.remove('visible', 'school-network');
+        }
+    }
+
+    // Initialize connection manager on page load
+    document.addEventListener('DOMContentLoaded', async () => {
+        await NexusConnection.init();
+        updateOfflineBanner();
+    });
+
+    // Listen for connection state changes
+    window.addEventListener('nexus-connection-ready', updateOfflineBanner);
+
+    // Listen for browser online/offline events as backup
     window.addEventListener('online', () => {
-        document.getElementById('offlineBanner').classList.remove('visible');
+        NexusConnection.refresh().then(updateOfflineBanner);
     });
     window.addEventListener('offline', () => {
-        document.getElementById('offlineBanner').classList.add('visible');
+        NexusConnection.state.internetAvailable = false;
+        NexusConnection.state.iservAvailable = false;
+        updateOfflineBanner();
     });
-    // Check initial state
-    if (!navigator.onLine) {
-        document.getElementById('offlineBanner').classList.add('visible');
-    }
 
     function updateAccountUI(account) {
         const avatar = document.getElementById('accountAvatar');
