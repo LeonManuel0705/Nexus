@@ -85,6 +85,33 @@
                     <option value="personal">Privat</option>
                 </select>
             </div>
+            <div class="form-group">
+                <label for="taskRepeatType">Wiederholung</label>
+                <select id="taskRepeatType" name="repeat_type" onchange="toggleRepeatOptions('add')">
+                    <option value="none">Keine</option>
+                    <option value="daily">Täglich</option>
+                    <option value="weekly">Wöchentlich</option>
+                    <option value="monthly">Monatlich</option>
+                    <option value="yearly">Jährlich</option>
+                    <option value="custom">Benutzerdefiniert</option>
+                </select>
+            </div>
+            <div class="form-group repeat-options" id="addRepeatOptions" style="display: none;">
+                <label>Wochentage</label>
+                <div class="weekday-selector">
+                    <label class="weekday-btn"><input type="checkbox" name="repeat_day" value="0"><span>So</span></label>
+                    <label class="weekday-btn"><input type="checkbox" name="repeat_day" value="1"><span>Mo</span></label>
+                    <label class="weekday-btn"><input type="checkbox" name="repeat_day" value="2"><span>Di</span></label>
+                    <label class="weekday-btn"><input type="checkbox" name="repeat_day" value="3"><span>Mi</span></label>
+                    <label class="weekday-btn"><input type="checkbox" name="repeat_day" value="4"><span>Do</span></label>
+                    <label class="weekday-btn"><input type="checkbox" name="repeat_day" value="5"><span>Fr</span></label>
+                    <label class="weekday-btn"><input type="checkbox" name="repeat_day" value="6"><span>Sa</span></label>
+                </div>
+            </div>
+            <div class="form-group repeat-end" id="addRepeatEnd" style="display: none;">
+                <label for="taskRepeatEndDate">Wiederholung bis (optional)</label>
+                <input type="date" id="taskRepeatEndDate" name="repeat_end_date">
+            </div>
             <div class="form-actions">
                 <button type="button" class="btn-secondary" onclick="closeModal('addTaskModal')">Abbrechen</button>
                 <button type="submit" class="btn-primary">Speichern</button>
@@ -132,6 +159,33 @@
                     <option value="project">Projekt</option>
                     <option value="personal">Privat</option>
                 </select>
+            </div>
+            <div class="form-group">
+                <label for="editTaskRepeatType">Wiederholung</label>
+                <select id="editTaskRepeatType" name="repeat_type" onchange="toggleRepeatOptions('edit')">
+                    <option value="none">Keine</option>
+                    <option value="daily">Täglich</option>
+                    <option value="weekly">Wöchentlich</option>
+                    <option value="monthly">Monatlich</option>
+                    <option value="yearly">Jährlich</option>
+                    <option value="custom">Benutzerdefiniert</option>
+                </select>
+            </div>
+            <div class="form-group repeat-options" id="editRepeatOptions" style="display: none;">
+                <label>Wochentage</label>
+                <div class="weekday-selector">
+                    <label class="weekday-btn"><input type="checkbox" name="edit_repeat_day" value="0"><span>So</span></label>
+                    <label class="weekday-btn"><input type="checkbox" name="edit_repeat_day" value="1"><span>Mo</span></label>
+                    <label class="weekday-btn"><input type="checkbox" name="edit_repeat_day" value="2"><span>Di</span></label>
+                    <label class="weekday-btn"><input type="checkbox" name="edit_repeat_day" value="3"><span>Mi</span></label>
+                    <label class="weekday-btn"><input type="checkbox" name="edit_repeat_day" value="4"><span>Do</span></label>
+                    <label class="weekday-btn"><input type="checkbox" name="edit_repeat_day" value="5"><span>Fr</span></label>
+                    <label class="weekday-btn"><input type="checkbox" name="edit_repeat_day" value="6"><span>Sa</span></label>
+                </div>
+            </div>
+            <div class="form-group repeat-end" id="editRepeatEnd" style="display: none;">
+                <label for="editTaskRepeatEndDate">Wiederholung bis (optional)</label>
+                <input type="date" id="editTaskRepeatEndDate" name="repeat_end_date">
             </div>
             <div class="form-actions">
                 <button type="button" class="btn-secondary btn-danger" onclick="deleteTask()">Löschen</button>
@@ -406,20 +460,39 @@ function openEditTaskModal(taskId) {
     document.getElementById('editTaskDueDate').value = task.due_date || '';
     document.getElementById('editTaskPriority').value = task.priority || 'medium';
     document.getElementById('editTaskCategory').value = task.category || 'general';
+    document.getElementById('editTaskRepeatType').value = task.repeat_type || 'none';
+    document.getElementById('editTaskRepeatEndDate').value = task.repeat_end_date || '';
 
+    // Set repeat days checkboxes
+    const repeatDays = task.repeat_days ? JSON.parse(task.repeat_days) : [];
+    document.querySelectorAll('input[name="edit_repeat_day"]').forEach(cb => {
+        cb.checked = repeatDays.includes(parseInt(cb.value));
+    });
+
+    toggleRepeatOptions('edit');
     openModal('editTaskModal');
 }
 
 async function saveTask(event) {
     event.preventDefault();
     const formData = new FormData(event.target);
+
+    // Collect repeat days
+    const repeatDays = [];
+    document.querySelectorAll('input[name="repeat_day"]:checked').forEach(cb => {
+        repeatDays.push(parseInt(cb.value));
+    });
+
     const taskData = addUserIdToBody({
         title: formData.get('title'),
         description: formData.get('description'),
         due_date: formData.get('due_date'),
         priority: formData.get('priority'),
         category: formData.get('category'),
-        completed: false
+        completed: false,
+        repeat_type: formData.get('repeat_type') || 'none',
+        repeat_days: repeatDays.length > 0 ? JSON.stringify(repeatDays) : null,
+        repeat_end_date: formData.get('repeat_end_date') || null
     });
 
     try {
@@ -430,6 +503,9 @@ async function saveTask(event) {
         });
         if (response.ok) {
             closeModal('addTaskModal');
+            document.getElementById('addTaskForm').reset();
+            document.getElementById('taskDueDate').valueAsDate = new Date();
+            toggleRepeatOptions('add');
             loadTasks();
         }
     } catch (err) {
@@ -441,12 +517,22 @@ async function updateTask(event) {
     event.preventDefault();
     const taskId = document.getElementById('editTaskId').value;
     const formData = new FormData(event.target);
+
+    // Collect repeat days
+    const repeatDays = [];
+    document.querySelectorAll('input[name="edit_repeat_day"]:checked').forEach(cb => {
+        repeatDays.push(parseInt(cb.value));
+    });
+
     const taskData = {
         title: formData.get('title'),
         description: formData.get('description'),
         due_date: formData.get('due_date'),
         priority: formData.get('priority'),
-        category: formData.get('category')
+        category: formData.get('category'),
+        repeat_type: formData.get('repeat_type') || 'none',
+        repeat_days: repeatDays.length > 0 ? JSON.stringify(repeatDays) : null,
+        repeat_end_date: formData.get('repeat_end_date') || null
     };
 
     try {
@@ -495,5 +581,83 @@ function openModal(modalId) {
 function closeModal(modalId) {
     document.getElementById(modalId).classList.remove('active');
 }
+
+function toggleRepeatOptions(prefix) {
+    const repeatType = document.getElementById(`${prefix === 'add' ? 'taskRepeatType' : 'editTaskRepeatType'}`).value;
+    const optionsDiv = document.getElementById(`${prefix}RepeatOptions`);
+    const endDiv = document.getElementById(`${prefix}RepeatEnd`);
+
+    // Show weekday selector only for custom type
+    optionsDiv.style.display = repeatType === 'custom' ? 'block' : 'none';
+
+    // Show end date for any repeat type except 'none'
+    endDiv.style.display = repeatType !== 'none' ? 'block' : 'none';
+}
 </script>
+
+<style>
+/* Weekday selector for repeat tasks */
+.weekday-selector {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.weekday-btn {
+    position: relative;
+    cursor: pointer;
+}
+
+.weekday-btn input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.weekday-btn span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    transition: all var(--transition-fast);
+    border: 2px solid transparent;
+}
+
+.weekday-btn input:checked + span {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent-hover);
+}
+
+.weekday-btn:hover span {
+    background: var(--accent-light);
+}
+
+.repeat-options {
+    margin-top: 12px;
+}
+
+.repeat-end {
+    margin-top: 12px;
+}
+
+/* Repeat indicator on task items */
+.task-repeat-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background: var(--accent-light);
+    color: var(--accent);
+    font-size: 11px;
+    border-radius: 10px;
+    margin-left: 8px;
+}
+</style>
 {% endblock %}

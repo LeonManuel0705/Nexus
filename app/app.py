@@ -123,7 +123,10 @@ def create_hub_task_api():
         due_time=data.get('due_time'),
         priority=data.get('priority', 'medium'),
         category=data.get('category'),
-        user_id=data.get('user_id')
+        user_id=data.get('user_id'),
+        repeat_type=data.get('repeat_type', 'none'),
+        repeat_days=data.get('repeat_days'),
+        repeat_end_date=data.get('repeat_end_date')
     )
     task = db.get_hub_task(task_id)
     return jsonify({'success': True, 'task': task})
@@ -150,7 +153,10 @@ def update_hub_task_api(task_id):
         due_date=data.get('due_date'),
         due_time=data.get('due_time'),
         priority=data.get('priority'),
-        category=data.get('category')
+        category=data.get('category'),
+        repeat_type=data.get('repeat_type'),
+        repeat_days=data.get('repeat_days'),
+        repeat_end_date=data.get('repeat_end_date')
     )
 
     if success:
@@ -168,11 +174,16 @@ def delete_hub_task_api(task_id):
 
 @app.route('/api/hub/tasks/<int:task_id>/toggle', methods=['POST'])
 def toggle_hub_task_api(task_id):
-                                        
-    success = db.toggle_hub_task(task_id)
-    if success:
+    """Toggle task completion and create next occurrence if repeating"""
+    result = db.toggle_hub_task(task_id)
+    if result.get('success'):
         task = db.get_hub_task(task_id)
-        return jsonify({'success': True, 'task': task})
+        response = {'success': True, 'task': task}
+        # If a next task was created (repeating task), include its info
+        if result.get('next_task_id'):
+            next_task = db.get_hub_task(result['next_task_id'])
+            response['next_task'] = next_task
+        return jsonify(response)
     return jsonify({'success': False, 'error': 'Task not found'}), 404
 
 @app.route('/api/hub/reviews', methods=['GET'])
@@ -493,6 +504,7 @@ def create_school_subject():
         'room': data.get('room', ''),
         'color': data.get('color', '#667eea'),
         'grade': data.get('grade'),
+        'course_type': data.get('course_type', 'GK'),
         'created_at': datetime.now().isoformat()
     }
 
@@ -520,6 +532,7 @@ def update_school_subject(subject_id):
         'room': data.get('room', subjects[subject_index].get('room')),
         'color': data.get('color', subjects[subject_index].get('color')),
         'grade': data.get('grade', subjects[subject_index].get('grade')),
+        'course_type': data.get('course_type', subjects[subject_index].get('course_type', 'GK')),
         'updated_at': datetime.now().isoformat()
     })
 

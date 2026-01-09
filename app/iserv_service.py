@@ -287,7 +287,9 @@ class IServService:
             event_id = event.get('id') or event.get('uid') or str(hash(str(event)))
             if event_id not in seen:
                 seen.add(event_id)
-                unique_events.append(event)
+                # Normalize event structure for frontend compatibility
+                normalized = self._normalize_event(event)
+                unique_events.append(normalized)
 
         if unique_events:
             return {'success': True, 'events': unique_events}
@@ -295,6 +297,35 @@ class IServService:
             return {'success': False, 'error': 'Keine Events gefunden', 'details': errors, 'events': []}
         else:
             return {'success': True, 'events': []}
+
+    def _normalize_event(self, event):
+        """Normalize event structure for frontend compatibility"""
+        # Extract date from various possible field names
+        date_val = (event.get('date') or event.get('start') or
+                   event.get('dtstart') or event.get('start_date') or
+                   event.get('begin') or event.get('startDate'))
+
+        # Handle datetime objects
+        if hasattr(date_val, 'isoformat'):
+            date_val = date_val.isoformat()
+        elif isinstance(date_val, str) and len(date_val) >= 10:
+            # Already a string, keep it
+            pass
+        else:
+            date_val = None
+
+        return {
+            'id': event.get('id') or event.get('uid') or event.get('eventId'),
+            'title': event.get('title') or event.get('summary') or event.get('name') or event.get('subject') or 'Termin',
+            'date': date_val,
+            'start': date_val,
+            'end': event.get('end') or event.get('dtend') or event.get('end_date') or event.get('endDate'),
+            'description': event.get('description') or event.get('notes') or event.get('body') or '',
+            'location': event.get('location') or event.get('place') or event.get('room') or '',
+            'calendar': event.get('calendar') or event.get('calendarName') or event.get('category') or 'IServ',
+            'all_day': event.get('allDay') or event.get('all_day') or event.get('allday') or False,
+            'source': 'iserv'
+        }
 
     def get_events_in_range(self, start_date: datetime, end_date: datetime):
                                              
