@@ -8,7 +8,7 @@ from pathlib import Path
 import json
 import time
 
-import database as db
+from . import database as db
 
 app = Flask(__name__, static_folder='static')
 CORS(app)

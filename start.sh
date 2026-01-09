@@ -57,6 +57,6 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# Run the app
-cd "$APP_DIR"
-python3 app.py
+# Run the app as a module (required for relative imports)
+cd "$SCRIPT_DIR"
+python3 -m app.app
