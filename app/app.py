@@ -1353,7 +1353,7 @@ def check_holiday_mode():
 
     if not is_holiday:
         try:
-            from google_oauth import fetch_google_calendar_events, load_tokens
+            from .google_oauth import fetch_google_calendar_events, load_tokens
 
             tokens = load_tokens()
             if tokens:
@@ -1495,8 +1495,8 @@ def import_training_schedule_route():
 
 @app.route('/api/email/accounts', methods=['GET'])
 def get_email_accounts_route():
-    from email_service import get_email_accounts
-    from google_oauth import get_google_accounts
+    from .email_service import get_email_accounts
+    from .google_oauth import get_google_accounts
     from .iserv_service import get_iserv_service
                                                                 
     imap_accounts = get_email_accounts()
@@ -1518,7 +1518,7 @@ def get_email_accounts_route():
 
 @app.route('/api/email/accounts', methods=['POST'])
 def add_email_account_route():
-    from email_service import add_email_account
+    from .email_service import add_email_account
     data = request.get_json()
     if not data:
         return jsonify({'error': 'No data provided'}), 400
@@ -1537,8 +1537,8 @@ def add_email_account_route():
 
 @app.route('/api/email/accounts/<path:email>', methods=['DELETE'])
 def remove_email_account_route(email):
-    from email_service import remove_email_account
-    from google_oauth import remove_google_account, get_google_accounts
+    from .email_service import remove_email_account
+    from .google_oauth import remove_google_account, get_google_accounts
 
     google_accounts = [a['email'] for a in get_google_accounts()]
     if email in google_accounts:
@@ -1552,7 +1552,7 @@ def remove_email_account_route(email):
 
 @app.route('/api/email/folders/<path:email>', methods=['GET'])
 def get_email_folders_route(email):
-    from email_service import get_folders
+    from .email_service import get_folders
     result = get_folders(email)
     if result['success']:
         return jsonify(result)
@@ -1560,8 +1560,8 @@ def get_email_folders_route(email):
 
 @app.route('/api/email/messages/<path:email>', methods=['GET'])
 def get_email_messages_route(email):
-    from email_service import fetch_emails
-    from google_oauth import get_google_accounts, fetch_gmail_messages
+    from .email_service import fetch_emails
+    from .google_oauth import get_google_accounts, fetch_gmail_messages
     from .iserv_service import get_iserv_service
 
     if email.endswith('@iserv'):
@@ -1602,8 +1602,8 @@ def get_email_messages_route(email):
 
 @app.route('/api/email/message/<path:email>/<msg_id>', methods=['GET'])
 def get_email_detail_route(email, msg_id):
-    from email_service import get_email_detail
-    from google_oauth import get_google_accounts, get_gmail_message_detail
+    from .email_service import get_email_detail
+    from .google_oauth import get_google_accounts, get_gmail_message_detail
     from .iserv_service import get_iserv_service
 
     if email.endswith('@iserv'):
@@ -1628,8 +1628,8 @@ def get_email_detail_route(email, msg_id):
 
 @app.route('/api/email/send', methods=['POST'])
 def send_email_route():
-    from email_service import send_email
-    from google_oauth import get_google_accounts, send_gmail
+    from .email_service import send_email
+    from .google_oauth import get_google_accounts, send_gmail
     from .iserv_service import get_iserv_service
     data = request.get_json()
     if not data:
@@ -1665,20 +1665,20 @@ def send_email_route():
 @app.route('/api/email/google/status', methods=['GET'])
 def google_oauth_status():
                                                   
-    from google_oauth import get_oauth_status
+    from .google_oauth import get_oauth_status
     return jsonify(get_oauth_status())
 
 @app.route('/api/email/google/auth', methods=['POST'])
 def start_google_auth():
                                   
-    from google_oauth import start_oauth_flow
+    from .google_oauth import start_oauth_flow
     result = start_oauth_flow()
     return jsonify(result)
 
 @app.route('/api/email/google/callback', methods=['POST'])
 def complete_google_auth():
                                                                        
-    from google_oauth import complete_oauth_flow
+    from .google_oauth import complete_oauth_flow
     data = request.get_json()
     if not data or not data.get('code'):
         return jsonify({'success': False, 'error': 'Authorization code required'}), 400
@@ -1688,7 +1688,7 @@ def complete_google_auth():
 @app.route('/api/email/google/oauth-callback', methods=['GET'])
 def google_oauth_redirect_callback():
                                             
-    from google_oauth import complete_oauth_flow
+    from .google_oauth import complete_oauth_flow
 
     code = request.args.get('code')
     error = request.args.get('error')
@@ -1744,21 +1744,21 @@ def google_oauth_redirect_callback():
 @app.route('/api/email/google/accounts', methods=['GET'])
 def list_google_accounts():
                                          
-    from google_oauth import get_google_accounts
+    from .google_oauth import get_google_accounts
     accounts = get_google_accounts()
     return jsonify({'accounts': accounts})
 
 @app.route('/api/email/google/remove/<path:email>', methods=['DELETE'])
 def remove_google_account_route(email):
                                         
-    from google_oauth import remove_google_account
+    from .google_oauth import remove_google_account
     success = remove_google_account(email)
     return jsonify({'success': success})
 
 @app.route('/api/calendar/events', methods=['GET'])
 def get_calendar_events():
                                                                                    
-    from google_oauth import fetch_google_calendar_events, load_tokens
+    from .google_oauth import fetch_google_calendar_events, load_tokens
 
     start_date = request.args.get('start')
     end_date = request.args.get('end')
@@ -1779,14 +1779,14 @@ def get_calendar_events():
         if result.get('error') == 'scope_needed':
             return jsonify(result)
 
-    from calendar_service import get_macos_calendar_events
+    from .calendar_service import get_macos_calendar_events
     result = get_macos_calendar_events(days)
     return jsonify(result)
 
 @app.route('/api/calendar/macos', methods=['GET'])
 def get_macos_calendar():
                                                
-    from calendar_service import get_macos_calendar_events
+    from .calendar_service import get_macos_calendar_events
     days = request.args.get('days', 14, type=int)
     result = get_macos_calendar_events(days)
     return jsonify(result)
@@ -1794,14 +1794,14 @@ def get_macos_calendar():
 @app.route('/api/calendar/list', methods=['GET'])
 def get_calendar_list():
                                                 
-    from calendar_service import get_calendars
+    from .calendar_service import get_calendars
     result = get_calendars()
     return jsonify(result)
 
 @app.route('/api/calendar/google/calendars', methods=['GET'])
 def get_google_calendars_route():
                                                       
-    from google_oauth import get_google_calendars
+    from .google_oauth import get_google_calendars
     account = request.args.get('account')
     result = get_google_calendars(account_email=account)
     return jsonify(result)
@@ -1809,7 +1809,7 @@ def get_google_calendars_route():
 @app.route('/api/calendar/events', methods=['POST'])
 def create_calendar_event():
                                                 
-    from google_oauth import create_google_calendar_event
+    from .google_oauth import create_google_calendar_event
     data = request.get_json()
 
     if not data or not data.get('title') or not data.get('date'):
@@ -1834,7 +1834,7 @@ def create_calendar_event():
 @app.route('/api/calendar/events/<event_id>', methods=['PUT'])
 def update_calendar_event(event_id):
                                                       
-    from google_oauth import update_google_calendar_event
+    from .google_oauth import update_google_calendar_event
     data = request.get_json()
 
     if not data:
@@ -1860,7 +1860,7 @@ def update_calendar_event(event_id):
 @app.route('/api/calendar/events/<event_id>', methods=['DELETE'])
 def delete_calendar_event(event_id):
                                                
-    from google_oauth import delete_google_calendar_event
+    from .google_oauth import delete_google_calendar_event
 
     calendar_id = request.args.get('calendar_id', 'primary')
     account = request.args.get('account')
@@ -1878,14 +1878,14 @@ def delete_calendar_event(event_id):
 @app.route('/api/calendar/caldav/accounts', methods=['GET'])
 def get_caldav_accounts_route():
                                       
-    from calendar_service import get_caldav_accounts
+    from .calendar_service import get_caldav_accounts
     accounts = get_caldav_accounts()
     return jsonify({'success': True, 'accounts': accounts})
 
 @app.route('/api/calendar/caldav/accounts', methods=['POST'])
 def add_caldav_account_route():
                                                            
-    from calendar_service import add_caldav_account
+    from .calendar_service import add_caldav_account
     data = request.get_json()
 
     if not data:
@@ -1906,14 +1906,14 @@ def add_caldav_account_route():
 @app.route('/api/calendar/caldav/accounts/<account_id>', methods=['DELETE'])
 def remove_caldav_account_route(account_id):
                                   
-    from calendar_service import remove_caldav_account
+    from .calendar_service import remove_caldav_account
     result = remove_caldav_account(account_id)
     return jsonify(result)
 
 @app.route('/api/calendar/caldav/events', methods=['GET'])
 def get_caldav_events_route():
                                             
-    from calendar_service import fetch_caldav_events
+    from .calendar_service import fetch_caldav_events
 
     account_id = request.args.get('account_id')
     start_date = request.args.get('start')
@@ -1932,7 +1932,7 @@ def get_caldav_events_route():
 @app.route('/api/calendar/caldav/events', methods=['POST'])
 def create_caldav_event_route():
                                                
-    from calendar_service import create_caldav_event
+    from .calendar_service import create_caldav_event
     data = request.get_json()
 
     if not data or not data.get('account_id') or not data.get('calendar_url'):
@@ -1957,8 +1957,8 @@ def create_caldav_event_route():
 @app.route('/api/email/message/<path:email>/<msg_id>', methods=['DELETE'])
 def delete_email_message(email, msg_id):
                                   
-    from google_oauth import get_google_accounts, delete_gmail_message
-    from email_service import delete_email
+    from .google_oauth import get_google_accounts, delete_gmail_message
+    from .email_service import delete_email
 
     permanent = request.args.get('permanent', 'false').lower() == 'true'
 
@@ -2208,7 +2208,7 @@ def iserv_analyze_vertretungsplan():
 @app.route('/api/vbb/search', methods=['GET'])
 def vbb_search_location():
                                         
-    from vbb_service import get_vbb_service
+    from .vbb_service import get_vbb_service
     service = get_vbb_service()
     query = request.args.get('q', '')
     if not query:
@@ -2221,7 +2221,7 @@ def vbb_search_location():
 @app.route('/api/vbb/nearby', methods=['GET'])
 def vbb_nearby_stops():
                                       
-    from vbb_service import get_vbb_service
+    from .vbb_service import get_vbb_service
     service = get_vbb_service()
     try:
         lat = float(request.args.get('lat', 0))
@@ -2241,7 +2241,7 @@ def vbb_nearby_stops():
 @app.route('/api/vbb/route', methods=['POST'])
 def vbb_get_route():
                                           
-    from vbb_service import get_vbb_service
+    from .vbb_service import get_vbb_service
     from datetime import datetime
     service = get_vbb_service()
 
@@ -2283,7 +2283,7 @@ def vbb_get_route():
 @app.route('/api/vbb/route-to-event', methods=['POST'])
 def vbb_route_to_event():
                                         
-    from vbb_service import get_vbb_service
+    from .vbb_service import get_vbb_service
     service = get_vbb_service()
 
     data = request.get_json() or {}
@@ -2311,7 +2311,7 @@ def vbb_route_to_event():
 @app.route('/api/vbb/departures/<stop_id>', methods=['GET'])
 def vbb_departures(stop_id):
                                      
-    from vbb_service import get_vbb_service
+    from .vbb_service import get_vbb_service
     service = get_vbb_service()
     duration = int(request.args.get('duration', 30))
     result = service.get_departures(stop_id, duration)
@@ -2322,14 +2322,14 @@ def vbb_departures(stop_id):
 @app.route('/api/vbb/locations', methods=['GET'])
 def vbb_get_known_locations():
                                     
-    from vbb_service import get_vbb_service
+    from .vbb_service import get_vbb_service
     service = get_vbb_service()
     return jsonify(service.get_known_locations())
 
 @app.route('/api/vbb/locations', methods=['POST'])
 def vbb_save_location():
                                 
-    from vbb_service import get_vbb_service
+    from .vbb_service import get_vbb_service
     service = get_vbb_service()
     data = request.get_json() or {}
 

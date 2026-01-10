@@ -992,7 +992,8 @@ def get_hub_tasks(filter_type: str = 'all', user_id: str = None) -> List[Dict[st
     conn = get_connection()
     cursor = conn.cursor()
 
-    user_filter = 'AND user_id = ?' if user_id else 'AND (user_id IS NULL OR user_id = "")'
+    # Single-user mode: show all data when no user_id filter is specified
+    user_filter = 'AND user_id = ?' if user_id else ''
     user_param = (user_id,) if user_id else ()
 
     if filter_type == 'today':
@@ -1236,7 +1237,8 @@ def get_hub_projects(status: str = None, user_id: str = None) -> List[Dict[str, 
     conn = get_connection()
     cursor = conn.cursor()
 
-    user_filter = 'AND user_id = ?' if user_id else 'AND (user_id IS NULL OR user_id = "")'
+    # Single-user mode: show all data when no user_id filter is specified
+    user_filter = 'AND user_id = ?' if user_id else ''
     user_param = (user_id,) if user_id else ()
 
     if status:
@@ -1341,7 +1343,8 @@ def get_hub_knowledge(topic: str = None, search: str = None, user_id: str = None
     conn = get_connection()
     cursor = conn.cursor()
 
-    user_filter = 'AND user_id = ?' if user_id else 'AND (user_id IS NULL OR user_id = "")'
+    # Single-user mode: show all data when no user_id filter is specified
+    user_filter = 'AND user_id = ?' if user_id else ''
     user_param = (user_id,) if user_id else ()
 
     if search:
@@ -1808,7 +1811,8 @@ def get_timetable_settings(user_id: str = None) -> Optional[Dict[str, Any]]:
     if user_id:
         cursor.execute('SELECT * FROM hub_timetable_settings WHERE user_id = ? ORDER BY id DESC LIMIT 1', (user_id,))
     else:
-        cursor.execute('SELECT * FROM hub_timetable_settings WHERE (user_id IS NULL OR user_id = "") ORDER BY id DESC LIMIT 1')
+        # Single-user mode: return most recent settings
+        cursor.execute('SELECT * FROM hub_timetable_settings ORDER BY id DESC LIMIT 1')
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
@@ -1823,7 +1827,8 @@ def save_timetable_settings(has_ab_weeks: bool = True, block_count: int = 4,
     if user_id:
         cursor.execute('SELECT id FROM hub_timetable_settings WHERE user_id = ? LIMIT 1', (user_id,))
     else:
-        cursor.execute('SELECT id FROM hub_timetable_settings WHERE (user_id IS NULL OR user_id = "") LIMIT 1')
+        # Single-user mode: update most recent settings
+        cursor.execute('SELECT id FROM hub_timetable_settings ORDER BY id DESC LIMIT 1')
     existing = cursor.fetchone()
 
     if existing:
@@ -1857,8 +1862,7 @@ def get_timetable_entries(day: int = None, week: str = None, user_id: str = None
     if user_id:
         query += ' AND user_id = ?'
         params.append(user_id)
-    else:
-        query += ' AND (user_id IS NULL OR user_id = "")'
+    # Single-user mode: no filter when user_id not specified
 
     if day is not None:
         query += ' AND day = ?'
@@ -1965,7 +1969,8 @@ def clear_timetable(user_id: str = None) -> int:
     if user_id:
         cursor.execute('DELETE FROM hub_timetable_entries WHERE user_id = ?', (user_id,))
     else:
-        cursor.execute('DELETE FROM hub_timetable_entries WHERE (user_id IS NULL OR user_id = "")')
+        # Single-user mode: clear all entries
+        cursor.execute('DELETE FROM hub_timetable_entries')
     affected = cursor.rowcount
     conn.commit()
     conn.close()
@@ -2007,7 +2012,8 @@ def get_training_schedule_settings(user_id: str = None) -> Optional[Dict[str, An
     if user_id:
         cursor.execute('SELECT * FROM hub_training_schedule_settings WHERE user_id = ? ORDER BY id DESC LIMIT 1', (user_id,))
     else:
-        cursor.execute('SELECT * FROM hub_training_schedule_settings WHERE (user_id IS NULL OR user_id = "") ORDER BY id DESC LIMIT 1')
+        # Single-user mode: return most recent settings
+        cursor.execute('SELECT * FROM hub_training_schedule_settings ORDER BY id DESC LIMIT 1')
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
@@ -2023,7 +2029,8 @@ def save_training_schedule_settings(schedule_mode: str = 'regular',
     if user_id:
         cursor.execute('SELECT id FROM hub_training_schedule_settings WHERE user_id = ? LIMIT 1', (user_id,))
     else:
-        cursor.execute('SELECT id FROM hub_training_schedule_settings WHERE (user_id IS NULL OR user_id = "") LIMIT 1')
+        # Single-user mode: get any existing settings when no user_id filter
+        cursor.execute('SELECT id FROM hub_training_schedule_settings ORDER BY id DESC LIMIT 1')
     existing = cursor.fetchone()
 
     if existing:
@@ -2057,8 +2064,7 @@ def get_training_schedule_entries(day: int = None, schedule_type: str = None, us
     if user_id:
         query += ' AND user_id = ?'
         params.append(user_id)
-    else:
-        query += ' AND (user_id IS NULL OR user_id = "")'
+    # Single-user mode: no filter when user_id not specified
 
     if day is not None:
         query += ' AND day = ?'
@@ -2180,10 +2186,11 @@ def clear_training_schedule(schedule_type: str = None, user_id: str = None) -> i
         else:
             cursor.execute('DELETE FROM hub_training_schedule_entries WHERE user_id = ?', (user_id,))
     else:
+        # Single-user mode: delete all entries when no user_id filter
         if schedule_type:
-            cursor.execute('DELETE FROM hub_training_schedule_entries WHERE schedule_type = ? AND (user_id IS NULL OR user_id = "")', (schedule_type,))
+            cursor.execute('DELETE FROM hub_training_schedule_entries WHERE schedule_type = ?', (schedule_type,))
         else:
-            cursor.execute('DELETE FROM hub_training_schedule_entries WHERE (user_id IS NULL OR user_id = "")')
+            cursor.execute('DELETE FROM hub_training_schedule_entries')
 
     affected = cursor.rowcount
     conn.commit()

@@ -220,9 +220,12 @@ const NexusAccounts = {
         }
 
         const accounts = await this.getAllAccounts();
-        if (accounts.length === 0) {
 
-            return null;
+        // Single-user mode: auto-create default account if none exists
+        if (accounts.length === 0) {
+            const defaultAccount = await this.createAccount('Benutzer', 'Benutzer', '#4285f4');
+            await this.switchAccount(defaultAccount.id);
+            return this.currentAccount;
         }
 
         if (!this.currentAccount && accounts.length > 0) {
