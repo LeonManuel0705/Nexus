@@ -121,7 +121,7 @@ def get_credentials(email: str) -> Optional[Credentials]:
     if creds.expired and creds.refresh_token:
         try:
             creds.refresh(Request())
-                                  
+
             tokens[email] = {
                 'token': creds.token,
                 'refresh_token': creds.refresh_token,
@@ -131,6 +131,11 @@ def get_credentials(email: str) -> Optional[Credentials]:
             }
             save_tokens(tokens)
         except Exception as e:
+            # Token revoked or expired - remove from storage
+            if 'invalid_grant' in str(e) or 'revoked' in str(e).lower():
+                if email in tokens:
+                    del tokens[email]
+                    save_tokens(tokens)
             return None
 
     return creds

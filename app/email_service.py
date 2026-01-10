@@ -31,8 +31,34 @@ PROVIDER_SETTINGS = {
         "smtp_host": "smtp.office365.com",
         "smtp_port": 587,
         "requires_app_password": False
+    },
+    "iserv": {
+        "imap_host": None,  # Dynamically set from email domain
+        "imap_port": 993,
+        "smtp_host": None,  # Dynamically set from email domain
+        "smtp_port": 587,
+        "requires_app_password": False
     }
 }
+
+def get_iserv_settings(email: str) -> Dict:
+    """Get IServ server settings based on email domain."""
+    domain = email.split('@')[1] if '@' in email else None
+    if not domain:
+        return None
+    return {
+        "imap_host": domain,  # IServ uses the domain directly
+        "imap_port": 993,
+        "smtp_host": domain,
+        "smtp_port": 587,
+        "requires_app_password": False
+    }
+
+def get_provider_settings(provider: str, email: str) -> Optional[Dict]:
+    """Get settings for any provider, including dynamic IServ settings."""
+    if provider == "iserv":
+        return get_iserv_settings(email)
+    return PROVIDER_SETTINGS.get(provider)
 
 def load_email_config() -> Dict:
     if not os.path.exists(EMAIL_CONFIG_PATH):
@@ -56,7 +82,14 @@ def add_email_account(email: str, password: str, provider: str) -> Dict:
     if provider not in PROVIDER_SETTINGS:
         return {"success": False, "error": "Unsupported provider"}
 
-    settings = PROVIDER_SETTINGS[provider]
+    # For IServ, get settings based on email domain
+    if provider == "iserv":
+        settings = get_iserv_settings(email)
+        if not settings:
+            return {"success": False, "error": "Invalid email address for IServ"}
+    else:
+        settings = PROVIDER_SETTINGS[provider]
+
     try:
         imap = imaplib.IMAP4_SSL(settings["imap_host"], settings["imap_port"])
         imap.login(email, password)
@@ -162,7 +195,7 @@ def fetch_emails(email: str, folder: str = "INBOX", limit: int = 20) -> Dict:
         return {"success": False, "error": "Account not found"}
 
     provider = account["provider"]
-    settings = PROVIDER_SETTINGS.get(provider)
+    settings = get_provider_settings(provider, email)
     if not settings:
         return {"success": False, "error": "Unknown provider"}
 
@@ -234,7 +267,7 @@ def get_email_detail(email_addr: str, msg_id: str, folder: str = "INBOX") -> Dic
         return {"success": False, "error": "Account not found"}
 
     provider = account["provider"]
-    settings = PROVIDER_SETTINGS.get(provider)
+    settings = get_provider_settings(provider, email_addr)
     if not settings:
         return {"success": False, "error": "Unknown provider"}
 
@@ -292,7 +325,7 @@ def send_email(from_email: str, to_email: str, subject: str, body: str, reply_to
         return {"success": False, "error": "Account not found"}
 
     provider = account["provider"]
-    settings = PROVIDER_SETTINGS.get(provider)
+    settings = get_provider_settings(provider, from_email)
     if not settings:
         return {"success": False, "error": "Unknown provider"}
 
@@ -322,14 +355,13 @@ def send_email(from_email: str, to_email: str, subject: str, body: str, reply_to
         return {"success": False, "error": f"Failed to send: {str(e)}"}
 
 def delete_email(email: str, msg_id: str, folder: str = "INBOX") -> Dict:
-                                                
     config = load_email_config()
     account = next((a for a in config["accounts"] if a["email"] == email), None)
     if not account:
         return {"success": False, "error": "Account not found"}
 
     provider = account["provider"]
-    settings = PROVIDER_SETTINGS.get(provider)
+    settings = get_provider_settings(provider, email)
     if not settings:
         return {"success": False, "error": "Unknown provider"}
 
@@ -368,7 +400,7 @@ def get_folders(email: str) -> Dict:
         return {"success": False, "error": "Account not found"}
 
     provider = account["provider"]
-    settings = PROVIDER_SETTINGS.get(provider)
+    settings = get_provider_settings(provider, email)
     if not settings:
         return {"success": False, "error": "Unknown provider"}
 

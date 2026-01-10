@@ -1218,6 +1218,39 @@ def create_training_health():
 
     return jsonify({'success': True})
 
+@app.route('/api/hub/training/health/<int:log_id>', methods=['GET'])
+def get_training_health_entry(log_id):
+    log = db.get_hub_training_health_by_id(log_id)
+    if not log:
+        return jsonify({'success': False, 'error': 'Health log not found'}), 404
+    return jsonify({'success': True, 'log': log})
+
+@app.route('/api/hub/training/health/<int:log_id>', methods=['PUT'])
+def update_training_health_entry(log_id):
+    data = request.json
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    log = db.get_hub_training_health_by_id(log_id)
+    if not log:
+        return jsonify({'success': False, 'error': 'Health log not found'}), 404
+
+    db.update_hub_training_health(
+        log_id,
+        sleep=data.get('sleep'),
+        energy=data.get('energy'),
+        stress=data.get('stress'),
+        recovery=data.get('recovery'),
+        weight=data.get('weight'),
+        notes=data.get('notes')
+    )
+    return jsonify({'success': True})
+
+@app.route('/api/hub/training/health/<int:log_id>', methods=['DELETE'])
+def delete_training_health_entry(log_id):
+    db.delete_hub_training_health(log_id)
+    return jsonify({'success': True})
+
 @app.route('/api/hub/training/goals', methods=['GET'])
 def get_training_goals():
                                  

@@ -1166,6 +1166,22 @@ def toggle_hub_task(task_id: int) -> dict:
                   task.get('parent_task_id') or task_id))
             next_task_id = cursor.lastrowid
 
+    # Enforce limit of 3 completed tasks - delete older ones
+    if new_status == 1:
+        cursor.execute('''
+            SELECT id FROM hub_tasks
+            WHERE completed = 1
+            ORDER BY completed_at DESC
+            LIMIT -1 OFFSET 3
+        ''')
+        old_completed = cursor.fetchall()
+        if old_completed:
+            ids_to_delete = [row['id'] for row in old_completed]
+            cursor.execute(
+                f"DELETE FROM hub_tasks WHERE id IN ({','.join('?' * len(ids_to_delete))})",
+                ids_to_delete
+            )
+
     conn.commit()
     conn.close()
     return {'success': True, 'next_task_id': next_task_id}
@@ -1706,6 +1722,25 @@ def update_hub_training_health(log_id: int, sleep: float = None, energy: int = N
     conn.commit()
     conn.close()
     return affected > 0
+
+def delete_hub_training_health(log_id: int) -> bool:
+    """Delete a health log entry."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM hub_training_health WHERE id = ?', (log_id,))
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return affected > 0
+
+def get_hub_training_health_by_id(log_id: int) -> Optional[Dict[str, Any]]:
+    """Get a specific health log entry by ID."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM hub_training_health WHERE id = ?', (log_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 def get_hub_training_goals(completed: bool = None) -> List[Dict[str, Any]]:
                                                                 

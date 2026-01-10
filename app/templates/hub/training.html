@@ -144,9 +144,23 @@
                 <label for="sessionType">Art des Trainings</label>
                 <select id="sessionType" name="type" required>
                     <option value="strength">Krafttraining</option>
-                    <option value="cardio">Ausdauer</option>
-                    <option value="flexibility">Beweglichkeit</option>
-                    <option value="sports">Sport/Spiel</option>
+                    <option value="cardio">Ausdauer/Laufen</option>
+                    <option value="swim">Schwimmen</option>
+                    <option value="cycling">Radfahren</option>
+                    <option value="fencing">Fechten</option>
+                    <option value="dance">Tanzen</option>
+                    <option value="athletics">Leichtathletik</option>
+                    <option value="soccer">Fußball</option>
+                    <option value="basketball">Basketball</option>
+                    <option value="tennis">Tennis</option>
+                    <option value="volleyball">Volleyball</option>
+                    <option value="martial_arts">Kampfsport</option>
+                    <option value="yoga">Yoga</option>
+                    <option value="flexibility">Beweglichkeit/Stretching</option>
+                    <option value="climbing">Klettern</option>
+                    <option value="gymnastics">Turnen</option>
+                    <option value="hiking">Wandern</option>
+                    <option value="sports">Anderer Sport</option>
                     <option value="rest">Ruhetag</option>
                 </select>
             </div>
@@ -183,10 +197,11 @@
 <div class="modal" id="healthModal">
     <div class="modal-content">
         <div class="modal-header">
-            <h3>Wohlbefinden eintragen</h3>
+            <h3 id="healthModalTitle">Wohlbefinden eintragen</h3>
             <button class="modal-close" onclick="closeModal('healthModal')">&times;</button>
         </div>
         <form id="healthForm" onsubmit="saveHealthLog(event)">
+            <input type="hidden" id="healthId" name="id">
             <div class="form-group">
                 <label for="healthDate">Datum</label>
                 <input type="date" id="healthDate" name="date" required>
@@ -216,6 +231,7 @@
                 <textarea id="healthNotes" name="notes" rows="2" placeholder="Wie fühlst du dich?"></textarea>
             </div>
             <div class="form-actions">
+                <button type="button" class="btn-secondary btn-danger" id="deleteHealthBtn" style="display:none" onclick="deleteHealthLog()">Löschen</button>
                 <button type="submit" class="btn-primary">Speichern</button>
             </div>
         </form>
@@ -225,7 +241,7 @@
 <div class="modal" id="goalModal">
     <div class="modal-content">
         <div class="modal-header">
-            <h3>Trainingsziel</h3>
+            <h3 id="goalModalTitle">Trainingsziel</h3>
             <button class="modal-close" onclick="closeModal('goalModal')">&times;</button>
         </div>
         <form id="goalForm" onsubmit="saveGoal(event)">
@@ -242,10 +258,40 @@
                 <label for="goalDeadline">Bis wann?</label>
                 <input type="date" id="goalDeadline" name="deadline">
             </div>
+            <div class="form-group">
+                <label for="goalCompleted">Status</label>
+                <select id="goalCompleted" name="completed">
+                    <option value="0">In Arbeit</option>
+                    <option value="1">Erreicht! 🎉</option>
+                </select>
+            </div>
             <div class="form-actions">
+                <button type="button" class="btn-secondary btn-danger" id="deleteGoalBtn" style="display:none" onclick="openDeleteGoalConfirm()">Löschen</button>
                 <button type="submit" class="btn-primary">Speichern</button>
             </div>
         </form>
+    </div>
+</div>
+
+<div class="modal" id="deleteGoalModal">
+    <div class="modal-content modal-small">
+        <div class="modal-header">
+            <h3>🎯 Ziel wirklich aufgeben?</h3>
+            <button class="modal-close" onclick="closeModal('deleteGoalModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                Bist du sicher? Ziele zu löschen ist einfach - sie zu erreichen ist besser! 💪
+            </p>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+                Tippe <strong>"AUFGEBEN"</strong> um das Ziel zu löschen:
+            </p>
+            <input type="text" id="deleteGoalConfirmInput" placeholder="AUFGEBEN" style="width: 100%; padding: 10px; border: 1px solid var(--card-border); border-radius: var(--radius-xs); background: var(--bg-secondary); color: var(--text-primary);">
+        </div>
+        <div class="form-actions">
+            <button class="btn-secondary" onclick="closeModal('deleteGoalModal')">Doch nicht</button>
+            <button class="btn-primary btn-danger" onclick="confirmDeleteGoal()">Ziel aufgeben</button>
+        </div>
     </div>
 </div>
 
@@ -266,29 +312,28 @@
             </div>
 
             <div class="form-group">
-                <label>Trainingsart</label>
-                <div class="radio-button-group">
-                    <label class="radio-button">
-                        <input type="radio" name="training_type" value="strength" checked>
-                        <span class="radio-button-label">Kraft</span>
-                    </label>
-                    <label class="radio-button">
-                        <input type="radio" name="training_type" value="cardio">
-                        <span class="radio-button-label">Ausdauer</span>
-                    </label>
-                    <label class="radio-button">
-                        <input type="radio" name="training_type" value="swim">
-                        <span class="radio-button-label">Schwimmen</span>
-                    </label>
-                    <label class="radio-button">
-                        <input type="radio" name="training_type" value="rest">
-                        <span class="radio-button-label">Ruhetag</span>
-                    </label>
-                    <label class="radio-button">
-                        <input type="radio" name="training_type" value="flexibility">
-                        <span class="radio-button-label">Mobility</span>
-                    </label>
-                </div>
+                <label for="trainingType">Trainingsart</label>
+                <select id="trainingType" name="training_type" required>
+                    <option value="strength">Krafttraining</option>
+                    <option value="cardio">Ausdauer/Laufen</option>
+                    <option value="swim">Schwimmen</option>
+                    <option value="cycling">Radfahren</option>
+                    <option value="fencing">Fechten</option>
+                    <option value="dance">Tanzen</option>
+                    <option value="athletics">Leichtathletik</option>
+                    <option value="soccer">Fußball</option>
+                    <option value="basketball">Basketball</option>
+                    <option value="tennis">Tennis</option>
+                    <option value="volleyball">Volleyball</option>
+                    <option value="martial_arts">Kampfsport</option>
+                    <option value="yoga">Yoga</option>
+                    <option value="flexibility">Beweglichkeit/Stretching</option>
+                    <option value="climbing">Klettern</option>
+                    <option value="gymnastics">Turnen</option>
+                    <option value="hiking">Wandern</option>
+                    <option value="sports">Anderer Sport</option>
+                    <option value="rest">Ruhetag</option>
+                </select>
             </div>
 
             <div class="form-row">
@@ -320,14 +365,42 @@
             <div class="form-group">
                 <label for="trainingIcon">Icon</label>
                 <select id="trainingIcon" name="icon">
-                    <option value="🏋️">🏋️ Kraft</option>
-                    <option value="🎯">🎯 Rucken</option>
-                    <option value="💪">💪 Arme</option>
+                    <option value="🏋️">🏋️ Krafttraining</option>
+                    <option value="🎯">🎯 Rücken</option>
+                    <option value="💪">💪 Arme/Bizeps</option>
                     <option value="🦵">🦵 Beine</option>
-                    <option value="🏃">🏃 Cardio</option>
+                    <option value="🏃">🏃 Laufen/Cardio</option>
                     <option value="🏊">🏊 Schwimmen</option>
+                    <option value="🚴">🚴 Radfahren</option>
+                    <option value="🤺">🤺 Fechten</option>
+                    <option value="💃">💃 Tanzen</option>
+                    <option value="🏅">🏅 Leichtathletik</option>
+                    <option value="⚽">⚽ Fußball</option>
+                    <option value="🏀">🏀 Basketball</option>
+                    <option value="🎾">🎾 Tennis</option>
+                    <option value="🏐">🏐 Volleyball</option>
+                    <option value="🥋">🥋 Kampfsport</option>
+                    <option value="🧘">🧘 Yoga/Mobility</option>
+                    <option value="🧗">🧗 Klettern</option>
+                    <option value="🤸">🤸 Turnen</option>
+                    <option value="🥾">🥾 Wandern</option>
+                    <option value="🏸">🏸 Badminton</option>
+                    <option value="⛷️">⛷️ Ski</option>
+                    <option value="🏂">🏂 Snowboard</option>
+                    <option value="⛸️">⛸️ Eislaufen</option>
+                    <option value="🎿">🎿 Langlauf</option>
+                    <option value="🏌️">🏌️ Golf</option>
+                    <option value="🏇">🏇 Reiten</option>
+                    <option value="🚣">🚣 Rudern</option>
+                    <option value="🎳">🎳 Bowling</option>
+                    <option value="🏓">🏓 Tischtennis</option>
+                    <option value="🤾">🤾 Handball</option>
+                    <option value="🏈">🏈 Football</option>
+                    <option value="🏒">🏒 Hockey</option>
+                    <option value="⚾">⚾ Baseball</option>
+                    <option value="🎯">🎯 Bogenschießen</option>
+                    <option value="🧩">🧩 Anderes</option>
                     <option value="😴">😴 Ruhetag</option>
-                    <option value="🧘">🧘 Mobility</option>
                 </select>
             </div>
 
@@ -634,6 +707,18 @@ function renderHealthStats() {
     document.getElementById('energyValue').textContent = todayLog?.energy || '-';
     document.getElementById('stressValue').textContent = todayLog?.stress || '-';
     document.getElementById('recoveryValue').textContent = todayLog?.recovery || '-';
+
+    // Make health stats clickable if there's a log for today
+    const healthStats = document.getElementById('healthStats');
+    if (todayLog) {
+        healthStats.style.cursor = 'pointer';
+        healthStats.onclick = () => openEditHealthModal(todayLog.id);
+        healthStats.title = 'Klicken zum Bearbeiten';
+    } else {
+        healthStats.style.cursor = 'default';
+        healthStats.onclick = null;
+        healthStats.title = '';
+    }
 }
 
 function renderGoals() {
@@ -671,7 +756,9 @@ function openAddSessionModal() {
 }
 
 function openEditSessionModal(id) {
-    const s = sessions.find(ses => ses.id === id);
+    // Convert id to number for comparison (onclick passes string)
+    const numId = typeof id === 'string' ? parseInt(id, 10) : id;
+    const s = sessions.find(ses => ses.id === numId || ses.id === id);
     if (!s) return;
     document.getElementById('sessionId').value = s.id;
     document.getElementById('sessionType').value = s.type;
@@ -687,23 +774,49 @@ function openEditSessionModal(id) {
 
 function openLogHealthModal() {
     document.getElementById('healthForm').reset();
+    document.getElementById('healthId').value = '';
     document.getElementById('healthDate').value = formatLocalDate(new Date());
+    document.getElementById('healthModalTitle').textContent = 'Wohlbefinden eintragen';
+    document.getElementById('deleteHealthBtn').style.display = 'none';
+    openModal('healthModal');
+}
+
+function openEditHealthModal(id) {
+    const log = healthLogs.find(l => l.id === id);
+    if (!log) return;
+    document.getElementById('healthId').value = log.id;
+    document.getElementById('healthDate').value = log.date;
+    document.getElementById('healthSleep').value = log.sleep || '';
+    document.getElementById('healthEnergy').value = log.energy || '';
+    document.getElementById('healthStress').value = log.stress || '';
+    document.getElementById('healthRecovery').value = log.recovery || '';
+    document.getElementById('healthNotes').value = log.notes || '';
+    document.getElementById('healthModalTitle').textContent = 'Wohlbefinden bearbeiten';
+    document.getElementById('deleteHealthBtn').style.display = 'block';
     openModal('healthModal');
 }
 
 function openAddGoalModal() {
     document.getElementById('goalForm').reset();
     document.getElementById('goalId').value = '';
+    document.getElementById('goalModalTitle').textContent = 'Neues Trainingsziel';
+    document.getElementById('deleteGoalBtn').style.display = 'none';
+    document.getElementById('goalCompleted').value = '0';
     openModal('goalModal');
 }
 
 function openEditGoalModal(id) {
-    const g = goals.find(go => go.id === id);
+    // Convert id to number for comparison (onclick passes string)
+    const numId = typeof id === 'string' ? parseInt(id, 10) : id;
+    const g = goals.find(go => go.id === numId || go.id === id);
     if (!g) return;
     document.getElementById('goalId').value = g.id;
     document.getElementById('goalTitle').value = g.title;
     document.getElementById('goalTarget').value = g.target || '';
     document.getElementById('goalDeadline').value = g.deadline || '';
+    document.getElementById('goalCompleted').value = g.completed ? '1' : '0';
+    document.getElementById('goalModalTitle').textContent = 'Ziel bearbeiten';
+    document.getElementById('deleteGoalBtn').style.display = 'block';
     openModal('goalModal');
 }
 
@@ -736,13 +849,24 @@ async function deleteSession() {
 async function saveHealthLog(e) {
     e.preventDefault();
     const formData = new FormData(e.target);
+    const id = formData.get('id');
     const data = { date: formData.get('date'), sleep: formData.get('sleep'), energy: formData.get('energy'), stress: formData.get('stress'), recovery: formData.get('recovery'), notes: formData.get('notes') };
     try {
-        await fetch('/api/hub/training/health', {
-            method: 'POST',
+        await fetch(id ? `/api/hub/training/health/${id}` : '/api/hub/training/health', {
+            method: id ? 'PUT' : 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
+        closeModal('healthModal');
+        loadTrainingData();
+    } catch (err) {}
+}
+
+async function deleteHealthLog() {
+    if (!confirm('Eintrag löschen?')) return;
+    const id = document.getElementById('healthId').value;
+    try {
+        await fetch(`/api/hub/training/health/${id}`, { method: 'DELETE' });
         closeModal('healthModal');
         loadTrainingData();
     } catch (err) {}
@@ -752,13 +876,39 @@ async function saveGoal(e) {
     e.preventDefault();
     const formData = new FormData(e.target);
     const id = formData.get('id');
-    const data = { title: formData.get('title'), target: formData.get('target'), deadline: formData.get('deadline') };
+    const data = {
+        title: formData.get('title'),
+        target: formData.get('target'),
+        deadline: formData.get('deadline'),
+        completed: formData.get('completed') === '1'
+    };
     try {
         await fetch(id ? `/api/hub/training/goals/${id}` : '/api/hub/training/goals', {
             method: id ? 'PUT' : 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
+        closeModal('goalModal');
+        loadTrainingData();
+    } catch (err) {}
+}
+
+function openDeleteGoalConfirm() {
+    document.getElementById('deleteGoalConfirmInput').value = '';
+    openModal('deleteGoalModal');
+}
+
+async function confirmDeleteGoal() {
+    const input = document.getElementById('deleteGoalConfirmInput').value;
+    if (input !== 'AUFGEBEN') {
+        alert('Bitte tippe "AUFGEBEN" um zu bestätigen.');
+        return;
+    }
+
+    const id = document.getElementById('goalId').value;
+    try {
+        await fetch(`/api/hub/training/goals/${id}`, { method: 'DELETE' });
+        closeModal('deleteGoalModal');
         closeModal('goalModal');
         loadTrainingData();
     } catch (err) {}
@@ -998,9 +1148,7 @@ function openTrainingEntryModal(day, scheduleType) {
         document.getElementById('trainingMuscles').value = existingEntry.muscle_groups || '';
         document.getElementById('trainingNotes').value = existingEntry.notes || '';
         document.getElementById('trainingIcon').value = existingEntry.icon || '🏋️';
-
-        const typeRadio = document.querySelector(`input[name="training_type"][value="${existingEntry.training_type}"]`);
-        if (typeRadio) typeRadio.checked = true;
+        document.getElementById('trainingType').value = existingEntry.training_type || 'strength';
     } else {
         title.textContent = `${FULL_DAY_NAMES[day]} - Training hinzufügen`;
         deleteBtn.style.display = 'none';
