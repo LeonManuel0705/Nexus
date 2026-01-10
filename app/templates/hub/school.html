@@ -123,7 +123,7 @@
         </div>
 
         <div class="week-overview-section">
-            <h3 class="section-title">Wochenübersicht</h3>
+            <h3 class="section-title">Wochenübersicht <span id="weekOverviewBadge" class="week-type-badge"></span></h3>
             <div class="week-grid" id="weekGrid">
                 
             </div>
@@ -1051,6 +1051,8 @@ async function loadTimetableEntries() {
 
 // Transform API entries to TIMETABLE_A/TIMETABLE_B format
 function transformEntriesToTimetables() {
+    console.log('[Timetable] Transforming entries:', timetableEntries.length);
+
     // Reset timetables
     TIMETABLE_A = { 1: [null, null, null, null], 2: [null, null, null, null], 3: [null, null, null, null], 4: [null, null, null, null], 5: [null, null, null, null] };
     TIMETABLE_B = { 1: [null, null, null, null], 2: [null, null, null, null], 3: [null, null, null, null], 4: [null, null, null, null], 5: [null, null, null, null] };
@@ -1104,6 +1106,10 @@ function transformEntriesToTimetables() {
             TIMETABLE_B[day][blockIndex] = { ...lessonData };
         }
     }
+
+    // Debug: Log final timetables
+    console.log('[Timetable] TIMETABLE_A[1]:', TIMETABLE_A[1]);
+    console.log('[Timetable] TIMETABLE_B[1]:', TIMETABLE_B[1]);
 }
 
 // Initialize timetable - load from API
@@ -2237,8 +2243,21 @@ function updateDaySchedule(which, date, weekType, isNextDay = false) {
 
 // Update week overview
 function updateWeekOverview(weekType) {
+    console.log('[Timetable] updateWeekOverview called with weekType:', weekType);
     const container = document.getElementById('weekGrid');
     const timetable = weekType === 'A' ? TIMETABLE_A : TIMETABLE_B;
+    console.log('[Timetable] Using timetable for day 1:', timetable[1]);
+
+    // Update the week badge in the section title (for debugging/clarity)
+    const weekBadge = document.getElementById('weekOverviewBadge');
+    if (weekBadge && timetableSettings.has_ab_weeks) {
+        weekBadge.textContent = weekType;
+        weekBadge.className = `week-type-badge type-${weekType.toLowerCase()}`;
+        weekBadge.style.display = 'inline-block';
+    } else if (weekBadge) {
+        weekBadge.style.display = 'none';
+    }
+
     const now = new Date();
     const currentDayOfWeek = now.getDay();
 
@@ -2297,6 +2316,7 @@ function updateWeekOverview(weekType) {
 // Toggle between viewing current week and other week
 function toggleWeekView() {
     const actualWeekType = getWeekType(new Date());
+    console.log('[Timetable] toggleWeekView: actualWeekType =', actualWeekType, ', viewingWeek before =', viewingWeek);
 
     if (viewingWeek === null) {
         // Switch to other week
@@ -2306,6 +2326,7 @@ function toggleWeekView() {
         viewingWeek = null;
     }
 
+    console.log('[Timetable] toggleWeekView: viewingWeek after =', viewingWeek);
     updateStundenplanDisplay();
 }
 
