@@ -40,7 +40,6 @@
         <button class="filter-tab" onclick="showTab('exams')">Klausuren</button>
         <button class="filter-tab" onclick="showTab('grades')">Noten</button>
         <button class="filter-tab" onclick="showTab('calendar')">Kalender</button>
-        <button class="filter-tab" onclick="showTab('iserv')">IServ</button>
     </div>
 
     <div class="tab-content" id="stundenplanTab">
@@ -455,35 +454,6 @@
                 </div>
             </div>
 
-            <div class="section-header" style="margin-top: 24px;">
-                <h3 class="section-title">IServ Aufgaben</h3>
-                <button class="btn-secondary small" onclick="refreshIServData()">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="23 4 23 10 17 10"></polyline>
-                        <polyline points="1 20 1 14 7 14"></polyline>
-                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                    </svg>
-                    Aktualisieren
-                </button>
-            </div>
-
-            <div class="iserv-exercises" id="iservExercises">
-                <div class="loading-state">Lade IServ-Daten...</div>
-            </div>
-
-            <div class="section-header" style="margin-top: 24px;">
-                <h3 class="section-title">IServ Kalender</h3>
-            </div>
-            <div class="iserv-events" id="iservEvents">
-                <div class="loading-state">Lade Termine...</div>
-            </div>
-
-            <div class="section-header" style="margin-top: 24px;">
-                <h3 class="section-title">Benachrichtigungen</h3>
-            </div>
-            <div class="iserv-notifications" id="iservNotifications">
-                <div class="loading-state">Lade Benachrichtigungen...</div>
-            </div>
         </div>
     </div>
 
@@ -1085,11 +1055,14 @@ function transformEntriesToTimetables() {
     TIMETABLE_A = { 1: [null, null, null, null], 2: [null, null, null, null], 3: [null, null, null, null], 4: [null, null, null, null], 5: [null, null, null, null] };
     TIMETABLE_B = { 1: [null, null, null, null], 2: [null, null, null, null], 3: [null, null, null, null], 4: [null, null, null, null], 5: [null, null, null, null] };
 
+    // First pass: add 'both' entries
     for (const entry of timetableEntries) {
-        const day = entry.day; // 1-5
-        const blockIndex = entry.block - 1; // Convert 1-4 to 0-3
-
+        const day = entry.day;
+        const blockIndex = entry.block - 1;
         if (day < 1 || day > 5 || blockIndex < 0 || blockIndex > 3) continue;
+
+        const week = entry.week || 'both';
+        if (week !== 'both') continue;
 
         const lessonData = {
             id: entry.id,
@@ -1097,14 +1070,37 @@ function transformEntriesToTimetables() {
             type: entry.subject_type || 'GK',
             room: entry.room || '',
             teacher: entry.teacher || '',
-            color: entry.color || '#4285f4'
+            color: entry.color || '#4285f4',
+            week: week
         };
 
-        // Add to appropriate timetable(s)
-        if (entry.week === 'A' || entry.week === 'both') {
+        TIMETABLE_A[day][blockIndex] = { ...lessonData };
+        TIMETABLE_B[day][blockIndex] = { ...lessonData };
+    }
+
+    // Second pass: add specific week entries (A or B) - these override 'both'
+    for (const entry of timetableEntries) {
+        const day = entry.day;
+        const blockIndex = entry.block - 1;
+        if (day < 1 || day > 5 || blockIndex < 0 || blockIndex > 3) continue;
+
+        const week = entry.week || 'both';
+        if (week === 'both') continue;
+
+        const lessonData = {
+            id: entry.id,
+            subject: entry.subject,
+            type: entry.subject_type || 'GK',
+            room: entry.room || '',
+            teacher: entry.teacher || '',
+            color: entry.color || '#4285f4',
+            week: week
+        };
+
+        if (week === 'A') {
             TIMETABLE_A[day][blockIndex] = { ...lessonData };
         }
-        if (entry.week === 'B' || entry.week === 'both') {
+        if (week === 'B') {
             TIMETABLE_B[day][blockIndex] = { ...lessonData };
         }
     }
@@ -1414,8 +1410,12 @@ function openLessonModal(day, block, weekType) {
         const typeRadio = document.querySelector(`input[name="subject_type"][value="${existingEntry.subject_type || 'GK'}"]`);
         if (typeRadio) typeRadio.checked = true;
 
-        // Set week radio
-        const weekRadio = document.querySelector(`input[name="week"][value="${existingEntry.week || 'both'}"]`);
+        // Set week radio - validate week value to prevent issues
+        const validWeeks = ['A', 'B', 'both'];
+        const entryWeek = existingEntry.week && validWeeks.includes(existingEntry.week)
+            ? existingEntry.week
+            : 'both';
+        const weekRadio = document.querySelector(`input[name="week"][value="${entryWeek}"]`);
         if (weekRadio) weekRadio.checked = true;
     } else {
         title.textContent = `Block ${block}, ${DAY_NAMES[day]} hinzufügen`;
@@ -1436,11 +1436,18 @@ function openLessonModal(day, block, weekType) {
 }
 
 function findEntryForSlot(day, block, weekType) {
-    return timetableEntries.find(entry =>
-        entry.day === day &&
-        entry.block === block &&
-        (entry.week === weekType || entry.week === 'both')
-    );
+    // First try to find an exact week match
+    const exactMatch = timetableEntries.find(entry => {
+        const entryWeek = entry.week || 'both';
+        return entry.day === day && entry.block === block && entryWeek === weekType;
+    });
+    if (exactMatch) return exactMatch;
+
+    // Fall back to 'both' entries
+    return timetableEntries.find(entry => {
+        const entryWeek = entry.week || 'both';
+        return entry.day === day && entry.block === block && entryWeek === 'both';
+    });
 }
 
 function updateSubjectSuggestions() {

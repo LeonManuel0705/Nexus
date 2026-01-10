@@ -50,7 +50,10 @@
         <aside class="sidebar glass-card">
             <div class="sidebar-header">
                 <img src="/static/images/nexus-logo.png" alt="Nexus" class="sidebar-logo">
-                <h1 class="sidebar-title">Nexus</h1>
+                <div>
+                    <h1 class="sidebar-title">Nexus</h1>
+                    <span class="version-tag">Version: N-0.1 (closed-beta)</span>
+                </div>
             </div>
 
             <nav class="sidebar-nav">
@@ -164,38 +167,8 @@
                 </a>
             </nav>
 
-            <div class="sidebar-account" id="accountSection">
-                <button class="account-button" id="accountButton" onclick="toggleAccountMenu()">
-                    <div class="account-avatar" id="accountAvatar">
-                        <span id="accountInitial">?</span>
-                    </div>
-                    <div class="account-info">
-                        <span class="account-name" id="accountName">Nicht angemeldet</span>
-                        <span class="account-status" id="accountStatus">Konto wählen</span>
-                    </div>
-                    <svg class="account-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                </button>
-
-                <div class="account-menu" id="accountMenu">
-                    <div class="account-menu-header">Konten</div>
-                    <div class="account-list" id="accountList">
-                        
-                    </div>
-                    <div class="account-menu-divider"></div>
-                    <button class="account-menu-item" onclick="showCreateAccountModal()">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="12" y1="5" x2="12" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
-                        <span>Neues Konto erstellen</span>
-                    </button>
-                </div>
-            </div>
-
             <div class="sidebar-footer">
-                <button class="icon-btn theme-toggle" id="themeToggle" title="Theme wechseln">
+                <button class="icon-btn theme-toggle" id="themeToggle" title="Theme wechseln" onclick="HubApp.toggleTheme();">
                     <svg class="sun-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="5"></circle>
                         <line x1="12" y1="1" x2="12" y2="3"></line>
@@ -267,107 +240,6 @@
 
     {% block modals %}{% endblock %}
 
-    <div class="modal" id="welcomeModal">
-        <div class="modal-content welcome-modal">
-            <div class="welcome-header">
-                <img src="/static/images/nexus-logo.png" alt="Nexus" class="welcome-logo">
-                <h2>Willkommen bei Nexus!</h2>
-                <p>Erstelle dein Konto, um zu starten</p>
-            </div>
-            <form id="welcomeForm" onsubmit="createFirstAccount(event)">
-                <div class="form-group">
-                    <label for="welcomeUsername">Benutzername</label>
-                    <input type="text" id="welcomeUsername" name="username" placeholder="Dein Name..." required minlength="2" maxlength="20">
-                </div>
-                <div class="form-group">
-                    <label>Profilfarbe wählen</label>
-                    <div class="color-picker" id="welcomeColorPicker">
-                        <button type="button" class="color-option selected" data-color="#4285f4" style="background: #4285f4"></button>
-                        <button type="button" class="color-option" data-color="#ea4335" style="background: #ea4335"></button>
-                        <button type="button" class="color-option" data-color="#34a853" style="background: #34a853"></button>
-                        <button type="button" class="color-option" data-color="#fbbc04" style="background: #fbbc04"></button>
-                        <button type="button" class="color-option" data-color="#9c27b0" style="background: #9c27b0"></button>
-                        <button type="button" class="color-option" data-color="#e91e63" style="background: #e91e63"></button>
-                        <button type="button" class="color-option" data-color="#00bcd4" style="background: #00bcd4"></button>
-                        <button type="button" class="color-option" data-color="#ff5722" style="background: #ff5722"></button>
-                    </div>
-                </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn-primary btn-large">Konto erstellen</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div class="modal" id="createAccountModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Neues Konto erstellen</h3>
-                <button class="modal-close" onclick="closeCreateAccountModal()">&times;</button>
-            </div>
-            <form id="createAccountForm" onsubmit="createNewAccount(event)">
-                <div class="form-group">
-                    <label for="newAccountUsername">Benutzername</label>
-                    <input type="text" id="newAccountUsername" name="username" placeholder="Name eingeben..." required minlength="2" maxlength="20">
-                </div>
-                <div class="form-group">
-                    <label>Profilfarbe</label>
-                    <div class="color-picker" id="newAccountColorPicker">
-                        <button type="button" class="color-option selected" data-color="#4285f4" style="background: #4285f4"></button>
-                        <button type="button" class="color-option" data-color="#ea4335" style="background: #ea4335"></button>
-                        <button type="button" class="color-option" data-color="#34a853" style="background: #34a853"></button>
-                        <button type="button" class="color-option" data-color="#fbbc04" style="background: #fbbc04"></button>
-                        <button type="button" class="color-option" data-color="#9c27b0" style="background: #9c27b0"></button>
-                        <button type="button" class="color-option" data-color="#e91e63" style="background: #e91e63"></button>
-                        <button type="button" class="color-option" data-color="#00bcd4" style="background: #00bcd4"></button>
-                        <button type="button" class="color-option" data-color="#ff5722" style="background: #ff5722"></button>
-                    </div>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn-secondary" onclick="closeCreateAccountModal()">Abbrechen</button>
-                    <button type="submit" class="btn-primary">Erstellen</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div class="modal" id="accountManageModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Konto verwalten</h3>
-                <button class="modal-close" onclick="closeAccountManageModal()">&times;</button>
-            </div>
-            <div class="account-manage-content">
-                <div class="account-manage-avatar" id="manageAccountAvatar">
-                    <span id="manageAccountInitial">?</span>
-                </div>
-                <form id="manageAccountForm" onsubmit="updateAccountDetails(event)">
-                    <div class="form-group">
-                        <label for="manageAccountUsername">Benutzername</label>
-                        <input type="text" id="manageAccountUsername" name="username" required minlength="2" maxlength="20">
-                    </div>
-                    <div class="form-group">
-                        <label>Profilfarbe</label>
-                        <div class="color-picker" id="manageAccountColorPicker">
-                            <button type="button" class="color-option" data-color="#4285f4" style="background: #4285f4"></button>
-                            <button type="button" class="color-option" data-color="#ea4335" style="background: #ea4335"></button>
-                            <button type="button" class="color-option" data-color="#34a853" style="background: #34a853"></button>
-                            <button type="button" class="color-option" data-color="#fbbc04" style="background: #fbbc04"></button>
-                            <button type="button" class="color-option" data-color="#9c27b0" style="background: #9c27b0"></button>
-                            <button type="button" class="color-option" data-color="#e91e63" style="background: #e91e63"></button>
-                            <button type="button" class="color-option" data-color="#00bcd4" style="background: #00bcd4"></button>
-                            <button type="button" class="color-option" data-color="#ff5722" style="background: #ff5722"></button>
-                        </div>
-                    </div>
-                    <div class="form-actions">
-                        <button type="button" class="btn-danger" onclick="confirmDeleteAccount()">Konto löschen</button>
-                        <button type="submit" class="btn-primary">Speichern</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <div class="offline-banner" id="offlineBanner">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="1" y1="1" x2="23" y2="23"></line>
@@ -391,36 +263,18 @@
         </div>
     </div>
 
-    <script src="/static/js/hub.js"></script>
-    <script src="/static/js/nexus-offline.js"></script>
-    <script src="/static/js/connection-manager.js"></script>
+    <script src="/static/js/hub.js?v=3"></script>
+    <script src="/static/js/nexus-offline.js?v=3"></script>
+    <script src="/static/js/connection-manager.js?v=3"></script>
 
     <script>
-    let managingAccountId = null;
-
-    /**
-     * Get the current user ID from NexusAccounts
-     * Returns null if no account is logged in
-     */
+    // Single-user mode - simplified helper functions for API compatibility
     function getCurrentUserId() {
-        if (NexusAccounts && NexusAccounts.currentAccount) {
-            return NexusAccounts.currentAccount.id;
-        }
-        return null;
+        return null; // Single-user mode - no user ID needed
     }
 
-    /**
-     * Build a URL with user_id query parameter
-     * @param {string} baseUrl - The base API URL
-     * @param {Object} params - Additional query parameters
-     * @returns {string} URL with user_id and other params
-     */
     function buildApiUrl(baseUrl, params = {}) {
-        const userId = getCurrentUserId();
         const url = new URL(baseUrl, window.location.origin);
-        if (userId) {
-            url.searchParams.set('user_id', userId);
-        }
         Object.entries(params).forEach(([key, value]) => {
             if (value !== undefined && value !== null) {
                 url.searchParams.set(key, value);
@@ -429,41 +283,9 @@
         return url.toString();
     }
 
-    /**
-     * Add user_id to a request body object
-     * @param {Object} data - The request body data
-     * @returns {Object} Data with user_id added
-     */
     function addUserIdToBody(data = {}) {
-        const userId = getCurrentUserId();
-        if (userId) {
-            return { ...data, user_id: userId };
-        }
-        return data;
+        return data; // Single-user mode - return unchanged
     }
-
-    // Initialize account system when page loads
-    window.addEventListener('nexus-ready', function(e) {
-        const account = e.detail.account;
-        if (account) {
-            updateAccountUI(account);
-        } else {
-            // No account - show welcome modal
-            showWelcomeModal();
-        }
-    });
-
-    // Listen for account changes
-    window.addEventListener('nexus-account-changed', function(e) {
-        const account = e.detail;
-        if (account) {
-            updateAccountUI(account);
-            // Reload page to refresh data for new account
-            location.reload();
-        } else {
-            showWelcomeModal();
-        }
-    });
 
     // Connection state management with NexusConnection
     function updateOfflineBanner() {
@@ -472,12 +294,10 @@
         const state = NexusConnection.state;
 
         if (NexusConnection.isOffline()) {
-            // Fully offline
             bannerText.textContent = 'Offline-Modus';
             banner.classList.remove('school-network');
             banner.classList.add('visible');
         } else if (state.isSchoolNetwork) {
-            // School network - IServ only, no external internet
             bannerText.textContent = 'Schulnetzwerk (nur IServ)';
             banner.classList.add('visible', 'school-network');
         } else {
@@ -502,217 +322,6 @@
         NexusConnection.state.internetAvailable = false;
         NexusConnection.state.iservAvailable = false;
         updateOfflineBanner();
-    });
-
-    function updateAccountUI(account) {
-        const avatar = document.getElementById('accountAvatar');
-        const initial = document.getElementById('accountInitial');
-        const name = document.getElementById('accountName');
-        const status = document.getElementById('accountStatus');
-
-        if (account) {
-            avatar.style.background = account.avatar_color || '#4285f4';
-            initial.textContent = account.username.charAt(0).toUpperCase();
-            name.textContent = account.display_name || account.username;
-            status.textContent = 'Angemeldet';
-        }
-    }
-
-    async function loadAccountList() {
-        const accounts = await NexusAccounts.getAllAccounts();
-        const list = document.getElementById('accountList');
-        const currentId = NexusAccounts.getCurrentUserId();
-
-        list.innerHTML = accounts.map(acc => `
-            <div class="account-menu-item account-option ${acc.id === currentId ? 'active' : ''}"
-                 onclick="switchToAccount(${acc.id})" data-account-id="${acc.id}">
-                <div class="account-option-avatar" style="background: ${acc.avatar_color || '#4285f4'}">
-                    ${acc.username.charAt(0).toUpperCase()}
-                </div>
-                <div class="account-option-info">
-                    <span class="account-option-name">${acc.display_name || acc.username}</span>
-                    ${acc.id === currentId ? '<span class="account-option-badge">Aktiv</span>' : ''}
-                </div>
-                <button class="account-option-edit" onclick="event.stopPropagation(); showAccountManageModal(${acc.id})" title="Bearbeiten">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="1"></circle>
-                        <circle cx="19" cy="12" r="1"></circle>
-                        <circle cx="5" cy="12" r="1"></circle>
-                    </svg>
-                </button>
-            </div>
-        `).join('');
-    }
-
-    function toggleAccountMenu() {
-        const menu = document.getElementById('accountMenu');
-        const isOpen = menu.classList.contains('open');
-
-        if (!isOpen) {
-            loadAccountList();
-        }
-
-        menu.classList.toggle('open');
-
-        // Close when clicking outside
-        if (!isOpen) {
-            setTimeout(() => {
-                document.addEventListener('click', closeAccountMenuOnClickOutside);
-            }, 0);
-        }
-    }
-
-    function closeAccountMenuOnClickOutside(e) {
-        const menu = document.getElementById('accountMenu');
-        const button = document.getElementById('accountButton');
-
-        if (!menu.contains(e.target) && !button.contains(e.target)) {
-            menu.classList.remove('open');
-            document.removeEventListener('click', closeAccountMenuOnClickOutside);
-        }
-    }
-
-    async function switchToAccount(accountId) {
-        try {
-            await NexusAccounts.switchAccount(accountId);
-            document.getElementById('accountMenu').classList.remove('open');
-        } catch (err) {
-            alert('Fehler beim Kontowechsel: ' + err.message);
-        }
-    }
-
-    function showWelcomeModal() {
-        document.getElementById('welcomeModal').classList.add('active');
-        document.getElementById('welcomeUsername').focus();
-    }
-
-    async function createFirstAccount(e) {
-        e.preventDefault();
-        const username = document.getElementById('welcomeUsername').value.trim();
-        const colorBtn = document.querySelector('#welcomeColorPicker .color-option.selected');
-        const color = colorBtn ? colorBtn.dataset.color : '#4285f4';
-
-        try {
-            const account = await NexusAccounts.createAccount(username, username, color);
-            await NexusAccounts.switchAccount(account.id);
-            document.getElementById('welcomeModal').classList.remove('active');
-        } catch (err) {
-            alert('Fehler: ' + err.message);
-        }
-    }
-
-    function showCreateAccountModal() {
-        document.getElementById('accountMenu').classList.remove('open');
-        document.getElementById('createAccountModal').classList.add('active');
-        document.getElementById('newAccountUsername').value = '';
-        document.getElementById('newAccountUsername').focus();
-    }
-
-    function closeCreateAccountModal() {
-        document.getElementById('createAccountModal').classList.remove('active');
-    }
-
-    async function createNewAccount(e) {
-        e.preventDefault();
-        const username = document.getElementById('newAccountUsername').value.trim();
-        const colorBtn = document.querySelector('#newAccountColorPicker .color-option.selected');
-        const color = colorBtn ? colorBtn.dataset.color : '#4285f4';
-
-        try {
-            const account = await NexusAccounts.createAccount(username, username, color);
-            closeCreateAccountModal();
-            // Ask if user wants to switch
-            if (confirm(`Konto "${username}" erstellt. Jetzt wechseln?`)) {
-                await NexusAccounts.switchAccount(account.id);
-            }
-        } catch (err) {
-            alert('Fehler: ' + err.message);
-        }
-    }
-
-    async function showAccountManageModal(accountId) {
-        document.getElementById('accountMenu').classList.remove('open');
-        managingAccountId = accountId;
-
-        const account = await NexusDB.get('accounts', accountId);
-        if (!account) return;
-
-        document.getElementById('manageAccountUsername').value = account.username;
-        const avatar = document.getElementById('manageAccountAvatar');
-        avatar.style.background = account.avatar_color || '#4285f4';
-        document.getElementById('manageAccountInitial').textContent = account.username.charAt(0).toUpperCase();
-
-        // Select current color
-        document.querySelectorAll('#manageAccountColorPicker .color-option').forEach(btn => {
-            btn.classList.toggle('selected', btn.dataset.color === account.avatar_color);
-        });
-
-        document.getElementById('accountManageModal').classList.add('active');
-    }
-
-    function closeAccountManageModal() {
-        document.getElementById('accountManageModal').classList.remove('active');
-        managingAccountId = null;
-    }
-
-    async function updateAccountDetails(e) {
-        e.preventDefault();
-        if (!managingAccountId) return;
-
-        const username = document.getElementById('manageAccountUsername').value.trim();
-        const colorBtn = document.querySelector('#manageAccountColorPicker .color-option.selected');
-        const color = colorBtn ? colorBtn.dataset.color : '#4285f4';
-
-        try {
-            await NexusAccounts.updateAccount(managingAccountId, {
-                username: username,
-                display_name: username,
-                avatar_color: color
-            });
-            closeAccountManageModal();
-
-            // Update UI if current account
-            if (NexusAccounts.getCurrentUserId() === managingAccountId) {
-                updateAccountUI(NexusAccounts.currentAccount);
-            }
-        } catch (err) {
-            alert('Fehler: ' + err.message);
-        }
-    }
-
-    async function confirmDeleteAccount() {
-        if (!managingAccountId) return;
-
-        const accounts = await NexusAccounts.getAllAccounts();
-        if (accounts.length <= 1) {
-            alert('Du kannst dein einziges Konto nicht löschen.');
-            return;
-        }
-
-        if (confirm('Konto und alle Daten wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden!')) {
-            try {
-                await NexusAccounts.deleteAccount(managingAccountId);
-                closeAccountManageModal();
-            } catch (err) {
-                alert('Fehler: ' + err.message);
-            }
-        }
-    }
-
-    // Color picker functionality
-    document.querySelectorAll('.color-picker').forEach(picker => {
-        picker.addEventListener('click', function(e) {
-            const btn = e.target.closest('.color-option');
-            if (btn) {
-                picker.querySelectorAll('.color-option').forEach(b => b.classList.remove('selected'));
-                btn.classList.add('selected');
-
-                // Update avatar preview in manage modal
-                if (picker.id === 'manageAccountColorPicker') {
-                    document.getElementById('manageAccountAvatar').style.background = btn.dataset.color;
-                }
-            }
-        });
     });
     </script>
 

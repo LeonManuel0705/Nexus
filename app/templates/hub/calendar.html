@@ -31,13 +31,6 @@
         <button class="filter-tab" data-filter="training" onclick="setCalendarFilter('training')">Training</button>
         <button class="filter-tab" data-filter="personal" onclick="setCalendarFilter('personal')">Privat</button>
         <button class="filter-tab" data-filter="holiday" onclick="setCalendarFilter('holiday')">Feiertage</button>
-        <button class="filter-tab" data-filter="iserv" onclick="setCalendarFilter('iserv')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
-                <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
-                <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
-            </svg>
-            IServ
-        </button>
     </div>
 
     <div class="calendar-layout">
@@ -635,8 +628,7 @@ async function loadEvents() {
         // Fetch CalDAV events (Samsung, iCloud, etc.)
         await loadCalDAVEvents(startStr, endStr);
 
-        // Fetch IServ events
-        await loadIServEvents();
+        // IServ calendar events disabled (feature removed)
 
         // Fetch local macOS calendar events
         await loadLocalCalendarEvents();
