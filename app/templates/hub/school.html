@@ -39,7 +39,7 @@
         <button class="filter-tab" onclick="showTab('tests')">Tests</button>
         <button class="filter-tab" onclick="showTab('exams')">Klausuren</button>
         <button class="filter-tab" onclick="showTab('grades')">Noten</button>
-        <button class="filter-tab" onclick="showTab('calendar')">Kalender</button>
+        <button class="filter-tab" onclick="showTab('iserv')">IServ</button>
     </div>
 
     <div class="tab-content" id="stundenplanTab">
@@ -344,76 +344,6 @@
                 </svg>
                 <span>Keine Noten eingetragen</span>
                 <button class="btn-primary small" onclick="openAddGradeModal()">Note hinzufügen</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="tab-content hidden" id="calendarTab">
-        <div class="section-header">
-            <h3 class="section-title">Schulkalender</h3>
-            <div class="calendar-actions">
-                <button class="btn-secondary small" onclick="refreshSchoolCalendar()">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="23 4 23 10 17 10"></polyline>
-                        <polyline points="1 20 1 14 7 14"></polyline>
-                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                    </svg>
-                    Aktualisieren
-                </button>
-                <button class="btn-primary small" onclick="openAddCalendarEventModal()">+ Termin</button>
-            </div>
-        </div>
-
-        <div class="calendar-container glass-card">
-            <div class="calendar-header">
-                <button class="btn-icon" onclick="changeCalendarMonth(-1)">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="15 18 9 12 15 6"></polyline>
-                    </svg>
-                </button>
-                <h3 class="calendar-month-title" id="calendarMonthTitle">Januar 2026</h3>
-                <button class="btn-icon" onclick="changeCalendarMonth(1)">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
-                </button>
-                <button class="btn-secondary small" onclick="goToToday()" style="margin-left: 12px;">Heute</button>
-            </div>
-            <div class="calendar-weekdays">
-                <div class="calendar-weekday">Mo</div>
-                <div class="calendar-weekday">Di</div>
-                <div class="calendar-weekday">Mi</div>
-                <div class="calendar-weekday">Do</div>
-                <div class="calendar-weekday">Fr</div>
-                <div class="calendar-weekday weekend">Sa</div>
-                <div class="calendar-weekday weekend">So</div>
-            </div>
-            <div class="calendar-grid" id="calendarGrid">
-                
-            </div>
-        </div>
-
-        <div class="upcoming-events-section" style="margin-top: 24px;">
-            <h3 class="section-title">Anstehende Termine</h3>
-            <div class="events-list" id="schoolEventsList">
-                <div class="empty-state">
-                    <span>Keine Termine vorhanden</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="iserv-events-section" id="iservCalendarSection" style="margin-top: 24px; display: none;">
-            <div class="section-header">
-                <h3 class="section-title">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
-                        <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
-                    </svg>
-                    IServ Termine
-                </h3>
-            </div>
-            <div class="events-list" id="iservSchoolEventsList">
-                <div class="loading-state">Lade IServ-Termine...</div>
             </div>
         </div>
     </div>
@@ -1945,18 +1875,17 @@ function updateStundenplanDisplay() {
             : `${otherWeek}-Woche zeigen`;      // Switch to the other week
     }
 
-    // Update current lesson (always based on actual now)
-    updateCurrentLesson(viewingWeek || actualWeekType);
+    // Update current lesson (always based on actual now, not toggled week)
+    updateCurrentLesson(actualWeekType);
 
-    // Update today's schedule - use the calculated todayDate with its correct week type
-    const todayScheduleWeekType = viewingWeek || todayWeekType;
-    updateDaySchedule('today', todayDate, todayScheduleWeekType, schoolOver || isWeekend);
+    // Update today's schedule - ALWAYS use the actual week type for that date
+    // The toggle should NOT affect Today/Tomorrow - only the Wochenübersicht
+    updateDaySchedule('today', todayDate, todayWeekType, schoolOver || isWeekend);
 
-    // Update tomorrow's schedule - use calculated tomorrowDate with its correct week type
-    const tomorrowScheduleWeekType = viewingWeek || tomorrowWeekType;
-    updateDaySchedule('tomorrow', tomorrowDate, tomorrowScheduleWeekType, false);
+    // Update tomorrow's schedule - ALWAYS use the actual week type for that date
+    updateDaySchedule('tomorrow', tomorrowDate, tomorrowWeekType, false);
 
-    // Update week overview
+    // Update week overview - THIS is the only thing affected by the toggle
     updateWeekOverview(displayWeekType);
 }
 
@@ -3907,33 +3836,9 @@ function getCategoryLabel(category) {
 }
 
 async function loadIServCalendarEvents() {
-    if (!iservConnected) {
-        document.getElementById('iservCalendarSection').style.display = 'none';
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/iserv/events');
-        const data = await response.json();
-
-        if (data.success && data.events) {
-            iservCalendarEvents = data.events;
-            console.log('IServ calendar events loaded:', iservCalendarEvents.length, 'events');
-            renderIServCalendarEvents();
-            renderCalendar(); // Re-render to show IServ events
-            document.getElementById('iservCalendarSection').style.display = 'block';
-        } else {
-            console.log('IServ events response:', data);
-            // Still show the section but with appropriate message
-            iservCalendarEvents = [];
-            renderIServCalendarEvents();
-            document.getElementById('iservCalendarSection').style.display = 'block';
-        }
-    } catch (err) {
-        console.error('Could not load IServ calendar events:', err);
-        iservCalendarEvents = [];
-        renderIServCalendarEvents();
-    }
+    // Schulkalender was removed - this function is now a no-op
+    // Keeping it to avoid errors from existing calls
+    return;
 }
 
 function renderIServCalendarEvents() {
