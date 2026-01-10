@@ -1938,7 +1938,11 @@ function updateStundenplanDisplay() {
     // Update toggle button (only visible if A/B weeks enabled)
     if (timetableSettings.has_ab_weeks) {
         const otherWeek = displayWeekType === 'A' ? 'B' : 'A';
-        document.getElementById('toggleWeekText').textContent = viewingWeek ? `Aktuelle Woche (${actualWeekType})` : `${otherWeek}-Woche zeigen`;
+        // When viewingWeek is set, we're showing a forced view - button should return to default
+        // When viewingWeek is null, we're showing the default - button should switch to other week
+        document.getElementById('toggleWeekText').textContent = viewingWeek
+            ? `${todayWeekType}-Woche zeigen`  // Return to the default displayed week
+            : `${otherWeek}-Woche zeigen`;      // Switch to the other week
     }
 
     // Update current lesson (always based on actual now)
@@ -2315,14 +2319,27 @@ function updateWeekOverview(weekType) {
 
 // Toggle between viewing current week and other week
 function toggleWeekView() {
-    const actualWeekType = getWeekType(new Date());
-    console.log('[Timetable] toggleWeekView: actualWeekType =', actualWeekType, ', viewingWeek before =', viewingWeek);
+    // Get the currently DISPLAYED week type (not the real-world week)
+    // This is important because on weekends, we show next Monday which might be a different week
+    const now = new Date();
+    let displayedDate = new Date(now);
+    const dayOfWeek = now.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const currentHour = now.getHours();
+    const schoolOver = dayOfWeek >= 1 && dayOfWeek <= 5 && currentHour >= 16;
+
+    if (isWeekend || schoolOver) {
+        displayedDate = getNextSchoolDay(now);
+    }
+
+    const displayedWeekType = getWeekType(displayedDate);
+    console.log('[Timetable] toggleWeekView: displayedWeekType =', displayedWeekType, ', viewingWeek before =', viewingWeek);
 
     if (viewingWeek === null) {
-        // Switch to other week
-        viewingWeek = actualWeekType === 'A' ? 'B' : 'A';
+        // Switch to the OTHER week (opposite of what's displayed)
+        viewingWeek = displayedWeekType === 'A' ? 'B' : 'A';
     } else {
-        // Switch back to current week
+        // Switch back to the default displayed week
         viewingWeek = null;
     }
 
