@@ -272,7 +272,9 @@ function getReviewPreview(review) {
 }
 
 function viewReview(id) {
-    const review = reviews.find(r => r.id === id);
+    // Convert id to number for comparison (onclick passes string)
+    const numId = typeof id === 'string' ? parseInt(id, 10) : id;
+    const review = reviews.find(r => r.id === numId || r.id === id);
     if (!review) return;
 
     let content = '';
@@ -331,11 +333,16 @@ function deleteViewedReview() {
 }
 
 function confirmDeleteReview(id) {
-    const review = reviews.find(r => r.id === id);
-    if (!review) return;
+    // Convert id to number for comparison (onclick passes string)
+    const numId = typeof id === 'string' ? parseInt(id, 10) : id;
+    const review = reviews.find(r => r.id === numId || r.id === id);
+    if (!review) {
+        console.error('Review not found:', id);
+        return;
+    }
 
     if (confirm(`${review.type === 'daily' ? 'Tages' : 'Wochen'}-Review vom ${new Date(review.date).toLocaleDateString('de-DE')} wirklich löschen?`)) {
-        deleteReview(id);
+        deleteReview(review.id);
     }
 }
 

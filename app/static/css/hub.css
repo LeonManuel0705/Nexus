@@ -2262,14 +2262,14 @@ body {
 }
 
 .sidebar-logo {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
     object-fit: contain;
 }
 
 .sidebar-title {
-    font-size: 26px;
+    font-size: 32px;
     font-weight: 700;
     background: var(--accent-gradient);
     -webkit-background-clip: text;
@@ -2382,6 +2382,16 @@ body {
     margin-left: 240px;
     padding: 24px;
     min-height: 100vh;
+    animation: pageSlideIn 0.12s ease-out;
+}
+
+@keyframes pageSlideIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 .dashboard {
@@ -3382,6 +3392,13 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 16px;
+    transition: all var(--transition-fast);
+}
+
+.health-stats[style*="cursor: pointer"]:hover .health-stat {
+    transform: translateY(-2px);
+    box-shadow: var(--card-shadow-hover);
+    border-color: var(--accent);
 }
 
 .health-stat {
@@ -3390,6 +3407,7 @@ body {
     border: 1px solid var(--card-border);
     border-radius: var(--radius-sm);
     text-align: center;
+    transition: all var(--transition-fast);
 }
 
 .health-value {
@@ -3416,11 +3434,13 @@ body {
     border: 1px solid var(--card-border);
     border-radius: var(--radius);
     transition: all var(--transition-fast);
+    cursor: pointer;
 }
 
 .project-card:hover {
     transform: translateY(-2px);
     box-shadow: var(--card-shadow-hover);
+    border-color: var(--accent);
 }
 
 .project-header {

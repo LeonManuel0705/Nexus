@@ -52,7 +52,7 @@
                 <img src="/static/images/nexus-logo.png" alt="Nexus" class="sidebar-logo">
                 <div>
                     <h1 class="sidebar-title">Nexus</h1>
-                    <span class="version-tag">Version: N-0.1 (closed-beta)</span>
+                    <span class="version-tag">0.1 closed beta</span>
                 </div>
             </div>
 
@@ -544,6 +544,32 @@
         deferredPrompt = null;
     });
     </script>
+
+    <script>
+    // Smooth page transitions - fade entire page for seamless experience
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.nav-item').forEach(link => {
+            link.addEventListener('click', function(e) {
+                const href = this.getAttribute('href');
+                if (!href || href === window.location.pathname || href.startsWith('http')) return;
+
+                e.preventDefault();
+                document.body.classList.add('page-transitioning');
+
+                setTimeout(() => {
+                    window.location.href = href;
+                }, 80);
+            });
+        });
+    });
+    </script>
+
+    <style>
+    body.page-transitioning {
+        opacity: 0;
+        transition: opacity 0.08s ease-out;
+    }
+    </style>
 
     {% block scripts %}{% endblock %}
 </body>
