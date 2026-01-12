@@ -1,0 +1,1804 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus - Dein Produktivitäts-Hub</title>
+    <meta name="description" content="Nexus vereint Aufgaben, Kalender, Schule und mehr in einer einzigen App. Kostenlos herunterladen.">
+    <link rel="icon" type="image/png" sizes="64x64" href="favicon.png">
+    <link rel="apple-touch-icon" href="images/nexus-logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #09090b;
+            --bg-elevated: #18181b;
+            --bg-card: #1f1f23;
+            --border: rgba(255,255,255,0.08);
+            --text: #fafafa;
+            --text-muted: #a1a1aa;
+            --accent-1: #667eea;
+            --accent-2: #764ba2;
+            --accent-3: #f093fb;
+            --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            --glow: rgba(102, 126, 234, 0.4);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Animated gradient background */
+        .gradient-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .gradient-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.15;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: var(--accent-1);
+            top: -200px;
+            right: -100px;
+            animation-delay: 0s;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: var(--accent-3);
+            bottom: 20%;
+            left: -150px;
+            animation-delay: -7s;
+        }
+
+        .orb-3 {
+            width: 400px;
+            height: 400px;
+            background: var(--accent-2);
+            top: 50%;
+            right: 10%;
+            animation-delay: -14s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(30px, -30px) scale(1.05); }
+            50% { transform: translate(-20px, 20px) scale(0.95); }
+            75% { transform: translate(20px, 10px) scale(1.02); }
+        }
+
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 20px 0;
+            transition: all 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        nav.scrolled {
+            background: rgba(9, 9, 11, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 0;
+        }
+
+        .nav-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            text-decoration: none;
+        }
+
+        .logo img {
+            width: 42px;
+            height: 42px;
+        }
+
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-cta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-cta a {
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .nav-link {
+            color: var(--text-muted);
+        }
+
+        .nav-link:hover {
+            color: var(--text);
+        }
+
+        .nav-btn {
+            background: var(--gradient);
+            color: white;
+            position: relative;
+            overflow: visible;
+            --border-angle: 0deg;
+            --border-progress: 0;
+        }
+
+        .nav-btn::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            border-radius: 12px;
+            background: conic-gradient(
+                from calc(var(--border-angle) - 180deg),
+                transparent 0deg,
+                transparent calc(180deg - (var(--border-progress) * 180deg)),
+                #667eea calc(180deg - (var(--border-progress) * 180deg)),
+                #f093fb 180deg,
+                #667eea calc(180deg + (var(--border-progress) * 180deg)),
+                transparent calc(180deg + (var(--border-progress) * 180deg)),
+                transparent 360deg
+            );
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .nav-btn.animating::before {
+            opacity: 1;
+        }
+
+        .nav-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px var(--glow);
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 120px 32px 80px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #10b981;
+            padding: 10px 20px;
+            border-radius: 100px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 40px;
+            animation: fadeInUp 1s ease 0.2s both;
+        }
+
+        .hero-badge::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.3); }
+        }
+
+        .hero h1 {
+            font-size: clamp(2.5rem, 8vw, 5rem);
+            font-weight: 800;
+            line-height: 1.05;
+            letter-spacing: -0.03em;
+            margin-bottom: 32px;
+            animation: fadeInUp 1s ease 0.4s both;
+        }
+
+        .hero h1 .gradient {
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-sub {
+            font-size: clamp(1.1rem, 2.5vw, 1.4rem);
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto 48px;
+            line-height: 1.7;
+            animation: fadeInUp 1s ease 0.6s both;
+        }
+
+        .hero-sub strong {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .hero-cta {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+            animation: fadeInUp 1s ease 0.8s both;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 18px 36px;
+            border-radius: 14px;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+                        box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+            position: relative;
+            overflow: visible;
+            --border-angle: 0deg;
+            --border-progress: 0;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            border-radius: 16px;
+            background: conic-gradient(
+                from calc(var(--border-angle) - 180deg),
+                transparent 0deg,
+                transparent calc(180deg - (var(--border-progress) * 180deg)),
+                #667eea calc(180deg - (var(--border-progress) * 180deg)),
+                #764ba2 calc(180deg - (var(--border-progress) * 90deg)),
+                #f093fb 180deg,
+                #764ba2 calc(180deg + (var(--border-progress) * 90deg)),
+                #667eea calc(180deg + (var(--border-progress) * 180deg)),
+                transparent calc(180deg + (var(--border-progress) * 180deg)),
+                transparent 360deg
+            );
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .btn.animating::before {
+            opacity: 1;
+        }
+
+        .btn-primary {
+            background: var(--gradient);
+            color: white;
+            box-shadow: 0 4px 20px var(--glow);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 12px 40px var(--glow);
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 14px;
+            background: var(--bg-card);
+            z-index: -1;
+            border: 1px solid var(--border);
+            transition: border-color 0.3s, background 0.3s;
+        }
+
+        .btn-secondary:hover::after {
+            background: var(--bg-elevated);
+            border-color: transparent;
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-3px);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Hero Visual */
+        .hero-visual {
+            margin-top: 80px;
+            width: 100%;
+            max-width: 1100px;
+            position: relative;
+            animation: fadeInUp 1.2s ease 1s both;
+        }
+
+        .hero-visual::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            background: var(--gradient);
+            border-radius: 22px;
+            opacity: 0.5;
+            filter: blur(30px);
+            z-index: -1;
+        }
+
+        .hero-visual img {
+            width: 100%;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            box-shadow: 0 60px 120px rgba(0,0,0,0.5),
+                        0 20px 50px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .hero-visual:hover img {
+            transform: scale(1.02);
+        }
+
+        /* Problem/Solution Section */
+        .problem {
+            padding: 160px 32px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .problem-inner {
+            max-width: 900px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .section-label {
+            display: inline-block;
+            font-size: 0.95rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 24px;
+        }
+
+        .problem h2 {
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 32px;
+            letter-spacing: -0.02em;
+        }
+
+        .problem-text {
+            font-size: 1.15rem;
+            color: var(--text-muted);
+            line-height: 1.8;
+            margin-bottom: 48px;
+        }
+
+        .problem-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 32px;
+            margin-top: 64px;
+        }
+
+        .stat {
+            padding: 32px;
+            background: var(--bg-card);
+            border-radius: 20px;
+            position: relative;
+            overflow: visible;
+            --border-angle: 0deg;
+            --border-progress: 0;
+            transition: transform 0.4s ease, box-shadow 0.4s ease;
+        }
+
+        .stat::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            border-radius: 22px;
+            background: conic-gradient(
+                from calc(var(--border-angle) - 180deg),
+                transparent 0deg,
+                transparent calc(180deg - (var(--border-progress) * 180deg)),
+                #667eea calc(180deg - (var(--border-progress) * 180deg)),
+                #764ba2 calc(180deg - (var(--border-progress) * 90deg)),
+                #f093fb 180deg,
+                #764ba2 calc(180deg + (var(--border-progress) * 90deg)),
+                #667eea calc(180deg + (var(--border-progress) * 180deg)),
+                transparent calc(180deg + (var(--border-progress) * 180deg)),
+                transparent 360deg
+            );
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .stat::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 20px;
+            background: var(--bg-card);
+            z-index: -1;
+            border: 1px solid var(--border);
+            transition: border-color 0.3s;
+        }
+
+        .stat.animating::before {
+            opacity: 1;
+        }
+
+        .stat:hover::after {
+            border-color: transparent;
+        }
+
+        .stat:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .stat-number, .stat-label {
+            position: relative;
+            z-index: 1;
+        }
+
+        .stat-number {
+            font-size: 3rem;
+            font-weight: 800;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+        }
+
+        /* Features Showcase */
+        .showcase {
+            padding: 120px 32px 160px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .showcase-header {
+            text-align: center;
+            max-width: 700px;
+            margin: 0 auto 100px;
+        }
+
+        .showcase-header h2 {
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 800;
+            margin-bottom: 20px;
+            letter-spacing: -0.02em;
+        }
+
+        .showcase-header p {
+            font-size: 1.15rem;
+            color: var(--text-muted);
+        }
+
+        .feature-block {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 80px;
+            align-items: center;
+            margin-bottom: 180px;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .feature-block:last-child {
+            margin-bottom: 0;
+        }
+
+        .feature-block.reverse {
+            direction: rtl;
+        }
+
+        .feature-block.reverse > * {
+            direction: ltr;
+        }
+
+        .feature-content {
+            padding: 20px 0;
+        }
+
+        .feature-icon {
+            width: 56px;
+            height: 56px;
+            background: var(--gradient);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 28px;
+            box-shadow: 0 8px 30px var(--glow);
+        }
+
+        .feature-icon svg {
+            width: 28px;
+            height: 28px;
+            stroke: white;
+        }
+
+        .feature-content h3 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            letter-spacing: -0.02em;
+        }
+
+        .feature-content p {
+            font-size: 1.05rem;
+            color: var(--text-muted);
+            line-height: 1.8;
+            margin-bottom: 28px;
+        }
+
+        .feature-list {
+            list-style: none;
+        }
+
+        .feature-list li {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 1rem;
+            color: var(--text);
+            margin-bottom: 16px;
+        }
+
+        .feature-list li::before {
+            content: '';
+            width: 24px;
+            height: 24px;
+            background: var(--gradient);
+            border-radius: 50%;
+            flex-shrink: 0;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+            background-size: 12px;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        .feature-image {
+            position: relative;
+        }
+
+        .feature-image::before {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            background: var(--gradient);
+            border-radius: 18px;
+            opacity: 0.3;
+            filter: blur(40px);
+            z-index: -1;
+            transition: opacity 0.5s;
+        }
+
+        .feature-image:hover::before {
+            opacity: 0.5;
+        }
+
+        .feature-image img {
+            width: 100%;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.4);
+            cursor: pointer;
+            transition: all 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .feature-image:hover img {
+            transform: scale(1.03) translateY(-8px);
+            box-shadow: 0 60px 100px rgba(0,0,0,0.5);
+        }
+
+        /* Why Section */
+        .why {
+            padding: 140px 32px;
+            position: relative;
+            z-index: 1;
+            background: linear-gradient(180deg, var(--bg) 0%, rgba(102, 126, 234, 0.03) 30%, rgba(118, 75, 162, 0.05) 70%, var(--bg) 100%);
+        }
+
+        .why::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.3), transparent);
+        }
+
+        .why::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.3), transparent);
+        }
+
+        .why-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .why-header {
+            text-align: center;
+            margin-bottom: 80px;
+        }
+
+        .why-header h2 {
+            font-size: clamp(2rem, 4vw, 2.8rem);
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+
+        .why-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 32px;
+        }
+
+        /* Animated border card */
+        .why-card {
+            position: relative;
+            background: var(--bg);
+            border-radius: 24px;
+            padding: 40px 32px;
+            transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+                        box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+            overflow: visible;
+            --border-angle: 0deg;
+            --border-progress: 0;
+        }
+
+        .why-card::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            border-radius: 26px;
+            background: conic-gradient(
+                from calc(var(--border-angle) - 180deg),
+                transparent 0deg,
+                transparent calc(180deg - (var(--border-progress) * 180deg)),
+                #667eea calc(180deg - (var(--border-progress) * 180deg)),
+                #764ba2 calc(180deg - (var(--border-progress) * 90deg)),
+                #f093fb 180deg,
+                #764ba2 calc(180deg + (var(--border-progress) * 90deg)),
+                #667eea calc(180deg + (var(--border-progress) * 180deg)),
+                transparent calc(180deg + (var(--border-progress) * 180deg)),
+                transparent 360deg
+            );
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .why-card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 24px;
+            background: var(--bg);
+            z-index: -1;
+            border: 1px solid var(--border);
+            transition: border-color 0.3s;
+        }
+
+        .why-card:hover {
+            transform: translateY(-12px);
+            box-shadow: 0 30px 80px rgba(0,0,0,0.4);
+        }
+
+        .why-card:hover::after {
+            border-color: transparent;
+        }
+
+        .why-card.animating::before {
+            opacity: 1;
+        }
+
+        .why-card-icon {
+            width: 52px;
+            height: 52px;
+            background: var(--bg-card);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 24px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .why-card-icon svg {
+            width: 26px;
+            height: 26px;
+            stroke: url(#icon-gradient);
+        }
+
+        .why-card h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 14px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .why-card p {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            line-height: 1.7;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* CTA Section */
+        .cta {
+            padding: 160px 32px;
+            position: relative;
+            z-index: 1;
+            text-align: center;
+        }
+
+        .cta-box {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--bg-card);
+            border-radius: 32px;
+            padding: 80px 60px;
+            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-box::before {
+            content: '';
+            position: absolute;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 400px;
+            height: 400px;
+            background: var(--gradient);
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.15;
+        }
+
+        .cta-box h2 {
+            font-size: clamp(1.8rem, 4vw, 2.6rem);
+            font-weight: 800;
+            margin-bottom: 20px;
+            letter-spacing: -0.02em;
+            position: relative;
+        }
+
+        .cta-box p {
+            font-size: 1.15rem;
+            color: var(--text-muted);
+            margin-bottom: 40px;
+            position: relative;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+            position: relative;
+        }
+
+        /* Installation */
+        .install {
+            padding: 120px 32px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .install-inner {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .install-header {
+            text-align: center;
+            margin-bottom: 64px;
+        }
+
+        .install-header h2 {
+            font-size: clamp(1.8rem, 4vw, 2.4rem);
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .install-header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .install-steps {
+            display: flex;
+            gap: 24px;
+        }
+
+        .install-step {
+            flex: 1;
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 36px 28px;
+            text-align: center;
+            position: relative;
+            overflow: visible;
+            --border-angle: 0deg;
+            --border-progress: 0;
+            transition: transform 0.4s ease, box-shadow 0.4s ease;
+        }
+
+        .install-step::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            border-radius: 22px;
+            background: conic-gradient(
+                from calc(var(--border-angle) - 180deg),
+                transparent 0deg,
+                transparent calc(180deg - (var(--border-progress) * 180deg)),
+                #667eea calc(180deg - (var(--border-progress) * 180deg)),
+                #764ba2 calc(180deg - (var(--border-progress) * 90deg)),
+                #f093fb 180deg,
+                #764ba2 calc(180deg + (var(--border-progress) * 90deg)),
+                #667eea calc(180deg + (var(--border-progress) * 180deg)),
+                transparent calc(180deg + (var(--border-progress) * 180deg)),
+                transparent 360deg
+            );
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .install-step::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 20px;
+            background: var(--bg-card);
+            z-index: -1;
+            border: 1px solid var(--border);
+            transition: border-color 0.3s;
+        }
+
+        .install-step.animating::before {
+            opacity: 1;
+        }
+
+        .install-step:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .install-step:hover::after {
+            border-color: transparent;
+        }
+
+        .step-num {
+            width: 48px;
+            height: 48px;
+            background: var(--gradient);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin: 0 auto 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .install-step h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .install-step p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            position: relative;
+            z-index: 1;
+        }
+
+        .install-step code {
+            display: block;
+            background: var(--bg);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 16px;
+            font-family: 'SF Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--accent-3);
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Footer */
+        footer {
+            padding: 60px 32px;
+            border-top: 1px solid var(--border);
+            position: relative;
+            z-index: 1;
+        }
+
+        .footer-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .footer-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .footer-logo img {
+            width: 32px;
+            height: 32px;
+        }
+
+        .footer-logo span {
+            font-size: 1.2rem;
+            font-weight: 700;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .footer-mid {
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .footer-mid .beta {
+            display: block;
+            font-size: 0.75rem;
+            opacity: 0.6;
+            margin-top: 6px;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 28px;
+        }
+
+        .footer-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.3s;
+        }
+
+        .footer-links a:hover {
+            color: var(--text);
+        }
+
+        /* Lightbox with morph effect */
+        .lightbox {
+            display: flex;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            cursor: zoom-out;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: background 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+                        visibility 0s 0.5s;
+        }
+
+        .lightbox.active {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            background: rgba(0, 0, 0, 0.95);
+            transition: background 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+                        visibility 0s 0s;
+        }
+
+        .lightbox img {
+            position: absolute;
+            max-width: 94%;
+            max-height: 94vh;
+            border-radius: 16px;
+            box-shadow: 0 40px 120px rgba(0, 0, 0, 0.6);
+            cursor: default;
+            transform-origin: center center;
+            will-change: transform, opacity;
+            opacity: 0;
+        }
+
+        .lightbox-close {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transform: scale(0.8) rotate(-90deg);
+            z-index: 10;
+        }
+
+        .lightbox-close:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .lightbox-close svg {
+            width: 24px;
+            height: 24px;
+            stroke: white;
+        }
+
+        /* Reveal animations */
+        .reveal {
+            opacity: 0;
+            transform: translateY(60px);
+            transition: opacity 1.2s cubic-bezier(0.22, 1, 0.36, 1),
+                        transform 1.5s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .problem-stats {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .feature-block {
+                grid-template-columns: 1fr;
+                gap: 48px;
+            }
+
+            .feature-block.reverse {
+                direction: ltr;
+            }
+
+            .why-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .install-steps {
+                flex-direction: column;
+            }
+
+            .footer-inner {
+                flex-direction: column;
+                gap: 24px;
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .hero h1 {
+                font-size: 2.2rem;
+            }
+
+            .hero-cta {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .cta-box {
+                padding: 48px 28px;
+            }
+        }
+
+        /* SVG gradient for icons */
+        .svg-defs {
+            position: absolute;
+            width: 0;
+            height: 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- SVG Definitions -->
+    <svg class="svg-defs">
+        <defs>
+            <linearGradient id="icon-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#667eea"/>
+                <stop offset="50%" stop-color="#764ba2"/>
+                <stop offset="100%" stop-color="#f093fb"/>
+            </linearGradient>
+        </defs>
+    </svg>
+
+    <!-- Animated Background -->
+    <div class="gradient-bg">
+        <div class="gradient-orb orb-1"></div>
+        <div class="gradient-orb orb-2"></div>
+        <div class="gradient-orb orb-3"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav id="nav">
+        <div class="nav-inner">
+            <a href="#" class="logo">
+                <img src="images/nexus-logo.png" alt="Nexus">
+                <span class="logo-text">Nexus</span>
+            </a>
+            <div class="nav-cta">
+                <a href="https://github.com/LeonManuel0705/Nexus" class="nav-link" target="_blank">GitHub</a>
+                <a href="downloads/Nexus.zip" class="nav-btn" download>Download</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <span class="hero-badge">Beta Version</span>
+        <h1>Dein Leben.<br><span class="gradient">Organisiert.</span></h1>
+        <p class="hero-sub">
+            Während andere zwischen Apps hin und her springen, hast du <strong>alles an einem Ort</strong>.
+            Aufgaben, Kalender, Schule, Training – vernetzt und synchronisiert.
+        </p>
+        <div class="hero-cta">
+            <a href="downloads/Nexus.zip" class="btn btn-primary" download>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Kostenlos herunterladen
+            </a>
+            <a href="https://github.com/LeonManuel0705/Nexus" class="btn btn-secondary" target="_blank">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                </svg>
+                Auf GitHub ansehen
+            </a>
+        </div>
+        <div class="hero-visual">
+            <img src="images/dashboard.png" alt="Nexus Dashboard" class="zoomable">
+        </div>
+    </section>
+
+    <!-- Problem Section -->
+    <section class="problem">
+        <div class="problem-inner">
+            <div class="reveal">
+                <span class="section-label">Das Problem</span>
+                <h2>Du verlierst jeden Tag Zeit mit Tools, die nicht zusammenarbeiten</h2>
+                <p class="problem-text">
+                    Kalender hier, Aufgaben dort, Schulplan in einer App, Training in einer anderen.
+                    Du verbringst mehr Zeit mit dem Organisieren deiner Tools als mit dem, was wirklich zählt.
+                </p>
+            </div>
+            <div class="problem-stats">
+                <div class="stat reveal">
+                    <div class="stat-number">5+</div>
+                    <div class="stat-label">Apps für Produktivität im Durchschnitt</div>
+                </div>
+                <div class="stat reveal">
+                    <div class="stat-number">23</div>
+                    <div class="stat-label">Minuten zum Refokussieren nach Unterbrechung</div>
+                </div>
+                <div class="stat reveal">
+                    <div class="stat-number">1</div>
+                    <div class="stat-label">Lösung, die alles vereint</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Showcase -->
+    <section class="showcase">
+        <div class="showcase-header reveal">
+            <span class="section-label">Die Lösung</span>
+            <h2>Ein Hub für dein gesamtes Leben</h2>
+            <p>Nexus verbindet alles, was du brauchst – intelligent, nahtlos, privat.</p>
+        </div>
+
+        <!-- Feature 1: Dashboard -->
+        <div class="feature-block reveal">
+            <div class="feature-content">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"/>
+                        <rect x="14" y="3" width="7" height="7"/>
+                        <rect x="14" y="14" width="7" height="7"/>
+                        <rect x="3" y="14" width="7" height="7"/>
+                    </svg>
+                </div>
+                <h3>Alles auf einen Blick</h3>
+                <p>Dein personalisiertes Dashboard zeigt dir genau das, was gerade wichtig ist – keine Ablenkung, nur Fokus.</p>
+                <ul class="feature-list">
+                    <li>Heutige Aufgaben und Termine</li>
+                    <li>Anstehende Deadlines</li>
+                    <li>Schnellzugriff auf alle Module</li>
+                </ul>
+            </div>
+            <div class="feature-image">
+                <img src="images/dashboard.png" alt="Dashboard" class="zoomable">
+            </div>
+        </div>
+
+        <!-- Feature 2: Calendar -->
+        <div class="feature-block reverse reveal">
+            <div class="feature-content">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/>
+                        <line x1="8" y1="2" x2="8" y2="6"/>
+                        <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                </div>
+                <h3>Kalender-Synchronisation</h3>
+                <p>Verbinde Google Calendar, iCloud oder jeden CalDAV-Server. Alle Termine, eine Übersicht.</p>
+                <ul class="feature-list">
+                    <li>Google Calendar Integration</li>
+                    <li>Mehrere Kalender gleichzeitig</li>
+                    <li>Automatische Synchronisation</li>
+                </ul>
+            </div>
+            <div class="feature-image">
+                <img src="images/calendar.png" alt="Kalender" class="zoomable">
+            </div>
+        </div>
+
+        <!-- Feature 3: School -->
+        <div class="feature-block reveal">
+            <div class="feature-content">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                        <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+                    </svg>
+                </div>
+                <h3>Schule im Griff</h3>
+                <p>Stundenplan, Vertretungen, Hausaufgaben – alles integriert mit IServ und anderen Schulplattformen.</p>
+                <ul class="feature-list">
+                    <li>Automatischer Stundenplan-Import</li>
+                    <li>A/B-Wochen Unterstützung</li>
+                    <li>Vertretungsplan-Benachrichtigungen</li>
+                </ul>
+            </div>
+            <div class="feature-image">
+                <img src="images/school.png" alt="Schule" class="zoomable">
+            </div>
+        </div>
+
+        <!-- Feature 4: Training -->
+        <div class="feature-block reverse reveal">
+            <div class="feature-content">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
+                        <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+                        <line x1="6" y1="1" x2="6" y2="4"/>
+                        <line x1="10" y1="1" x2="10" y2="4"/>
+                        <line x1="14" y1="1" x2="14" y2="4"/>
+                    </svg>
+                </div>
+                <h3>Training & Gesundheit</h3>
+                <p>Protokolliere deine Workouts, tracke Fortschritte und bleibe motiviert mit deinen persönlichen Statistiken.</p>
+                <ul class="feature-list">
+                    <li>Trainingseinheiten protokollieren</li>
+                    <li>Wöchentliche Trainingspläne</li>
+                    <li>Fortschritts-Statistiken</li>
+                </ul>
+            </div>
+            <div class="feature-image">
+                <img src="images/training.png" alt="Training" class="zoomable">
+            </div>
+        </div>
+    </section>
+
+    <!-- Why Section -->
+    <section class="why">
+        <div class="why-inner">
+            <div class="why-header reveal">
+                <span class="section-label">Warum Nexus?</span>
+                <h2>Gebaut für Menschen, die mehr erreichen wollen</h2>
+            </div>
+            <div class="why-grid">
+                <div class="why-card reveal">
+                    <div class="why-card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="url(#icon-gradient)" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                    </div>
+                    <h3>100% Privat</h3>
+                    <p>Deine Daten bleiben auf deinem Gerät. Keine Cloud, kein Tracking, keine Kompromisse bei der Privatsphäre.</p>
+                </div>
+                <div class="why-card reveal">
+                    <div class="why-card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="url(#icon-gradient)" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M2 12h20"/>
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                        </svg>
+                    </div>
+                    <h3>Überall verfügbar</h3>
+                    <p>Als PWA auf jedem Gerät nutzbar – Mac, Windows, iPhone, Android. Funktioniert sogar offline.</p>
+                </div>
+                <div class="why-card reveal">
+                    <div class="why-card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="url(#icon-gradient)" stroke-width="2">
+                            <polyline points="20 12 20 22 4 22 4 12"/>
+                            <rect x="2" y="7" width="20" height="5"/>
+                            <line x1="12" y1="22" x2="12" y2="7"/>
+                            <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+                            <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+                        </svg>
+                    </div>
+                    <h3>Komplett kostenlos</h3>
+                    <p>Keine versteckten Kosten, keine Premium-Features hinter Paywalls. Für immer kostenlos.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Installation -->
+    <section class="install">
+        <div class="install-inner">
+            <div class="install-header reveal">
+                <span class="section-label">Loslegen</span>
+                <h2>In 3 Schritten startklar</h2>
+                <p>Einfacher geht's nicht</p>
+            </div>
+            <div class="install-steps">
+                <div class="install-step reveal">
+                    <div class="step-num">1</div>
+                    <h3>Herunterladen</h3>
+                    <p>Lade Nexus herunter und entpacke es</p>
+                    <code>Nexus.zip</code>
+                </div>
+                <div class="install-step reveal">
+                    <div class="step-num">2</div>
+                    <h3>Setup ausführen</h3>
+                    <p>Starte das automatische Setup</p>
+                    <code>./setup.sh</code>
+                </div>
+                <div class="install-step reveal">
+                    <div class="step-num">3</div>
+                    <h3>Starten</h3>
+                    <p>Öffne Nexus in deinem Browser</p>
+                    <code>./start.sh</code>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta reveal">
+        <div class="cta-box">
+            <h2>Bereit, den Überblick zu behalten?</h2>
+            <p>Schließe dich den Beta-Testern an und erlebe, wie Produktivität sich anfühlen sollte.</p>
+            <div class="cta-buttons">
+                <a href="downloads/Nexus.zip" class="btn btn-primary" download>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Jetzt herunterladen
+                </a>
+                <a href="https://github.com/LeonManuel0705/Nexus" class="btn btn-secondary" target="_blank">
+                    Mehr erfahren
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-inner">
+            <div class="footer-logo">
+                <img src="images/nexus-logo.png" alt="Nexus">
+                <span>Nexus</span>
+            </div>
+            <div class="footer-mid">
+                © 2026 Leon Manuel Töpper
+                <span class="beta">Aktuell in der Beta</span>
+            </div>
+            <div class="footer-links">
+                <a href="impressum.html">Impressum</a>
+                <a href="datenschutz.html">Datenschutz</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Lightbox -->
+    <div class="lightbox" id="lightbox">
+        <button class="lightbox-close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        </button>
+        <img src="" alt="Preview">
+    </div>
+
+    <script>
+        // Navigation scroll effect
+        const nav = document.getElementById('nav');
+        window.addEventListener('scroll', () => {
+            nav.classList.toggle('scrolled', window.scrollY > 50);
+        });
+
+        // Reveal animations - trigger later so effect is visible when scrolling fast
+        const reveals = document.querySelectorAll('.reveal');
+        const revealObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.15, rootMargin: '0px 0px -150px 0px' });
+
+        reveals.forEach(el => revealObserver.observe(el));
+
+        // Animated border effect for cards and buttons
+        function setupBorderAnimation(elements, speed = 0.012) {
+            elements.forEach(el => {
+                let animationId = null;
+                let currentProgress = 0;
+                let targetProgress = 0;
+                let isHovering = false;
+
+                function animate() {
+                    const animSpeed = isHovering ? speed : speed * 2;
+                    const diff = targetProgress - currentProgress;
+
+                    if (Math.abs(diff) > 0.001) {
+                        currentProgress += diff * animSpeed * 60 / 16.67; // Normalize for 60fps
+                        el.style.setProperty('--border-progress', currentProgress);
+                        animationId = requestAnimationFrame(animate);
+                    } else {
+                        currentProgress = targetProgress;
+                        el.style.setProperty('--border-progress', currentProgress);
+                        if (!isHovering && currentProgress === 0) {
+                            el.classList.remove('animating');
+                        }
+                    }
+                }
+
+                el.addEventListener('mouseenter', (e) => {
+                    const rect = el.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+
+                    // Calculate angle from center to entry point
+                    const angle = Math.atan2(y - centerY, x - centerX) * (180 / Math.PI) + 90;
+
+                    // Set the starting angle
+                    el.style.setProperty('--border-angle', `${angle}deg`);
+                    el.classList.add('animating');
+
+                    isHovering = true;
+                    targetProgress = 1;
+
+                    if (animationId) cancelAnimationFrame(animationId);
+                    animate();
+                });
+
+                el.addEventListener('mouseleave', () => {
+                    isHovering = false;
+                    targetProgress = 0;
+
+                    if (animationId) cancelAnimationFrame(animationId);
+                    animate();
+                });
+            });
+        }
+
+        // Apply to why-cards (slower)
+        setupBorderAnimation(document.querySelectorAll('.why-card'), 0.008);
+
+        // Apply to buttons (slightly faster)
+        setupBorderAnimation(document.querySelectorAll('.btn'), 0.012);
+
+        // Apply to nav buttons
+        setupBorderAnimation(document.querySelectorAll('.nav-btn'), 0.015);
+
+        // Apply to stat cards
+        setupBorderAnimation(document.querySelectorAll('.stat'), 0.010);
+
+        // Apply to install step cards
+        setupBorderAnimation(document.querySelectorAll('.install-step'), 0.010);
+
+        // Lightbox with morph effect
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = lightbox.querySelector('img');
+        const lightboxClose = lightbox.querySelector('.lightbox-close');
+        const zoomables = document.querySelectorAll('.zoomable');
+
+        let sourceElement = null;
+        let isAnimating = false;
+
+        function openLightbox(sourceImg) {
+            if (isAnimating) return;
+            isAnimating = true;
+
+            // Store the source element reference
+            sourceElement = sourceImg;
+            const sourceRect = sourceImg.getBoundingClientRect();
+
+            // Set the image source
+            lightboxImg.src = sourceImg.src;
+
+            // Wait for image to load to get its natural dimensions
+            lightboxImg.onload = () => {
+                // Calculate the target (centered) position
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                const padding = 40;
+
+                // Calculate max dimensions
+                const maxWidth = viewportWidth - (padding * 2);
+                const maxHeight = viewportHeight - (padding * 2);
+
+                // Calculate the actual display size maintaining aspect ratio
+                const imgRatio = lightboxImg.naturalWidth / lightboxImg.naturalHeight;
+                let targetWidth, targetHeight;
+
+                if (maxWidth / maxHeight > imgRatio) {
+                    targetHeight = Math.min(maxHeight, lightboxImg.naturalHeight);
+                    targetWidth = targetHeight * imgRatio;
+                } else {
+                    targetWidth = Math.min(maxWidth, lightboxImg.naturalWidth);
+                    targetHeight = targetWidth / imgRatio;
+                }
+
+                // Target position (centered)
+                const targetX = (viewportWidth - targetWidth) / 2;
+                const targetY = (viewportHeight - targetHeight) / 2;
+
+                // Calculate initial transform to match source position
+                const scaleX = sourceRect.width / targetWidth;
+                const scaleY = sourceRect.height / targetHeight;
+                const scale = Math.max(scaleX, scaleY);
+
+                // Calculate translation to match source center
+                const sourceCenterX = sourceRect.left + sourceRect.width / 2;
+                const sourceCenterY = sourceRect.top + sourceRect.height / 2;
+                const targetCenterX = targetX + targetWidth / 2;
+                const targetCenterY = targetY + targetHeight / 2;
+
+                const translateX = sourceCenterX - targetCenterX;
+                const translateY = sourceCenterY - targetCenterY;
+
+                // Set initial state (at source position)
+                lightboxImg.style.transition = 'none';
+                lightboxImg.style.width = targetWidth + 'px';
+                lightboxImg.style.height = targetHeight + 'px';
+                lightboxImg.style.left = targetX + 'px';
+                lightboxImg.style.top = targetY + 'px';
+                lightboxImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+                lightboxImg.style.opacity = '1';
+                lightboxImg.style.borderRadius = getComputedStyle(sourceImg).borderRadius;
+
+                // Show lightbox
+                lightbox.classList.add('active');
+                document.body.style.overflow = 'hidden';
+
+                // Force reflow
+                lightboxImg.offsetHeight;
+
+                // Animate to center
+                lightboxImg.style.transition = 'transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.6s cubic-bezier(0.22, 1, 0.36, 1)';
+                lightboxImg.style.transform = 'translate(0, 0) scale(1)';
+                lightboxImg.style.borderRadius = '16px';
+
+                // Show close button
+                lightboxClose.style.transition = 'opacity 0.4s 0.2s, transform 0.5s 0.2s cubic-bezier(0.22, 1, 0.36, 1), background 0.3s';
+                lightboxClose.style.opacity = '1';
+                lightboxClose.style.transform = 'scale(1) rotate(0deg)';
+
+                setTimeout(() => {
+                    isAnimating = false;
+                }, 600);
+            };
+
+            // If image is already cached, trigger onload manually
+            if (lightboxImg.complete) {
+                lightboxImg.onload();
+            }
+        }
+
+        function closeLightbox() {
+            if (isAnimating || !sourceElement) return;
+            isAnimating = true;
+
+            // Get current positions (recalculate source in case of scroll)
+            const sourceRect = sourceElement.getBoundingClientRect();
+            const currentRect = lightboxImg.getBoundingClientRect();
+
+            // Calculate transform to return to source
+            const scaleX = sourceRect.width / currentRect.width;
+            const scaleY = sourceRect.height / currentRect.height;
+            const scale = Math.max(scaleX, scaleY);
+
+            const sourceCenterX = sourceRect.left + sourceRect.width / 2;
+            const sourceCenterY = sourceRect.top + sourceRect.height / 2;
+            const currentCenterX = currentRect.left + currentRect.width / 2;
+            const currentCenterY = currentRect.top + currentRect.height / 2;
+
+            const translateX = sourceCenterX - currentCenterX;
+            const translateY = sourceCenterY - currentCenterY;
+
+            // Hide close button
+            lightboxClose.style.transition = 'opacity 0.15s';
+            lightboxClose.style.opacity = '0';
+
+            // Get source border radius
+            const sourceBorderRadius = getComputedStyle(sourceElement).borderRadius;
+
+            // Keep lightbox visible but fade background manually
+            lightbox.style.transition = 'background 0.5s cubic-bezier(0.22, 1, 0.36, 1)';
+            lightbox.style.background = 'rgba(0, 0, 0, 0)';
+
+            // Force reflow to ensure transition is applied
+            lightboxImg.offsetHeight;
+
+            // Animate back to source (same as opening but reversed)
+            lightboxImg.style.transition = 'transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.6s cubic-bezier(0.22, 1, 0.36, 1)';
+            lightboxImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+            lightboxImg.style.borderRadius = sourceBorderRadius;
+
+            // Clean up after animation completes
+            setTimeout(() => {
+                lightbox.classList.remove('active');
+                lightbox.style.transition = '';
+                lightbox.style.background = '';
+                lightboxImg.style.transition = 'none';
+                lightboxImg.style.opacity = '0';
+                lightboxClose.style.transform = 'scale(0.8) rotate(-90deg)';
+                document.body.style.overflow = '';
+                isAnimating = false;
+            }, 600);
+        }
+
+        zoomables.forEach(img => {
+            img.addEventListener('click', () => openLightbox(img));
+        });
+
+        lightbox.addEventListener('click', (e) => {
+            if (e.target !== lightboxImg) {
+                closeLightbox();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && lightbox.classList.contains('active')) {
+                closeLightbox();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -206,6 +206,30 @@
         </form>
     </div>
 </div>
+
+<!-- Bundesland Selection Modal -->
+<div class="modal" id="bundeslandModal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h3>Wähle dein Bundesland</h3>
+            <button class="modal-close" onclick="closeModal('bundeslandModal')">&times;</button>
+        </div>
+        <div class="bundesland-wizard-content">
+            <p class="setup-intro">Für korrekte Feiertage und Schulferien:</p>
+            <div class="bundesland-grid" id="bundeslandGrid">
+                <!-- Will be populated by JavaScript -->
+            </div>
+            <div class="bundesland-loading" id="bundeslandLoading" style="display: none;">
+                <div class="loading-spinner"></div>
+                <span>Feiertage und Schulferien werden importiert...</span>
+            </div>
+            <div class="setup-actions" id="bundeslandActions">
+                <button class="btn-secondary" onclick="skipBundeslandSelection()">Später einrichten</button>
+                <button class="btn-primary" onclick="saveBundeslandSelection()" id="saveBundeslandBtn" disabled>Speichern</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -306,72 +330,124 @@ async function syncCachedChanges() {
 }
 
 // ==========================================
-// Brandenburg Holidays
+// Bundesland Selection
 // ==========================================
 
-function getBrandenburgHolidays(year) {
-    // Fixed holidays
-    const holidays = [
-        { date: `${year}-01-01`, title: 'Neujahr', category: 'holiday' },
-        { date: `${year}-05-01`, title: 'Tag der Arbeit', category: 'holiday' },
-        { date: `${year}-10-03`, title: 'Tag der Deutschen Einheit', category: 'holiday' },
-        { date: `${year}-10-31`, title: 'Reformationstag', category: 'holiday' }, // Brandenburg specific
-        { date: `${year}-12-25`, title: '1. Weihnachtstag', category: 'holiday' },
-        { date: `${year}-12-26`, title: '2. Weihnachtstag', category: 'holiday' }
-    ];
+let selectedBundesland = null;
+let bundeslaender = {};
 
-    // Calculate Easter-dependent holidays
-    const easter = calculateEaster(year);
-    const easterDate = new Date(year, easter.month - 1, easter.day);
+async function checkAndShowBundeslandModal() {
+    try {
+        const response = await fetch('/api/hub/bundesland');
+        const data = await response.json();
 
-    // Karfreitag (Good Friday) - 2 days before Easter
-    const karfreitag = new Date(easterDate);
-    karfreitag.setDate(easterDate.getDate() - 2);
-    holidays.push({ date: formatLocalDate(karfreitag), title: 'Karfreitag', category: 'holiday' });
-
-    // Ostersonntag (Easter Sunday)
-    holidays.push({ date: formatLocalDate(easterDate), title: 'Ostersonntag', category: 'holiday' });
-
-    // Ostermontag (Easter Monday) - 1 day after Easter
-    const ostermontag = new Date(easterDate);
-    ostermontag.setDate(easterDate.getDate() + 1);
-    holidays.push({ date: formatLocalDate(ostermontag), title: 'Ostermontag', category: 'holiday' });
-
-    // Christi Himmelfahrt (Ascension Day) - 39 days after Easter
-    const himmelfahrt = new Date(easterDate);
-    himmelfahrt.setDate(easterDate.getDate() + 39);
-    holidays.push({ date: formatLocalDate(himmelfahrt), title: 'Christi Himmelfahrt', category: 'holiday' });
-
-    // Pfingstsonntag (Whit Sunday) - 49 days after Easter
-    const pfingstsonntag = new Date(easterDate);
-    pfingstsonntag.setDate(easterDate.getDate() + 49);
-    holidays.push({ date: formatLocalDate(pfingstsonntag), title: 'Pfingstsonntag', category: 'holiday' });
-
-    // Pfingstmontag (Whit Monday) - 50 days after Easter
-    const pfingstmontag = new Date(easterDate);
-    pfingstmontag.setDate(easterDate.getDate() + 50);
-    holidays.push({ date: formatLocalDate(pfingstmontag), title: 'Pfingstmontag', category: 'holiday' });
-
-    return holidays;
+        if (data.success && !data.bundesland) {
+            bundeslaender = data.bundeslaender || {};
+            showBundeslandModal();
+        }
+    } catch (error) {
+        console.error('Error checking Bundesland:', error);
+    }
 }
 
-// Calculate Easter Sunday using the Anonymous Gregorian algorithm
-function calculateEaster(year) {
-    const a = year % 19;
-    const b = Math.floor(year / 100);
-    const c = year % 100;
-    const d = Math.floor(b / 4);
-    const e = b % 4;
-    const f = Math.floor((b + 8) / 25);
-    const g = Math.floor((b - f + 1) / 3);
-    const h = (19 * a + b - d - g + 15) % 30;
-    const i = Math.floor(c / 4);
-    const k = c % 4;
-    const l = (32 + 2 * e + 2 * i - h - k) % 7;
-    const m = Math.floor((a + 11 * h + 22 * l) / 451);
-    const month = Math.floor((h + l - 7 * m + 114) / 31);
-    const day = ((h + l - 7 * m + 114) % 31) + 1;
-    return { month, day };
+function showBundeslandModal() {
+    const grid = document.getElementById('bundeslandGrid');
+    if (!grid) return;
+
+    grid.innerHTML = Object.entries(bundeslaender).map(([code, name]) => `
+        <div class="bundesland-card" data-code="${code}" onclick="selectBundesland('${code}')">
+            <span class="bundesland-code">${code}</span>
+            <span class="bundesland-name">${name}</span>
+        </div>
+    `).join('');
+
+    openModal('bundeslandModal');
+}
+
+function selectBundesland(code) {
+    selectedBundesland = code;
+
+    document.querySelectorAll('.bundesland-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    document.querySelector(`.bundesland-card[data-code="${code}"]`)?.classList.add('selected');
+
+    document.getElementById('saveBundeslandBtn').disabled = false;
+}
+
+async function saveBundeslandSelection() {
+    if (!selectedBundesland) return;
+
+    const grid = document.getElementById('bundeslandGrid');
+    const loading = document.getElementById('bundeslandLoading');
+    const actions = document.getElementById('bundeslandActions');
+
+    grid.style.display = 'none';
+    actions.style.display = 'none';
+    loading.style.display = 'flex';
+    loading.innerHTML = `
+        <div class="loading-spinner"></div>
+        <span>Feiertage und Schulferien werden importiert...</span>
+        <div class="import-progress-container">
+            <div class="import-progress-bar" id="importProgressBar"></div>
+        </div>
+        <span class="import-progress-text" id="importProgressText">Verbinde mit feiertage-api.de...</span>
+    `;
+
+    const progressBar = document.getElementById('importProgressBar');
+    const progressText = document.getElementById('importProgressText');
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress > 85) progress = 85;
+        progressBar.style.width = progress + '%';
+
+        if (progress < 30) {
+            progressText.textContent = 'Feiertage werden geladen...';
+        } else if (progress < 60) {
+            progressText.textContent = 'Schulferien werden geladen...';
+        } else {
+            progressText.textContent = 'Daten werden gespeichert...';
+        }
+    }, 300);
+
+    try {
+        const response = await fetch('/api/hub/bundesland', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bundesland: selectedBundesland })
+        });
+        const data = await response.json();
+
+        clearInterval(progressInterval);
+        progressBar.style.width = '100%';
+        progressText.textContent = 'Fertig!';
+
+        if (data.success) {
+            setTimeout(() => {
+                closeModal('bundeslandModal');
+                const importedCount = data.imported_count || 0;
+                const bundeslandName = data.bundesland_name || selectedBundesland;
+                showToast(`${bundeslandName}: ${importedCount} Feiertage und Schulferien importiert!`, 'success');
+                loadEvents(); // Reload events to show new holidays
+            }, 500);
+        } else {
+            throw new Error(data.error || 'Import fehlgeschlagen');
+        }
+    } catch (error) {
+        clearInterval(progressInterval);
+        console.error('Error saving Bundesland:', error);
+
+        loading.style.display = 'none';
+        grid.style.display = 'grid';
+        actions.style.display = 'flex';
+
+        showToast('Import fehlgeschlagen: ' + error.message, 'error');
+    }
+}
+
+function skipBundeslandSelection() {
+    closeModal('bundeslandModal');
 }
 
 function renderCalendar() {
@@ -585,33 +661,8 @@ async function loadEvents() {
         const startStr = formatLocalDate(startDate);
         const endStr = formatLocalDate(endDate);
 
-        // Add Brandenburg public holidays (Feiertage) for current and next year
-        const holidaysThisYear = getBrandenburgHolidays(currentYear).map(h => ({
-            id: `holiday_${h.date}`,
-            title: h.title,
-            start_date: h.date,
-            start_time: null,
-            all_day: true,
-            category: 'holiday',
-            source: 'holiday',
-            calendar: 'Feiertage',
-            calendar_color: '#e74c3c'
-        }));
-        const holidaysNextYear = getBrandenburgHolidays(currentYear + 1).map(h => ({
-            id: `holiday_${h.date}`,
-            title: h.title,
-            start_date: h.date,
-            start_time: null,
-            all_day: true,
-            category: 'holiday',
-            source: 'holiday',
-            calendar: 'Feiertage',
-            calendar_color: '#e74c3c'
-        }));
-        events = events.concat(holidaysThisYear, holidaysNextYear);
-
-        // Load Brandenburg school holidays (Schulferien) from server
-        await loadSchoolHolidays();
+        // Load holidays (Feiertage + Schulferien) from database
+        await loadHolidaysFromDatabase();
 
         // Fetch Google Calendar events for the extended range (always fetch all accounts)
         const googleResponse = await fetch(`/api/calendar/events?start=${startStr}&end=${endStr}`);
@@ -790,31 +841,41 @@ async function debugIServCalendar() {
     }
 }
 
-async function loadSchoolHolidays() {
+async function loadHolidaysFromDatabase() {
     try {
         const response = await fetch('/api/calendar/holidays');
         if (!response.ok) return;
 
         const data = await response.json();
+
+        // Check if Bundesland needs to be set
+        if (data.needs_bundesland) {
+            checkAndShowBundeslandModal();
+            return;
+        }
+
         if (!data.success || !data.holidays) return;
 
-        // Convert school holidays to event format
-        const schoolHolidays = data.holidays.map(h => ({
-            id: `schulferien_${h.start}_${h.name.replace(/\s+/g, '_')}`,
-            title: h.name,
-            start_date: h.start,
-            end_date: h.end,
-            start_time: null,
-            all_day: true,
-            category: 'holiday',
-            source: 'holiday',
-            calendar: 'Schulferien',
-            calendar_color: h.color || '#718096'  // Grey for school holidays
-        }));
+        // Convert holidays to event format
+        const holidays = data.holidays.map(h => {
+            const isFeiertag = h.type === 'feiertag';
+            return {
+                id: `${h.type}_${h.start}_${h.name.replace(/\s+/g, '_')}`,
+                title: h.name,
+                start_date: h.start,
+                end_date: h.end || h.start,
+                start_time: null,
+                all_day: true,
+                category: 'holiday',
+                source: 'holiday',
+                calendar: isFeiertag ? 'Feiertage' : 'Schulferien',
+                calendar_color: isFeiertag ? '#e74c3c' : '#718096'
+            };
+        });
 
-        events = events.concat(schoolHolidays);
+        events = events.concat(holidays);
     } catch (err) {
-        console.log('School holidays not available:', err);
+        console.log('Holidays not available:', err);
     }
 }
 
@@ -1862,6 +1923,105 @@ async function loadCalendarAccounts() {
 @media (max-width: 900px) {
     .calendar-layout {
         grid-template-columns: 1fr;
+    }
+}
+
+/* Bundesland Selection Grid */
+.bundesland-wizard-content {
+    padding: 10px 0;
+}
+
+.bundesland-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin: 20px 0;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+.bundesland-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 10px;
+    background: var(--glass-bg);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    min-height: 80px;
+}
+
+.bundesland-card:hover {
+    border-color: var(--accent);
+    background: var(--accent-light);
+}
+
+.bundesland-card.selected {
+    border-color: var(--accent);
+    background: var(--accent-light);
+    box-shadow: 0 0 0 2px var(--accent);
+}
+
+.bundesland-code {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+}
+
+.bundesland-name {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.2;
+}
+
+.bundesland-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.import-progress-container {
+    width: 100%;
+    max-width: 300px;
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 10px 0;
+}
+
+.import-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), #764ba2);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.import-progress-text {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+    .bundesland-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .bundesland-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 </style>

@@ -446,6 +446,58 @@ def init_db():
         ON hub_timetable_entries(day, block, week)
     ''')
 
+    # Pomodoro sessions table for tracking study time
+    cursor.execute(f'''
+        CREATE TABLE IF NOT EXISTS pomodoro_sessions (
+            id {pk},
+            subject_id TEXT,
+            duration INTEGER NOT NULL DEFAULT 25,
+            session_type TEXT DEFAULT 'work',
+            completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_pomodoro_completed_at
+        ON pomodoro_sessions(completed_at)
+    ''')
+
+    # Holidays table for storing imported Feiertage and Schulferien per user
+    cursor.execute(f'''
+        CREATE TABLE IF NOT EXISTS hub_holidays (
+            id {pk},
+            date TEXT NOT NULL,
+            end_date TEXT,
+            name TEXT NOT NULL,
+            type TEXT DEFAULT 'feiertag',
+            bundesland TEXT NOT NULL,
+            year INTEGER NOT NULL,
+            user_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_holidays_bundesland_year
+        ON hub_holidays(bundesland, year)
+    ''')
+
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_holidays_date
+        ON hub_holidays(date)
+    ''')
+
+    # Add bundesland columns to hub_timetable_settings if not exist
+    if not _use_postgres:
+        try:
+            cursor.execute('ALTER TABLE hub_timetable_settings ADD COLUMN bundesland TEXT')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        try:
+            cursor.execute('ALTER TABLE hub_timetable_settings ADD COLUMN holidays_imported_until INTEGER')
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
     conn.commit()
     conn.close()
 
@@ -1239,7 +1291,7 @@ def calculate_next_due_date(current_due: str, repeat_type: str, repeat_days: str
     return next_date.isoformat()
 
 def delete_hub_task(task_id: int) -> bool:
-                            
+    """Delete a single task"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM hub_tasks WHERE id = ?', (task_id,))
@@ -1247,6 +1299,96 @@ def delete_hub_task(task_id: int) -> bool:
     conn.commit()
     conn.close()
     return affected > 0
+
+def delete_hub_task_all_occurrences(task_id: int) -> int:
+    """Delete a task and all its child occurrences (for recurring tasks)"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # First, get the task to find the parent_task_id
+    cursor.execute('SELECT id, parent_task_id FROM hub_tasks WHERE id = ?', (task_id,))
+    task = cursor.fetchone()
+    if not task:
+        conn.close()
+        return 0
+
+    # Determine the root task ID (either this task or its parent)
+    root_id = task['parent_task_id'] if task['parent_task_id'] else task_id
+
+    # Delete all tasks with this root as parent, plus the root itself
+    cursor.execute('DELETE FROM hub_tasks WHERE parent_task_id = ? OR id = ?', (root_id, root_id))
+    affected = cursor.rowcount
+
+    # Also delete tasks where this task is the parent
+    cursor.execute('DELETE FROM hub_tasks WHERE parent_task_id = ?', (task_id,))
+    affected += cursor.rowcount
+
+    conn.commit()
+    conn.close()
+    return affected
+
+def skip_hub_task_occurrence(task_id: int) -> Optional[Dict[str, Any]]:
+    """Skip the current occurrence of a recurring task and create the next one"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Get the task
+    cursor.execute('SELECT * FROM hub_tasks WHERE id = ?', (task_id,))
+    task = _fetchone_dict(cursor)
+    if not task:
+        conn.close()
+        return None
+
+    # Check if it's a repeating task
+    repeat_type = task.get('repeat_type', 'none')
+    if repeat_type == 'none':
+        # Not a repeating task, just delete it
+        cursor.execute('DELETE FROM hub_tasks WHERE id = ?', (task_id,))
+        conn.commit()
+        conn.close()
+        return {'deleted': True, 'next_task': None}
+
+    # Calculate next due date
+    next_due = calculate_next_due_date(task)
+    if not next_due:
+        # No more occurrences, just delete
+        cursor.execute('DELETE FROM hub_tasks WHERE id = ?', (task_id,))
+        conn.commit()
+        conn.close()
+        return {'deleted': True, 'next_task': None}
+
+    # Create the next occurrence
+    parent_id = task.get('parent_task_id') or task_id
+    cursor.execute('''
+        INSERT INTO hub_tasks (title, description, due_date, due_time, priority, category,
+                              repeat_type, repeat_days, repeat_end_date, parent_task_id, user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        task['title'],
+        task.get('description'),
+        next_due,
+        task.get('due_time'),
+        task.get('priority', 'medium'),
+        task.get('category'),
+        task['repeat_type'],
+        task.get('repeat_days'),
+        task.get('repeat_end_date'),
+        parent_id,
+        task.get('user_id')
+    ))
+    next_task_id = cursor.lastrowid
+
+    # Delete the current occurrence
+    cursor.execute('DELETE FROM hub_tasks WHERE id = ?', (task_id,))
+
+    conn.commit()
+
+    # Get the new task
+    cursor.execute('SELECT * FROM hub_tasks WHERE id = ?', (next_task_id,))
+    next_task = _fetchone_dict(cursor)
+    conn.close()
+
+    return {'deleted': True, 'next_task': next_task}
 
 def get_hub_projects(status: str = None, user_id: str = None) -> List[Dict[str, Any]]:
     """Get hub projects, optionally filtered by user_id"""
@@ -2262,5 +2404,268 @@ def import_training_schedule_template(entries: List[Dict[str, Any]], user_id: st
     conn.commit()
     conn.close()
     return count
+
+# ============================================================================
+# Pomodoro Session Functions
+# ============================================================================
+
+def create_pomodoro_session(subject_id: str = None, duration: int = 25, session_type: str = 'work') -> int:
+    """Create a new Pomodoro session"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO pomodoro_sessions (subject_id, duration, session_type)
+        VALUES (?, ?, ?)
+    ''', (subject_id, duration, session_type))
+    session_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return session_id
+
+def get_pomodoro_sessions(limit: int = 50) -> List[Dict[str, Any]]:
+    """Get recent Pomodoro sessions"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT * FROM pomodoro_sessions
+        ORDER BY completed_at DESC
+        LIMIT ?
+    ''', (limit,))
+    sessions = _fetchall_dict(cursor)
+    conn.close()
+    return sessions
+
+def get_pomodoro_stats(range_type: str = 'week') -> Dict[str, Any]:
+    """Get Pomodoro statistics for a time range"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Determine date range
+    if range_type == 'today':
+        date_filter = "DATE(completed_at) = DATE('now', 'localtime')"
+    elif range_type == 'week':
+        date_filter = "DATE(completed_at) >= DATE('now', 'localtime', '-7 days')"
+    elif range_type == 'month':
+        date_filter = "DATE(completed_at) >= DATE('now', 'localtime', '-30 days')"
+    else:
+        date_filter = "1=1"  # All time
+
+    # Total stats
+    cursor.execute(f'''
+        SELECT
+            COUNT(*) as total_sessions,
+            COALESCE(SUM(duration), 0) as total_minutes
+        FROM pomodoro_sessions
+        WHERE session_type = 'work' AND {date_filter}
+    ''')
+    totals = _fetchone_dict(cursor)
+
+    # Stats by subject
+    cursor.execute(f'''
+        SELECT
+            subject_id,
+            COUNT(*) as sessions,
+            SUM(duration) as minutes
+        FROM pomodoro_sessions
+        WHERE session_type = 'work' AND {date_filter}
+        GROUP BY subject_id
+        ORDER BY minutes DESC
+    ''')
+    by_subject = _fetchall_dict(cursor)
+
+    conn.close()
+
+    return {
+        'total_sessions': totals['total_sessions'] if totals else 0,
+        'total_minutes': totals['total_minutes'] if totals else 0,
+        'by_subject': by_subject
+    }
+
+# ============================================================================
+# Holiday Functions (Feiertage + Schulferien)
+# ============================================================================
+
+def get_holidays(bundesland: str = None, year: int = None, holiday_type: str = None,
+                 user_id: str = None) -> List[Dict[str, Any]]:
+    """Get holidays, optionally filtered by bundesland, year, type, or user_id"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = 'SELECT * FROM hub_holidays WHERE 1=1'
+    params = []
+
+    if bundesland:
+        query += ' AND bundesland = ?'
+        params.append(bundesland)
+    if year:
+        query += ' AND year = ?'
+        params.append(year)
+    if holiday_type:
+        query += ' AND type = ?'
+        params.append(holiday_type)
+    if user_id:
+        query += ' AND user_id = ?'
+        params.append(user_id)
+
+    query += ' ORDER BY date ASC'
+    cursor.execute(query, params)
+    holidays = _fetchall_dict(cursor)
+    conn.close()
+    return holidays
+
+def get_holidays_for_date_range(start_date: str, end_date: str, bundesland: str = None,
+                                 user_id: str = None) -> List[Dict[str, Any]]:
+    """Get holidays within a date range"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = '''
+        SELECT * FROM hub_holidays
+        WHERE (date >= ? AND date <= ?)
+           OR (end_date IS NOT NULL AND date <= ? AND end_date >= ?)
+    '''
+    params = [start_date, end_date, end_date, start_date]
+
+    if bundesland:
+        query += ' AND bundesland = ?'
+        params.append(bundesland)
+    if user_id:
+        query += ' AND user_id = ?'
+        params.append(user_id)
+
+    query += ' ORDER BY date ASC'
+    cursor.execute(query, params)
+    holidays = _fetchall_dict(cursor)
+    conn.close()
+    return holidays
+
+def create_holiday(date: str, name: str, bundesland: str, year: int,
+                   end_date: str = None, holiday_type: str = 'feiertag',
+                   user_id: str = None) -> int:
+    """Create a holiday entry"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO hub_holidays (date, end_date, name, type, bundesland, year, user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (date, end_date, name, holiday_type, bundesland, year, user_id))
+    holiday_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return holiday_id
+
+def import_holidays(holidays: List[Dict[str, Any]], bundesland: str, user_id: str = None) -> int:
+    """Bulk import holidays for a bundesland"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    count = 0
+    for h in holidays:
+        cursor.execute('''
+            INSERT INTO hub_holidays (date, end_date, name, type, bundesland, year, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            h.get('date'),
+            h.get('end_date'),
+            h.get('name'),
+            h.get('type', 'feiertag'),
+            bundesland,
+            h.get('year'),
+            user_id
+        ))
+        count += 1
+
+    conn.commit()
+    conn.close()
+    return count
+
+def clear_holidays(bundesland: str = None, year: int = None, user_id: str = None) -> int:
+    """Clear holidays, optionally filtered by bundesland, year, or user_id"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = 'DELETE FROM hub_holidays WHERE 1=1'
+    params = []
+
+    if bundesland:
+        query += ' AND bundesland = ?'
+        params.append(bundesland)
+    if year:
+        query += ' AND year = ?'
+        params.append(year)
+    if user_id:
+        query += ' AND user_id = ?'
+        params.append(user_id)
+
+    cursor.execute(query, params)
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return affected
+
+def is_holiday(date: str, bundesland: str = None, user_id: str = None) -> Optional[Dict[str, Any]]:
+    """Check if a date is a holiday, returns the holiday info or None"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = '''
+        SELECT * FROM hub_holidays
+        WHERE (date = ? OR (end_date IS NOT NULL AND date <= ? AND end_date >= ?))
+    '''
+    params = [date, date, date]
+
+    if bundesland:
+        query += ' AND bundesland = ?'
+        params.append(bundesland)
+    if user_id:
+        query += ' AND user_id = ?'
+        params.append(user_id)
+
+    query += ' LIMIT 1'
+    cursor.execute(query, params)
+    holiday = _fetchone_dict(cursor)
+    conn.close()
+    return holiday
+
+def get_bundesland_setting(user_id: str = None) -> Optional[str]:
+    """Get the user's Bundesland setting from timetable settings"""
+    settings = get_timetable_settings(user_id)
+    if settings:
+        return settings.get('bundesland')
+    return None
+
+def save_bundesland_setting(bundesland: str, holidays_imported_until: int = None,
+                            user_id: str = None) -> bool:
+    """Save the user's Bundesland setting"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Check if settings exist
+    if user_id:
+        cursor.execute('SELECT id FROM hub_timetable_settings WHERE user_id = ? LIMIT 1', (user_id,))
+    else:
+        cursor.execute('SELECT id FROM hub_timetable_settings ORDER BY id DESC LIMIT 1')
+    existing = cursor.fetchone()
+
+    if existing:
+        update_parts = ['bundesland = ?', 'updated_at = CURRENT_TIMESTAMP']
+        params = [bundesland]
+        if holidays_imported_until:
+            update_parts.append('holidays_imported_until = ?')
+            params.append(holidays_imported_until)
+        params.append(existing['id'])
+
+        cursor.execute(f'''
+            UPDATE hub_timetable_settings SET {', '.join(update_parts)} WHERE id = ?
+        ''', params)
+    else:
+        cursor.execute('''
+            INSERT INTO hub_timetable_settings (bundesland, holidays_imported_until, user_id)
+            VALUES (?, ?, ?)
+        ''', (bundesland, holidays_imported_until, user_id))
+
+    conn.commit()
+    conn.close()
+    return True
 
 init_db()

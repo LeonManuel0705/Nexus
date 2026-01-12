@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 import json
 import time
+import requests
 
 from . import database as db
 
@@ -84,6 +85,10 @@ def hub_privacy():
 @app.route('/hub/email')
 def hub_email():
     return render_template('hub/email.html', active_tab='email')
+
+@app.route('/hub/pomodoro')
+def hub_pomodoro():
+    return render_template('hub/pomodoro.html', active_tab='pomodoro')
 
 # Fast ping endpoints for connection checking
 @app.route('/api/ping', methods=['HEAD', 'GET'])
@@ -184,6 +189,26 @@ def toggle_hub_task_api(task_id):
             next_task = db.get_hub_task(result['next_task_id'])
             response['next_task'] = next_task
         return jsonify(response)
+    return jsonify({'success': False, 'error': 'Task not found'}), 404
+
+@app.route('/api/hub/tasks/<int:task_id>/delete-all', methods=['DELETE'])
+def delete_hub_task_all_api(task_id):
+    """Delete a recurring task and all its occurrences"""
+    affected = db.delete_hub_task_all_occurrences(task_id)
+    if affected > 0:
+        return jsonify({'success': True, 'deleted_count': affected})
+    return jsonify({'success': False, 'error': 'Task not found'}), 404
+
+@app.route('/api/hub/tasks/<int:task_id>/skip', methods=['POST'])
+def skip_hub_task_api(task_id):
+    """Skip the current occurrence and create the next one"""
+    result = db.skip_hub_task_occurrence(task_id)
+    if result:
+        return jsonify({
+            'success': True,
+            'deleted': result.get('deleted'),
+            'next_task': result.get('next_task')
+        })
     return jsonify({'success': False, 'error': 'Task not found'}), 404
 
 @app.route('/api/hub/reviews', methods=['GET'])
@@ -2531,25 +2556,308 @@ def get_weather():
             'offline': True
         }), 503
 
-BRANDENBURG_HOLIDAYS_FILE = Path(__file__).parent.parent / 'data' / 'brandenburg_holidays.json'
+# ============================================================================
+# Bundesland + Holiday API
+# ============================================================================
 
-@app.route('/api/calendar/holidays', methods=['GET'])
-def get_holidays():
-                                                        
+# Bundesland codes for feiertage-api.de
+BUNDESLAENDER = {
+    'BW': 'Baden-Württemberg',
+    'BY': 'Bayern',
+    'BE': 'Berlin',
+    'BB': 'Brandenburg',
+    'HB': 'Bremen',
+    'HH': 'Hamburg',
+    'HE': 'Hessen',
+    'MV': 'Mecklenburg-Vorpommern',
+    'NI': 'Niedersachsen',
+    'NW': 'Nordrhein-Westfalen',
+    'RP': 'Rheinland-Pfalz',
+    'SL': 'Saarland',
+    'SN': 'Sachsen',
+    'ST': 'Sachsen-Anhalt',
+    'SH': 'Schleswig-Holstein',
+    'TH': 'Thüringen'
+}
+
+@app.route('/api/hub/bundesland', methods=['GET'])
+def get_bundesland():
+    """Get the user's Bundesland setting"""
+    bundesland = db.get_bundesland_setting()
+    settings = db.get_timetable_settings()
+    return jsonify({
+        'success': True,
+        'bundesland': bundesland,
+        'holidays_imported_until': settings.get('holidays_imported_until') if settings else None,
+        'bundeslaender': BUNDESLAENDER
+    })
+
+@app.route('/api/hub/bundesland', methods=['POST'])
+def save_bundesland():
+    """Save the user's Bundesland and import holidays"""
     try:
-        if not BRANDENBURG_HOLIDAYS_FILE.exists():
-            return jsonify({'success': True, 'holidays': []})
+        data = request.get_json()
+        if not data or 'bundesland' not in data:
+            return jsonify({'success': False, 'error': 'Bundesland is required'}), 400
 
-        with open(BRANDENBURG_HOLIDAYS_FILE, 'r') as f:
-            data = json.load(f)
+        bundesland = data['bundesland']
+        if bundesland not in BUNDESLAENDER:
+            return jsonify({'success': False, 'error': 'Invalid Bundesland code'}), 400
+
+        # Import holidays for current year + next 2 years
+        current_year = datetime.now().year
+        years_to_import = [current_year, current_year + 1, current_year + 2]
+
+        # Clear existing holidays for this user
+        db.clear_holidays()
+
+        imported_count = 0
+        errors = []
+
+        for year in years_to_import:
+            # Fetch Feiertage from feiertage-api.de
+            try:
+                feiertage_url = f'https://feiertage-api.de/api/?jahr={year}&nur_land={bundesland}'
+                print(f"Fetching Feiertage from: {feiertage_url}")
+                response = requests.get(feiertage_url, timeout=10)
+                print(f"Feiertage response status: {response.status_code}")
+                if response.status_code == 200:
+                    feiertage_data = response.json()
+                    holidays = []
+                    for name, info in feiertage_data.items():
+                        holidays.append({
+                            'date': info['datum'],
+                            'name': name,
+                            'type': 'feiertag',
+                            'year': year
+                        })
+                    imported_count += db.import_holidays(holidays, bundesland)
+                    print(f"Imported {len(holidays)} Feiertage for {year}")
+                else:
+                    errors.append(f'Feiertage {year}: HTTP {response.status_code}')
+            except Exception as e:
+                print(f"Feiertage error for {year}: {e}")
+                errors.append(f'Feiertage {year}: {str(e)}')
+
+            # Fetch Schulferien from ferien-api.de
+            try:
+                ferien_url = f'https://ferien-api.de/api/v1/holidays/{bundesland}/{year}'
+                print(f"Fetching Schulferien from: {ferien_url}")
+                response = requests.get(ferien_url, timeout=10)
+                print(f"Schulferien response status: {response.status_code}")
+                if response.status_code == 200:
+                    ferien_data = response.json()
+                    holidays = []
+                    for ferien in ferien_data:
+                        holidays.append({
+                            'date': ferien['start'][:10],  # YYYY-MM-DD
+                            'end_date': ferien['end'][:10],
+                            'name': ferien['name'],
+                            'type': 'schulferien',
+                            'year': year
+                        })
+                    imported_count += db.import_holidays(holidays, bundesland)
+                    print(f"Imported {len(holidays)} Schulferien for {year}")
+                else:
+                    errors.append(f'Schulferien {year}: HTTP {response.status_code}')
+            except Exception as e:
+                print(f"Schulferien error for {year}: {e}")
+                errors.append(f'Schulferien {year}: {str(e)}')
+
+        # Save the Bundesland setting
+        db.save_bundesland_setting(bundesland, holidays_imported_until=years_to_import[-1])
+        print(f"Saved Bundesland setting: {bundesland}, imported {imported_count} holidays")
 
         return jsonify({
             'success': True,
-            'source': data.get('source', 'Brandenburg Schulferien'),
-            'holidays': data.get('holidays', [])
+            'bundesland': bundesland,
+            'bundesland_name': BUNDESLAENDER[bundesland],
+            'imported_count': imported_count,
+            'years': years_to_import,
+            'errors': errors if errors else None
+        })
+    except Exception as e:
+        print(f"Error in save_bundesland: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/hub/holidays', methods=['GET'])
+def get_hub_holidays():
+    """Get holidays from the database"""
+    year = request.args.get('year', type=int)
+    holiday_type = request.args.get('type')  # 'feiertag' or 'schulferien'
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+
+    bundesland = db.get_bundesland_setting()
+
+    if start_date and end_date:
+        holidays = db.get_holidays_for_date_range(start_date, end_date, bundesland)
+    else:
+        holidays = db.get_holidays(bundesland=bundesland, year=year, holiday_type=holiday_type)
+
+    return jsonify({
+        'success': True,
+        'bundesland': bundesland,
+        'holidays': holidays
+    })
+
+@app.route('/api/hub/holidays/refresh', methods=['POST'])
+def refresh_holidays():
+    """Re-import holidays for the user's Bundesland"""
+    bundesland = db.get_bundesland_setting()
+    if not bundesland:
+        return jsonify({'success': False, 'error': 'No Bundesland set'}), 400
+
+    # Trigger the same import logic as save_bundesland
+    return save_bundesland()
+
+@app.route('/api/calendar/holidays', methods=['GET'])
+def get_calendar_holidays():
+    """Get holidays for the calendar view (legacy endpoint, now reads from database)"""
+    try:
+        bundesland = db.get_bundesland_setting()
+        if not bundesland:
+            return jsonify({
+                'success': True,
+                'holidays': [],
+                'needs_bundesland': True
+            })
+
+        # Get current and next year holidays
+        current_year = datetime.now().year
+        holidays = db.get_holidays(bundesland=bundesland)
+
+        # Convert to the format expected by calendar.html
+        formatted_holidays = []
+        for h in holidays:
+            formatted_holidays.append({
+                'name': h['name'],
+                'start': h['date'],
+                'end': h.get('end_date') or h['date'],
+                'type': h['type']
+            })
+
+        return jsonify({
+            'success': True,
+            'bundesland': bundesland,
+            'bundesland_name': BUNDESLAENDER.get(bundesland, bundesland),
+            'holidays': formatted_holidays
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# ============================================================================
+# Pomodoro Session Tracking API
+# ============================================================================
+
+@app.route('/api/pomodoro/session', methods=['POST'])
+def save_pomodoro_session():
+    """Save a completed Pomodoro session"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    session_id = db.create_pomodoro_session(
+        subject_id=data.get('subject_id'),
+        duration=data.get('duration', 25),
+        session_type=data.get('session_type', 'work')
+    )
+    return jsonify({'success': True, 'session_id': session_id})
+
+@app.route('/api/pomodoro/stats', methods=['GET'])
+def get_pomodoro_stats():
+    """Get Pomodoro statistics for a time range"""
+    range_type = request.args.get('range', 'week')  # today, week, month
+    stats = db.get_pomodoro_stats(range_type)
+    return jsonify(stats)
+
+@app.route('/api/pomodoro/sessions', methods=['GET'])
+def get_pomodoro_sessions():
+    """Get recent Pomodoro sessions"""
+    limit = request.args.get('limit', 50, type=int)
+    sessions = db.get_pomodoro_sessions(limit=limit)
+    return jsonify({'sessions': sessions})
+
+# ============================================================================
+# Deadline Aggregation API
+# ============================================================================
+
+@app.route('/api/deadlines', methods=['GET'])
+def get_all_deadlines():
+    """Get aggregated deadlines from homework, tests, exams, and tasks"""
+    days = request.args.get('days', 14, type=int)
+    deadlines = []
+    today = datetime.now().date()
+
+    # Load homework
+    homework = load_school_homework()
+    for hw in homework:
+        if hw.get('completed'):
+            continue
+        try:
+            due_date = datetime.strptime(hw['due_date'], '%Y-%m-%d').date()
+            days_until = (due_date - today).days
+            if 0 <= days_until <= days:
+                deadlines.append({
+                    'id': hw['id'],
+                    'type': 'homework',
+                    'title': hw['title'],
+                    'subject_id': hw.get('subject_id'),
+                    'due_date': hw['due_date'],
+                    'days_until': days_until,
+                    'urgency': 'urgent' if days_until == 0 else 'warning' if days_until <= 1 else 'normal'
+                })
+        except (ValueError, KeyError):
+            continue
+
+    # Load tests
+    tests = load_school_tests()
+    for test in tests:
+        try:
+            test_date = datetime.strptime(test['date'], '%Y-%m-%d').date()
+            days_until = (test_date - today).days
+            if 0 <= days_until <= days:
+                deadlines.append({
+                    'id': test['id'],
+                    'type': 'test',
+                    'title': test.get('title', 'Test'),
+                    'subject_id': test.get('subject_id'),
+                    'due_date': test['date'],
+                    'days_until': days_until,
+                    'urgency': 'urgent' if days_until == 0 else 'warning' if days_until <= 1 else 'normal'
+                })
+        except (ValueError, KeyError):
+            continue
+
+    # Load exams
+    exams = load_school_exams()
+    for exam in exams:
+        try:
+            exam_date = datetime.strptime(exam['date'], '%Y-%m-%d').date()
+            days_until = (exam_date - today).days
+            if 0 <= days_until <= days:
+                deadlines.append({
+                    'id': exam['id'],
+                    'type': 'exam',
+                    'title': exam.get('title', 'Klausur'),
+                    'subject_id': exam.get('subject_id'),
+                    'due_date': exam['date'],
+                    'days_until': days_until,
+                    'urgency': 'urgent' if days_until == 0 else 'warning' if days_until <= 2 else 'normal'
+                })
+        except (ValueError, KeyError):
+            continue
+
+    # Sort by days_until
+    deadlines.sort(key=lambda x: x['days_until'])
+
+    return jsonify({
+        'success': True,
+        'deadlines': deadlines,
+        'count': len(deadlines)
+    })
 
 if __name__ == '__main__':
     import socket
