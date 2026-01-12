@@ -3796,6 +3796,85 @@ body {
     }
 }
 
+/* Mobile performance optimizations - disable heavy animations */
+@media (max-width: 768px), (pointer: coarse) {
+    /* Completely disable gradient orbs on mobile for better performance */
+    .gradient-orb {
+        display: none !important;
+    }
+
+    /* Reduce backdrop-filter blur for better performance */
+    .sidebar,
+    .glass-card,
+    .modal-content,
+    .dashboard-hero,
+    .dropdown-menu,
+    .pwa-install-btn,
+    .offline-banner {
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+
+    /* Disable complex animations */
+    .nav-item,
+    .glass-card,
+    .task-card,
+    .widget,
+    .btn-primary,
+    .btn-secondary,
+    .icon-btn,
+    .filter-tab {
+        animation: none !important;
+        transition: opacity 0.15s ease, background 0.15s ease !important;
+    }
+
+    /* Simpler hover effects */
+    .glass-card:hover,
+    .task-card:hover,
+    .widget:hover {
+        transform: none !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Disable page transitions for snappier navigation */
+    body.page-transitioning {
+        transition: none !important;
+    }
+
+    /* Remove will-change for memory savings */
+    * {
+        will-change: auto !important;
+    }
+
+    /* Faster modal transitions */
+    .modal {
+        transition: opacity 0.15s ease !important;
+    }
+
+    .modal-content {
+        transition: transform 0.15s ease, opacity 0.15s ease !important;
+    }
+
+    /* Pomodoro ring - simpler animation */
+    .pomodoro-ring .ring-progress {
+        transition: stroke-dashoffset 0.5s ease !important;
+    }
+
+    /* Disable pulse animations on mobile */
+    .countdown-urgent,
+    .status-icon,
+    .notification-dot {
+        animation: none !important;
+    }
+
+    /* Simpler hover states for interactive elements */
+    .deadline-item:hover,
+    .task-item:hover,
+    .nav-item:hover {
+        transform: none !important;
+    }
+}
+
 .calendar-controls {
     display: flex;
     align-items: center;

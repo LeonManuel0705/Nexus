@@ -1214,6 +1214,61 @@
             }
         }
 
+        /* Mobile performance optimizations */
+        @media (max-width: 768px), (pointer: coarse) {
+            /* Disable floating gradient orbs on mobile */
+            .gradient-orb {
+                display: none;
+            }
+
+            /* Simplify reveal animations */
+            .reveal {
+                transform: translateY(30px);
+                transition: opacity 0.6s ease, transform 0.6s ease;
+            }
+
+            /* Disable animated borders - use simple borders instead */
+            .why-card::before,
+            .stat::before,
+            .install-step::before,
+            .btn::before,
+            .nav-btn::before {
+                display: none !important;
+            }
+
+            /* Remove will-change to save memory */
+            .lightbox img {
+                will-change: auto;
+            }
+
+            /* Simpler hover effects */
+            .why-card:hover,
+            .stat:hover,
+            .install-step:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            }
+
+            .feature-image:hover img {
+                transform: scale(1.01);
+            }
+
+            /* Reduce blur for performance */
+            nav.scrolled {
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+            }
+
+            /* Simpler lightbox transitions */
+            .lightbox {
+                transition: background 0.3s ease, visibility 0s 0.3s;
+            }
+
+            .lightbox.active {
+                transition: background 0.3s ease, visibility 0s 0s;
+            }
+        }
+
         /* SVG gradient for icons */
         .svg-defs {
             position: absolute;
@@ -1543,6 +1598,11 @@
     </div>
 
     <script>
+        // Mobile detection - disable heavy animations on mobile
+        const isMobile = window.matchMedia('(max-width: 768px)').matches ||
+                         window.matchMedia('(pointer: coarse)').matches ||
+                         /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
         // Navigation scroll effect
         const nav = document.getElementById('nav');
         window.addEventListener('scroll', () => {
@@ -1617,20 +1677,14 @@
             });
         }
 
-        // Apply to why-cards (slower)
-        setupBorderAnimation(document.querySelectorAll('.why-card'), 0.008);
-
-        // Apply to buttons (slightly faster)
-        setupBorderAnimation(document.querySelectorAll('.btn'), 0.012);
-
-        // Apply to nav buttons
-        setupBorderAnimation(document.querySelectorAll('.nav-btn'), 0.015);
-
-        // Apply to stat cards
-        setupBorderAnimation(document.querySelectorAll('.stat'), 0.010);
-
-        // Apply to install step cards
-        setupBorderAnimation(document.querySelectorAll('.install-step'), 0.010);
+        // Only run animated borders on desktop (too heavy for mobile)
+        if (!isMobile) {
+            setupBorderAnimation(document.querySelectorAll('.why-card'), 0.008);
+            setupBorderAnimation(document.querySelectorAll('.btn'), 0.012);
+            setupBorderAnimation(document.querySelectorAll('.nav-btn'), 0.015);
+            setupBorderAnimation(document.querySelectorAll('.stat'), 0.010);
+            setupBorderAnimation(document.querySelectorAll('.install-step'), 0.010);
+        }
 
         // Lightbox with morph effect
         const lightbox = document.getElementById('lightbox');
@@ -1647,23 +1701,45 @@
 
             // Store the source element reference
             sourceElement = sourceImg;
-            const sourceRect = sourceImg.getBoundingClientRect();
-
-            // Set the image source
             lightboxImg.src = sourceImg.src;
 
-            // Wait for image to load to get its natural dimensions
+            // Simple fade for mobile, morph for desktop
+            if (isMobile) {
+                lightboxImg.style.transition = 'none';
+                lightboxImg.style.width = '';
+                lightboxImg.style.height = '';
+                lightboxImg.style.left = '50%';
+                lightboxImg.style.top = '50%';
+                lightboxImg.style.transform = 'translate(-50%, -50%) scale(0.9)';
+                lightboxImg.style.opacity = '0';
+                lightboxImg.style.borderRadius = '12px';
+
+                lightbox.classList.add('active');
+                document.body.style.overflow = 'hidden';
+
+                lightboxImg.offsetHeight;
+
+                lightboxImg.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+                lightboxImg.style.transform = 'translate(-50%, -50%) scale(1)';
+                lightboxImg.style.opacity = '1';
+
+                lightboxClose.style.transition = 'opacity 0.2s 0.1s';
+                lightboxClose.style.opacity = '1';
+                lightboxClose.style.transform = 'scale(1) rotate(0deg)';
+
+                setTimeout(() => { isAnimating = false; }, 300);
+                return;
+            }
+
+            // Desktop: Full morph animation
+            const sourceRect = sourceImg.getBoundingClientRect();
+
             lightboxImg.onload = () => {
-                // Calculate the target (centered) position
                 const viewportWidth = window.innerWidth;
                 const viewportHeight = window.innerHeight;
                 const padding = 40;
-
-                // Calculate max dimensions
                 const maxWidth = viewportWidth - (padding * 2);
                 const maxHeight = viewportHeight - (padding * 2);
-
-                // Calculate the actual display size maintaining aspect ratio
                 const imgRatio = lightboxImg.naturalWidth / lightboxImg.naturalHeight;
                 let targetWidth, targetHeight;
 
@@ -1675,25 +1751,18 @@
                     targetHeight = targetWidth / imgRatio;
                 }
 
-                // Target position (centered)
                 const targetX = (viewportWidth - targetWidth) / 2;
                 const targetY = (viewportHeight - targetHeight) / 2;
-
-                // Calculate initial transform to match source position
                 const scaleX = sourceRect.width / targetWidth;
                 const scaleY = sourceRect.height / targetHeight;
                 const scale = Math.max(scaleX, scaleY);
-
-                // Calculate translation to match source center
                 const sourceCenterX = sourceRect.left + sourceRect.width / 2;
                 const sourceCenterY = sourceRect.top + sourceRect.height / 2;
                 const targetCenterX = targetX + targetWidth / 2;
                 const targetCenterY = targetY + targetHeight / 2;
-
                 const translateX = sourceCenterX - targetCenterX;
                 const translateY = sourceCenterY - targetCenterY;
 
-                // Set initial state (at source position)
                 lightboxImg.style.transition = 'none';
                 lightboxImg.style.width = targetWidth + 'px';
                 lightboxImg.style.height = targetHeight + 'px';
@@ -1703,29 +1772,21 @@
                 lightboxImg.style.opacity = '1';
                 lightboxImg.style.borderRadius = getComputedStyle(sourceImg).borderRadius;
 
-                // Show lightbox
                 lightbox.classList.add('active');
                 document.body.style.overflow = 'hidden';
-
-                // Force reflow
                 lightboxImg.offsetHeight;
 
-                // Animate to center
                 lightboxImg.style.transition = 'transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.6s cubic-bezier(0.22, 1, 0.36, 1)';
                 lightboxImg.style.transform = 'translate(0, 0) scale(1)';
                 lightboxImg.style.borderRadius = '16px';
 
-                // Show close button
                 lightboxClose.style.transition = 'opacity 0.4s 0.2s, transform 0.5s 0.2s cubic-bezier(0.22, 1, 0.36, 1), background 0.3s';
                 lightboxClose.style.opacity = '1';
                 lightboxClose.style.transform = 'scale(1) rotate(0deg)';
 
-                setTimeout(() => {
-                    isAnimating = false;
-                }, 600);
+                setTimeout(() => { isAnimating = false; }, 600);
             };
 
-            // If image is already cached, trigger onload manually
             if (lightboxImg.complete) {
                 lightboxImg.onload();
             }
@@ -1735,6 +1796,31 @@
             if (isAnimating || !sourceElement) return;
             isAnimating = true;
 
+            // Simple fade for mobile
+            if (isMobile) {
+                lightboxClose.style.transition = 'opacity 0.15s';
+                lightboxClose.style.opacity = '0';
+
+                lightbox.style.transition = 'background 0.3s ease';
+                lightbox.style.background = 'rgba(0, 0, 0, 0)';
+
+                lightboxImg.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                lightboxImg.style.opacity = '0';
+                lightboxImg.style.transform = 'translate(-50%, -50%) scale(0.9)';
+
+                setTimeout(() => {
+                    lightbox.classList.remove('active');
+                    lightbox.style.transition = '';
+                    lightbox.style.background = '';
+                    lightboxImg.style.transition = 'none';
+                    lightboxClose.style.transform = 'scale(0.8) rotate(-90deg)';
+                    document.body.style.overflow = '';
+                    isAnimating = false;
+                }, 300);
+                return;
+            }
+
+            // Desktop: Full morph animation
             // Get current positions (recalculate source in case of scroll)
             const sourceRect = sourceElement.getBoundingClientRect();
             const currentRect = lightboxImg.getBoundingClientRect();
