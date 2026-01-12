@@ -638,6 +638,29 @@
     </div>
 </div>
 
+<div class="modal" id="bundeslandModal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h3>Wähle dein Bundesland</h3>
+            <button class="modal-close" onclick="closeModal('bundeslandModal')">&times;</button>
+        </div>
+        <div class="bundesland-wizard-content">
+            <p class="setup-intro">Für korrekte Feiertage und Schulferien:</p>
+            <div class="bundesland-grid" id="bundeslandGrid">
+                <!-- Will be populated by JavaScript -->
+            </div>
+            <div class="bundesland-loading" id="bundeslandLoading" style="display: none;">
+                <div class="loading-spinner"></div>
+                <span>Feiertage und Schulferien werden importiert...</span>
+            </div>
+            <div class="setup-actions" id="bundeslandActions">
+                <button class="btn-secondary" onclick="skipBundeslandSelection()">Später einrichten</button>
+                <button class="btn-primary" onclick="saveBundeslandSelection()" id="saveBundeslandBtn" disabled>Weiter</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal" id="setupWizardModal">
     <div class="modal-content modal-large">
         <div class="modal-header">
@@ -1056,9 +1079,15 @@ async function initTimetable() {
         // Hide loading
         if (loadingEl) loadingEl.style.display = 'none';
 
-        // Check if setup is needed
+        // Check if Bundesland is set (always check, even if timetable exists)
+        checkBundeslandSetting();
+
+        // Check if setup is needed (only for new users)
         if (!timetableSettings.setup_completed && timetableEntries.length === 0) {
-            showSetupWizard();
+            // Will be shown after Bundesland selection if needed
+            if (timetableSettings.bundesland) {
+                showSetupWizard();
+            }
         }
 
         // Initialize the stundenplan display
@@ -1193,6 +1222,146 @@ async function importDefaultTemplate() {
         console.error('Error importing template:', error);
     }
     return false;
+}
+
+// ==========================================
+// BUNDESLAND SELECTION FUNCTIONS
+// ==========================================
+
+let selectedBundesland = null;
+let bundeslaender = {};
+
+async function checkBundeslandSetting() {
+    // Check if Bundesland is set, show modal if not
+    try {
+        const response = await fetch('/api/hub/bundesland');
+        const data = await response.json();
+
+        if (data.success && !data.bundesland) {
+            // No Bundesland set, show selection modal
+            bundeslaender = data.bundeslaender || {};
+            showBundeslandModal();
+        }
+    } catch (error) {
+        console.error('Error checking Bundesland:', error);
+    }
+}
+
+function showBundeslandModal() {
+    const grid = document.getElementById('bundeslandGrid');
+    if (!grid) return;
+
+    // Populate the grid with Bundesland options
+    grid.innerHTML = Object.entries(bundeslaender).map(([code, name]) => `
+        <div class="bundesland-card" data-code="${code}" onclick="selectBundesland('${code}')">
+            <span class="bundesland-code">${code}</span>
+            <span class="bundesland-name">${name}</span>
+        </div>
+    `).join('');
+
+    openModal('bundeslandModal');
+}
+
+function selectBundesland(code) {
+    selectedBundesland = code;
+
+    // Update UI
+    document.querySelectorAll('.bundesland-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    document.querySelector(`.bundesland-card[data-code="${code}"]`)?.classList.add('selected');
+
+    // Enable the save button
+    document.getElementById('saveBundeslandBtn').disabled = false;
+}
+
+async function saveBundeslandSelection() {
+    if (!selectedBundesland) return;
+
+    const grid = document.getElementById('bundeslandGrid');
+    const loading = document.getElementById('bundeslandLoading');
+    const actions = document.getElementById('bundeslandActions');
+
+    // Show loading state with progress
+    grid.style.display = 'none';
+    actions.style.display = 'none';
+    loading.style.display = 'flex';
+    loading.innerHTML = `
+        <div class="loading-spinner"></div>
+        <span>Feiertage und Schulferien werden importiert...</span>
+        <div class="import-progress-container">
+            <div class="import-progress-bar" id="importProgressBar"></div>
+        </div>
+        <span class="import-progress-text" id="importProgressText">Verbinde mit feiertage-api.de...</span>
+    `;
+
+    // Animate progress bar
+    const progressBar = document.getElementById('importProgressBar');
+    const progressText = document.getElementById('importProgressText');
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress > 85) progress = 85; // Cap at 85% until complete
+        progressBar.style.width = progress + '%';
+
+        if (progress < 30) {
+            progressText.textContent = 'Feiertage werden geladen...';
+        } else if (progress < 60) {
+            progressText.textContent = 'Schulferien werden geladen...';
+        } else {
+            progressText.textContent = 'Daten werden gespeichert...';
+        }
+    }, 300);
+
+    try {
+        const response = await fetch('/api/hub/bundesland', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bundesland: selectedBundesland })
+        });
+        const data = await response.json();
+
+        clearInterval(progressInterval);
+        progressBar.style.width = '100%';
+        progressText.textContent = 'Fertig!';
+
+        if (data.success) {
+            setTimeout(() => {
+                closeModal('bundeslandModal');
+
+                // Show success message
+                const importedCount = data.imported_count || 0;
+                const bundeslandName = data.bundesland_name || selectedBundesland;
+                showToast(`${bundeslandName}: ${importedCount} Feiertage und Schulferien importiert!`, 'success');
+
+                // Now show setup wizard if needed
+                if (!timetableSettings.setup_completed && timetableEntries.length === 0) {
+                    showSetupWizard();
+                }
+            }, 500);
+        } else {
+            throw new Error(data.error || 'Import fehlgeschlagen');
+        }
+    } catch (error) {
+        clearInterval(progressInterval);
+        console.error('Error saving Bundesland:', error);
+
+        // Reset modal to allow retry
+        loading.style.display = 'none';
+        grid.style.display = 'grid';
+        actions.style.display = 'flex';
+
+        showToast('Import fehlgeschlagen: ' + error.message, 'error');
+    }
+}
+
+function skipBundeslandSelection() {
+    closeModal('bundeslandModal');
+
+    // Show setup wizard if needed
+    if (!timetableSettings.setup_completed && timetableEntries.length === 0) {
+        showSetupWizard();
+    }
 }
 
 // ==========================================
@@ -4434,6 +4603,105 @@ async function deleteGrade() {
 </script>
 
 <style>
+/* Bundesland Selection Grid */
+.bundesland-wizard-content {
+    padding: 10px 0;
+}
+
+.bundesland-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin: 20px 0;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+.bundesland-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 10px;
+    background: var(--glass-bg);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    min-height: 80px;
+}
+
+.bundesland-card:hover {
+    border-color: var(--accent);
+    background: var(--accent-light);
+}
+
+.bundesland-card.selected {
+    border-color: var(--accent);
+    background: var(--accent-light);
+    box-shadow: 0 0 0 2px var(--accent);
+}
+
+.bundesland-code {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+}
+
+.bundesland-name {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.2;
+}
+
+.bundesland-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.import-progress-container {
+    width: 100%;
+    max-width: 300px;
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 10px 0;
+}
+
+.import-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), #764ba2);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.import-progress-text {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+    .bundesland-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .bundesland-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 /* Import from Stundenplan Banner */
 .import-from-stundenplan {
     display: flex;

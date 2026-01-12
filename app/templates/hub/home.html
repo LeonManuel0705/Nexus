@@ -75,16 +75,17 @@
             </div>
         </section>
 
-        <section class="widget glass-card widget-alerts">
+        <section class="widget glass-card widget-alerts widget-deadlines">
             <div class="widget-header">
-                <h3>Wichtig</h3>
+                <h3>Deadlines</h3>
+                <a href="/hub/school" class="widget-link">Schule →</a>
             </div>
-            <div class="alerts-list" id="alertsList">
+            <div class="deadlines-list" id="deadlinesList">
                 <div class="empty-state">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                         <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
-                    <span>Alles im Griff</span>
+                    <span>Keine anstehenden Deadlines</span>
                 </div>
             </div>
         </section>
@@ -144,6 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(updateClock, 1000);
 
     loadDashboardData();
+    initNotifications();
     // Theme toggle is handled by HubApp in hub.js
 });
 
@@ -166,6 +168,57 @@ function updateClock() {
     else if (hour < 12) greetingEl.textContent = 'Guten Morgen';
     else if (hour < 18) greetingEl.textContent = 'Guten Tag';
     else greetingEl.textContent = 'Guten Abend';
+}
+
+// Request notification permission on load
+async function initNotifications() {
+    if ('Notification' in window && Notification.permission === 'default') {
+        // Don't ask immediately, wait for user interaction
+        const askBtn = document.createElement('button');
+        askBtn.className = 'notification-prompt';
+        askBtn.innerHTML = '🔔 Benachrichtigungen aktivieren';
+        askBtn.onclick = async () => {
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                askBtn.remove();
+                checkDeadlineNotifications();
+            }
+        };
+        // Add to status bar if not already granted
+        if (Notification.permission !== 'granted') {
+            const statusBar = document.querySelector('.status-bar');
+            if (statusBar && !localStorage.getItem('notification_prompt_dismissed')) {
+                statusBar.appendChild(askBtn);
+            }
+        }
+    }
+}
+
+function checkDeadlineNotifications() {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    const lastNotified = localStorage.getItem('last_deadline_notification');
+    const today = new Date().toISOString().split('T')[0];
+
+    // Only notify once per day
+    if (lastNotified === today) return;
+
+    // Check for urgent deadlines
+    const urgentItems = document.querySelectorAll('.deadline-item.urgent');
+    if (urgentItems.length > 0) {
+        const titles = Array.from(urgentItems).map(el =>
+            el.querySelector('.deadline-title')?.textContent
+        ).filter(Boolean).slice(0, 3);
+
+        new Notification('Deadlines heute!', {
+            body: titles.join(', '),
+            icon: '/static/icon-192.png',
+            tag: 'deadline-urgent',
+            requireInteraction: true
+        });
+
+        localStorage.setItem('last_deadline_notification', today);
+    }
 }
 
 async function loadDashboardData() {
@@ -530,15 +583,18 @@ async function loadSchoolAlerts() {
     const examCount = alerts.filter(a => a.type === 'exam').length;
     document.getElementById('statUpcomingExams').textContent = examCount;
 
-    // Render alerts
-    renderAlerts(alerts);
+    // Render deadlines with countdown
+    renderDeadlines(alerts);
 
     // Update deadline status
     updateDeadlineStatus(alerts);
+
+    // Check for browser notifications (after a short delay to ensure DOM is updated)
+    setTimeout(() => checkDeadlineNotifications(), 500);
 }
 
-function renderAlerts(alerts) {
-    const container = document.getElementById('alertsList');
+function renderDeadlines(alerts) {
+    const container = document.getElementById('deadlinesList');
 
     if (!alerts || alerts.length === 0) {
         container.innerHTML = `
@@ -546,22 +602,37 @@ function renderAlerts(alerts) {
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                     <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
-                <span>Alles im Griff</span>
+                <span>Keine anstehenden Deadlines</span>
             </div>
         `;
         return;
     }
 
     container.innerHTML = alerts.slice(0, 5).map(alert => {
-        const daysText = alert.days === 0 ? 'Heute' : alert.days === 1 ? 'Morgen' : `in ${alert.days} Tagen`;
+        const typeIcon = alert.type === 'homework' ? '📝' : alert.type === 'test' ? '📋' : '📚';
         const typeLabel = alert.type === 'homework' ? 'Hausaufgabe' : alert.type === 'test' ? 'Test' : 'Klausur';
 
+        // Build countdown display
+        let countdownHtml = '';
+        if (alert.days === 0) {
+            countdownHtml = '<span class="countdown-urgent">HEUTE</span>';
+        } else if (alert.days === 1) {
+            countdownHtml = '<span class="countdown-warning">Morgen</span>';
+        } else {
+            countdownHtml = `<span class="countdown-days">${alert.days}</span><span class="countdown-label">Tage</span>`;
+        }
+
         return `
-            <div class="alert-item ${alert.urgency}">
-                <span class="alert-icon">${alert.icon}</span>
-                <div class="alert-content">
-                    <span class="alert-title">${alert.subject}: ${alert.title}</span>
-                    <span class="alert-meta">${typeLabel} • ${daysText}</span>
+            <div class="deadline-item ${alert.urgency}">
+                <div class="deadline-countdown">
+                    ${countdownHtml}
+                </div>
+                <div class="deadline-content">
+                    <div class="deadline-title">${alert.title}</div>
+                    <div class="deadline-meta">
+                        <span class="deadline-type">${typeIcon} ${typeLabel}</span>
+                        <span class="deadline-subject">${alert.subject}</span>
+                    </div>
                 </div>
             </div>
         `;
@@ -588,4 +659,145 @@ function updateDeadlineStatus(alerts) {
     }
 }
 </script>
+<style>
+/* Deadline Widget Styles */
+.widget-deadlines {
+    grid-column: span 1;
+}
+
+.deadlines-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.deadline-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--bg-tertiary);
+    transition: transform 0.2s;
+}
+
+.deadline-item:hover {
+    transform: translateX(4px);
+}
+
+.deadline-item.urgent {
+    background: rgba(239, 68, 68, 0.15);
+    border-left: 3px solid #ef4444;
+}
+
+.deadline-item.warning {
+    background: rgba(245, 158, 11, 0.15);
+    border-left: 3px solid #f59e0b;
+}
+
+.deadline-item.normal {
+    border-left: 3px solid var(--accent-color);
+}
+
+.deadline-countdown {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 50px;
+    padding: 6px;
+    border-radius: 8px;
+    background: var(--bg-secondary);
+}
+
+.deadline-item.urgent .deadline-countdown {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.deadline-item.warning .deadline-countdown {
+    background: rgba(245, 158, 11, 0.2);
+}
+
+.countdown-days {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+}
+
+.countdown-label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.countdown-urgent {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #ef4444;
+    animation: pulse 1.5s infinite;
+}
+
+.countdown-warning {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #f59e0b;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.deadline-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.deadline-title {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.deadline-meta {
+    display: flex;
+    gap: 8px;
+    margin-top: 2px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.deadline-type {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.deadline-subject {
+    color: var(--text-secondary);
+}
+
+/* Notification prompt */
+.notification-prompt {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.notification-prompt:hover {
+    opacity: 0.9;
+}
+</style>
 {% endblock %}

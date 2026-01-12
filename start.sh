@@ -26,7 +26,7 @@ echo -e "${NC}"
 
 # Check if setup has been run
 if [ ! -d "$VENV_DIR" ]; then
-    echo -e "${YELLOW}⚠️  Nexus Hub ist noch nicht eingerichtet!${NC}"
+    echo -e "${YELLOW}Nexus Hub ist noch nicht eingerichtet!${NC}"
     echo ""
     echo "   Bitte führe zuerst das Setup aus:"
     echo -e "   ${CYAN}./setup.sh${NC}"
@@ -40,11 +40,11 @@ source "$VENV_DIR/bin/activate"
 # Quick dependency check (silent)
 pip install --quiet -r "$SCRIPT_DIR/requirements.txt" 2>/dev/null
 
-echo -e "🚀 ${BOLD}Server wird gestartet...${NC}"
-echo ""
-
 # Get local IP for mobile access
 LOCAL_IP=$(python3 -c "import socket; s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.connect(('8.8.8.8',80)); print(s.getsockname()[0]); s.close()" 2>/dev/null)
+
+echo -e "🚀 ${BOLD}Server wird gestartet...${NC}"
+echo ""
 
 echo -e "   ${BOLD}Desktop:${NC}  ${GREEN}http://localhost:5050${NC}"
 if [ -n "$LOCAL_IP" ]; then
@@ -58,6 +58,9 @@ echo -e "   ${YELLOW}Ctrl+C${NC} zum Beenden"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
+
+# Auto-open browser after short delay (give server time to start)
+(sleep 2 && open "http://localhost:5050" 2>/dev/null) &
 
 # Run the app as a module (required for relative imports)
 cd "$SCRIPT_DIR"
