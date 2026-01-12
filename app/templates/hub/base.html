@@ -32,6 +32,11 @@
             var theme = localStorage.getItem('nexus-theme') || localStorage.getItem('hub_theme') || 'dark';
             document.documentElement.setAttribute('data-theme', theme);
         })();
+
+        // Mobile detection - used globally to disable heavy animations
+        window.isMobile = window.matchMedia('(max-width: 768px)').matches ||
+                          window.matchMedia('(pointer: coarse)').matches ||
+                          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     </script>
 </head>
 <body>
@@ -556,7 +561,10 @@
 
     <script>
     // Smooth page transitions - fade entire page for seamless experience
+    // Disabled on mobile for snappier navigation
     document.addEventListener('DOMContentLoaded', () => {
+        if (window.isMobile) return; // Skip transition setup on mobile
+
         document.querySelectorAll('.nav-item').forEach(link => {
             link.addEventListener('click', function(e) {
                 const href = this.getAttribute('href');
