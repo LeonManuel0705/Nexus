@@ -1,12 +1,9 @@
-/**
- * Nexus Connection Manager
- * Centralized connection state management with caching and WiFi detection
- */
+
 const NexusConnection = {
     state: {
-        internetAvailable: null,    // null = unknown, true/false = checked
+        internetAvailable: null,
         iservAvailable: null,
-        isSchoolNetwork: false,     // True if on WERDER-EHG (IServ only, no internet)
+        isSchoolNetwork: false,
         lastCheck: null,
         checkInProgress: false
     },
@@ -14,18 +11,13 @@ const NexusConnection = {
     SCHOOL_WIFI_NAME: 'WERDER-EHG',
     CACHE_KEY: 'nexus_connection_state',
     SESSION_KEY: 'nexus_session_started',
-    CACHE_DURATION: 60000,  // 1 minute cache
-    PING_TIMEOUT: 500,      // 500ms max for ping
+    CACHE_DURATION: 60000,
+    PING_TIMEOUT: 500,
 
-    /**
-     * Initialize connection manager
-     * Only performs connectivity check on fresh session
-     */
     async init() {
-        // Load cached state from sessionStorage
+
         this.loadCachedState();
 
-        // Check if this is a fresh session or tab navigation
         const isInitialLoad = !sessionStorage.getItem(this.SESSION_KEY);
 
         if (isInitialLoad || !this.state.lastCheck) {
@@ -33,7 +25,6 @@ const NexusConnection = {
             await this.checkConnectivity();
         }
 
-        // Dispatch ready event
         window.dispatchEvent(new CustomEvent('nexus-connection-ready', {
             detail: this.state
         }));
@@ -41,9 +32,6 @@ const NexusConnection = {
         return this.state;
     },
 
-    /**
-     * Load cached connection state from sessionStorage
-     */
     loadCachedState() {
         try {
             const cached = sessionStorage.getItem(this.CACHE_KEY);
@@ -61,9 +49,6 @@ const NexusConnection = {
         return false;
     },
 
-    /**
-     * Save current state to sessionStorage
-     */
     saveState() {
         this.state.lastCheck = Date.now();
         try {
@@ -73,15 +58,12 @@ const NexusConnection = {
         }
     },
 
-    /**
-     * Check connectivity with fast parallel pings
-     */
     async checkConnectivity() {
         if (this.state.checkInProgress) return this.state;
         this.state.checkInProgress = true;
 
         try {
-            // Fast parallel checks with short timeouts
+
             const [internet, iserv] = await Promise.allSettled([
                 this.checkInternet(),
                 this.checkIServ()
@@ -90,8 +72,6 @@ const NexusConnection = {
             this.state.internetAvailable = internet.status === 'fulfilled' && internet.value;
             this.state.iservAvailable = iserv.status === 'fulfilled' && iserv.value;
 
-            // Detect school network: IServ works but internet doesn't
-            // This happens when connected to WERDER-EHG WiFi
             this.state.isSchoolNetwork = this.state.iservAvailable && !this.state.internetAvailable;
 
             this.saveState();
@@ -104,9 +84,6 @@ const NexusConnection = {
         return this.state;
     },
 
-    /**
-     * Fast internet connectivity check via local ping endpoint
-     */
     async checkInternet() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.PING_TIMEOUT);
@@ -125,9 +102,6 @@ const NexusConnection = {
         }
     },
 
-    /**
-     * Fast IServ availability check
-     */
     async checkIServ() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.PING_TIMEOUT);
@@ -146,46 +120,27 @@ const NexusConnection = {
         }
     },
 
-    /**
-     * Check if external APIs should be called (weather, etc.)
-     * Returns false if on school network or offline
-     */
     shouldCallExternalAPI() {
         return this.state.internetAvailable === true && !this.state.isSchoolNetwork;
     },
 
-    /**
-     * Check if IServ calls should be made
-     */
     shouldCallIServ() {
         return this.state.iservAvailable === true;
     },
 
-    /**
-     * Check if we're on the school network (WERDER-EHG)
-     */
     isOnSchoolNetwork() {
         return this.state.isSchoolNetwork;
     },
 
-    /**
-     * Check if we're fully offline
-     */
     isOffline() {
         return !this.state.internetAvailable && !this.state.iservAvailable;
     },
 
-    /**
-     * Force refresh connectivity check
-     */
     async refresh() {
         this.state.lastCheck = null;
         return this.checkConnectivity();
     },
 
-    /**
-     * Get human-readable connection status
-     */
     getStatusText() {
         if (this.isOffline()) {
             return 'Offline';
@@ -198,7 +153,6 @@ const NexusConnection = {
     }
 };
 
-// Export for module usage if needed
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = NexusConnection;
 }

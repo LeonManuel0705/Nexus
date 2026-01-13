@@ -288,13 +288,13 @@ const translations = {
 
 const HubApp = {
     state: {
-        // Migrate old hub_theme key to nexus-theme
+
         theme: (function() {
             const nexusTheme = localStorage.getItem('nexus-theme');
             const hubTheme = localStorage.getItem('hub_theme');
-            // Prefer nexus-theme, fallback to hub_theme, default to dark
+
             const theme = nexusTheme || hubTheme || 'dark';
-            // Consolidate to single key
+
             if (theme && !nexusTheme) {
                 localStorage.setItem('nexus-theme', theme);
             }
@@ -1790,7 +1790,7 @@ const HubApp = {
         if (modal) modal.classList.remove('active');
 
         try {
-            const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`);
+            const response = await fetch(`https:
             const data = await response.json();
             if (!data.results?.length) throw new Error('City not found');
             const result = data.results[0];
@@ -1947,7 +1947,6 @@ const HubApp = {
     },
 
     initEventListeners() {
-        // Theme toggle handled via inline onclick in base.html
 
         document.querySelectorAll('.lang-selector button').forEach(btn => {
             btn.addEventListener('click', () => this.setLanguage(btn.dataset.lang));
@@ -2102,7 +2101,6 @@ const HubApp = {
     }
 };
 
-// Expose HubApp globally
 window.HubApp = HubApp;
 
 document.addEventListener('DOMContentLoaded', () => {

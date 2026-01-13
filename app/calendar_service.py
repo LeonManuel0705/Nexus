@@ -21,7 +21,7 @@ except ImportError:
 CALDAV_ACCOUNTS_FILE = os.path.join(os.path.dirname(__file__), '..', 'caldav_accounts.json')
 
 def load_caldav_accounts() -> List[Dict]:
-                                     
+
     try:
         if os.path.exists(CALDAV_ACCOUNTS_FILE):
             with open(CALDAV_ACCOUNTS_FILE, 'r') as f:
@@ -31,12 +31,12 @@ def load_caldav_accounts() -> List[Dict]:
     return []
 
 def save_caldav_accounts(accounts: List[Dict]):
-                               
+
     with open(CALDAV_ACCOUNTS_FILE, 'w') as f:
         json.dump(accounts, f)
 
 def add_caldav_account(name: str, url: str, username: str, password: str, provider: str = 'caldav') -> Dict:
-                                                                       
+
     if not CALDAV_AVAILABLE:
         return {
             "success": False,
@@ -66,7 +66,7 @@ def add_caldav_account(name: str, url: str, username: str, password: str, provid
             "name": name or username,
             "url": url,
             "username": username,
-            "password": password,                                
+            "password": password,
             "provider": provider,
             "calendars": [{"name": cal.name, "url": str(cal.url)} for cal in calendars]
         }
@@ -88,14 +88,14 @@ def add_caldav_account(name: str, url: str, username: str, password: str, provid
         return {"success": False, "error": f"Failed to connect: {str(e)}"}
 
 def remove_caldav_account(account_id: str) -> Dict:
-                                  
+
     accounts = load_caldav_accounts()
     accounts = [a for a in accounts if a.get('id') != account_id]
     save_caldav_accounts(accounts)
     return {"success": True}
 
 def get_caldav_accounts() -> List[Dict]:
-                                                          
+
     accounts = load_caldav_accounts()
     return [
         {
@@ -109,7 +109,7 @@ def get_caldav_accounts() -> List[Dict]:
 
 def fetch_caldav_events(account_id: str = None, days_ahead: int = 30,
                         start_date: str = None, end_date: str = None) -> Dict:
-                                            
+
     if not CALDAV_AVAILABLE:
         return {
             "success": False,
@@ -146,7 +146,7 @@ def fetch_caldav_events(account_id: str = None, days_ahead: int = 30,
 
             for cal in calendars:
                 try:
-                                                
+
                     events = cal.date_search(start=start, end=end, expand=True)
 
                     for event in events:
@@ -220,7 +220,7 @@ def create_caldav_event(account_id: str, calendar_url: str, title: str,
                         start_date: str, start_time: str = None,
                         end_date: str = None, end_time: str = None,
                         description: str = '', location: str = '') -> Dict:
-                                               
+
     if not CALDAV_AVAILABLE:
         return {"success": False, "error": "CalDAV not available"}
 
@@ -277,7 +277,7 @@ END:VCALENDAR"""
         return {"success": False, "error": str(e)}
 
 def get_macos_calendar_events_eventkit(days_ahead: int = 14) -> Dict:
-                                                                       
+
     if not EVENTKIT_AVAILABLE:
         return {
             "success": False,
@@ -292,17 +292,17 @@ def get_macos_calendar_events_eventkit(days_ahead: int = 14) -> Dict:
         status = EventKit.EKEventStore.authorizationStatusForEntityType_(EventKit.EKEntityTypeEvent)
 
         if status == EventKit.EKAuthorizationStatusNotDetermined:
-                                                                             
+
             try:
-                               
+
                 store.requestFullAccessToEventsWithCompletion_(lambda granted, error: None)
             except:
-                            
+
                 store.requestAccessToEntityType_completion_(
                     EventKit.EKEntityTypeEvent,
                     lambda granted, error: None
                 )
-                                                               
+
             return {
                 "success": False,
                 "error": "permission_needed",
@@ -339,10 +339,10 @@ def get_macos_calendar_events_eventkit(days_ahead: int = 14) -> Dict:
         events = []
         for ek_event in ek_events:
             try:
-                                
+
                 start = ek_event.startDate()
                 if start:
-                                                       
+
                     timestamp = start.timeIntervalSince1970()
                     dt = datetime.fromtimestamp(timestamp)
                     date_str = dt.strftime("%Y-%m-%d")
@@ -363,7 +363,7 @@ def get_macos_calendar_events_eventkit(days_ahead: int = 14) -> Dict:
                 }
                 events.append(event)
             except Exception as e:
-                                         
+
                 continue
 
         events.sort(key=lambda e: (e.get('date', ''), e.get('time', '')))
@@ -383,7 +383,7 @@ def get_macos_calendar_events_eventkit(days_ahead: int = 14) -> Dict:
         }
 
 def get_macos_calendar_events_icalbuddy(days_ahead: int = 14) -> Dict:
-                                                                      
+
     try:
         cmd = [
             'icalBuddy',
@@ -447,7 +447,7 @@ def get_macos_calendar_events_icalbuddy(days_ahead: int = 14) -> Dict:
         }
 
 def get_macos_calendar_events(days_ahead: int = 14) -> Dict:
-                                                                                          
+
     if EVENTKIT_AVAILABLE:
         result = get_macos_calendar_events_eventkit(days_ahead)
         if result["success"] or result.get("error") in ["no_permission", "no_calendars"]:
@@ -456,7 +456,7 @@ def get_macos_calendar_events(days_ahead: int = 14) -> Dict:
     return get_macos_calendar_events_icalbuddy(days_ahead)
 
 def parse_icalbuddy_output(output: str) -> List[Dict]:
-                                                        
+
     events = []
 
     if not output.strip():
@@ -494,7 +494,7 @@ def parse_icalbuddy_output(output: str) -> List[Dict]:
     return events
 
 def get_calendars() -> Dict:
-                                          
+
     if EVENTKIT_AVAILABLE:
         try:
             store = EventKit.EKEventStore.alloc().init()
@@ -510,7 +510,7 @@ def get_calendars() -> Dict:
 
             return {"success": True, "calendars": cal_list}
         except Exception as e:
-            pass                             
+            pass
 
     try:
         result = subprocess.run(['icalBuddy', 'calendars'], capture_output=True, text=True, timeout=5)
@@ -533,7 +533,7 @@ def get_calendars() -> Dict:
         return {"success": False, "calendars": [], "error": str(e)}
 
 def merge_events(macos_events: List[Dict], local_events: List[Dict]) -> List[Dict]:
-                                                              
+
     all_events = []
     seen_ids = set()
 

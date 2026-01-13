@@ -221,7 +221,6 @@ const NexusAccounts = {
 
         const accounts = await this.getAllAccounts();
 
-        // Single-user mode: auto-create default account if none exists
         if (accounts.length === 0) {
             const defaultAccount = await this.createAccount('Benutzer', 'Benutzer', '#4285f4');
             await this.switchAccount(defaultAccount.id);
@@ -357,7 +356,7 @@ const NexusAccounts = {
 };
 
 const NexusData = {
-    
+
     getUserId() {
         const userId = NexusAccounts.getCurrentUserId();
         if (!userId) {
