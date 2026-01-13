@@ -11,7 +11,6 @@ from typing import Dict, List, Optional
 from datetime import datetime
 import re
 
-# Use project data directory
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -33,21 +32,21 @@ PROVIDER_SETTINGS = {
         "requires_app_password": False
     },
     "iserv": {
-        "imap_host": None,  # Dynamically set from email domain
+        "imap_host": None,
         "imap_port": 993,
-        "smtp_host": None,  # Dynamically set from email domain
+        "smtp_host": None,
         "smtp_port": 587,
         "requires_app_password": False
     }
 }
 
 def get_iserv_settings(email: str) -> Dict:
-    """Get IServ server settings based on email domain."""
+
     domain = email.split('@')[1] if '@' in email else None
     if not domain:
         return None
     return {
-        "imap_host": domain,  # IServ uses the domain directly
+        "imap_host": domain,
         "imap_port": 993,
         "smtp_host": domain,
         "smtp_port": 587,
@@ -55,7 +54,7 @@ def get_iserv_settings(email: str) -> Dict:
     }
 
 def get_provider_settings(provider: str, email: str) -> Optional[Dict]:
-    """Get settings for any provider, including dynamic IServ settings."""
+
     if provider == "iserv":
         return get_iserv_settings(email)
     return PROVIDER_SETTINGS.get(provider)
@@ -82,7 +81,6 @@ def add_email_account(email: str, password: str, provider: str) -> Dict:
     if provider not in PROVIDER_SETTINGS:
         return {"success": False, "error": "Unsupported provider"}
 
-    # For IServ, get settings based on email domain
     if provider == "iserv":
         settings = get_iserv_settings(email)
         if not settings:

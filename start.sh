@@ -1,14 +1,9 @@
 #!/bin/bash
 
-# ============================================
-# Nexus Hub - Start Script
-# ============================================
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_DIR="$SCRIPT_DIR/app"
 VENV_DIR="$SCRIPT_DIR/venv"
 
-# Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
@@ -24,7 +19,6 @@ echo "║               Developer: Leon              ║"
 echo "╚════════════════════════════════════════════╝"
 echo -e "${NC}"
 
-# Check if setup has been run
 if [ ! -d "$VENV_DIR" ]; then
     echo -e "${YELLOW}Nexus Hub ist noch nicht eingerichtet!${NC}"
     echo ""
@@ -34,13 +28,10 @@ if [ ! -d "$VENV_DIR" ]; then
     exit 1
 fi
 
-# Activate virtual environment
 source "$VENV_DIR/bin/activate"
 
-# Quick dependency check (silent)
 pip install --quiet -r "$SCRIPT_DIR/requirements.txt" 2>/dev/null
 
-# Get local IP for mobile access
 LOCAL_IP=$(python3 -c "import socket; s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.connect(('8.8.8.8',80)); print(s.getsockname()[0]); s.close()" 2>/dev/null)
 
 echo -e "🚀 ${BOLD}Server wird gestartet...${NC}"
@@ -59,9 +50,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# Auto-open browser after short delay (give server time to start)
 (sleep 2 && open "http://localhost:5050" 2>/dev/null) &
 
-# Run the app as a module (required for relative imports)
 cd "$SCRIPT_DIR"
 python3 -m app.app

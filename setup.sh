@@ -1,36 +1,25 @@
 #!/bin/bash
 
-# ============================================
-# Nexus Hub - Automatisches Setup
-# ============================================
-# Dieses Script installiert automatisch alle
-# notwendigen Komponenten für Nexus Hub.
-# ============================================
+set -e
 
-set -e  # Exit on error
-
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 BOLD='\033[1m'
 
-# Get script directory
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_DIR="$SCRIPT_DIR/app"
 VENV_DIR="$SCRIPT_DIR/venv"
 DATA_DIR="$SCRIPT_DIR/data"
 
-# Status tracking
 CHECKS_PASSED=0
 CHECKS_TOTAL=0
 INSTALLS_DONE=0
 
-# Print functions
 print_header() {
     echo ""
     echo -e "${PURPLE}${BOLD}"
@@ -80,14 +69,9 @@ print_info() {
     echo -e "  ${BLUE}[INFO ]${NC} $1"
 }
 
-# Check if command exists
 command_exists() {
     command -v "$1" &> /dev/null
 }
-
-# ============================================
-# MAIN SETUP PROCESS
-# ============================================
 
 print_header
 
@@ -98,12 +82,8 @@ echo "und führt alle notwendigen Installationen durch."
 echo ""
 read -p "Drücke Enter um zu starten (oder Ctrl+C zum Abbrechen)..."
 
-# ============================================
-# 1. SYSTEM REQUIREMENTS CHECK
-# ============================================
 print_section "1/5 - System-Anforderungen prüfen"
 
-# Check Python 3
 print_check "Python 3..."
 ((CHECKS_TOTAL++))
 if command_exists python3; then
@@ -124,7 +104,6 @@ else
     exit 1
 fi
 
-# Check pip
 print_check "pip..."
 ((CHECKS_TOTAL++))
 if python3 -m pip --version &> /dev/null; then
@@ -135,7 +114,6 @@ else
     print_ok "pip installiert"
 fi
 
-# Check Homebrew (macOS only)
 if [[ "$OSTYPE" == "darwin"* ]]; then
     print_check "Homebrew (macOS)..."
     ((CHECKS_TOTAL++))
@@ -148,9 +126,6 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
     fi
 fi
 
-# ============================================
-# 2. VIRTUAL ENVIRONMENT
-# ============================================
 print_section "2/5 - Python Virtual Environment"
 
 print_check "Virtual Environment..."
@@ -163,23 +138,17 @@ else
     print_ok "Virtual Environment erstellt"
 fi
 
-# Activate venv
 source "$VENV_DIR/bin/activate"
 print_ok "Virtual Environment aktiviert"
 
-# Upgrade pip in venv
 print_check "pip aktualisieren..."
 pip install --quiet --upgrade pip
 
-# ============================================
-# 3. PYTHON PACKAGES
-# ============================================
 print_section "3/5 - Python Pakete installieren"
 
-# Function to check and install package
 install_if_missing() {
     local package=$1
-    local pip_name=${2:-$1}  # Use second arg if provided, otherwise use first
+    local pip_name=${2:-$1}
 
     print_check "$package..."
     ((CHECKS_TOTAL++))
@@ -193,40 +162,30 @@ install_if_missing() {
     fi
 }
 
-# Core Flask packages
 install_if_missing "flask" "flask>=3.0.0"
 install_if_missing "flask-cors" "flask-cors>=4.0.0"
 install_if_missing "flask-socketio" "flask-socketio>=5.3.0"
 install_if_missing "flask-login" "flask-login>=0.6.0"
 
-# Server packages
 install_if_missing "gunicorn" "gunicorn>=21.0.0"
 install_if_missing "gevent" "gevent>=23.0.0"
 install_if_missing "gevent-websocket" "gevent-websocket>=0.10.0"
 
-# Database
 install_if_missing "psycopg2-binary" "psycopg2-binary>=2.9.0"
 
-# Google API packages
 install_if_missing "google-api-python-client" "google-api-python-client>=2.100.0"
 install_if_missing "google-auth" "google-auth>=2.23.0"
 install_if_missing "google-auth-oauthlib" "google-auth-oauthlib>=1.1.0"
 install_if_missing "google-auth-httplib2" "google-auth-httplib2>=0.1.0"
 
-# Utilities
 install_if_missing "python-dotenv" "python-dotenv>=1.0.0"
 install_if_missing "requests" "requests>=2.31.0"
 
-# IServ API and dependencies
 install_if_missing "beautifulsoup4" "beautifulsoup4"
 install_if_missing "IServAPI" "IServAPI"
 
-# ============================================
-# 4. CONFIGURATION FILES
-# ============================================
 print_section "4/5 - Konfiguration"
 
-# Create data directory
 print_check "Data Verzeichnis..."
 ((CHECKS_TOTAL++))
 if [ -d "$DATA_DIR" ]; then
@@ -237,7 +196,6 @@ else
     print_ok "Data Verzeichnis erstellt"
 fi
 
-# Create .env file from example if it doesn't exist
 print_check ".env Konfiguration..."
 ((CHECKS_TOTAL++))
 if [ -f "$SCRIPT_DIR/.env" ]; then
@@ -254,7 +212,6 @@ else
 SECRET_KEY=nexus-hub-secret-key-change-me
 FLASK_ENV=development
 
-# Google API (optional - für Kalender & Email)
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_PROJECT_ID=
@@ -263,22 +220,15 @@ EOF
     fi
 fi
 
-# ============================================
-# 5. DATABASE INITIALIZATION
-# ============================================
 print_section "5/5 - Datenbank initialisieren"
 
 print_check "SQLite Datenbank..."
 ((CHECKS_TOTAL++))
 
-# Initialize database by importing the module
 cd "$SCRIPT_DIR"
 print_install "Datenbank wird initialisiert..."
 python3 -c "from app import database; print('Database initialized')" 2>/dev/null && print_ok "Datenbank initialisiert" || print_warn "Datenbank-Check übersprungen"
 
-# ============================================
-# SETUP COMPLETE
-# ============================================
 echo ""
 echo -e "${GREEN}${BOLD}"
 echo "╔══════════════════════════════════════════════════════════════╗"

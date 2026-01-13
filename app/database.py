@@ -5,7 +5,6 @@ from typing import List, Optional, Dict, Any
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
-# Use project data directory for SQLite (fallback when no PostgreSQL)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 DATABASE_PATH = os.path.join(DATA_DIR, "nexus.db")
@@ -21,28 +20,28 @@ if DATABASE_URL:
         _use_postgres = False
 
 def get_connection():
-                                                                                
+
     if _use_postgres:
-                               
+
         conn = psycopg2.connect(DATABASE_URL)
         return conn
     else:
-                                               
+
         os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
         conn = sqlite3.connect(DATABASE_PATH)
         conn.row_factory = sqlite3.Row
         return conn
 
 def _execute(cursor, query, params=None):
-                                                                    
+
     if _use_postgres:
-                                        
+
         query = query.replace('?', '%s')
     cursor.execute(query, params or ())
     return cursor
 
 def _fetchone_dict(cursor):
-                                      
+
     row = cursor.fetchone()
     if row is None:
         return None
@@ -52,7 +51,7 @@ def _fetchone_dict(cursor):
     return dict(row)
 
 def _fetchall_dict(cursor):
-                                                 
+
     rows = cursor.fetchall()
     if _use_postgres:
         columns = [desc[0] for desc in cursor.description]
@@ -64,7 +63,7 @@ def init_db():
     cursor = conn.cursor()
 
     if _use_postgres:
-                           
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS folders (
                 id SERIAL PRIMARY KEY,
@@ -112,7 +111,7 @@ def init_db():
             ON notes USING gin(to_tsvector('german', coalesce(title, '') || ' ' || coalesce(content, '')))
         ''')
     else:
-                       
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS folders (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -183,7 +182,7 @@ def init_db():
         try:
             cursor.execute('ALTER TABLE notes ADD COLUMN note_type TEXT DEFAULT "transcription"')
         except sqlite3.OperationalError:
-            pass                         
+            pass
 
         try:
             cursor.execute('ALTER TABLE notes ADD COLUMN source TEXT')
@@ -205,7 +204,6 @@ def init_db():
         except sqlite3.OperationalError:
             pass
 
-        # Add user_id columns to all hub_* tables for multi-user support
         hub_tables_needing_user_id = [
             'hub_tasks',
             'hub_projects',
@@ -223,9 +221,8 @@ def init_db():
             try:
                 cursor.execute(f'ALTER TABLE {table} ADD COLUMN user_id TEXT')
             except sqlite3.OperationalError:
-                pass  # Column already exists
+                pass
 
-        # Add repeat columns to hub_tasks for task repetition feature
         repeat_columns = [
             ('repeat_type', "TEXT DEFAULT 'none'"),
             ('repeat_days', 'TEXT'),
@@ -236,7 +233,7 @@ def init_db():
             try:
                 cursor.execute(f'ALTER TABLE hub_tasks ADD COLUMN {col_name} {col_def}')
             except sqlite3.OperationalError:
-                pass  # Column already exists
+                pass
 
     pk = 'SERIAL PRIMARY KEY' if _use_postgres else 'INTEGER PRIMARY KEY AUTOINCREMENT'
 
@@ -377,7 +374,6 @@ def init_db():
         )
     ''')
 
-    # Training schedule tables (persistent weekly training plan)
     cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS hub_training_schedule_settings (
             id {pk},
@@ -446,7 +442,6 @@ def init_db():
         ON hub_timetable_entries(day, block, week)
     ''')
 
-    # Pomodoro sessions table for tracking study time
     cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS pomodoro_sessions (
             id {pk},
@@ -462,7 +457,6 @@ def init_db():
         ON pomodoro_sessions(completed_at)
     ''')
 
-    # Holidays table for storing imported Feiertage and Schulferien per user
     cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS hub_holidays (
             id {pk},
@@ -487,16 +481,15 @@ def init_db():
         ON hub_holidays(date)
     ''')
 
-    # Add bundesland columns to hub_timetable_settings if not exist
     if not _use_postgres:
         try:
             cursor.execute('ALTER TABLE hub_timetable_settings ADD COLUMN bundesland TEXT')
         except sqlite3.OperationalError:
-            pass  # Column already exists
+            pass
         try:
             cursor.execute('ALTER TABLE hub_timetable_settings ADD COLUMN holidays_imported_until INTEGER')
         except sqlite3.OperationalError:
-            pass  # Column already exists
+            pass
 
     conn.commit()
     conn.close()
@@ -643,7 +636,7 @@ def search_notes(query: str) -> List[Dict[str, Any]]:
     cursor = conn.cursor()
 
     if _use_postgres:
-                                     
+
         _execute(cursor, '''
             SELECT * FROM notes
             WHERE to_tsvector('german', coalesce(title, '') || ' ' || coalesce(content, ''))
@@ -651,7 +644,7 @@ def search_notes(query: str) -> List[Dict[str, Any]]:
             ORDER BY created_at DESC
         ''', (query,))
     else:
-                            
+
         cursor.execute('''
             SELECT notes.* FROM notes
             JOIN notes_fts ON notes.id = notes_fts.rowid
@@ -678,7 +671,7 @@ def create_tag(name: str) -> int:
         else:
             tag_id = cursor.lastrowid
     except Exception as e:
-                                                                                   
+
         if 'UNIQUE' in str(e).upper() or 'unique' in str(e) or 'duplicate' in str(e).lower():
             conn.rollback()
             _execute(cursor, 'SELECT id FROM tags WHERE name = ?', (name.lower(),))
@@ -706,7 +699,7 @@ def add_tag_to_note(note_id: int, tag_name: str) -> bool:
         conn.commit()
         result = True
     except Exception as e:
-                                            
+
         if 'UNIQUE' in str(e).upper() or 'unique' in str(e) or 'duplicate' in str(e).lower():
             result = False
         else:
@@ -771,7 +764,7 @@ def create_template(name: str, description: str, content_structure: str, icon: s
     return template_id
 
 def get_templates() -> List[Dict[str, Any]]:
-                                 
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM note_templates ORDER BY name')
@@ -780,7 +773,7 @@ def get_templates() -> List[Dict[str, Any]]:
     return templates
 
 def get_template(template_id: int) -> Optional[Dict[str, Any]]:
-                                        
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM note_templates WHERE id = ?', (template_id,))
@@ -790,7 +783,7 @@ def get_template(template_id: int) -> Optional[Dict[str, Any]]:
 
 def update_template(template_id: int, name: str = None, description: str = None,
                    content_structure: str = None, icon: str = None) -> bool:
-                            
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -822,7 +815,7 @@ def update_template(template_id: int, name: str = None, description: str = None,
     return affected > 0
 
 def delete_template(template_id: int) -> bool:
-                            
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM note_templates WHERE id = ?', (template_id,))
@@ -851,7 +844,7 @@ def create_note_version(note_id: int, content: str, title: str, change_summary: 
     return version_id
 
 def get_note_versions(note_id: int, limit: int = 20) -> List[Dict[str, Any]]:
-                                         
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -865,7 +858,7 @@ def get_note_versions(note_id: int, limit: int = 20) -> List[Dict[str, Any]]:
     return versions
 
 def get_note_version(version_id: int) -> Optional[Dict[str, Any]]:
-                                       
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM note_versions WHERE id = ?', (version_id,))
@@ -874,7 +867,7 @@ def get_note_version(version_id: int) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 def revert_to_version(note_id: int, version_id: int) -> bool:
-                                              
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -896,7 +889,7 @@ def revert_to_version(note_id: int, version_id: int) -> bool:
     return affected > 0
 
 def delete_old_versions(note_id: int, keep_count: int = 20) -> int:
-                                                                 
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -914,7 +907,7 @@ def delete_old_versions(note_id: int, keep_count: int = 20) -> int:
     return deleted
 
 def create_note_session(note_id: int) -> int:
-                                                 
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -930,7 +923,7 @@ def create_note_session(note_id: int) -> int:
     return session_id
 
 def mark_session_formatted(note_id: int) -> bool:
-                                                                      
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -943,7 +936,7 @@ def mark_session_formatted(note_id: int) -> bool:
     return affected > 0
 
 def get_active_session(note_id: int) -> Optional[Dict[str, Any]]:
-                                            
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -955,7 +948,7 @@ def get_active_session(note_id: int) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 def clear_session(note_id: int) -> bool:
-                                           
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM note_sessions WHERE note_id = ?', (note_id,))
@@ -979,7 +972,7 @@ def create_smart_note(title: str, content: str, note_type: str = 'smart_note',
     return note_id
 
 def update_note_formatting_status(note_id: int, ai_formatted: bool) -> bool:
-                                                    
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -993,7 +986,7 @@ def update_note_formatting_status(note_id: int, ai_formatted: bool) -> bool:
 
 def get_smart_notes(note_type: str = None, source: str = None,
                    folder_id: int = None) -> List[Dict[str, Any]]:
-                                                  
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -1022,7 +1015,7 @@ def get_smart_notes(note_type: str = None, source: str = None,
     return notes
 
 def get_recent_smart_notes(limit: int = 10) -> List[Dict[str, Any]]:
-                                                    
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -1040,11 +1033,10 @@ def get_recent_smart_notes(limit: int = 10) -> List[Dict[str, Any]]:
     return notes
 
 def get_hub_tasks(filter_type: str = 'all', user_id: str = None) -> List[Dict[str, Any]]:
-    """Get hub tasks, optionally filtered by user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Single-user mode: show all data when no user_id filter is specified
     user_filter = 'AND user_id = ?' if user_id else ''
     user_param = (user_id,) if user_id else ()
 
@@ -1087,7 +1079,7 @@ def get_hub_tasks(filter_type: str = 'all', user_id: str = None) -> List[Dict[st
     return tasks
 
 def get_hub_task(task_id: int) -> Optional[Dict[str, Any]]:
-                                        
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM hub_tasks WHERE id = ?', (task_id,))
@@ -1099,7 +1091,7 @@ def create_hub_task(title: str, description: str = None, due_date: str = None,
                     due_time: str = None, priority: str = 'medium', category: str = None,
                     user_id: str = None, repeat_type: str = 'none', repeat_days: str = None,
                     repeat_end_date: str = None, parent_task_id: int = None) -> int:
-    """Create a hub task with optional user_id and repeat settings"""
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -1117,7 +1109,7 @@ def update_hub_task(task_id: int, title: str = None, description: str = None,
                     due_date: str = None, due_time: str = None, priority: str = None,
                     category: str = None, repeat_type: str = None, repeat_days: str = None,
                     repeat_end_date: str = None) -> bool:
-    """Update a hub task"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -1168,7 +1160,7 @@ def update_hub_task(task_id: int, title: str = None, description: str = None,
     return affected > 0
 
 def toggle_hub_task(task_id: int) -> dict:
-    """Toggle task completion. Returns dict with success status and next_task_id if created."""
+
     from datetime import timedelta
     import json
 
@@ -1193,7 +1185,6 @@ def toggle_hub_task(task_id: int) -> dict:
 
     next_task_id = None
 
-    # If completing a repeating task, create the next occurrence
     if new_status == 1 and task.get('repeat_type') and task['repeat_type'] != 'none':
         next_due_date = calculate_next_due_date(
             task.get('due_date'),
@@ -1201,7 +1192,6 @@ def toggle_hub_task(task_id: int) -> dict:
             task.get('repeat_days')
         )
 
-        # Check if next date is within end date (if set)
         should_create = True
         if task.get('repeat_end_date') and next_due_date:
             if next_due_date > task['repeat_end_date']:
@@ -1218,7 +1208,6 @@ def toggle_hub_task(task_id: int) -> dict:
                   task.get('parent_task_id') or task_id))
             next_task_id = cursor.lastrowid
 
-    # Enforce limit of 3 completed tasks - delete older ones
     if new_status == 1:
         cursor.execute('''
             SELECT id FROM hub_tasks
@@ -1238,14 +1227,13 @@ def toggle_hub_task(task_id: int) -> dict:
     conn.close()
     return {'success': True, 'next_task_id': next_task_id}
 
-
 def calculate_next_due_date(current_due: str, repeat_type: str, repeat_days: str = None) -> str:
-    """Calculate the next due date based on repeat settings."""
+
     from datetime import timedelta
     import json
 
     if not current_due:
-        # No due date, use today
+
         current_date = datetime.now().date()
     else:
         current_date = datetime.strptime(current_due[:10], '%Y-%m-%d').date()
@@ -1255,26 +1243,25 @@ def calculate_next_due_date(current_due: str, repeat_type: str, repeat_days: str
     elif repeat_type == 'weekly':
         next_date = current_date + timedelta(weeks=1)
     elif repeat_type == 'monthly':
-        # Add one month
+
         month = current_date.month + 1
         year = current_date.year
         if month > 12:
             month = 1
             year += 1
-        day = min(current_date.day, 28)  # Avoid day overflow issues
+        day = min(current_date.day, 28)
         next_date = current_date.replace(year=year, month=month, day=day)
     elif repeat_type == 'yearly':
         next_date = current_date.replace(year=current_date.year + 1)
     elif repeat_type == 'custom' and repeat_days:
-        # repeat_days is a JSON array of weekday numbers (0=Sunday, 1=Monday, etc.)
+
         try:
             days = json.loads(repeat_days) if isinstance(repeat_days, str) else repeat_days
             if days:
-                # Find the next day that matches
-                for i in range(1, 8):  # Check next 7 days
+
+                for i in range(1, 8):
                     check_date = current_date + timedelta(days=i)
-                    # Python weekday: 0=Monday, 6=Sunday
-                    # JavaScript weekday: 0=Sunday, 6=Saturday
+
                     js_weekday = (check_date.weekday() + 1) % 7
                     if js_weekday in days:
                         next_date = check_date
@@ -1291,7 +1278,7 @@ def calculate_next_due_date(current_due: str, repeat_type: str, repeat_days: str
     return next_date.isoformat()
 
 def delete_hub_task(task_id: int) -> bool:
-    """Delete a single task"""
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM hub_tasks WHERE id = ?', (task_id,))
@@ -1301,25 +1288,21 @@ def delete_hub_task(task_id: int) -> bool:
     return affected > 0
 
 def delete_hub_task_all_occurrences(task_id: int) -> int:
-    """Delete a task and all its child occurrences (for recurring tasks)"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
-    # First, get the task to find the parent_task_id
     cursor.execute('SELECT id, parent_task_id FROM hub_tasks WHERE id = ?', (task_id,))
     task = cursor.fetchone()
     if not task:
         conn.close()
         return 0
 
-    # Determine the root task ID (either this task or its parent)
     root_id = task['parent_task_id'] if task['parent_task_id'] else task_id
 
-    # Delete all tasks with this root as parent, plus the root itself
     cursor.execute('DELETE FROM hub_tasks WHERE parent_task_id = ? OR id = ?', (root_id, root_id))
     affected = cursor.rowcount
 
-    # Also delete tasks where this task is the parent
     cursor.execute('DELETE FROM hub_tasks WHERE parent_task_id = ?', (task_id,))
     affected += cursor.rowcount
 
@@ -1328,36 +1311,32 @@ def delete_hub_task_all_occurrences(task_id: int) -> int:
     return affected
 
 def skip_hub_task_occurrence(task_id: int) -> Optional[Dict[str, Any]]:
-    """Skip the current occurrence of a recurring task and create the next one"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Get the task
     cursor.execute('SELECT * FROM hub_tasks WHERE id = ?', (task_id,))
     task = _fetchone_dict(cursor)
     if not task:
         conn.close()
         return None
 
-    # Check if it's a repeating task
     repeat_type = task.get('repeat_type', 'none')
     if repeat_type == 'none':
-        # Not a repeating task, just delete it
+
         cursor.execute('DELETE FROM hub_tasks WHERE id = ?', (task_id,))
         conn.commit()
         conn.close()
         return {'deleted': True, 'next_task': None}
 
-    # Calculate next due date
     next_due = calculate_next_due_date(task)
     if not next_due:
-        # No more occurrences, just delete
+
         cursor.execute('DELETE FROM hub_tasks WHERE id = ?', (task_id,))
         conn.commit()
         conn.close()
         return {'deleted': True, 'next_task': None}
 
-    # Create the next occurrence
     parent_id = task.get('parent_task_id') or task_id
     cursor.execute('''
         INSERT INTO hub_tasks (title, description, due_date, due_time, priority, category,
@@ -1378,12 +1357,10 @@ def skip_hub_task_occurrence(task_id: int) -> Optional[Dict[str, Any]]:
     ))
     next_task_id = cursor.lastrowid
 
-    # Delete the current occurrence
     cursor.execute('DELETE FROM hub_tasks WHERE id = ?', (task_id,))
 
     conn.commit()
 
-    # Get the new task
     cursor.execute('SELECT * FROM hub_tasks WHERE id = ?', (next_task_id,))
     next_task = _fetchone_dict(cursor)
     conn.close()
@@ -1391,11 +1368,10 @@ def skip_hub_task_occurrence(task_id: int) -> Optional[Dict[str, Any]]:
     return {'deleted': True, 'next_task': next_task}
 
 def get_hub_projects(status: str = None, user_id: str = None) -> List[Dict[str, Any]]:
-    """Get hub projects, optionally filtered by user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Single-user mode: show all data when no user_id filter is specified
     user_filter = 'AND user_id = ?' if user_id else ''
     user_param = (user_id,) if user_id else ()
 
@@ -1416,7 +1392,7 @@ def get_hub_projects(status: str = None, user_id: str = None) -> List[Dict[str, 
     return projects
 
 def get_hub_project(project_id: int) -> Optional[Dict[str, Any]]:
-                                           
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM hub_projects WHERE id = ?', (project_id,))
@@ -1427,7 +1403,7 @@ def get_hub_project(project_id: int) -> Optional[Dict[str, Any]]:
 def create_hub_project(name: str, goal: str = None, status: str = 'active',
                        deadline: str = None, next_step: str = None, notes: str = None,
                        progress: int = 0, user_id: str = None) -> int:
-    """Create a hub project with optional user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -1442,7 +1418,7 @@ def create_hub_project(name: str, goal: str = None, status: str = 'active',
 def update_hub_project(project_id: int, name: str = None, goal: str = None,
                        status: str = None, deadline: str = None, next_step: str = None,
                        notes: str = None, progress: int = None) -> bool:
-                                         
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -1487,7 +1463,7 @@ def update_hub_project(project_id: int, name: str = None, goal: str = None,
     return affected > 0
 
 def delete_hub_project(project_id: int) -> bool:
-                               
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM hub_projects WHERE id = ?', (project_id,))
@@ -1497,11 +1473,10 @@ def delete_hub_project(project_id: int) -> bool:
     return affected > 0
 
 def get_hub_knowledge(topic: str = None, search: str = None, user_id: str = None) -> List[Dict[str, Any]]:
-    """Get hub knowledge entries, optionally filtered by user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Single-user mode: show all data when no user_id filter is specified
     user_filter = 'AND user_id = ?' if user_id else ''
     user_param = (user_id,) if user_id else ()
 
@@ -1529,7 +1504,7 @@ def get_hub_knowledge(topic: str = None, search: str = None, user_id: str = None
     return entries
 
 def get_hub_knowledge_entry(entry_id: int) -> Optional[Dict[str, Any]]:
-                                               
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM hub_knowledge WHERE id = ?', (entry_id,))
@@ -1539,7 +1514,7 @@ def get_hub_knowledge_entry(entry_id: int) -> Optional[Dict[str, Any]]:
 
 def create_hub_knowledge(title: str, topic: str = 'general', content: str = None,
                          tags: str = None, user_id: str = None) -> int:
-    """Create a hub knowledge entry with optional user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -1553,7 +1528,7 @@ def create_hub_knowledge(title: str, topic: str = 'general', content: str = None
 
 def update_hub_knowledge(entry_id: int, title: str = None, topic: str = None,
                          content: str = None, tags: str = None) -> bool:
-                                             
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -1589,7 +1564,7 @@ def update_hub_knowledge(entry_id: int, title: str = None, topic: str = None,
     return affected > 0
 
 def delete_hub_knowledge(entry_id: int) -> bool:
-                                   
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM hub_knowledge WHERE id = ?', (entry_id,))
@@ -1599,7 +1574,7 @@ def delete_hub_knowledge(entry_id: int) -> bool:
     return affected > 0
 
 def get_hub_reviews(review_type: str = None, limit: int = 50) -> List[Dict[str, Any]]:
-                                                   
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -1619,7 +1594,7 @@ def get_hub_reviews(review_type: str = None, limit: int = 50) -> List[Dict[str, 
     return reviews
 
 def get_hub_review(review_id: int) -> Optional[Dict[str, Any]]:
-                                      
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM hub_reviews WHERE id = ?', (review_id,))
@@ -1628,7 +1603,7 @@ def get_hub_review(review_id: int) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 def get_hub_review_by_date(date: str, review_type: str = 'daily') -> Optional[Dict[str, Any]]:
-                                        
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM hub_reviews WHERE date = ? AND type = ?', (date, review_type))
@@ -1637,7 +1612,7 @@ def get_hub_review_by_date(date: str, review_type: str = 'daily') -> Optional[Di
     return dict(row) if row else None
 
 def create_hub_review(review_type: str, date: str, data: str = None, energy: int = None) -> int:
-                              
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -1650,7 +1625,7 @@ def create_hub_review(review_type: str, date: str, data: str = None, energy: int
     return review_id
 
 def update_hub_review(review_id: int, data: str = None, energy: int = None) -> bool:
-                                    
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -1680,7 +1655,7 @@ def update_hub_review(review_id: int, data: str = None, energy: int = None) -> b
     return affected > 0
 
 def delete_hub_review(review_id: int) -> bool:
-                          
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM hub_reviews WHERE id = ?', (review_id,))
@@ -1690,7 +1665,7 @@ def delete_hub_review(review_id: int) -> bool:
     return affected > 0
 
 def get_hub_training_sessions(session_type: str = None, limit: int = 50) -> List[Dict[str, Any]]:
-                                                             
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -1710,7 +1685,7 @@ def get_hub_training_sessions(session_type: str = None, limit: int = 50) -> List
     return sessions
 
 def get_hub_training_session(session_id: int) -> Optional[Dict[str, Any]]:
-                                                
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM hub_training_sessions WHERE id = ?', (session_id,))
@@ -1721,7 +1696,7 @@ def get_hub_training_session(session_id: int) -> Optional[Dict[str, Any]]:
 def create_hub_training_session(session_type: str, date: str, duration: int = None,
                                  notes: str = None, calories: int = None,
                                  exercises: str = None) -> int:
-                                        
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -1736,7 +1711,7 @@ def create_hub_training_session(session_type: str, date: str, duration: int = No
 def update_hub_training_session(session_id: int, session_type: str = None, date: str = None,
                                  duration: int = None, notes: str = None, calories: int = None,
                                  exercises: str = None) -> bool:
-                                              
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -1777,7 +1752,7 @@ def update_hub_training_session(session_id: int, session_type: str = None, date:
     return affected > 0
 
 def delete_hub_training_session(session_id: int) -> bool:
-                                    
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM hub_training_sessions WHERE id = ?', (session_id,))
@@ -1787,7 +1762,7 @@ def delete_hub_training_session(session_id: int) -> bool:
     return affected > 0
 
 def get_hub_training_health(limit: int = 30) -> List[Dict[str, Any]]:
-                          
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -1799,7 +1774,7 @@ def get_hub_training_health(limit: int = 30) -> List[Dict[str, Any]]:
     return logs
 
 def get_hub_training_health_by_date(date: str) -> Optional[Dict[str, Any]]:
-                                             
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM hub_training_health WHERE date = ?', (date,))
@@ -1810,7 +1785,7 @@ def get_hub_training_health_by_date(date: str) -> Optional[Dict[str, Any]]:
 def create_hub_training_health(date: str, sleep: float = None, energy: int = None,
                                 stress: int = None, recovery: int = None,
                                 weight: float = None, notes: str = None) -> int:
-                                        
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -1825,7 +1800,7 @@ def create_hub_training_health(date: str, sleep: float = None, energy: int = Non
 def update_hub_training_health(log_id: int, sleep: float = None, energy: int = None,
                                 stress: int = None, recovery: int = None,
                                 weight: float = None, notes: str = None) -> bool:
-                                        
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -1866,7 +1841,7 @@ def update_hub_training_health(log_id: int, sleep: float = None, energy: int = N
     return affected > 0
 
 def delete_hub_training_health(log_id: int) -> bool:
-    """Delete a health log entry."""
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM hub_training_health WHERE id = ?', (log_id,))
@@ -1876,7 +1851,7 @@ def delete_hub_training_health(log_id: int) -> bool:
     return affected > 0
 
 def get_hub_training_health_by_id(log_id: int) -> Optional[Dict[str, Any]]:
-    """Get a specific health log entry by ID."""
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM hub_training_health WHERE id = ?', (log_id,))
@@ -1885,7 +1860,7 @@ def get_hub_training_health_by_id(log_id: int) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 def get_hub_training_goals(completed: bool = None) -> List[Dict[str, Any]]:
-                                                                
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -1905,7 +1880,7 @@ def get_hub_training_goals(completed: bool = None) -> List[Dict[str, Any]]:
     return goals
 
 def get_hub_training_goal(goal_id: int) -> Optional[Dict[str, Any]]:
-                                             
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM hub_training_goals WHERE id = ?', (goal_id,))
@@ -1915,7 +1890,7 @@ def get_hub_training_goal(goal_id: int) -> Optional[Dict[str, Any]]:
 
 def create_hub_training_goal(title: str, target: float = None, current: float = 0,
                               unit: str = None, deadline: str = None) -> int:
-                                     
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -1930,7 +1905,7 @@ def create_hub_training_goal(title: str, target: float = None, current: float = 
 def update_hub_training_goal(goal_id: int, title: str = None, target: float = None,
                               current: float = None, unit: str = None, deadline: str = None,
                               completed: bool = None) -> bool:
-                                           
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -1972,7 +1947,7 @@ def update_hub_training_goal(goal_id: int, title: str = None, target: float = No
     return affected > 0
 
 def delete_hub_training_goal(goal_id: int) -> bool:
-                                 
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM hub_training_goals WHERE id = ?', (goal_id,))
@@ -1982,13 +1957,13 @@ def delete_hub_training_goal(goal_id: int) -> bool:
     return affected > 0
 
 def get_timetable_settings(user_id: str = None) -> Optional[Dict[str, Any]]:
-    """Get timetable settings, optionally filtered by user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
     if user_id:
         cursor.execute('SELECT * FROM hub_timetable_settings WHERE user_id = ? ORDER BY id DESC LIMIT 1', (user_id,))
     else:
-        # Single-user mode: return most recent settings
+
         cursor.execute('SELECT * FROM hub_timetable_settings ORDER BY id DESC LIMIT 1')
     row = cursor.fetchone()
     conn.close()
@@ -1997,14 +1972,14 @@ def get_timetable_settings(user_id: str = None) -> Optional[Dict[str, Any]]:
 def save_timetable_settings(has_ab_weeks: bool = True, block_count: int = 4,
                             reference_date: str = None, setup_completed: bool = False,
                             user_id: str = None) -> int:
-    """Save timetable settings with optional user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
     if user_id:
         cursor.execute('SELECT id FROM hub_timetable_settings WHERE user_id = ? LIMIT 1', (user_id,))
     else:
-        # Single-user mode: update most recent settings
+
         cursor.execute('SELECT id FROM hub_timetable_settings ORDER BY id DESC LIMIT 1')
     existing = cursor.fetchone()
 
@@ -2029,7 +2004,7 @@ def save_timetable_settings(has_ab_weeks: bool = True, block_count: int = 4,
     return settings_id
 
 def get_timetable_entries(day: int = None, week: str = None, user_id: str = None) -> List[Dict[str, Any]]:
-    """Get timetable entries, optionally filtered by user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -2039,7 +2014,6 @@ def get_timetable_entries(day: int = None, week: str = None, user_id: str = None
     if user_id:
         query += ' AND user_id = ?'
         params.append(user_id)
-    # Single-user mode: no filter when user_id not specified
 
     if day is not None:
         query += ' AND day = ?'
@@ -2056,7 +2030,7 @@ def get_timetable_entries(day: int = None, week: str = None, user_id: str = None
     return entries
 
 def get_timetable_entry(entry_id: int) -> Optional[Dict[str, Any]]:
-                                       
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM hub_timetable_entries WHERE id = ?', (entry_id,))
@@ -2067,7 +2041,7 @@ def get_timetable_entry(entry_id: int) -> Optional[Dict[str, Any]]:
 def create_timetable_entry(day: int, block: int, subject: str, week: str = 'both',
                            subject_type: str = 'GK', room: str = None,
                            teacher: str = None, color: str = None, user_id: str = None) -> int:
-    """Create timetable entry with optional user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -2082,7 +2056,7 @@ def create_timetable_entry(day: int, block: int, subject: str, week: str = 'both
 def update_timetable_entry(entry_id: int, day: int = None, block: int = None,
                            subject: str = None, week: str = None, subject_type: str = None,
                            room: str = None, teacher: str = None, color: str = None) -> bool:
-                                   
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -2130,7 +2104,7 @@ def update_timetable_entry(entry_id: int, day: int = None, block: int = None,
     return affected > 0
 
 def delete_timetable_entry(entry_id: int) -> bool:
-                                   
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM hub_timetable_entries WHERE id = ?', (entry_id,))
@@ -2140,13 +2114,13 @@ def delete_timetable_entry(entry_id: int) -> bool:
     return affected > 0
 
 def clear_timetable(user_id: str = None) -> int:
-    """Clear timetable entries, optionally filtered by user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
     if user_id:
         cursor.execute('DELETE FROM hub_timetable_entries WHERE user_id = ?', (user_id,))
     else:
-        # Single-user mode: clear all entries
+
         cursor.execute('DELETE FROM hub_timetable_entries')
     affected = cursor.rowcount
     conn.commit()
@@ -2154,7 +2128,7 @@ def clear_timetable(user_id: str = None) -> int:
     return affected
 
 def import_timetable_template(entries: List[Dict[str, Any]], user_id: str = None) -> int:
-    """Import timetable template entries with optional user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -2180,16 +2154,14 @@ def import_timetable_template(entries: List[Dict[str, Any]], user_id: str = None
     conn.close()
     return count
 
-# Training Schedule Functions
-
 def get_training_schedule_settings(user_id: str = None) -> Optional[Dict[str, Any]]:
-    """Get training schedule settings, optionally filtered by user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
     if user_id:
         cursor.execute('SELECT * FROM hub_training_schedule_settings WHERE user_id = ? ORDER BY id DESC LIMIT 1', (user_id,))
     else:
-        # Single-user mode: return most recent settings
+
         cursor.execute('SELECT * FROM hub_training_schedule_settings ORDER BY id DESC LIMIT 1')
     row = cursor.fetchone()
     conn.close()
@@ -2199,14 +2171,14 @@ def save_training_schedule_settings(schedule_mode: str = 'regular',
                                     auto_detect_holiday: bool = True,
                                     setup_completed: bool = False,
                                     user_id: str = None) -> int:
-    """Save training schedule settings with optional user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
     if user_id:
         cursor.execute('SELECT id FROM hub_training_schedule_settings WHERE user_id = ? LIMIT 1', (user_id,))
     else:
-        # Single-user mode: get any existing settings when no user_id filter
+
         cursor.execute('SELECT id FROM hub_training_schedule_settings ORDER BY id DESC LIMIT 1')
     existing = cursor.fetchone()
 
@@ -2231,7 +2203,7 @@ def save_training_schedule_settings(schedule_mode: str = 'regular',
     return settings_id
 
 def get_training_schedule_entries(day: int = None, schedule_type: str = None, user_id: str = None) -> List[Dict[str, Any]]:
-    """Get training schedule entries, optionally filtered by user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -2241,7 +2213,6 @@ def get_training_schedule_entries(day: int = None, schedule_type: str = None, us
     if user_id:
         query += ' AND user_id = ?'
         params.append(user_id)
-    # Single-user mode: no filter when user_id not specified
 
     if day is not None:
         query += ' AND day = ?'
@@ -2270,7 +2241,7 @@ def create_training_schedule_entry(day: int, training_type: str, title: str,
                                    duration: int = None, location: str = None,
                                    muscle_groups: str = None, notes: str = None,
                                    icon: str = None, color: str = None, user_id: str = None) -> int:
-    """Create training schedule entry with optional user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -2353,7 +2324,7 @@ def delete_training_schedule_entry(entry_id: int) -> bool:
     return affected > 0
 
 def clear_training_schedule(schedule_type: str = None, user_id: str = None) -> int:
-    """Clear training schedule entries, optionally filtered by user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -2363,7 +2334,7 @@ def clear_training_schedule(schedule_type: str = None, user_id: str = None) -> i
         else:
             cursor.execute('DELETE FROM hub_training_schedule_entries WHERE user_id = ?', (user_id,))
     else:
-        # Single-user mode: delete all entries when no user_id filter
+
         if schedule_type:
             cursor.execute('DELETE FROM hub_training_schedule_entries WHERE schedule_type = ?', (schedule_type,))
         else:
@@ -2375,7 +2346,7 @@ def clear_training_schedule(schedule_type: str = None, user_id: str = None) -> i
     return affected
 
 def import_training_schedule_template(entries: List[Dict[str, Any]], user_id: str = None) -> int:
-    """Import training schedule template entries with optional user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -2405,12 +2376,8 @@ def import_training_schedule_template(entries: List[Dict[str, Any]], user_id: st
     conn.close()
     return count
 
-# ============================================================================
-# Pomodoro Session Functions
-# ============================================================================
-
 def create_pomodoro_session(subject_id: str = None, duration: int = 25, session_type: str = 'work') -> int:
-    """Create a new Pomodoro session"""
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -2423,7 +2390,7 @@ def create_pomodoro_session(subject_id: str = None, duration: int = 25, session_
     return session_id
 
 def get_pomodoro_sessions(limit: int = 50) -> List[Dict[str, Any]]:
-    """Get recent Pomodoro sessions"""
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -2436,11 +2403,10 @@ def get_pomodoro_sessions(limit: int = 50) -> List[Dict[str, Any]]:
     return sessions
 
 def get_pomodoro_stats(range_type: str = 'week') -> Dict[str, Any]:
-    """Get Pomodoro statistics for a time range"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Determine date range
     if range_type == 'today':
         date_filter = "DATE(completed_at) = DATE('now', 'localtime')"
     elif range_type == 'week':
@@ -2448,9 +2414,8 @@ def get_pomodoro_stats(range_type: str = 'week') -> Dict[str, Any]:
     elif range_type == 'month':
         date_filter = "DATE(completed_at) >= DATE('now', 'localtime', '-30 days')"
     else:
-        date_filter = "1=1"  # All time
+        date_filter = "1=1"
 
-    # Total stats
     cursor.execute(f'''
         SELECT
             COUNT(*) as total_sessions,
@@ -2460,7 +2425,6 @@ def get_pomodoro_stats(range_type: str = 'week') -> Dict[str, Any]:
     ''')
     totals = _fetchone_dict(cursor)
 
-    # Stats by subject
     cursor.execute(f'''
         SELECT
             subject_id,
@@ -2481,13 +2445,9 @@ def get_pomodoro_stats(range_type: str = 'week') -> Dict[str, Any]:
         'by_subject': by_subject
     }
 
-# ============================================================================
-# Holiday Functions (Feiertage + Schulferien)
-# ============================================================================
-
 def get_holidays(bundesland: str = None, year: int = None, holiday_type: str = None,
                  user_id: str = None) -> List[Dict[str, Any]]:
-    """Get holidays, optionally filtered by bundesland, year, type, or user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -2515,7 +2475,7 @@ def get_holidays(bundesland: str = None, year: int = None, holiday_type: str = N
 
 def get_holidays_for_date_range(start_date: str, end_date: str, bundesland: str = None,
                                  user_id: str = None) -> List[Dict[str, Any]]:
-    """Get holidays within a date range"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -2542,7 +2502,7 @@ def get_holidays_for_date_range(start_date: str, end_date: str, bundesland: str 
 def create_holiday(date: str, name: str, bundesland: str, year: int,
                    end_date: str = None, holiday_type: str = 'feiertag',
                    user_id: str = None) -> int:
-    """Create a holiday entry"""
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
@@ -2555,7 +2515,7 @@ def create_holiday(date: str, name: str, bundesland: str, year: int,
     return holiday_id
 
 def import_holidays(holidays: List[Dict[str, Any]], bundesland: str, user_id: str = None) -> int:
-    """Bulk import holidays for a bundesland"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -2580,7 +2540,7 @@ def import_holidays(holidays: List[Dict[str, Any]], bundesland: str, user_id: st
     return count
 
 def clear_holidays(bundesland: str = None, year: int = None, user_id: str = None) -> int:
-    """Clear holidays, optionally filtered by bundesland, year, or user_id"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -2604,7 +2564,7 @@ def clear_holidays(bundesland: str = None, year: int = None, user_id: str = None
     return affected
 
 def is_holiday(date: str, bundesland: str = None, user_id: str = None) -> Optional[Dict[str, Any]]:
-    """Check if a date is a holiday, returns the holiday info or None"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -2628,7 +2588,7 @@ def is_holiday(date: str, bundesland: str = None, user_id: str = None) -> Option
     return holiday
 
 def get_bundesland_setting(user_id: str = None) -> Optional[str]:
-    """Get the user's Bundesland setting from timetable settings"""
+
     settings = get_timetable_settings(user_id)
     if settings:
         return settings.get('bundesland')
@@ -2636,11 +2596,10 @@ def get_bundesland_setting(user_id: str = None) -> Optional[str]:
 
 def save_bundesland_setting(bundesland: str, holidays_imported_until: int = None,
                             user_id: str = None) -> bool:
-    """Save the user's Bundesland setting"""
+
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Check if settings exist
     if user_id:
         cursor.execute('SELECT id FROM hub_timetable_settings WHERE user_id = ? LIMIT 1', (user_id,))
     else:

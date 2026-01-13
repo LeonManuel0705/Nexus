@@ -11,13 +11,13 @@
     z-index: 10000;
     opacity: 0;
     transition: opacity 0.2s ease;
-    pointer-events: none; 
+    pointer-events: none;
 }
 
 .app-loading-overlay.active {
     display: flex;
     opacity: 1;
-    pointer-events: auto; 
+    pointer-events: auto;
 }
 
 .app-loading-content {

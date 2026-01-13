@@ -3,7 +3,7 @@
 \
 \
 \
-   
+
 import os
 import json
 import requests
@@ -18,13 +18,13 @@ LOCATIONS_CACHE_FILE = Path(__file__).parent.parent / 'data' / 'vbb_locations_ca
 KNOWN_LOCATIONS_FILE = Path(__file__).parent.parent / 'data' / 'known_locations.json'
 
 class VBBService:
-                                                          
+
     def __init__(self):
         self.locations_cache = self._load_locations_cache()
         self.known_locations = self._load_known_locations()
 
     def _load_locations_cache(self) -> Dict:
-                                            
+
         if LOCATIONS_CACHE_FILE.exists():
             try:
                 with open(LOCATIONS_CACHE_FILE, 'r') as f:
@@ -34,29 +34,29 @@ class VBBService:
         return {}
 
     def _save_locations_cache(self):
-                                          
+
         LOCATIONS_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(LOCATIONS_CACHE_FILE, 'w') as f:
             json.dump(self.locations_cache, f)
 
     def _load_known_locations(self) -> Dict:
-                                         
+
         if KNOWN_LOCATIONS_FILE.exists():
             try:
                 with open(KNOWN_LOCATIONS_FILE, 'r') as f:
                     return json.load(f)
             except Exception:
                 pass
-                                 
+
         return {
-            'home': None,                       
-            'dlrg': None,                          
-            'gym': None,                 
-            'school': None                  
+            'home': None,
+            'dlrg': None,
+            'gym': None,
+            'school': None
         }
 
     def save_known_location(self, name: str, location: Dict) -> Dict:
-                                                     
+
         self.known_locations[name] = location
         KNOWN_LOCATIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(KNOWN_LOCATIONS_FILE, 'w') as f:
@@ -64,22 +64,22 @@ class VBBService:
         return {'success': True, 'location': location}
 
     def get_known_locations(self) -> Dict:
-                                            
+
         return {'success': True, 'locations': self.known_locations}
 
     def search_location(self, query: str) -> Dict:
-                                                               
+
         cache_key = query.lower().strip()
         if cache_key in self.locations_cache:
             cached = self.locations_cache[cache_key]
-                                    
+
             if cached.get('cached_at'):
                 cached_time = datetime.fromisoformat(cached['cached_at'])
                 if datetime.now() - cached_time < timedelta(days=7):
                     return {'success': True, 'locations': cached['results'], 'cached': True}
 
         try:
-                                  
+
             response = requests.get(
                 f"{VBB_API_BASE}/locations",
                 params={
@@ -99,7 +99,7 @@ class VBBService:
                 normalized.append({
                     'id': loc.get('id'),
                     'name': loc.get('name'),
-                    'type': loc.get('type'),                      
+                    'type': loc.get('type'),
                     'latitude': loc.get('location', {}).get('latitude') if loc.get('location') else loc.get('latitude'),
                     'longitude': loc.get('location', {}).get('longitude') if loc.get('location') else loc.get('longitude'),
                     'address': loc.get('address'),
@@ -120,7 +120,7 @@ class VBBService:
             return {'success': False, 'error': str(e)}
 
     def search_nearby_stops(self, latitude: float, longitude: float, radius: int = 1000) -> Dict:
-                                                
+
         try:
             response = requests.get(
                 f"{VBB_API_BASE}/stops/nearby",
@@ -165,7 +165,7 @@ class VBBService:
 \
 \
 \
-           
+
         try:
             params = {
                 'results': num_results,
@@ -218,12 +218,12 @@ class VBBService:
                 max_delay = 0
 
                 for leg in journey.get('legs', []):
-                                     
+
                     delay_departure = 0
                     delay_arrival = 0
 
                     if leg.get('departureDelay'):
-                        delay_departure = leg['departureDelay'] // 60                      
+                        delay_departure = leg['departureDelay'] // 60
                         if delay_departure > 0:
                             has_delay = True
                             max_delay = max(max_delay, delay_departure)
@@ -250,7 +250,7 @@ class VBBService:
                             'station': leg.get('destination', {}).get('name'),
                             'platform': leg.get('arrivalPlatform')
                         },
-                        'duration': leg.get('duration', 0) // 60 if leg.get('duration') else 0,           
+                        'duration': leg.get('duration', 0) // 60 if leg.get('duration') else 0,
                         'distance': leg.get('distance')
                     }
 
@@ -258,13 +258,13 @@ class VBBService:
                         line = leg.get('line', {})
                         leg_info['line'] = {
                             'name': line.get('name'),
-                            'product': line.get('product'),                                                         
+                            'product': line.get('product'),
                             'direction': leg.get('direction'),
                             'operator': line.get('operator', {}).get('name') if line.get('operator') else None
                         }
 
                         stopovers = leg.get('stopovers', [])
-                        leg_info['stops_count'] = max(0, len(stopovers) - 2)                                  
+                        leg_info['stops_count'] = max(0, len(stopovers) - 2)
 
                     legs.append(leg_info)
                     total_duration += leg_info['duration']
@@ -304,7 +304,7 @@ class VBBService:
 \
 \
 \
-           
+
         if not event.get('location'):
             return {'success': False, 'error': 'Event hat keinen Ort'}
 
@@ -317,7 +317,7 @@ class VBBService:
         event_start = event.get('start')
         if isinstance(event_start, str):
             try:
-                                       
+
                 for fmt in ['%Y-%m-%dT%H:%M:%S%z', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M']:
                     try:
                         event_start = datetime.strptime(event_start.replace('Z', '+00:00'), fmt)
@@ -325,9 +325,9 @@ class VBBService:
                     except ValueError:
                         continue
                 else:
-                                                                
+
                     event_start = datetime.strptime(event_start[:10], '%Y-%m-%d')
-                    event_start = event_start.replace(hour=9, minute=0)                   
+                    event_start = event_start.replace(hour=9, minute=0)
             except Exception:
                 return {'success': False, 'error': 'Ungültiges Datum'}
 
@@ -351,7 +351,7 @@ class VBBService:
         return routes
 
     def get_departures(self, stop_id: str, duration: int = 30) -> Dict:
-                                                  
+
         try:
             response = requests.get(
                 f"{VBB_API_BASE}/stops/{stop_id}/departures",
@@ -389,7 +389,7 @@ class VBBService:
             return {'success': False, 'error': str(e)}
 
     def check_delays_for_route(self, route: Dict) -> Dict:
-                                                       
+
         delays = []
         total_delay = 0
 
@@ -425,7 +425,7 @@ class VBBService:
         }
 
     def format_route_summary(self, route: Dict) -> str:
-                                                         
+
         if not route.get('legs'):
             return "Keine Route gefunden"
 
@@ -442,8 +442,8 @@ class VBBService:
                 name = line.get('name', '')
 
                 emoji = {
-                    'suburban': '🚆',          
-                    'subway': '🚇',            
+                    'suburban': '🚆',
+                    'subway': '🚇',
                     'tram': '🚊',
                     'bus': '🚌',
                     'ferry': '⛴️',
@@ -474,5 +474,5 @@ class VBBService:
 vbb_service = VBBService()
 
 def get_vbb_service() -> VBBService:
-                                              
+
     return vbb_service

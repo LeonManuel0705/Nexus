@@ -44,6 +44,12 @@
             -webkit-font-smoothing: antialiased;
         }
 
+        /* Optimize image rendering */
+        img {
+            content-visibility: auto;
+            image-rendering: -webkit-optimize-contrast;
+        }
+
         /* Animated gradient background */
         .gradient-bg {
             position: fixed;
@@ -1243,55 +1249,154 @@
         @media (max-width: 768px), (pointer: coarse) {
             /* Disable floating gradient orbs on mobile */
             .gradient-orb {
-                display: none;
+                display: none !important;
+                animation: none !important;
             }
 
-            /* Simplify reveal animations */
+            /* Disable all keyframe animations on mobile for performance */
+            @keyframes float {
+                0%, 100% { transform: none; }
+            }
+
+            /* Simplify reveal animations - faster and simpler */
             .reveal {
-                transform: translateY(30px);
-                transition: opacity 0.6s ease, transform 0.6s ease;
+                transform: translateY(20px);
+                transition: opacity 0.4s ease-out, transform 0.4s ease-out;
             }
 
-            /* Disable animated borders - use simple borders instead */
+            /* Disable animated borders completely */
             .why-card::before,
             .stat::before,
             .install-step::before,
             .btn::before,
-            .nav-btn::before {
+            .nav-btn::before,
+            .download-option::before {
                 display: none !important;
             }
 
-            /* Remove will-change to save memory */
-            .lightbox img {
+            /* Remove will-change and complex properties */
+            .lightbox img,
+            .btn,
+            .why-card,
+            .stat,
+            .install-step,
+            .feature-image img {
                 will-change: auto;
             }
 
-            /* Simpler hover effects */
+            /* DISABLE all hover effects on touch devices - they're not needed */
             .why-card:hover,
             .stat:hover,
-            .install-step:hover {
-                transform: translateY(-4px);
-                box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            .install-step:hover,
+            .feature-image:hover img,
+            .hero-visual:hover img,
+            .btn-primary:hover,
+            .btn-secondary:hover,
+            .nav-btn:hover,
+            .nav-link:hover,
+            .download-option:hover,
+            .feature-image:hover::before {
+                transform: none !important;
+                box-shadow: inherit;
             }
 
-            .feature-image:hover img {
-                transform: scale(1.01);
+            /* Keep simple active states for tap feedback */
+            .btn:active,
+            .nav-btn:active,
+            .download-option:active {
+                transform: scale(0.98) !important;
+                transition: transform 0.1s ease;
             }
 
-            /* Reduce blur for performance */
+            /* Simpler box shadows - no blur-heavy shadows */
+            .btn-primary {
+                box-shadow: 0 2px 8px rgba(102, 126, 234, 0.25);
+            }
+
+            .why-card,
+            .stat,
+            .install-step {
+                box-shadow: none;
+            }
+
+            /* Disable backdrop-filter entirely on mobile - very expensive */
             nav.scrolled {
-                backdrop-filter: blur(10px);
-                -webkit-backdrop-filter: blur(10px);
+                backdrop-filter: none;
+                -webkit-backdrop-filter: none;
+                background: rgba(9, 9, 11, 0.95);
             }
 
-            /* Simpler lightbox transitions */
+            .download-modal {
+                backdrop-filter: none;
+                -webkit-backdrop-filter: none;
+                background: rgba(0, 0, 0, 0.95);
+            }
+
+            /* Simpler lightbox - no morph, just fade */
             .lightbox {
-                transition: background 0.3s ease, visibility 0s 0.3s;
+                transition: opacity 0.25s ease;
             }
 
             .lightbox.active {
-                transition: background 0.3s ease, visibility 0s 0s;
+                transition: opacity 0.25s ease;
             }
+
+            /* Disable glow effects */
+            .feature-image::before,
+            .hero-visual::before,
+            .cta-box::before,
+            .download-modal-content::before {
+                display: none !important;
+            }
+
+            /* Simpler feature icon */
+            .feature-icon {
+                box-shadow: none;
+            }
+
+            /* Disable complex transitions on cards */
+            .why-card,
+            .stat,
+            .install-step,
+            .download-option {
+                transition: none;
+            }
+
+            /* Simplify nav transitions */
+            nav {
+                transition: background 0.2s ease, padding 0.2s ease;
+            }
+
+            /* Reduce filter blur on orbs (if somehow shown) */
+            .gradient-orb {
+                filter: none;
+            }
+
+            /* Disable pulse animation */
+            .hero-badge::before {
+                animation: none;
+            }
+        }
+
+        /* Additional mobile-only styles via JS class */
+        body.is-mobile {
+            /* Disable smooth scrolling on mobile for better performance */
+            scroll-behavior: auto;
+        }
+
+        body.is-mobile * {
+            /* Ensure no animations run unexpectedly */
+            animation-play-state: paused !important;
+        }
+
+        body.is-mobile .reveal.visible,
+        body.is-mobile .hero-badge,
+        body.is-mobile .hero h1,
+        body.is-mobile .hero-sub,
+        body.is-mobile .hero-cta,
+        body.is-mobile .hero-visual {
+            /* Allow only the essential animations */
+            animation-play-state: running !important;
         }
 
         /* SVG gradient for icons */
@@ -1633,7 +1738,7 @@
     </style>
 </head>
 <body>
-    <!-- SVG Definitions -->
+
     <svg class="svg-defs">
         <defs>
             <linearGradient id="icon-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -1644,14 +1749,14 @@
         </defs>
     </svg>
 
-    <!-- Animated Background -->
+
     <div class="gradient-bg">
         <div class="gradient-orb orb-1"></div>
         <div class="gradient-orb orb-2"></div>
         <div class="gradient-orb orb-3"></div>
     </div>
 
-    <!-- Navigation -->
+
     <nav id="nav">
         <div class="nav-inner">
             <a href="#" class="logo">
@@ -1665,7 +1770,7 @@
         </div>
     </nav>
 
-    <!-- Hero -->
+
     <section class="hero">
         <span class="hero-badge">Closed Beta</span>
         <p class="beta-notice">Aktive Entwicklung – Bugs und Fehler sind zu erwarten</p>
@@ -1691,11 +1796,11 @@
             </a>
         </div>
         <div class="hero-visual">
-            <img src="images/dashboard.png" alt="Nexus Dashboard" class="zoomable">
+            <img src="images/dashboard.png" alt="Nexus Dashboard" class="zoomable" fetchpriority="high">
         </div>
     </section>
 
-    <!-- Problem Section -->
+
     <section class="problem">
         <div class="problem-inner">
             <div class="reveal">
@@ -1723,7 +1828,7 @@
         </div>
     </section>
 
-    <!-- Features Showcase -->
+
     <section class="showcase">
         <div class="showcase-header reveal">
             <span class="section-label">Die Lösung</span>
@@ -1731,7 +1836,7 @@
             <p>Nexus verbindet alles, was du brauchst – intelligent, nahtlos, privat.</p>
         </div>
 
-        <!-- Feature 1: Dashboard -->
+
         <div class="feature-block reveal">
             <div class="feature-content">
                 <div class="feature-icon">
@@ -1751,11 +1856,11 @@
                 </ul>
             </div>
             <div class="feature-image">
-                <img src="images/dashboard.png" alt="Dashboard" class="zoomable">
+                <img src="images/dashboard.png" alt="Dashboard" class="zoomable" loading="lazy">
             </div>
         </div>
 
-        <!-- Feature 2: Calendar -->
+
         <div class="feature-block reverse reveal">
             <div class="feature-content">
                 <div class="feature-icon">
@@ -1775,11 +1880,11 @@
                 </ul>
             </div>
             <div class="feature-image">
-                <img src="images/calendar.png" alt="Kalender" class="zoomable">
+                <img src="images/calendar.png" alt="Kalender" class="zoomable" loading="lazy">
             </div>
         </div>
 
-        <!-- Feature 3: School -->
+
         <div class="feature-block reveal">
             <div class="feature-content">
                 <div class="feature-icon">
@@ -1797,11 +1902,11 @@
                 </ul>
             </div>
             <div class="feature-image">
-                <img src="images/school.png" alt="Schule" class="zoomable">
+                <img src="images/school.png" alt="Schule" class="zoomable" loading="lazy">
             </div>
         </div>
 
-        <!-- Feature 4: Training -->
+
         <div class="feature-block reverse reveal">
             <div class="feature-content">
                 <div class="feature-icon">
@@ -1822,12 +1927,12 @@
                 </ul>
             </div>
             <div class="feature-image">
-                <img src="images/training.png" alt="Training" class="zoomable">
+                <img src="images/training.png" alt="Training" class="zoomable" loading="lazy">
             </div>
         </div>
     </section>
 
-    <!-- Why Section -->
+
     <section class="why">
         <div class="why-inner">
             <div class="why-header reveal">
@@ -1872,7 +1977,7 @@
         </div>
     </section>
 
-    <!-- Installation -->
+
     <section class="install">
         <div class="install-inner">
             <div class="install-header reveal">
@@ -1903,7 +2008,7 @@
         </div>
     </section>
 
-    <!-- CTA -->
+
     <section class="cta reveal">
         <div class="cta-box">
             <h2>Bereit, den Überblick zu behalten?</h2>
@@ -1921,7 +2026,7 @@
         </div>
     </section>
 
-    <!-- Footer -->
+
     <footer>
         <div class="footer-inner">
             <div class="footer-logo">
@@ -1939,7 +2044,7 @@
         </div>
     </footer>
 
-    <!-- Download Modal -->
+
     <div class="download-modal" id="downloadModal">
         <div class="download-modal-content">
             <button class="download-modal-close" onclick="closeDownloadModal()">
@@ -2000,16 +2105,21 @@
             <div class="download-section">
                 <div class="download-section-label">Mobile</div>
                 <div class="download-grid">
-                    <div class="download-option disabled">
+                    <a href="downloads/Nexus.apk" class="download-option" download>
                         <div class="download-option-icon">
                             <img src="images/Android-Logo.webp" alt="Android">
                         </div>
                         <div class="download-option-info">
                             <span class="download-option-name">Android</span>
                             <span class="download-option-devices">Samsung, Pixel, OnePlus</span>
-                            <span class="download-option-status soon">Bald verfügbar</span>
                         </div>
-                    </div>
+                        <div class="download-option-arrow">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                        </div>
+                    </a>
                     <div class="download-option disabled">
                         <div class="download-option-icon">
                             <img src="images/iOS-Logo.png" alt="iOS">
@@ -2025,7 +2135,7 @@
         </div>
     </div>
 
-    <!-- Lightbox -->
+
     <div class="lightbox" id="lightbox">
         <button class="lightbox-close">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2041,6 +2151,13 @@
         const isMobile = window.matchMedia('(max-width: 768px)').matches ||
                          window.matchMedia('(pointer: coarse)').matches ||
                          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        // If mobile, add class to body for additional CSS optimizations
+        if (isMobile) {
+            document.body.classList.add('is-mobile');
+            // Remove gradient orbs from DOM entirely on mobile
+            document.querySelectorAll('.gradient-orb').forEach(el => el.remove());
+        }
 
         // Download Modal
         const downloadModal = document.getElementById('downloadModal');
@@ -2076,21 +2193,46 @@
             }
         });
 
-        // Navigation scroll effect
+        // Navigation scroll effect - use passive listener for performance
         const nav = document.getElementById('nav');
-        window.addEventListener('scroll', () => {
-            nav.classList.toggle('scrolled', window.scrollY > 50);
-        });
+        let lastScrollY = 0;
+        let ticking = false;
 
-        // Reveal animations - trigger later so effect is visible when scrolling fast
+        function updateNavOnScroll() {
+            nav.classList.toggle('scrolled', lastScrollY > 50);
+            ticking = false;
+        }
+
+        window.addEventListener('scroll', () => {
+            lastScrollY = window.scrollY;
+            if (!ticking) {
+                // Use requestAnimationFrame to throttle updates
+                if (isMobile) {
+                    // On mobile, update less frequently
+                    requestAnimationFrame(updateNavOnScroll);
+                } else {
+                    updateNavOnScroll();
+                }
+                ticking = true;
+            }
+        }, { passive: true });
+
+        // Reveal animations - simpler for mobile, fancier for desktop
         const reveals = document.querySelectorAll('.reveal');
         const revealObserver = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
                     entry.target.classList.add('visible');
+                    // On mobile, unobserve immediately to free up resources
+                    if (isMobile) {
+                        revealObserver.unobserve(entry.target);
+                    }
                 }
             });
-        }, { threshold: 0.15, rootMargin: '0px 0px -150px 0px' });
+        }, {
+            threshold: isMobile ? 0.1 : 0.15,
+            rootMargin: isMobile ? '0px' : '0px 0px -150px 0px'
+        });
 
         reveals.forEach(el => revealObserver.observe(el));
 

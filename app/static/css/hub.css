@@ -1,6 +1,6 @@
 :root {
     color-scheme: light;
-    
+
     --bg-primary: #fafbfc;
     --bg-secondary: #ffffff;
     --bg-tertiary: #f5f7fa;
@@ -43,7 +43,6 @@
     --transition-bounce: 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
-/* Explicit light theme - ensures light mode works when selected */
 [data-theme="light"],
 html[data-theme="light"],
 body[data-theme="light"] {
@@ -2099,7 +2098,6 @@ body {
     flex-shrink: 0;
 }
 
-/* Light theme - explicit styling */
 [data-theme="light"] .btn-google {
     background: #ffffff;
     border-color: #e0e0e0;
@@ -2111,7 +2109,6 @@ body {
     border-color: #d0d0d0;
 }
 
-/* Dark theme - explicit styling */
 [data-theme="dark"] .btn-google {
     background: var(--bg-tertiary);
     border-color: var(--card-border);
@@ -3274,7 +3271,7 @@ body {
 }
 
 .test-item {
-    border-left: 4px solid #f59e0b; 
+    border-left: 4px solid #f59e0b;
 }
 
 .exam-item {
@@ -3796,14 +3793,13 @@ body {
     }
 }
 
-/* Mobile performance optimizations - disable heavy animations */
 @media (max-width: 768px), (pointer: coarse) {
-    /* Completely disable gradient orbs on mobile for better performance */
+
     .gradient-orb {
         display: none !important;
     }
 
-    /* Reduce backdrop-filter blur for better performance */
+
     .sidebar,
     .glass-card,
     .modal-content,
@@ -3815,7 +3811,7 @@ body {
         -webkit-backdrop-filter: blur(10px);
     }
 
-    /* Disable complex animations */
+
     .nav-item,
     .glass-card,
     .task-card,
@@ -3828,7 +3824,7 @@ body {
         transition: opacity 0.15s ease, background 0.15s ease !important;
     }
 
-    /* Simpler hover effects */
+
     .glass-card:hover,
     .task-card:hover,
     .widget:hover {
@@ -3836,17 +3832,17 @@ body {
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     }
 
-    /* Disable page transitions for snappier navigation */
+
     body.page-transitioning {
         transition: none !important;
     }
 
-    /* Remove will-change for memory savings */
+
     * {
         will-change: auto !important;
     }
 
-    /* Faster modal transitions */
+
     .modal {
         transition: opacity 0.15s ease !important;
     }
@@ -3855,19 +3851,19 @@ body {
         transition: transform 0.15s ease, opacity 0.15s ease !important;
     }
 
-    /* Pomodoro ring - simpler animation */
+
     .pomodoro-ring .ring-progress {
         transition: stroke-dashoffset 0.5s ease !important;
     }
 
-    /* Disable pulse animations on mobile */
+
     .countdown-urgent,
     .status-icon,
     .notification-dot {
         animation: none !important;
     }
 
-    /* Simpler hover states for interactive elements */
+
     .deadline-item:hover,
     .task-item:hover,
     .nav-item:hover {
@@ -4801,11 +4797,6 @@ body {
     }
 }
 
-/* ============================================
-   Mobile & PWA Optimizations
-   ============================================ */
-
-/* Safe area insets for notched devices (iPhone X+) */
 @supports (padding: env(safe-area-inset-top)) {
     body {
         padding-top: env(safe-area-inset-top);
@@ -4836,9 +4827,8 @@ body {
     }
 }
 
-/* Touch optimizations for mobile */
 @media (hover: none) and (pointer: coarse) {
-    /* Larger touch targets */
+
     .btn-primary,
     .btn-secondary,
     .nav-item,
@@ -4848,7 +4838,7 @@ body {
         min-height: 44px;
     }
 
-    /* Remove hover effects on touch devices */
+
     .card:hover,
     .btn-primary:hover,
     .btn-secondary:hover,
@@ -4856,7 +4846,7 @@ body {
         transform: none;
     }
 
-    /* Prevent text selection on interactive elements */
+
     button,
     .btn-primary,
     .btn-secondary,
@@ -4867,7 +4857,7 @@ body {
         -webkit-touch-callout: none;
     }
 
-    /* Smooth scrolling */
+
     .main-content,
     .modal-content,
     .sidebar {
@@ -4875,26 +4865,24 @@ body {
         scroll-behavior: smooth;
     }
 
-    /* Prevent pull-to-refresh on content areas */
+
     .main-content {
         overscroll-behavior-y: contain;
     }
 }
 
-/* PWA standalone mode adjustments */
 @media (display-mode: standalone) {
-    /* Hide browser-specific elements in PWA mode */
+
     .install-prompt {
         display: none !important;
     }
 
-    /* Adjust for status bar in standalone */
+
     body {
         padding-top: max(env(safe-area-inset-top), 20px);
     }
 }
 
-/* Prevent zoom on input focus (iOS) */
 @media screen and (max-width: 768px) {
     input[type="text"],
     input[type="email"],

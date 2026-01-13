@@ -8,7 +8,7 @@
 \
 \
 \
-   
+
 import os
 import json
 import base64
@@ -19,7 +19,6 @@ from email.mime.multipart import MIMEMultipart
 
 from dotenv import load_dotenv
 
-# Load .env from project root (one level up from app/)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
@@ -32,7 +31,6 @@ try:
 except ImportError:
     GOOGLE_API_AVAILABLE = False
 
-# Use project data directory
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 CREDENTIALS_FILE = os.path.join(DATA_DIR, "google_credentials.json")
@@ -46,17 +44,17 @@ SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/gmail.send',
     'https://www.googleapis.com/auth/gmail.modify',
-    'https://www.googleapis.com/auth/calendar'                                            
+    'https://www.googleapis.com/auth/calendar'
 ]
 
 def is_google_oauth_configured() -> bool:
-                                                       
+
     if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
         return GOOGLE_API_AVAILABLE
     return GOOGLE_API_AVAILABLE and os.path.exists(CREDENTIALS_FILE)
 
 def get_oauth_status() -> Dict:
-                                                     
+
     if not GOOGLE_API_AVAILABLE:
         return {
             "configured": False,
@@ -82,7 +80,7 @@ def get_oauth_status() -> Dict:
     }
 
 def load_tokens() -> Dict:
-                                  
+
     if not os.path.exists(TOKENS_FILE):
         return {}
     try:
@@ -92,7 +90,7 @@ def load_tokens() -> Dict:
         return {}
 
 def save_tokens(tokens: Dict) -> bool:
-                            
+
     os.makedirs(DATA_DIR, exist_ok=True)
     try:
         with open(TOKENS_FILE, 'w') as f:
@@ -102,7 +100,7 @@ def save_tokens(tokens: Dict) -> bool:
         return False
 
 def get_credentials(email: str) -> Optional[Credentials]:
-                                                     
+
     tokens = load_tokens()
     token_data = tokens.get(email)
 
@@ -131,7 +129,7 @@ def get_credentials(email: str) -> Optional[Credentials]:
             }
             save_tokens(tokens)
         except Exception as e:
-            # Token revoked or expired - remove from storage
+
             if 'invalid_grant' in str(e) or 'revoked' in str(e).lower():
                 if email in tokens:
                     del tokens[email]
@@ -141,7 +139,7 @@ def get_credentials(email: str) -> Optional[Credentials]:
     return creds
 
 def _get_oauth_client_config() -> Dict:
-                                                                           
+
     if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
         return {
             "web": {
@@ -156,7 +154,7 @@ def _get_oauth_client_config() -> Dict:
     if os.path.exists(CREDENTIALS_FILE):
         with open(CREDENTIALS_FILE, 'r') as f:
             creds_data = json.load(f)
-                                                           
+
             if "installed" in creds_data:
                 installed = creds_data["installed"]
                 return {
@@ -173,7 +171,7 @@ def _get_oauth_client_config() -> Dict:
     return None
 
 def start_oauth_flow() -> Dict:
-                                                                
+
     if not GOOGLE_API_AVAILABLE:
         return {"success": False, "error": "Google API not available"}
 
@@ -203,7 +201,7 @@ def start_oauth_flow() -> Dict:
         return {"success": False, "error": str(e)}
 
 def complete_oauth_flow(auth_code: str) -> Dict:
-                                                          
+
     if not GOOGLE_API_AVAILABLE:
         return {"success": False, "error": "Google API not available"}
 
@@ -248,7 +246,7 @@ def complete_oauth_flow(auth_code: str) -> Dict:
         return {"success": False, "error": str(e)}
 
 def remove_google_account(email: str) -> bool:
-                                  
+
     tokens = load_tokens()
     if email in tokens:
         del tokens[email]
@@ -257,12 +255,12 @@ def remove_google_account(email: str) -> bool:
     return False
 
 def get_google_accounts() -> List[Dict]:
-                                                
+
     tokens = load_tokens()
     return [{"email": email, "provider": "gmail_oauth"} for email in tokens.keys()]
 
 def fetch_gmail_messages(email: str, max_results: int = 20) -> Dict:
-                                              
+
     creds = get_credentials(email)
     if not creds:
         return {"success": False, "error": "Not authenticated. Please sign in again."}
@@ -324,7 +322,7 @@ def fetch_gmail_messages(email: str, max_results: int = 20) -> Dict:
         return {"success": False, "error": str(e)}
 
 def get_gmail_message_detail(email: str, msg_id: str) -> Dict:
-                                 
+
     creds = get_credentials(email)
     if not creds:
         return {"success": False, "error": "Not authenticated"}
@@ -398,7 +396,7 @@ def get_gmail_message_detail(email: str, msg_id: str) -> Dict:
         return {"success": False, "error": str(e)}
 
 def send_gmail(from_email: str, to_email: str, subject: str, body: str) -> Dict:
-                               
+
     creds = get_credentials(from_email)
     if not creds:
         return {"success": False, "error": "Not authenticated"}
@@ -432,7 +430,7 @@ def fetch_google_calendar_events(days_ahead: int = 30, account_email: str = None
 \
 \
 \
-       
+
     tokens = load_tokens()
 
     if not tokens:
@@ -462,7 +460,7 @@ def fetch_google_calendar_events(days_ahead: int = 30, account_email: str = None
         service = build('calendar', 'v3', credentials=creds)
 
         if start_date and end_date:
-                                                                        
+
             time_min = f"{start_date}T00:00:00Z"
             time_max = f"{end_date}T23:59:59Z"
         else:
@@ -495,14 +493,14 @@ def fetch_google_calendar_events(days_ahead: int = 30, account_email: str = None
                     end = event.get('end', {})
 
                     if 'date' in start:
-                                       
+
                         start_date = start['date']
                         start_time = None
                         end_date = end.get('date', start_date)
                         end_time = None
                         all_day = True
                     else:
-                                     
+
                         start_dt = start.get('dateTime', '')
                         end_dt = end.get('dateTime', '')
                         start_date = start_dt[:10] if start_dt else ''
@@ -527,7 +525,7 @@ def fetch_google_calendar_events(days_ahead: int = 30, account_email: str = None
                         "source": "google"
                     })
             except Exception as cal_err:
-                                                
+
                 continue
 
         all_events.sort(key=lambda e: (e['start_date'], e['start_time'] or '00:00'))
@@ -556,7 +554,7 @@ def fetch_google_calendar_events(days_ahead: int = 30, account_email: str = None
         }
 
 def get_google_calendars(account_email: str = None) -> Dict:
-                                                     
+
     tokens = load_tokens()
 
     if not tokens:
@@ -602,7 +600,7 @@ def create_google_calendar_event(
     calendar_id: str = 'primary',
     account_email: str = None
 ) -> Dict:
-                                                
+
     tokens = load_tokens()
 
     if not tokens:
@@ -627,7 +625,7 @@ def create_google_calendar_event(
         }
 
         if start_time:
-                         
+
             start_datetime = f"{start_date}T{start_time}:00"
             end_date = end_date or start_date
             end_time = end_time or start_time
@@ -636,7 +634,7 @@ def create_google_calendar_event(
             event['start'] = {'dateTime': start_datetime, 'timeZone': 'Europe/Berlin'}
             event['end'] = {'dateTime': end_datetime, 'timeZone': 'Europe/Berlin'}
         else:
-                           
+
             end_date = end_date or start_date
             event['start'] = {'date': start_date}
             event['end'] = {'date': end_date}
@@ -668,7 +666,7 @@ def update_google_calendar_event(
     calendar_id: str = 'primary',
     account_email: str = None
 ) -> Dict:
-                                                      
+
     tokens = load_tokens()
 
     if not tokens:
@@ -732,7 +730,7 @@ def delete_google_calendar_event(
     calendar_id: str = 'primary',
     account_email: str = None
 ) -> Dict:
-                                               
+
     tokens = load_tokens()
 
     if not tokens:
@@ -761,7 +759,7 @@ def delete_google_calendar_event(
         return {"success": False, "error": str(e)}
 
 def delete_gmail_message(email: str, msg_id: str, permanent: bool = False) -> Dict:
-                                           
+
     creds = get_credentials(email)
     if not creds:
         return {"success": False, "error": "Not authenticated"}
@@ -770,13 +768,13 @@ def delete_gmail_message(email: str, msg_id: str, permanent: bool = False) -> Di
         service = build('gmail', 'v1', credentials=creds)
 
         if permanent:
-                                
+
             service.users().messages().delete(
                 userId='me',
                 id=msg_id
             ).execute()
         else:
-                           
+
             service.users().messages().trash(
                 userId='me',
                 id=msg_id

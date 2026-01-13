@@ -7,7 +7,7 @@ from pathlib import Path
 
 class IServWarningFilter(logging.Filter):
     def filter(self, record):
-                                                            
+
         if 'No data in publiccontact' in record.getMessage():
             return False
         return True
@@ -20,7 +20,7 @@ from IServAPI import IServAPI
 CREDENTIALS_FILE = Path(__file__).parent.parent / 'data' / 'iserv_credentials.json'
 
 class IServService:
-                                                   
+
     def __init__(self):
         self.api = None
         self.connected = False
@@ -28,7 +28,7 @@ class IServService:
         self.iserv_url = None
 
     def load_credentials(self):
-                                                
+
         if CREDENTIALS_FILE.exists():
             try:
                 with open(CREDENTIALS_FILE, 'r') as f:
@@ -38,7 +38,7 @@ class IServService:
         return None
 
     def save_credentials(self, username: str, password: str, iserv_url: str):
-                                                                                      
+
         CREDENTIALS_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(CREDENTIALS_FILE, 'w') as f:
             json.dump({
@@ -48,13 +48,13 @@ class IServService:
             }, f)
 
     def delete_credentials(self):
-                                        
+
         if CREDENTIALS_FILE.exists():
             CREDENTIALS_FILE.unlink()
         self.disconnect()
 
     def connect(self, username: str = None, password: str = None, iserv_url: str = None):
-                                                                   
+
         if not all([username, password, iserv_url]):
             creds = self.load_credentials()
             if creds:
@@ -113,18 +113,18 @@ class IServService:
                 return {'success': False, 'error': f'Verbindungsfehler: {str(e)}'}
 
     def disconnect(self):
-                                    
+
         self.api = None
         self.connected = False
         self.user_info = None
         self.iserv_url = None
 
     def is_connected(self):
-                                          
+
         return self.connected and self.api is not None
 
     def get_status(self):
-                                            
+
         creds = self.load_credentials()
         return {
             'connected': self.connected,
@@ -135,7 +135,7 @@ class IServService:
         }
 
     def get_notifications(self):
-                                    
+
         if not self.is_connected():
             return {'success': False, 'error': 'Nicht verbunden'}
 
@@ -146,7 +146,7 @@ class IServService:
             return {'success': False, 'error': str(e)}
 
     def get_badges(self):
-                                                      
+
         if not self.is_connected():
             return {'success': False, 'error': 'Nicht verbunden'}
 
@@ -157,7 +157,7 @@ class IServService:
             return {'success': False, 'error': str(e)}
 
     def mark_notification_read(self, notification_id: str):
-                                          
+
         if not self.is_connected():
             return {'success': False, 'error': 'Nicht verbunden'}
 
@@ -168,7 +168,7 @@ class IServService:
             return {'success': False, 'error': str(e)}
 
     def get_emails(self, folder: str = 'INBOX', limit: int = 20):
-                                       
+
         if not self.is_connected():
             return {'success': False, 'error': 'Nicht verbunden'}
 
@@ -179,7 +179,7 @@ class IServService:
             return {'success': False, 'error': str(e)}
 
     def get_mail_folders(self):
-                                       
+
         if not self.is_connected():
             return {'success': False, 'error': 'Nicht verbunden'}
 
@@ -190,12 +190,12 @@ class IServService:
             return {'success': False, 'error': str(e)}
 
     def get_email_detail(self, msg_id: str, folder: str = 'INBOX'):
-                                           
+
         if not self.is_connected():
             return {'success': False, 'error': 'Nicht verbunden'}
 
         try:
-                                     
+
             email = self.api.get_mail(uid=msg_id, path=folder)
             if email:
                 return {
@@ -217,12 +217,12 @@ class IServService:
             return {'success': False, 'error': str(e)}
 
     def send_email(self, to: str, subject: str, body: str, attachments: list = None):
-                            
+
         if not self.is_connected():
             return {'success': False, 'error': 'Nicht verbunden'}
 
         try:
-                                             
+
             self.api.send_email(
                 to=to,
                 subject=subject,
@@ -233,7 +233,7 @@ class IServService:
             return {'success': False, 'error': str(e)}
 
     def get_upcoming_events(self, days: int = 60):
-                                                              
+
         if not self.is_connected():
             return {'success': False, 'error': 'Nicht verbunden'}
 
@@ -287,7 +287,7 @@ class IServService:
             event_id = event.get('id') or event.get('uid') or str(hash(str(event)))
             if event_id not in seen:
                 seen.add(event_id)
-                # Normalize event structure for frontend compatibility
+
                 normalized = self._normalize_event(event)
                 unique_events.append(normalized)
 
@@ -299,17 +299,15 @@ class IServService:
             return {'success': True, 'events': []}
 
     def _normalize_event(self, event):
-        """Normalize event structure for frontend compatibility"""
-        # Extract date from various possible field names
+
         date_val = (event.get('date') or event.get('start') or
                    event.get('dtstart') or event.get('start_date') or
                    event.get('begin') or event.get('startDate'))
 
-        # Handle datetime objects
         if hasattr(date_val, 'isoformat'):
             date_val = date_val.isoformat()
         elif isinstance(date_val, str) and len(date_val) >= 10:
-            # Already a string, keep it
+
             pass
         else:
             date_val = None
@@ -328,12 +326,12 @@ class IServService:
         }
 
     def get_events_in_range(self, start_date: datetime, end_date: datetime):
-                                             
+
         if not self.is_connected():
             return {'success': False, 'error': 'Nicht verbunden'}
 
         try:
-                                                               
+
             start_str = start_date.strftime('%Y-%m-%d')
             end_str = end_date.strftime('%Y-%m-%d')
 
@@ -344,7 +342,7 @@ class IServService:
 
     def create_event(self, title: str, start: datetime, end: datetime = None,
                      description: str = '', location: str = ''):
-                                      
+
         if not self.is_connected():
             return {'success': False, 'error': 'Nicht verbunden'}
 
@@ -361,14 +359,14 @@ class IServService:
             return {'success': False, 'error': str(e)}
 
     def get_exercises(self):
-                                                                
+
         if not self.is_connected():
             return {'success': False, 'error': 'Nicht verbunden'}
 
         exercises = []
 
         try:
-                                                
+
             start = datetime.now()
             end = start + timedelta(days=60)
             start_str = start.strftime('%Y-%m-%d')
@@ -441,7 +439,7 @@ class IServService:
         return {'success': True, 'exercises': unique_exercises}
 
     def _normalize_exercises(self, raw_data):
-                                                                 
+
         normalized = []
         if not raw_data:
             return normalized
@@ -467,7 +465,7 @@ class IServService:
         return normalized
 
     def get_storage_info(self):
-                                             
+
         if not self.is_connected():
             return {'success': False, 'error': 'Nicht verbunden'}
 
@@ -478,21 +476,21 @@ class IServService:
             return {'success': False, 'error': str(e)}
 
     def list_files(self, path: str = '/'):
-                                                     
+
         if not self.is_connected():
             return {'success': False, 'error': 'Nicht verbunden'}
 
         try:
-                               
+
             webdav_client = self.api.file(path=path)
-                                         
+
             files = webdav_client.list(path)
             return {'success': True, 'files': files, 'path': path}
         except Exception as e:
             return {'success': False, 'error': str(e)}
 
     def get_file_info(self, path: str):
-                                             
+
         if not self.is_connected():
             return {'success': False, 'error': 'Nicht verbunden'}
 
@@ -504,7 +502,7 @@ class IServService:
             return {'success': False, 'error': str(e)}
 
     def download_file(self, remote_path: str, local_path: str):
-                                         
+
         if not self.is_connected():
             return {'success': False, 'error': 'Nicht verbunden'}
 
@@ -516,7 +514,7 @@ class IServService:
             return {'success': False, 'error': str(e)}
 
     def search_users(self, query: str):
-                               
+
         if not self.is_connected():
             return {'success': False, 'error': 'Nicht verbunden'}
 
@@ -533,7 +531,7 @@ class IServService:
 \
 \
 \
-           
+
         cache_dir = self.VERTRETUNGSPLAN_CACHE_DIR
         cache_dir.mkdir(parents=True, exist_ok=True)
         cache_meta_file = cache_dir / 'cache_meta.json'
@@ -548,24 +546,24 @@ class IServService:
             try:
                 result = self._fetch_vertretungsplan_pdfs(display_id)
                 if result.get('success') and result.get('pdfs'):
-                                    
+
                     self._cache_vertretungsplan_pdfs(result['pdfs'], cache_dir, cache_meta_file)
                     return result
                 elif not result.get('success'):
-                                                                  
+
                     cached = self._get_cached_vertretungsplan(cache_dir, cache_meta_file)
                     if cached.get('success'):
                         cached['fetch_error'] = result.get('error')
                         return cached
-                                                                          
+
                     result['iserv_connected'] = True
                     return result
             except Exception as e:
                 logging.error(f"Error fetching Vertretungsplan: {e}")
-                                       
+
         cached = self._get_cached_vertretungsplan(cache_dir, cache_meta_file)
         if not cached.get('success'):
-                                         
+
             creds = self.load_credentials()
             if not creds:
                 cached['error'] = 'IServ nicht konfiguriert. Gehe zu Einstellungen um dich anzumelden.'
@@ -576,7 +574,7 @@ class IServService:
         return cached
 
     def _fetch_vertretungsplan_pdfs(self, display_id: int = 3):
-                                                    
+
         import base64
         import re
         from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -640,7 +638,7 @@ class IServService:
             scripts = soup.find_all('script')
             for script in scripts:
                 if script.string:
-                                                     
+
                     pdf_matches = re.findall(r'["\']([^"\']*\.pdf[^"\']*)["\']', script.string, re.IGNORECASE)
                     for match in pdf_matches:
                         if not match.startswith('http'):
@@ -669,13 +667,13 @@ class IServService:
                     try:
                         result = future.result()
                         if result:
-                            pdf_links.insert(0, result)                    
+                            pdf_links.insert(0, result)
                     except Exception:
                         pass
 
             for img in soup.find_all('img'):
                 src = img.get('src', '')
-                                                                                            
+
                 if src and ('vertretung' in src.lower() or 'plan' in src.lower() or
                            'infodisplay' in src.lower() or '/file/' in src.lower() or
                            'upload' in src.lower()):
@@ -706,7 +704,7 @@ class IServService:
 
             for script in scripts:
                 if script.string:
-                                                             
+
                     url_matches = re.findall(r'["\'](/iserv/[^"\']+)["\']', script.string)
                     for match in url_matches:
                         if 'file' in match.lower() or 'image' in match.lower() or 'display' in match.lower():
@@ -735,12 +733,12 @@ class IServService:
                     if resp.status_code != 200:
                         return None
                     ct = resp.headers.get('Content-Type', '').lower()
-                                                               
+
                     if 'text/html' in ct or 'svg' in ct:
                         return None
                     if not ('pdf' in ct or 'image' in ct):
                         return None
-                                              
+
                     if len(resp.content) < 10000:
                         return None
                     return {'url': url, 'content': resp.content, 'content_type': ct}
@@ -748,10 +746,10 @@ class IServService:
                     return None
 
             with ThreadPoolExecutor(max_workers=6) as executor:
-                                                                
+
                 futures = {executor.submit(fetch_pdf, url): url for url in unique_links[:10]}
                 for future in as_completed(futures, timeout=15):
-                    if len(pdfs) >= 6:                         
+                    if len(pdfs) >= 6:
                         break
                     try:
                         result = future.result()
@@ -805,7 +803,7 @@ class IServService:
         return {'success': False, 'error': f'Unbekannter Content-Type: {content_type}'}
 
     def _cache_vertretungsplan_pdfs(self, pdfs: list, cache_dir: Path, meta_file: Path):
-                                                 
+
         import base64
 
         try:
@@ -837,7 +835,7 @@ class IServService:
             logging.error(f"Error caching Vertretungsplan: {e}")
 
     def _get_cached_vertretungsplan(self, cache_dir: Path, meta_file: Path):
-                                              
+
         import base64
 
         if not meta_file.exists():
@@ -888,11 +886,11 @@ class IServService:
             }
 
     def get_vertretungsplan(self, display_id: int = 3):
-                                                                                           
+
         return self.get_vertretungsplan_pdfs(display_id)
 
     def get_vertretungsplan_image(self, display_id: int = 3):
-                                                                    
+
         if not self.is_connected():
             return {'success': False, 'error': 'Nicht verbunden'}
 
@@ -929,5 +927,5 @@ class IServService:
 iserv_service = IServService()
 
 def get_iserv_service():
-                                                
+
     return iserv_service
