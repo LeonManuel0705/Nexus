@@ -144,18 +144,11 @@ class IServService {
         }
       }
 
-      // Check for any valid session cookie (IServ uses different names across versions)
-      // Common patterns: IServSession, IServSAT, PHPSESSID, session, _session
-      final hasSessionCookie = sessionCookie.contains('IServ') ||
-                                sessionCookie.contains('PHPSESSID') ||
-                                sessionCookie.contains('session') ||
-                                sessionCookie.contains('SESS');
-
-      if (!hasSessionCookie || sessionCookie.isEmpty) {
-        return {'success': false, 'error': 'Keine gültige Session erhalten. Bitte Zugangsdaten prüfen.'};
+      // Verify we can actually access a logged-in page - this is the real test
+      if (sessionCookie.isEmpty) {
+        return {'success': false, 'error': 'Keine Session-Cookies erhalten. Bitte Zugangsdaten prüfen.'};
       }
 
-      // Verify we can actually access a logged-in page
       try {
         final verifyResponse = await dio.get(
           '/iserv/',
@@ -168,12 +161,25 @@ class IServService {
 
         final verifyBody = verifyResponse.data?.toString() ?? '';
 
-        // Check if we got redirected back to login
-        if (verifyBody.contains('login_check') || verifyBody.contains('_username')) {
+        // Check if we got redirected back to login - this means auth failed
+        if (verifyBody.contains('login_check') ||
+            (verifyBody.contains('_username') && verifyBody.contains('_password'))) {
           return {'success': false, 'error': 'Anmeldung fehlgeschlagen. Bitte Zugangsdaten prüfen.'};
         }
+
+        // If we can see IServ content (dashboard, menus, etc.), we're logged in
+        final isLoggedIn = verifyBody.contains('/iserv/') ||
+                           verifyBody.contains('iserv-menu') ||
+                           verifyBody.contains('iserv-nav') ||
+                           verifyBody.contains('dashboard') ||
+                           verifyBody.contains('Abmelden') ||
+                           verifyBody.contains('logout');
+
+        if (!isLoggedIn) {
+          return {'success': false, 'error': 'Konnte Anmeldung nicht verifizieren. Bitte erneut versuchen.'};
+        }
       } catch (e) {
-        // Ignore verification errors, proceed with session
+        // If verification fails but we have cookies, try to proceed anyway
       }
 
       _sessionToken = sessionCookie;
