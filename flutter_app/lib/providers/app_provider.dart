@@ -180,6 +180,7 @@ class AppProvider extends ChangeNotifier {
     required String endTime,
     required int lessonNumber,
     String? color,
+    String? lessonType,
   }) async {
     final now = DateTime.now();
     final lesson = Lesson(
@@ -192,6 +193,7 @@ class AppProvider extends ChangeNotifier {
       endTime: endTime,
       lessonNumber: lessonNumber,
       color: color,
+      lessonType: lessonType,
       createdAt: now,
       updatedAt: now,
     );
