@@ -59,25 +59,30 @@ class AssistantScreen extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: NexusTheme.warning.withOpacity(0.15),
+                      gradient: LinearGradient(
+                        colors: [
+                          NexusTheme.primary.withOpacity(0.2),
+                          NexusTheme.secondary.withOpacity(0.2),
+                        ],
+                      ),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: NexusTheme.warning.withOpacity(0.3),
+                        color: NexusTheme.primary.withOpacity(0.3),
                       ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          Icons.construction,
+                          Icons.rocket_launch,
                           size: 18,
-                          color: NexusTheme.warning,
+                          color: NexusTheme.primary,
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'In Entwicklung',
+                          'Coming Soon',
                           style: TextStyle(
-                            color: NexusTheme.warning,
+                            color: NexusTheme.primary,
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
                           ),
@@ -87,7 +92,7 @@ class AssistantScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    'Der KI Assistent wird gerade überarbeitet\nund ist bald wieder verfügbar.',
+                    'Der KI Assistent wird bald verfügbar sein.\nBleib gespannt auf coole Features!',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,

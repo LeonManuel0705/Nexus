@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'providers/app_provider.dart';
 import 'providers/drawing_provider.dart';
 import 'providers/bookmark_provider.dart';
@@ -110,6 +111,57 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _currentIndex = 0;
+  bool _hasCheckedFirstLaunch = false;
+
+  static const _bundeslaender = [
+    'Baden-Württemberg',
+    'Bayern',
+    'Berlin',
+    'Brandenburg',
+    'Bremen',
+    'Hamburg',
+    'Hessen',
+    'Mecklenburg-Vorpommern',
+    'Niedersachsen',
+    'Nordrhein-Westfalen',
+    'Rheinland-Pfalz',
+    'Saarland',
+    'Sachsen',
+    'Sachsen-Anhalt',
+    'Schleswig-Holstein',
+    'Thüringen',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkFirstLaunch());
+  }
+
+  Future<void> _checkFirstLaunch() async {
+    if (_hasCheckedFirstLaunch) return;
+    _hasCheckedFirstLaunch = true;
+
+    final prefs = await SharedPreferences.getInstance();
+    final hasSelectedBundesland = prefs.containsKey('user_bundesland');
+
+    if (!hasSelectedBundesland && mounted) {
+      _showBundeslandDialog();
+    }
+  }
+
+  Future<void> _showBundeslandDialog() async {
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _BundeslandSelectionDialog(bundeslaender: _bundeslaender),
+    );
+
+    if (result != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_bundesland', result);
+    }
+  }
 
   final List<Widget> _allScreens = const [
     DashboardScreen(),
@@ -266,5 +318,124 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildFab() {
     return const QuickNoteFab();
+  }
+}
+
+class _BundeslandSelectionDialog extends StatefulWidget {
+  final List<String> bundeslaender;
+
+  const _BundeslandSelectionDialog({required this.bundeslaender});
+
+  @override
+  State<_BundeslandSelectionDialog> createState() => _BundeslandSelectionDialogState();
+}
+
+class _BundeslandSelectionDialogState extends State<_BundeslandSelectionDialog> {
+  String? _selectedBundesland;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return AlertDialog(
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: NexusTheme.primaryGradient,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.location_on, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Willkommen bei Nexus!',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'In welchem Bundesland wohnst du?',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.normal,
+              color: isDark ? Colors.white70 : Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Wird für Ferien und Feiertage verwendet.',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.normal,
+              color: isDark ? Colors.white38 : Colors.black38,
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 350,
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: widget.bundeslaender.length,
+          itemBuilder: (context, index) {
+            final bundesland = widget.bundeslaender[index];
+            final isSelected = _selectedBundesland == bundesland;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 4),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? NexusTheme.primaryColor.withOpacity(0.15)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isSelected
+                      ? NexusTheme.primaryColor
+                      : Colors.transparent,
+                ),
+              ),
+              child: ListTile(
+                dense: true,
+                title: Text(
+                  bundesland,
+                  style: TextStyle(
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    color: isSelected ? NexusTheme.primaryColor : null,
+                  ),
+                ),
+                trailing: isSelected
+                    ? Icon(Icons.check_circle, color: NexusTheme.primaryColor, size: 20)
+                    : null,
+                onTap: () => setState(() => _selectedBundesland = bundesland),
+              ),
+            );
+          },
+        ),
+      ),
+      actions: [
+        ElevatedButton(
+          onPressed: _selectedBundesland != null
+              ? () => Navigator.pop(context, _selectedBundesland)
+              : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: NexusTheme.primaryColor,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: isDark ? Colors.grey.shade800 : Colors.grey.shade300,
+          ),
+          child: const Text('Weiter'),
+        ),
+      ],
+    );
   }
 }
