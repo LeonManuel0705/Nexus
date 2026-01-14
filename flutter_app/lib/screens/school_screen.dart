@@ -415,13 +415,26 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
           ),
           if (lessonsForDay.isEmpty)
             _buildEmptyDayState(isDark, dayOfWeek)
-          else
+          else ...[
             ...lessonsForDay.map((lesson) => _LessonCard(
               lesson: lesson,
               onDelete: () => provider.deleteLesson(lesson.id),
               onEdit: () => _showEditLessonDialog(context, lesson),
               isCurrentLesson: isToday && _isCurrentLesson(lesson, now),
             )),
+            const SizedBox(height: 16),
+            Center(
+              child: OutlinedButton.icon(
+                onPressed: () => showAddLessonDialog(context, dayOfWeek: dayOfWeek),
+                icon: const Icon(Icons.add),
+                label: const Text('Weitere Stunde hinzufügen'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: NexusTheme.primaryColor,
+                  side: BorderSide(color: NexusTheme.primaryColor.withOpacity(0.5)),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 80),
         ],
       ),
