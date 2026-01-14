@@ -1692,6 +1692,11 @@
             background: rgba(239, 68, 68, 0.15);
         }
 
+        .download-option-status.pwa {
+            color: #60a5fa;
+            background: rgba(96, 165, 250, 0.15);
+        }
+
         .download-option.disabled {
             opacity: 0.5;
             cursor: not-allowed;
@@ -2122,16 +2127,23 @@
                             </svg>
                         </div>
                     </a>
-                    <div class="download-option disabled">
+                    <a href="pwa/" class="download-option" target="_blank">
                         <div class="download-option-icon">
                             <img src="images/iOS-Logo.png" alt="iOS">
                         </div>
                         <div class="download-option-info">
                             <span class="download-option-name">iOS</span>
                             <span class="download-option-devices">iPhone, iPad</span>
-                            <span class="download-option-status soon">Bald verfügbar</span>
+                            <span class="download-option-status pwa">Web App</span>
                         </div>
-                    </div>
+                        <div class="download-option-arrow">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                <polyline points="15 3 21 3 21 9"/>
+                                <line x1="10" y1="14" x2="21" y2="3"/>
+                            </svg>
+                        </div>
+                    </a>
                 </div>
             </div>
         </div>
