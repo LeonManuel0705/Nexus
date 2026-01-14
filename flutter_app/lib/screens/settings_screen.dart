@@ -13,7 +13,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _abWeeksEnabled = false;
+  bool _abWeeksEnabled = true;
   String? _weatherCity;
   double? _weatherLat;
   double? _weatherLon;
@@ -27,7 +27,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _abWeeksEnabled = prefs.getBool('ab_weeks_enabled') ?? false;
+      _abWeeksEnabled = prefs.getBool('ab_weeks_enabled') ?? true;
       _weatherCity = prefs.getString('weather_city');
       _weatherLat = prefs.getDouble('weather_lat');
       _weatherLon = prefs.getDouble('weather_lon');

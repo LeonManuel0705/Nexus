@@ -688,26 +688,15 @@ class _TrainingScreenState extends State<TrainingScreen> {
           schedule: _currentSchedule,
           isHoliday: _isHolidayMode,
           onSave: (schedule) async {
-            try {
-              await _db.saveTrainingSchedule(schedule, isHoliday: _isHolidayMode);
-              await _loadData();
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Trainingsplan gespeichert!'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              }
-            } catch (e) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Fehler: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
+            await _db.saveTrainingSchedule(schedule, isHoliday: _isHolidayMode);
+            await _loadData();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Trainingsplan gespeichert!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
             }
           },
         ),
@@ -722,31 +711,20 @@ class _TrainingScreenState extends State<TrainingScreen> {
         dayIndex: dayIndex,
         existing: existing,
         onSave: (entry) async {
-          try {
-            final schedule = List<TrainingEntry>.from(_currentSchedule);
-            schedule.removeWhere((e) => e.day == dayIndex);
-            if (entry != null) {
-              schedule.add(entry);
-            }
-            await _db.saveTrainingSchedule(schedule, isHoliday: _isHolidayMode);
-            await _loadData();
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Tag gespeichert!'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            }
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Fehler: $e'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
+          final schedule = List<TrainingEntry>.from(_currentSchedule);
+          schedule.removeWhere((e) => e.day == dayIndex);
+          if (entry != null) {
+            schedule.add(entry);
+          }
+          await _db.saveTrainingSchedule(schedule, isHoliday: _isHolidayMode);
+          await _loadData();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Tag gespeichert!'),
+                backgroundColor: Colors.green,
+              ),
+            );
           }
         },
       ),
@@ -1152,7 +1130,7 @@ class _GoalTile extends StatelessWidget {
 class _EditScheduleScreen extends StatefulWidget {
   final List<TrainingEntry> schedule;
   final bool isHoliday;
-  final Function(List<TrainingEntry>) onSave;
+  final Future<void> Function(List<TrainingEntry>) onSave;
 
   const _EditScheduleScreen({
     required this.schedule,
@@ -1167,6 +1145,7 @@ class _EditScheduleScreen extends StatefulWidget {
 class _EditScheduleScreenState extends State<_EditScheduleScreen> {
   late List<TrainingEntry> _schedule;
   final dayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -1181,11 +1160,18 @@ class _EditScheduleScreenState extends State<_EditScheduleScreen> {
         title: Text(widget.isHoliday ? 'Ferienplan bearbeiten' : 'Trainingsplan bearbeiten'),
         actions: [
           TextButton(
-            onPressed: () {
-              widget.onSave(_schedule);
-              Navigator.pop(context);
+            onPressed: _isSaving ? null : () async {
+              setState(() => _isSaving = true);
+              try {
+                await widget.onSave(_schedule);
+                if (mounted) Navigator.pop(context);
+              } finally {
+                if (mounted) setState(() => _isSaving = false);
+              }
             },
-            child: const Text('Speichern'),
+            child: _isSaving
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Speichern'),
           ),
         ],
       ),
@@ -1255,7 +1241,7 @@ class _EditScheduleScreenState extends State<_EditScheduleScreen> {
       builder: (context) => _EditDayDialog(
         dayIndex: dayIndex,
         existing: existing,
-        onSave: (entry) => Navigator.pop(context, entry),
+        onSave: (entry) async => Navigator.pop(context, entry),
       ),
     );
 
@@ -1271,7 +1257,7 @@ class _EditScheduleScreenState extends State<_EditScheduleScreen> {
 class _EditDayDialog extends StatefulWidget {
   final int dayIndex;
   final TrainingEntry? existing;
-  final Function(TrainingEntry?) onSave;
+  final Future<void> Function(TrainingEntry?) onSave;
 
   const _EditDayDialog({
     required this.dayIndex,
@@ -1289,6 +1275,7 @@ class _EditDayDialogState extends State<_EditDayDialog> {
   late TextEditingController _notesController;
   String _type = 'strength';
   String _icon = '🏋️';
+  bool _isSaving = false;
 
   final _typeOptions = [
     ('strength', 'Krafttraining', '🏋️'),
@@ -1381,36 +1368,48 @@ class _EditDayDialogState extends State<_EditDayDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: _isSaving ? null : () => Navigator.pop(context),
           child: const Text('Abbrechen'),
         ),
         if (widget.existing != null)
           TextButton(
-            onPressed: () {
-              widget.onSave(null);
-              Navigator.pop(context);
+            onPressed: _isSaving ? null : () async {
+              setState(() => _isSaving = true);
+              try {
+                await widget.onSave(null);
+                if (mounted) Navigator.pop(context);
+              } finally {
+                if (mounted) setState(() => _isSaving = false);
+              }
             },
             child: Text('Löschen', style: TextStyle(color: NexusTheme.danger)),
           ),
         ElevatedButton(
-          onPressed: () {
+          onPressed: _isSaving ? null : () async {
             if (_titleController.text.isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Bitte Titel eingeben')),
               );
               return;
             }
-            widget.onSave(TrainingEntry(
-              day: widget.dayIndex,
-              title: _titleController.text,
-              type: _type,
-              icon: _icon,
-              muscleGroups: _muscleGroupsController.text.isEmpty ? null : _muscleGroupsController.text,
-              notes: _notesController.text.isEmpty ? null : _notesController.text,
-            ));
-            Navigator.pop(context);
+            setState(() => _isSaving = true);
+            try {
+              await widget.onSave(TrainingEntry(
+                day: widget.dayIndex,
+                title: _titleController.text,
+                type: _type,
+                icon: _icon,
+                muscleGroups: _muscleGroupsController.text.isEmpty ? null : _muscleGroupsController.text,
+                notes: _notesController.text.isEmpty ? null : _notesController.text,
+              ));
+              if (mounted) Navigator.pop(context);
+            } finally {
+              if (mounted) setState(() => _isSaving = false);
+            }
           },
-          child: const Text('Speichern'),
+          child: _isSaving
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Speichern'),
         ),
       ],
     );
