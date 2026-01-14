@@ -32,7 +32,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -48,9 +48,63 @@ class DatabaseService {
 
       await db.execute("ALTER TABLE events ADD COLUMN category TEXT DEFAULT 'personal'");
     }
+
+    // Ensure training tables exist for all upgrades
+    await _createTrainingTables(db);
   }
 
   Future<void> _onCreate(Database db, int version) async {
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS training_schedule (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        day INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        type TEXT NOT NULL,
+        icon TEXT NOT NULL,
+        muscle_groups TEXT,
+        notes TEXT,
+        is_holiday INTEGER DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS training_sessions (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        duration INTEGER,
+        notes TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS health_logs (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL,
+        sleep REAL,
+        energy INTEGER,
+        stress INTEGER,
+        recovery INTEGER
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS training_goals (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        target_date TEXT,
+        completed INTEGER DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS training_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      )
+    ''');
 
     await db.execute('''
       CREATE TABLE tasks (
@@ -544,7 +598,11 @@ class DatabaseService {
 
   Future<void> insertLesson(Lesson lesson) async {
     final db = await database;
-    await db.insert('lessons', lesson.toMap());
+    await db.insert(
+      'lessons',
+      lesson.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
   }
 
   Future<void> updateLesson(Lesson lesson) async {
