@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/app_provider.dart';
 import '../providers/iserv_provider.dart';
+import '../services/holiday_service.dart';
 import '../theme.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -17,6 +18,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _weatherCity;
   double? _weatherLat;
   double? _weatherLon;
+  String? _bundesland;
+  bool _isImportingHolidays = false;
+
+  static const _bundeslaender = [
+    'Baden-Württemberg',
+    'Bayern',
+    'Berlin',
+    'Brandenburg',
+    'Bremen',
+    'Hamburg',
+    'Hessen',
+    'Mecklenburg-Vorpommern',
+    'Niedersachsen',
+    'Nordrhein-Westfalen',
+    'Rheinland-Pfalz',
+    'Saarland',
+    'Sachsen',
+    'Sachsen-Anhalt',
+    'Schleswig-Holstein',
+    'Thüringen',
+  ];
 
   @override
   void initState() {
@@ -31,6 +53,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _weatherCity = prefs.getString('weather_city');
       _weatherLat = prefs.getDouble('weather_lat');
       _weatherLon = prefs.getDouble('weather_lon');
+      _bundesland = prefs.getString('user_bundesland');
     });
   }
 
@@ -163,6 +186,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 fontSize: 12,
                                 color: isDark ? NexusTheme.darkTextSecondary : NexusTheme.lightTextSecondary,
                               ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            _buildSectionTitle(context, 'Feiertage & Ferien', Icons.celebration),
+            _buildCard(
+              isDark,
+              children: [
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF22C55E).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.location_on, color: Color(0xFF22C55E), size: 20),
+                  ),
+                  title: const Text('Bundesland'),
+                  subtitle: Text(_bundesland ?? 'Nicht festgelegt'),
+                  trailing: TextButton(
+                    onPressed: () => _showBundeslandDialog(context),
+                    child: const Text('Ändern'),
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.refresh, color: Color(0xFFEF4444), size: 20),
+                  ),
+                  title: const Text('Feiertage aktualisieren'),
+                  subtitle: const Text('Lade Feiertage und Ferien neu'),
+                  trailing: _isImportingHolidays
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : FilledButton(
+                          onPressed: _bundesland != null ? () => _refreshHolidays(context) : null,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: NexusTheme.primaryColor,
+                          ),
+                          child: const Text('Aktualisieren'),
+                        ),
+                ),
+                if (_bundesland == null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, size: 16, color: Colors.amber[700]),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Wähle zuerst ein Bundesland aus, um Feiertage zu importieren',
+                              style: TextStyle(fontSize: 12, color: Colors.amber[800]),
                             ),
                           ),
                         ],
@@ -923,5 +1020,138 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  void _showBundeslandDialog(BuildContext context) {
+    String? selected = _bundesland;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Bundesland auswählen'),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 350,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _bundeslaender.length,
+              itemBuilder: (context, index) {
+                final bundesland = _bundeslaender[index];
+                final isSelected = selected == bundesland;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 4),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? NexusTheme.primaryColor.withOpacity(0.15)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isSelected
+                          ? NexusTheme.primaryColor
+                          : Colors.transparent,
+                    ),
+                  ),
+                  child: ListTile(
+                    dense: true,
+                    title: Text(
+                      bundesland,
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: isSelected ? NexusTheme.primaryColor : null,
+                      ),
+                    ),
+                    trailing: isSelected
+                        ? Icon(Icons.check_circle, color: NexusTheme.primaryColor, size: 20)
+                        : null,
+                    onTap: () => setDialogState(() => selected = bundesland),
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Abbrechen'),
+            ),
+            FilledButton(
+              onPressed: selected != null
+                  ? () async {
+                      Navigator.pop(context);
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setString('user_bundesland', selected!);
+                      setState(() => _bundesland = selected);
+
+                      // Ask to refresh holidays
+                      if (mounted) {
+                        _showRefreshHolidaysPrompt(context);
+                      }
+                    }
+                  : null,
+              child: const Text('Speichern'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showRefreshHolidaysPrompt(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Feiertage aktualisieren?'),
+        content: const Text(
+          'Möchtest du die Feiertage und Ferien für das neue Bundesland importieren?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Später'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _refreshHolidays(context);
+            },
+            child: const Text('Ja, importieren'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _refreshHolidays(BuildContext context) async {
+    setState(() => _isImportingHolidays = true);
+
+    try {
+      final holidayService = HolidayService();
+      await holidayService.refreshHolidays();
+
+      if (mounted) {
+        context.read<AppProvider>().refresh();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Feiertage und Ferien wurden importiert'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Fehler beim Importieren: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isImportingHolidays = false);
+      }
+    }
   }
 }

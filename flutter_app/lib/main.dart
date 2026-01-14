@@ -18,6 +18,7 @@ import 'services/sync_manager.dart';
 import 'services/offline_queue.dart';
 import 'services/background_service.dart';
 import 'services/database_service.dart';
+import 'services/holiday_service.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/tasks_screen.dart' show TasksScreen, showAddTaskDialog;
 import 'screens/calendar_screen.dart' show CalendarScreen, showAddEventDialog;
@@ -146,7 +147,26 @@ class _MainScreenState extends State<MainScreen> {
     final hasSelectedBundesland = prefs.containsKey('user_bundesland');
 
     if (!hasSelectedBundesland && mounted) {
-      _showBundeslandDialog();
+      await _showBundeslandDialog();
+    } else if (hasSelectedBundesland) {
+      // Import holidays if not already imported
+      _importHolidaysIfNeeded();
+    }
+  }
+
+  Future<void> _importHolidaysIfNeeded() async {
+    try {
+      final holidayService = HolidayService();
+      final hasHolidays = await holidayService.hasImportedHolidays();
+      if (!hasHolidays) {
+        await holidayService.importHolidays();
+        // Refresh the app provider to show new holidays
+        if (mounted) {
+          context.read<AppProvider>().refresh();
+        }
+      }
+    } catch (e) {
+      // Silently fail - holidays are not critical
     }
   }
 
@@ -160,6 +180,37 @@ class _MainScreenState extends State<MainScreen> {
     if (result != null) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_bundesland', result);
+
+      // Import holidays for the selected Bundesland
+      if (mounted) {
+        _importHolidaysAfterSelection();
+      }
+    }
+  }
+
+  Future<void> _importHolidaysAfterSelection() async {
+    try {
+      final holidayService = HolidayService();
+      await holidayService.importHolidays();
+      // Refresh the app provider to show new holidays
+      if (mounted) {
+        context.read<AppProvider>().refresh();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Feiertage und Ferien wurden importiert'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Fehler beim Importieren der Feiertage: $e'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
     }
   }
 

@@ -1,11 +1,11 @@
 {
-    "name": "nexus",
-    "short_name": "nexus",
+    "name": "Nexus",
+    "short_name": "Nexus",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0F172A",
+    "theme_color": "#667EEA",
+    "description": "Dein persönlicher Produktivitäts-Hub für Schule, Studium und Alltag.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
