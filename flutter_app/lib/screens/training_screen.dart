@@ -216,49 +216,75 @@ class _TrainingScreenState extends State<TrainingScreen> {
     );
   }
 
+  Widget _buildGlassCard({required Widget child, EdgeInsets? padding}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: padding ?? const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withOpacity(0.05)
+            : Colors.white.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withOpacity(0.1)
+              : Colors.black.withOpacity(0.05),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withOpacity(0.2)
+                : Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
   Widget _buildWeekNavigation() {
     final weekNum = _getWeekNumber(_selectedWeekStart);
     final isCurrentWeek = _getWeekStart(DateTime.now()) == _selectedWeekStart;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.chevron_left),
-              onPressed: _previousWeek,
-            ),
-            Expanded(
-              child: GestureDetector(
-                onTap: _goToCurrentWeek,
-                child: Column(
-                  children: [
-                    Text(
-                      'KW $weekNum',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    Text(
-                      '${DateFormat('d. MMM', 'de_DE').format(_selectedWeekStart)} - ${DateFormat('d. MMM yyyy', 'de_DE').format(_selectedWeekStart.add(const Duration(days: 6)))}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
+    return _buildGlassCard(
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: _previousWeek,
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: _goToCurrentWeek,
+              child: Column(
+                children: [
+                  Text(
+                    'KW $weekNum',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  Text(
+                    '${DateFormat('d. MMM', 'de_DE').format(_selectedWeekStart)} - ${DateFormat('d. MMM yyyy', 'de_DE').format(_selectedWeekStart.add(const Duration(days: 6)))}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.chevron_right),
-              onPressed: _nextWeek,
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            onPressed: _nextWeek,
+          ),
+          if (!isCurrentWeek)
+            TextButton(
+              onPressed: _goToCurrentWeek,
+              child: const Text('Heute'),
             ),
-            if (!isCurrentWeek)
-              TextButton(
-                onPressed: _goToCurrentWeek,
-                child: const Text('Heute'),
-              ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -317,7 +343,8 @@ class _TrainingScreenState extends State<TrainingScreen> {
     final schedule = _currentSchedule;
     final dayNames = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 
-    return Card(
+    return _buildGlassCard(
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -372,7 +399,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: 7,
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (_, __) => Divider(height: 1, color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05)),
               itemBuilder: (context, index) {
                 final dayIndex = index + 1;
                 final entry = schedule.where((e) => e.day == dayIndex).firstOrNull;
@@ -403,23 +430,21 @@ class _TrainingScreenState extends State<TrainingScreen> {
     final today = DateTime.now();
     final correctEntry = _currentSchedule.where((e) => e.day == today.weekday).firstOrNull;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.today, size: 20, color: NexusTheme.accentColor),
-                const SizedBox(width: 8),
-                Text(
-                  'Heute',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
+    return _buildGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.today, size: 20, color: NexusTheme.accentColor),
+              const SizedBox(width: 8),
+              Text(
+                'Heute',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
             if (correctEntry == null || correctEntry.type == 'rest')
               Container(
                 padding: const EdgeInsets.all(20),
@@ -502,7 +527,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
               ),
           ],
         ),
-      ),
     );
   }
 
@@ -511,108 +535,102 @@ class _TrainingScreenState extends State<TrainingScreen> {
         DateFormat('yyyy-MM-dd').format(h.date) ==
         DateFormat('yyyy-MM-dd').format(DateTime.now())).firstOrNull;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.favorite, size: 20, color: NexusTheme.trainingColor),
-                const SizedBox(width: 8),
-                Text(
-                  'Wohlbefinden',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: () => _showHealthLogDialog(todayLog),
-                  child: Text(todayLog != null ? 'Bearbeiten' : 'Eintragen'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                _HealthStatCard(
-                  icon: Icons.bedtime,
-                  label: 'Schlaf',
-                  value: todayLog?.sleep != null ? '${todayLog!.sleep}h' : '--',
-                  color: NexusTheme.info,
-                ),
-                const SizedBox(width: 12),
-                _HealthStatCard(
-                  icon: Icons.bolt,
-                  label: 'Energie',
-                  value: todayLog?.energy != null ? '${todayLog!.energy}/10' : '--',
-                  color: NexusTheme.warning,
-                ),
-                const SizedBox(width: 12),
-                _HealthStatCard(
-                  icon: Icons.psychology,
-                  label: 'Stress',
-                  value: todayLog?.stress != null ? '${todayLog!.stress}/10' : '--',
-                  color: NexusTheme.danger,
-                ),
-                const SizedBox(width: 12),
-                _HealthStatCard(
-                  icon: Icons.healing,
-                  label: 'Erholung',
-                  value: todayLog?.recovery != null ? '${todayLog!.recovery}/10' : '--',
-                  color: NexusTheme.success,
-                ),
-              ],
-            ),
-          ],
-        ),
+    return _buildGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.favorite, size: 20, color: NexusTheme.trainingColor),
+              const SizedBox(width: 8),
+              Text(
+                'Wohlbefinden',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () => _showHealthLogDialog(todayLog),
+                child: Text(todayLog != null ? 'Bearbeiten' : 'Eintragen'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _HealthStatCard(
+                icon: Icons.bedtime,
+                label: 'Schlaf',
+                value: todayLog?.sleep != null ? '${todayLog!.sleep}h' : '--',
+                color: NexusTheme.info,
+              ),
+              const SizedBox(width: 12),
+              _HealthStatCard(
+                icon: Icons.bolt,
+                label: 'Energie',
+                value: todayLog?.energy != null ? '${todayLog!.energy}/10' : '--',
+                color: NexusTheme.warning,
+              ),
+              const SizedBox(width: 12),
+              _HealthStatCard(
+                icon: Icons.psychology,
+                label: 'Stress',
+                value: todayLog?.stress != null ? '${todayLog!.stress}/10' : '--',
+                color: NexusTheme.danger,
+              ),
+              const SizedBox(width: 12),
+              _HealthStatCard(
+                icon: Icons.healing,
+                label: 'Erholung',
+                value: todayLog?.recovery != null ? '${todayLog!.recovery}/10' : '--',
+                color: NexusTheme.success,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildGoalsSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.flag, size: 20, color: NexusTheme.success),
-                const SizedBox(width: 8),
-                Text(
-                  'Ziele',
-                  style: Theme.of(context).textTheme.titleMedium,
+    return _buildGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.flag, size: 20, color: NexusTheme.success),
+              const SizedBox(width: 8),
+              Text(
+                'Ziele',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: () => _showGoalDialog(null),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_goals.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Center(
+                child: Text(
+                  'Keine Ziele gesetzt\nTippe auf + um ein Ziel hinzuzufügen',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.add),
-                  onPressed: () => _showGoalDialog(null),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (_goals.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Center(
-                  child: Text(
-                    'Keine Ziele gesetzt\nTippe auf + um ein Ziel hinzuzufügen',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-              )
-            else
-              ...(_goals.map((goal) => _GoalTile(
-                    goal: goal,
-                    onEdit: () => _showGoalDialog(goal),
-                    onDelete: () => _deleteGoal(goal),
-                    onToggle: () => _toggleGoal(goal),
-                  ))),
-          ],
-        ),
+              ),
+            )
+          else
+            ...(_goals.map((goal) => _GoalTile(
+                  goal: goal,
+                  onEdit: () => _showGoalDialog(goal),
+                  onDelete: () => _deleteGoal(goal),
+                  onToggle: () => _toggleGoal(goal),
+                ))),
+        ],
       ),
     );
   }
@@ -1177,9 +1195,30 @@ class _EditScheduleScreenState extends State<_EditScheduleScreen> {
         itemBuilder: (context, index) {
           final dayIndex = index + 1;
           final entry = _schedule.where((e) => e.day == dayIndex).firstOrNull;
+          final isDark = Theme.of(context).brightness == Brightness.dark;
 
-          return Card(
-            margin: const EdgeInsets.only(bottom: 8),
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withOpacity(0.05)
+                  : Colors.white.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withOpacity(0.1)
+                    : Colors.black.withOpacity(0.05),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: isDark
+                      ? Colors.black.withOpacity(0.2)
+                      : Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
             child: ListTile(
               title: Text(dayNames[index]),
               subtitle: entry != null
