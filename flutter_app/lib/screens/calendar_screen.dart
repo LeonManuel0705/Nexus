@@ -37,6 +37,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
         return NexusTheme.trainingColor;
       case 'work':
         return NexusTheme.warning;
+      case 'holiday':
+        return const Color(0xFFEF4444); // Red for public holidays
+      case 'vacation':
+        return const Color(0xFF22C55E); // Green for school vacations
       case 'personal':
       default:
         return NexusTheme.accent3;
@@ -133,6 +137,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       _buildFilterChip('training', 'Training'),
                       _buildFilterChip('personal', 'Privat'),
                       _buildFilterChip('work', 'Arbeit'),
+                      _buildFilterChip('holiday', 'Feiertage'),
+                      _buildFilterChip('vacation', 'Ferien'),
                     ],
                   ),
                 ),
