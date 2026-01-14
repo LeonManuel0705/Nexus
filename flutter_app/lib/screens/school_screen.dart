@@ -2889,6 +2889,7 @@ class _LessonCard extends StatelessWidget {
     final lessonColor = lesson.color != null
         ? Color(int.parse(lesson.color!.replaceFirst('#', '0xFF')))
         : NexusTheme.primaryColor;
+    final isWhiteColor = lesson.color == '#FFFFFF';
 
     return Dismissible(
       key: Key(lesson.id),
@@ -2897,7 +2898,7 @@ class _LessonCard extends StatelessWidget {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(color: NexusTheme.danger, borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(color: NexusTheme.danger, borderRadius: BorderRadius.circular(16)),
         child: const Icon(Icons.delete, color: Colors.white),
       ),
       confirmDismiss: (direction) async {
@@ -2919,43 +2920,107 @@ class _LessonCard extends StatelessWidget {
       },
       onDismissed: (_) => onDelete(),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
+        margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
-          color: isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
-          borderRadius: BorderRadius.circular(12),
+          color: isDark
+              ? Colors.white.withOpacity(0.05)
+              : Colors.white.withOpacity(0.7),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isCurrentLesson ? NexusTheme.primaryColor : (isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder),
+            color: isCurrentLesson
+                ? NexusTheme.primaryColor
+                : (isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05)),
             width: isCurrentLesson ? 2 : 1,
           ),
-          boxShadow: isCurrentLesson ? [BoxShadow(color: NexusTheme.primaryColor.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 2))] : null,
+          boxShadow: [
+            if (isCurrentLesson)
+              BoxShadow(color: NexusTheme.primaryColor.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4))
+            else
+              BoxShadow(
+                color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+          ],
         ),
         child: InkWell(
           onTap: onEdit,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
             child: Row(
               children: [
                 Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(color: lessonColor, borderRadius: BorderRadius.circular(10)),
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: lessonColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: isWhiteColor ? Border.all(color: Colors.grey.shade300) : null,
+                    boxShadow: [
+                      BoxShadow(
+                        color: lessonColor.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
                   child: Center(
-                    child: Text('${lesson.lessonNumber}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                    child: Text(
+                      '${lesson.lessonNumber}',
+                      style: TextStyle(
+                        color: isWhiteColor ? Colors.black87 : Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(lesson.subject, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              lesson.subject,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (lesson.lessonType != null) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: lessonColor.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: lessonColor.withOpacity(0.3)),
+                              ),
+                              child: Text(
+                                lesson.lessonType == 'Leistungskurs' ? 'LK' : lesson.lessonType == 'Grundkurs' ? 'GK' : 'SK',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: lessonColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(Icons.access_time, size: 14, color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted),
+                          Icon(Icons.access_time, size: 14, color: isDark ? Colors.white60 : Colors.black45),
                           const SizedBox(width: 4),
-                          Text(lesson.timeRange, style: TextStyle(fontSize: 13, color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted)),
+                          Text(lesson.timeRange, style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : Colors.black45)),
                         ],
                       ),
                     ],
@@ -2965,22 +3030,22 @@ class _LessonCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     if (lesson.teacher != null) Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.person, size: 14, color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted),
+                      Icon(Icons.person, size: 14, color: isDark ? Colors.white60 : Colors.black45),
                       const SizedBox(width: 4),
-                      Text(lesson.teacher!, style: TextStyle(fontSize: 12, color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted)),
+                      Text(lesson.teacher!, style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black45)),
                     ]),
                     if (lesson.room != null) ...[
                       const SizedBox(height: 2),
                       Row(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(Icons.room, size: 14, color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted),
+                        Icon(Icons.room, size: 14, color: isDark ? Colors.white60 : Colors.black45),
                         const SizedBox(width: 4),
-                        Text(lesson.room!, style: TextStyle(fontSize: 12, color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted)),
+                        Text(lesson.room!, style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black45)),
                       ]),
                     ],
                   ],
                 ),
                 const SizedBox(width: 8),
-                Icon(Icons.chevron_right, color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted),
+                Icon(Icons.chevron_right, color: isDark ? Colors.white38 : Colors.black38),
               ],
             ),
           ),
@@ -3007,10 +3072,33 @@ class _LessonDialogState extends State<_LessonDialog> {
   late int _dayOfWeek;
   late int _lessonNumber;
   String _startTime = '08:00';
-  String _endTime = '08:45';
+  String _endTime = '09:30';
   String? _selectedColor;
+  String? _selectedLessonType;
 
-  static const _colorOptions = ['#667EEA', '#764BA2', '#F093FB', '#22C55E', '#F59E0B', '#EF4444', '#06B6D4', '#8B5CF6'];
+  static const _colorOptions = [
+    '#667EEA', '#764BA2', '#F093FB', '#22C55E', '#F59E0B', '#EF4444', '#06B6D4', '#8B5CF6',
+    '#9CA3AF', '#FFFFFF', '#EC4899', '#F472B6', '#6366F1', '#14B8A6', '#84CC16', '#A855F7',
+  ];
+
+  static const _colorNames = {
+    '#667EEA': 'Blau',
+    '#764BA2': 'Lila',
+    '#F093FB': 'Pink hell',
+    '#22C55E': 'Grün',
+    '#F59E0B': 'Orange',
+    '#EF4444': 'Rot',
+    '#06B6D4': 'Cyan',
+    '#8B5CF6': 'Violett',
+    '#9CA3AF': 'Grau',
+    '#FFFFFF': 'Weiß',
+    '#EC4899': 'Pink',
+    '#F472B6': 'Rosa',
+    '#6366F1': 'Indigo',
+    '#14B8A6': 'Türkis',
+    '#84CC16': 'Lime',
+    '#A855F7': 'Lila hell',
+  };
 
   @override
   void initState() {
@@ -3022,12 +3110,57 @@ class _LessonDialogState extends State<_LessonDialog> {
     if (_dayOfWeek > 5) _dayOfWeek = 1;
     _lessonNumber = widget.lesson?.lessonNumber ?? 1;
     _startTime = widget.lesson?.startTime ?? '08:00';
-    _endTime = widget.lesson?.endTime ?? '08:45';
+    _endTime = widget.lesson?.endTime ?? '09:30';
     _selectedColor = widget.lesson?.color;
+    _selectedLessonType = widget.lesson?.lessonType;
+
+    // Add listener for autofill
+    _subjectController.addListener(_onSubjectChanged);
+  }
+
+  void _onSubjectChanged() {
+    if (widget.lesson != null) return; // Don't autofill when editing
+
+    final subject = _subjectController.text.trim().toLowerCase();
+    if (subject.isEmpty) return;
+
+    // Find existing lesson with same subject
+    final provider = context.read<AppProvider>();
+    final existingLesson = provider.lessons.firstWhere(
+      (l) => l.subject.toLowerCase() == subject,
+      orElse: () => Lesson(
+        id: '',
+        subject: '',
+        dayOfWeek: 1,
+        startTime: '08:00',
+        endTime: '09:30',
+        lessonNumber: 1,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+    );
+
+    if (existingLesson.id.isNotEmpty) {
+      setState(() {
+        if (_teacherController.text.isEmpty && existingLesson.teacher != null) {
+          _teacherController.text = existingLesson.teacher!;
+        }
+        if (_roomController.text.isEmpty && existingLesson.room != null) {
+          _roomController.text = existingLesson.room!;
+        }
+        if (_selectedColor == null && existingLesson.color != null) {
+          _selectedColor = existingLesson.color;
+        }
+        if (_selectedLessonType == null && existingLesson.lessonType != null) {
+          _selectedLessonType = existingLesson.lessonType;
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
+    _subjectController.removeListener(_onSubjectChanged);
     _subjectController.dispose();
     _teacherController.dispose();
     _roomController.dispose();
@@ -3075,6 +3208,18 @@ class _LessonDialogState extends State<_LessonDialog> {
               ],
             ),
             const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _selectedLessonType,
+              decoration: const InputDecoration(labelText: 'Kursart (optional)', prefixIcon: Icon(Icons.school)),
+              items: const [
+                DropdownMenuItem(value: null, child: Text('Keine Angabe')),
+                DropdownMenuItem(value: 'Grundkurs', child: Text('Grundkurs')),
+                DropdownMenuItem(value: 'Leistungskurs', child: Text('Leistungskurs')),
+                DropdownMenuItem(value: 'Seminarkurs', child: Text('Seminarkurs')),
+              ],
+              onChanged: (value) => setState(() => _selectedLessonType = value),
+            ),
+            const SizedBox(height: 16),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -3082,20 +3227,28 @@ class _LessonDialogState extends State<_LessonDialog> {
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
+                  runSpacing: 8,
                   children: _colorOptions.map((color) {
                     final isSelected = _selectedColor == color;
+                    final colorValue = Color(int.parse(color.replaceFirst('#', '0xFF')));
+                    final isWhite = color == '#FFFFFF';
                     return GestureDetector(
                       onTap: () => setState(() => _selectedColor = color),
                       child: Container(
                         width: 32,
                         height: 32,
                         decoration: BoxDecoration(
-                          color: Color(int.parse(color.replaceFirst('#', '0xFF'))),
+                          color: colorValue,
                           borderRadius: BorderRadius.circular(8),
-                          border: isSelected ? Border.all(color: Colors.white, width: 2) : null,
-                          boxShadow: isSelected ? [BoxShadow(color: Color(int.parse(color.replaceFirst('#', '0xFF'))).withOpacity(0.5), blurRadius: 8)] : null,
+                          border: Border.all(
+                            color: isSelected
+                                ? (isWhite ? Colors.black : Colors.white)
+                                : (isWhite ? Colors.grey.shade300 : Colors.transparent),
+                            width: isSelected ? 2 : 1,
+                          ),
+                          boxShadow: isSelected ? [BoxShadow(color: colorValue.withOpacity(0.5), blurRadius: 8)] : null,
                         ),
-                        child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 16) : null,
+                        child: isSelected ? Icon(Icons.check, color: isWhite ? Colors.black : Colors.white, size: 16) : null,
                       ),
                     );
                   }).toList(),
@@ -3153,6 +3306,7 @@ class _LessonDialogState extends State<_LessonDialog> {
         startTime: _startTime,
         endTime: _endTime,
         color: _selectedColor,
+        lessonType: _selectedLessonType,
       ));
     } else {
       provider.addLesson(
@@ -3164,6 +3318,7 @@ class _LessonDialogState extends State<_LessonDialog> {
         startTime: _startTime,
         endTime: _endTime,
         color: _selectedColor,
+        lessonType: _selectedLessonType,
       );
     }
 

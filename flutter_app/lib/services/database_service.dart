@@ -32,7 +32,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -47,6 +47,11 @@ class DatabaseService {
       await db.execute("ALTER TABLE tasks ADD COLUMN category TEXT DEFAULT 'general'");
 
       await db.execute("ALTER TABLE events ADD COLUMN category TEXT DEFAULT 'personal'");
+    }
+
+    if (oldVersion < 5) {
+      // Add lesson_type column to lessons table
+      await db.execute("ALTER TABLE lessons ADD COLUMN lesson_type TEXT");
     }
 
     // Ensure training tables exist for all upgrades
@@ -147,6 +152,7 @@ class DatabaseService {
         end_time TEXT NOT NULL,
         lesson_number INTEGER NOT NULL,
         color TEXT,
+        lesson_type TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
