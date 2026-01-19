@@ -20,6 +20,7 @@ import 'services/offline_queue.dart';
 import 'services/background_service.dart' if (dart.library.html) 'services/background_service_web.dart';
 import 'services/database_service.dart' if (dart.library.html) 'services/database_service_web.dart';
 import 'services/holiday_service.dart';
+import 'services/update_service.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/tasks_screen.dart' show TasksScreen, showAddTaskDialog;
 import 'screens/calendar_screen.dart' show CalendarScreen, showAddEventDialog;
@@ -163,7 +164,22 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkFirstLaunch());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkFirstLaunch();
+      _checkForUpdates();
+    });
+  }
+
+  Future<void> _checkForUpdates() async {
+    // Small delay to let the UI settle
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (!mounted) return;
+
+    final updateInfo = await UpdateService.checkForUpdate();
+    if (updateInfo != null && mounted) {
+      UpdateService.showUpdateDialog(context, updateInfo);
+    }
   }
 
   Future<void> _checkFirstLaunch() async {

@@ -1,0 +1,13 @@
+{
+  "version": "0.2",
+  "versionName": "0.2 Closed Beta",
+  "releaseDate": "2025-01-19",
+  "minSupportedVersion": "0.1",
+  "updateUrl": "https://nexus-lifehub.netlify.app/download",
+  "changelog": [
+    "Neues Landing Page Design",
+    "Orientierungs-basiertes Responsive Design",
+    "Roadmap mit AI-Assistent in Phase 4",
+    "Performance-Verbesserungen"
+  ]
+}
