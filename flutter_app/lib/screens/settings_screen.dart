@@ -19,6 +19,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   double? _weatherLat;
   double? _weatherLon;
   String? _bundesland;
+  int? _graduationYear;
   bool _isImportingHolidays = false;
 
   static const _bundeslaender = [
@@ -54,6 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _weatherLat = prefs.getDouble('weather_lat');
       _weatherLon = prefs.getDouble('weather_lon');
       _bundesland = prefs.getString('user_bundesland');
+      _graduationYear = prefs.getInt('graduation_year');
     });
   }
 
@@ -213,6 +215,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: Text(_bundesland ?? 'Nicht festgelegt'),
                   trailing: TextButton(
                     onPressed: () => _showBundeslandDialog(context),
+                    child: const Text('Ändern'),
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3B82F6).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.school, color: Color(0xFF3B82F6), size: 20),
+                  ),
+                  title: const Text('Schulzeit bis'),
+                  subtitle: Text(_graduationYear != null
+                      ? '$_graduationYear (${_graduationYear! - DateTime.now().year} Jahre)'
+                      : 'Nicht festgelegt'),
+                  trailing: TextButton(
+                    onPressed: () => _showGraduationYearDialog(context),
                     child: const Text('Ändern'),
                   ),
                 ),
@@ -575,7 +596,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Text(
-                      '0.1 beta',
+                      '0.2 closed beta',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -1084,7 +1105,130 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       await prefs.setString('user_bundesland', selected!);
                       setState(() => _bundesland = selected);
 
-                      // Ask to refresh holidays
+                      if (mounted) {
+                        _showRefreshHolidaysPrompt(context);
+                      }
+                    }
+                  : null,
+              child: const Text('Speichern'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showGraduationYearDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    int? selected = _graduationYear;
+    final currentYear = DateTime.now().year;
+    final years = List.generate(11, (i) => currentYear + i);
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Schulzeit bis'),
+              const SizedBox(height: 8),
+              Text(
+                'Ferien und Feiertage werden bis zu diesem Jahr importiert.',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.normal,
+                  color: isDark ? Colors.white54 : Colors.black54,
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 350,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: years.length,
+              itemBuilder: (context, index) {
+                final year = years[index];
+                final isSelected = selected == year;
+                final yearsFromNow = year - currentYear;
+                final label = yearsFromNow == 0
+                    ? 'Dieses Jahr'
+                    : yearsFromNow == 1
+                        ? 'Nächstes Jahr'
+                        : 'In $yearsFromNow Jahren';
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 4),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? NexusTheme.primaryColor.withOpacity(0.15)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isSelected
+                          ? NexusTheme.primaryColor
+                          : Colors.transparent,
+                    ),
+                  ),
+                  child: ListTile(
+                    dense: true,
+                    leading: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? NexusTheme.primaryColor.withOpacity(0.2)
+                            : (isDark ? Colors.white10 : Colors.black.withOpacity(0.05)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          Icons.school,
+                          size: 18,
+                          color: isSelected
+                              ? NexusTheme.primaryColor
+                              : (isDark ? Colors.white54 : Colors.black38),
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      '$year',
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: isSelected ? NexusTheme.primaryColor : null,
+                      ),
+                    ),
+                    subtitle: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.white54 : Colors.black45,
+                      ),
+                    ),
+                    trailing: isSelected
+                        ? Icon(Icons.check_circle, color: NexusTheme.primaryColor, size: 20)
+                        : null,
+                    onTap: () => setDialogState(() => selected = year),
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Abbrechen'),
+            ),
+            FilledButton(
+              onPressed: selected != null
+                  ? () async {
+                      Navigator.pop(context);
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setInt('graduation_year', selected!);
+                      setState(() => _graduationYear = selected);
+
                       if (mounted) {
                         _showRefreshHolidaysPrompt(context);
                       }
@@ -1104,7 +1248,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Feiertage aktualisieren?'),
         content: const Text(
-          'Möchtest du die Feiertage und Ferien für das neue Bundesland importieren?',
+          'Möchtest du die Feiertage und Ferien neu importieren?',
         ),
         actions: [
           TextButton(

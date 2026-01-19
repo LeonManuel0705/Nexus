@@ -3,7 +3,8 @@ import 'package:uuid/uuid.dart';
 import '../models/task.dart';
 import '../models/event.dart';
 import '../models/lesson.dart';
-import '../services/database_service.dart';
+import '../models/quick_note.dart';
+import '../services/database_service.dart' if (dart.library.html) '../services/database_service_web.dart';
 
 class AppProvider extends ChangeNotifier {
   final DatabaseService _db = DatabaseService();
@@ -29,12 +30,16 @@ class AppProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    await Future.wait([
-      loadTasks(),
-      loadEvents(),
-      loadLessons(),
-      loadStats(),
-    ]);
+    try {
+      await Future.wait([
+        loadTasks(),
+        loadEvents(),
+        loadLessons(),
+        loadStats(),
+      ]);
+    } catch (e) {
+      debugPrint('AppProvider initialize error: $e');
+    }
 
     _isLoading = false;
     notifyListeners();
@@ -45,8 +50,12 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> loadTasks() async {
-    _tasks = await _db.getTasks();
-    notifyListeners();
+    try {
+      _tasks = await _db.getTasks();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('loadTasks error: $e');
+    }
   }
 
   Future<List<Task>> getTodayTasks() async {
@@ -104,8 +113,12 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> loadEvents() async {
-    _events = await _db.getEvents();
-    notifyListeners();
+    try {
+      _events = await _db.getEvents();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('loadEvents error: $e');
+    }
   }
 
   Future<List<Event>> getTodayEvents() async {
@@ -159,8 +172,12 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> loadLessons() async {
-    _lessons = await _db.getLessons();
-    notifyListeners();
+    try {
+      _lessons = await _db.getLessons();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('loadLessons error: $e');
+    }
   }
 
   Future<List<Lesson>> getTodayLessons() async {
@@ -213,9 +230,13 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> loadStats() async {
-    _openTaskCount = await _db.getOpenTaskCount();
-    _todayEventCount = await _db.getTodayEventCount();
-    notifyListeners();
+    try {
+      _openTaskCount = await _db.getOpenTaskCount();
+      _todayEventCount = await _db.getTodayEventCount();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('loadStats error: $e');
+    }
   }
 
   void toggleTheme() {
@@ -288,18 +309,19 @@ class AppProvider extends ChangeNotifier {
     String? content,
   }) async {
     final now = DateTime.now();
-    final wordCount = (content ?? '').split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+    final wordCount = QuickNote.calculateWordCount(content ?? '');
 
-    final db = await _db.database;
-    await db.insert('quick_notes', {
-      'id': _uuid.v4(),
-      'type': type,
-      'title': title,
-      'content': content ?? '',
-      'word_count': wordCount,
-      'created_at': now.toIso8601String(),
-      'updated_at': now.toIso8601String(),
-    });
+    final note = QuickNote(
+      id: _uuid.v4(),
+      type: type,
+      title: title,
+      content: content ?? '',
+      wordCount: wordCount,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    await _db.insertQuickNote(note);
     notifyListeners();
   }
 }

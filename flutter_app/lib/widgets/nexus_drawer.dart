@@ -100,8 +100,15 @@ class NexusDrawer extends StatelessWidget {
                     ),
 
                     const SizedBox(height: 20),
-                    _SectionLabel(label: 'SYSTEM'),
+                    _SectionLabel(label: 'TOOLS'),
 
+                    _NavItem(
+                      icon: Icons.note_outlined,
+                      selectedIcon: Icons.note,
+                      label: 'Notizen',
+                      isSelected: currentIndex == 14,
+                      onTap: () => _navigate(context, 14),
+                    ),
                     _NavItem(
                       icon: Icons.email_outlined,
                       selectedIcon: Icons.email,
@@ -157,7 +164,6 @@ class NexusDrawer extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
       child: Row(
         children: [
-          // Nexus logo
           Container(
             width: 56,
             height: 56,
@@ -175,7 +181,6 @@ class NexusDrawer extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 14),
-          // Gradient text "Nexus"
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -205,7 +210,7 @@ class NexusDrawer extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '0.1 closed beta',
+                  '0.2 closed beta',
                   style: TextStyle(
                     color: isDark ? Colors.white70 : NexusTheme.primaryColor,
                     fontSize: 11,

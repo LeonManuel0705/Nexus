@@ -117,7 +117,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
       }
     } catch (e) {
-      // Ignore
     }
 
     try {
@@ -140,7 +139,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
       }
     } catch (e) {
-      // Ignore
     }
 
     deadlines.sort((a, b) => (a['days'] as int).compareTo(b['days'] as int));
@@ -157,7 +155,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       openTasks = allTasks.where((t) => !t.completed).length;
       completedThisWeek = allTasks.where((t) => t.completed).length;
     } catch (e) {
-      // Ignore
     }
 
     return {
@@ -203,7 +200,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Hero section - Time & Greeting
                   _buildHeroSection(context, isDark),
                   const SizedBox(height: 20),
 
@@ -212,27 +208,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(height: 16),
                   ],
 
-                  // Quick Stats Row
                   _buildQuickStats(context, isDark, provider),
                   const SizedBox(height: 20),
 
-                  // Next Event Card
                   if (_todayEvents.isNotEmpty || _upcomingEvents.isNotEmpty) ...[
                     _buildNextEventCard(context, isDark),
                     const SizedBox(height: 16),
                   ],
 
-                  // Deadlines (if any)
                   if (_deadlines.isNotEmpty) ...[
                     _buildDeadlinesSection(context, isDark),
                     const SizedBox(height: 16),
                   ],
 
-                  // Today's Tasks
                   _buildTasksSection(context, isDark, provider),
                   const SizedBox(height: 16),
 
-                  // Today's Events
                   _buildEventsSection(context, isDark),
 
                   const SizedBox(height: 80),
@@ -262,12 +253,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Time & Date
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Time with gradient
                 ShaderMask(
                   shaderCallback: (bounds) => const LinearGradient(
                     colors: NexusTheme.primaryGradient,
@@ -292,7 +281,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Greeting
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
@@ -317,7 +305,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
 
-          // Weather widget
           if (_weatherData != null) _buildWeatherWidget(isDark),
         ],
       ),
@@ -484,7 +471,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       child: Row(
         children: [
-          // Time indicator
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
@@ -501,7 +487,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(width: 16),
-          // Event details
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -686,8 +671,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 }
-
-// ============== WIDGETS ==============
 
 class _QuickStatCard extends StatelessWidget {
   final IconData icon;

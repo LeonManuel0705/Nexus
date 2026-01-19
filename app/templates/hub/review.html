@@ -272,7 +272,6 @@ function getReviewPreview(review) {
 }
 
 function viewReview(id) {
-    // Convert id to number for comparison (onclick passes string)
     const numId = typeof id === 'string' ? parseInt(id, 10) : id;
     const review = reviews.find(r => r.id === numId || r.id === id);
     if (!review) return;
@@ -308,7 +307,6 @@ function viewReview(id) {
         `;
     }
 
-    // Show the modal
     document.getElementById('reviewViewContent').innerHTML = content;
     document.getElementById('reviewViewModal').classList.add('active');
     currentViewingReviewId = id;
@@ -333,7 +331,6 @@ function deleteViewedReview() {
 }
 
 function confirmDeleteReview(id) {
-    // Convert id to number for comparison (onclick passes string)
     const numId = typeof id === 'string' ? parseInt(id, 10) : id;
     const review = reviews.find(r => r.id === numId || r.id === id);
     if (!review) {

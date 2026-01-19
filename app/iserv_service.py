@@ -527,11 +527,6 @@ class IServService:
     VERTRETUNGSPLAN_CACHE_DIR = Path(__file__).parent.parent / 'data' / 'vertretungsplan_cache'
 
     def get_vertretungsplan_pdfs(self, display_id: int = 3):
-\
-\
-\
-\
-
         cache_dir = self.VERTRETUNGSPLAN_CACHE_DIR
         cache_dir.mkdir(parents=True, exist_ok=True)
         cache_meta_file = cache_dir / 'cache_meta.json'

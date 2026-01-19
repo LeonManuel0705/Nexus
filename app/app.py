@@ -1340,11 +1340,6 @@ def delete_training_goal(goal_id):
 
 @app.route('/api/hub/training/holiday-check', methods=['GET'])
 def check_holiday_mode():
-\
-\
-\
-\
-
     from datetime import datetime, timedelta
 
     today = datetime.now().date()
@@ -1778,7 +1773,6 @@ def google_oauth_redirect_callback():
             <p>Connected: <strong>{email}</strong></p>
             <p>You can close this window and return to Nexus.</p>
             <script>
-                // Notify opener window
                 if (window.opener) {{
                     window.opener.postMessage({{ type: 'google-oauth-success', email: '{email}' }}, '*');
                 }}
@@ -1920,11 +1914,15 @@ def delete_calendar_event(event_id):
 
     calendar_id = request.args.get('calendar_id', 'primary')
     account = request.args.get('account')
+    delete_all = request.args.get('delete_all', 'false').lower() == 'true'
+    recurring_event_id = request.args.get('recurring_event_id')
 
     result = delete_google_calendar_event(
         event_id=event_id,
         calendar_id=calendar_id,
-        account_email=account
+        account_email=account,
+        delete_all_occurrences=delete_all,
+        recurring_event_id=recurring_event_id
     )
 
     if result.get('success'):

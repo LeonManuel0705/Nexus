@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../services/database_service.dart' if (dart.library.html) '../services/database_service_web.dart';
 import '../theme.dart';
 
 class ProjectsScreen extends StatefulWidget {
@@ -8,8 +10,88 @@ class ProjectsScreen extends StatefulWidget {
   State<ProjectsScreen> createState() => _ProjectsScreenState();
 }
 
-class _ProjectsScreenState extends State<ProjectsScreen> {
-  final List<Project> _projects = [];
+class _ProjectsScreenState extends State<ProjectsScreen> with SingleTickerProviderStateMixin {
+  final DatabaseService _db = DatabaseService();
+  late TabController _tabController;
+
+  List<Project> _allProjects = [];
+  bool _isLoading = true;
+  String? _error;
+
+  final _statusFilters = [
+    ('all', 'Alle', Icons.folder_copy),
+    ('active', 'Aktiv', Icons.play_circle_outline),
+    ('paused', 'Pausiert', Icons.pause_circle_outline),
+    ('completed', 'Abgeschlossen', Icons.check_circle_outline),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: _statusFilters.length, vsync: this);
+    _tabController.addListener(() => setState(() {}));
+    _loadProjects();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadProjects() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final maps = await _db.getProjectsList();
+      _allProjects = maps.map((m) => Project.fromMap(m)).toList();
+    } catch (e) {
+      _error = 'Fehler beim Laden: $e';
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  List<Project> get _filteredProjects {
+    final filter = _statusFilters[_tabController.index].$1;
+    if (filter == 'all') return _allProjects;
+    return _allProjects.where((p) => p.status == filter).toList();
+  }
+
+  int _countByStatus(String status) {
+    if (status == 'all') return _allProjects.length;
+    return _allProjects.where((p) => p.status == status).toList().length;
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'active': return NexusTheme.success;
+      case 'paused': return NexusTheme.warning;
+      case 'completed': return NexusTheme.info;
+      default: return NexusTheme.projectsColor;
+    }
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status) {
+      case 'active': return 'Aktiv';
+      case 'paused': return 'Pausiert';
+      case 'completed': return 'Abgeschlossen';
+      default: return status;
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status) {
+      case 'active': return Icons.play_circle_outline;
+      case 'paused': return Icons.pause_circle_outline;
+      case 'completed': return Icons.check_circle_outline;
+      default: return Icons.folder;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,64 +99,43 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
     return Stack(
       children: [
-        ListView(
-          padding: const EdgeInsets.all(16),
+        Column(
           children: [
-            // Header
-            _buildHeader(context, isDark),
-            const SizedBox(height: 20),
-
-            // Stats row
-            Row(
-              children: [
-                Expanded(child: _buildStatCard(
-                  context,
-                  isDark: isDark,
-                  value: '${_projects.length}',
-                  label: 'Aktive Projekte',
-                  icon: Icons.folder_open,
-                  color: NexusTheme.projectsColor,
-                )),
-                const SizedBox(width: 12),
-                Expanded(child: _buildStatCard(
-                  context,
-                  isDark: isDark,
-                  value: '${_projects.fold(0, (sum, p) => sum + p.tasks)}',
-                  label: 'Aufgaben',
-                  icon: Icons.task_alt,
-                  color: NexusTheme.info,
-                )),
-              ],
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: _buildHeader(isDark),
             ),
 
-            const SizedBox(height: 24),
+            _buildFilterTabs(isDark),
 
-            // Section header
-            _buildSectionHeader(
-              context,
-              isDark: isDark,
-              title: 'Aktive Projekte',
-              icon: Icons.folder,
-              iconColor: NexusTheme.projectsColor,
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                      ? Center(child: Text(_error!, style: TextStyle(color: NexusTheme.danger)))
+                      : RefreshIndicator(
+                          onRefresh: _loadProjects,
+                          child: _filteredProjects.isEmpty
+                              ? _buildEmptyState(isDark)
+                              : ListView.builder(
+                                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                                  itemCount: _filteredProjects.length,
+                                  itemBuilder: (context, index) => _buildProjectCard(
+                                    _filteredProjects[index],
+                                    isDark,
+                                  ),
+                                ),
+                        ),
             ),
-            const SizedBox(height: 12),
-
-            // Projects list
-            if (_projects.isEmpty)
-              _buildEmptyState(context, isDark)
-            else
-              ..._projects.map((project) => _buildProjectCard(context, project, isDark)),
-
-            const SizedBox(height: 100),
           ],
         ),
 
-        // FAB
         Positioned(
           right: 16,
           bottom: 16,
           child: FloatingActionButton(
-            onPressed: () => _showAddProjectDialog(context),
+            heroTag: 'fab_projects',
+            onPressed: () => _showProjectEditor(null),
             backgroundColor: NexusTheme.projectsColor,
             child: const Icon(Icons.add, color: Colors.white),
           ),
@@ -83,208 +144,214 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool isDark) {
+  Widget _buildHeader(bool isDark) {
+    final activeCount = _countByStatus('active');
+    final completedCount = _countByStatus('completed');
+    final avgProgress = _allProjects.isEmpty
+        ? 0
+        : (_allProjects.fold<int>(0, (sum, p) => sum + p.progress) / _allProjects.length).round();
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withOpacity(0.05)
-            : Colors.white.withOpacity(0.7),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            NexusTheme.projectsColor.withOpacity(isDark ? 0.3 : 0.15),
+            NexusTheme.projectsColor.withOpacity(isDark ? 0.1 : 0.05),
+          ],
+        ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.1)
-              : Colors.black.withOpacity(0.05),
+          color: NexusTheme.projectsColor.withOpacity(0.3),
         ),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: NexusTheme.projectsColor.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.folder, color: NexusTheme.projectsColor, size: 28),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: NexusTheme.projectsColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.folder, color: NexusTheme.projectsColor, size: 28),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Projekte',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : NexusTheme.lightText,
+                      ),
+                    ),
+                    Text(
+                      'Verwalte deine Projekte und Ziele',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark ? Colors.white60 : Colors.black54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Projekte',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                ),
-                Text(
-                  'Verwalte deine Projekte und Ziele',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: isDark ? Colors.white60 : Colors.black54,
-                  ),
-                ),
-              ],
-            ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _buildMiniStat(isDark, '$activeCount', 'Aktiv', NexusTheme.success),
+              const SizedBox(width: 12),
+              _buildMiniStat(isDark, '$completedCount', 'Fertig', NexusTheme.info),
+              const SizedBox(width: 12),
+              _buildMiniStat(isDark, '$avgProgress%', 'Ø Fortschritt', NexusTheme.projectsColor),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(
-    BuildContext context, {
-    required bool isDark,
-    required String value,
-    required String label,
-    required IconData icon,
-    required Color color,
-  }) {
+  Widget _buildMiniStat(bool isDark, String value, String label, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(isDark ? 0.15 : 0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? Colors.white54 : Colors.black54,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterTabs(bool isDark) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withOpacity(0.05)
-            : Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.1)
-              : Colors.black.withOpacity(0.05),
-        ),
+        color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: TabBar(
+        controller: _tabController,
+        indicator: BoxDecoration(
+          gradient: const LinearGradient(colors: NexusTheme.primaryGradient),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        indicatorPadding: const EdgeInsets.all(4),
+        dividerColor: Colors.transparent,
+        labelColor: Colors.white,
+        unselectedLabelColor: isDark ? Colors.white54 : Colors.black54,
+        labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 12),
+        tabs: _statusFilters.map((f) {
+          final count = _countByStatus(f.$1);
+          return Tab(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? Colors.white54 : Colors.black54,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+                Icon(f.$3, size: 16),
+                const SizedBox(width: 4),
+                Text('${f.$2} ($count)'),
               ],
             ),
-          ),
-        ],
+          );
+        }).toList(),
       ),
     );
   }
 
-  Widget _buildSectionHeader(
-    BuildContext context, {
-    required bool isDark,
-    required String title,
-    required IconData icon,
-    required Color iconColor,
-  }) {
-    return Row(
+  Widget _buildEmptyState(bool isDark) {
+    return ListView(
       children: [
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, size: 16, color: iconColor),
+        const SizedBox(height: 80),
+        Icon(
+          Icons.folder_open,
+          size: 64,
+          color: isDark ? Colors.white24 : Colors.black26,
         ),
-        const SizedBox(width: 10),
+        const SizedBox(height: 16),
         Text(
-          title,
+          'Keine Projekte',
+          textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : Colors.black87,
+            fontSize: 18,
+            fontWeight: FontWeight.w500,
+            color: isDark ? Colors.white54 : Colors.black54,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Tippe auf + um ein Projekt zu erstellen',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14,
+            color: isDark ? Colors.white38 : Colors.black38,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildEmptyState(BuildContext context, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withOpacity(0.05)
-            : Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.1)
-              : Colors.black.withOpacity(0.05),
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.folder_open,
-            size: 48,
-            color: isDark ? Colors.white38 : Colors.black26,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Keine Projekte',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: isDark ? Colors.white70 : Colors.black54,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Tippe auf + um ein Projekt zu erstellen',
-            style: TextStyle(
-              fontSize: 13,
-              color: isDark ? Colors.white38 : Colors.black38,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildProjectCard(Project project, bool isDark) {
+    final statusColor = _getStatusColor(project.status);
+    final progressColor = project.progress >= 100
+        ? NexusTheme.success
+        : project.progress >= 50
+            ? NexusTheme.projectsColor
+            : NexusTheme.warning;
 
-  Widget _buildProjectCard(BuildContext context, Project project, bool isDark) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withOpacity(0.05)
-            : Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.1)
-              : Colors.black.withOpacity(0.05),
+    return GestureDetector(
+      onTap: () => _showProjectEditor(project),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              statusColor.withOpacity(isDark ? 0.15 : 0.08),
+              statusColor.withOpacity(isDark ? 0.05 : 0.02),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: statusColor.withOpacity(0.2),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: statusColor.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-      ),
-      child: InkWell(
-        onTap: () => _showProjectDetails(context, project),
-        borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -296,10 +363,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: project.color.withOpacity(0.15),
+                      color: statusColor.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(Icons.folder, color: project.color),
+                    child: Icon(Icons.folder, color: statusColor),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -310,57 +377,133 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                           project.name,
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                            color: isDark ? Colors.white : Colors.black87,
+                            fontSize: 16,
+                            color: isDark ? Colors.white : NexusTheme.lightText,
                           ),
                         ),
-                        Text(
-                          project.description,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark ? Colors.white54 : Colors.black54,
+                        if (project.goal != null && project.goal!.isNotEmpty)
+                          Text(
+                            project.goal!,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark ? Colors.white60 : Colors.black54,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
                       ],
                     ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: project.color.withOpacity(0.15),
+                      color: statusColor.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Text(
-                      '${(project.progress * 100).toInt()}%',
-                      style: TextStyle(
-                        color: project.color,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(_getStatusIcon(project.status), size: 14, color: statusColor),
+                        const SizedBox(width: 4),
+                        Text(
+                          _getStatusLabel(project.status),
+                          style: TextStyle(
+                            color: statusColor,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: project.progress,
-                  backgroundColor: isDark
-                      ? Colors.white.withOpacity(0.1)
-                      : Colors.black.withOpacity(0.1),
-                  valueColor: AlwaysStoppedAnimation(project.color),
-                  minHeight: 6,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Fortschritt',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? Colors.white54 : Colors.black54,
+                              ),
+                            ),
+                            Text(
+                              '${project.progress}%',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: progressColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: project.progress / 100,
+                            backgroundColor: isDark
+                                ? Colors.white.withOpacity(0.1)
+                                : Colors.black.withOpacity(0.1),
+                            valueColor: AlwaysStoppedAnimation(progressColor),
+                            minHeight: 8,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                '${project.completedTasks} von ${project.tasks} Aufgaben erledigt',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark ? Colors.white54 : Colors.black54,
+              if (project.nextStep != null && project.nextStep!.isNotEmpty || project.deadline != null) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    if (project.nextStep != null && project.nextStep!.isNotEmpty) ...[
+                      Icon(Icons.arrow_forward, size: 14, color: NexusTheme.primaryColor),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          project.nextStep!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: NexusTheme.primaryColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                    if (project.deadline != null) ...[
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.event,
+                        size: 14,
+                        color: project.deadline!.isBefore(DateTime.now())
+                            ? NexusTheme.danger
+                            : (isDark ? Colors.white54 : Colors.black54),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        DateFormat('d. MMM', 'de_DE').format(project.deadline!),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: project.deadline!.isBefore(DateTime.now())
+                              ? NexusTheme.danger
+                              : (isDark ? Colors.white54 : Colors.black54),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -368,172 +511,419 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     );
   }
 
-  void _showProjectDetails(BuildContext context, Project project) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.6,
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+  void _showProjectEditor(Project? existing) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _ProjectEditorScreen(
+          existing: existing,
+          onSave: (project) async {
+            await _db.saveProject(project.toMap());
+            await _loadProjects();
+          },
+          onDelete: existing != null ? () async {
+            await _db.deleteProject(existing.id);
+            await _loadProjects();
+          } : null,
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectEditorScreen extends StatefulWidget {
+  final Project? existing;
+  final Future<void> Function(Project) onSave;
+  final Future<void> Function()? onDelete;
+
+  const _ProjectEditorScreen({
+    required this.existing,
+    required this.onSave,
+    this.onDelete,
+  });
+
+  @override
+  State<_ProjectEditorScreen> createState() => _ProjectEditorScreenState();
+}
+
+class _ProjectEditorScreenState extends State<_ProjectEditorScreen> {
+  late TextEditingController _nameController;
+  late TextEditingController _goalController;
+  late TextEditingController _nextStepController;
+  late TextEditingController _notesController;
+  String _status = 'active';
+  DateTime? _deadline;
+  int _progress = 0;
+  bool _isSaving = false;
+
+  final _statusOptions = [
+    ('active', 'Aktiv', Icons.play_circle_outline, NexusTheme.success),
+    ('paused', 'Pausiert', Icons.pause_circle_outline, NexusTheme.warning),
+    ('completed', 'Abgeschlossen', Icons.check_circle_outline, NexusTheme.info),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.existing?.name ?? '');
+    _goalController = TextEditingController(text: widget.existing?.goal ?? '');
+    _nextStepController = TextEditingController(text: widget.existing?.nextStep ?? '');
+    _notesController = TextEditingController(text: widget.existing?.notes ?? '');
+    _status = widget.existing?.status ?? 'active';
+    _deadline = widget.existing?.deadline;
+    _progress = widget.existing?.progress ?? 0;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _goalController.dispose();
+    _nextStepController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isEditing = widget.existing != null;
+
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF1A1A2E) : const Color(0xFFF5F7FA),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          isEditing ? 'Projekt bearbeiten' : 'Neues Projekt',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : NexusTheme.lightText,
           ),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[400],
-                  borderRadius: BorderRadius.circular(2),
+        ),
+        actions: [
+          if (isEditing && widget.onDelete != null)
+            IconButton(
+              icon: Icon(Icons.delete_outline, color: NexusTheme.danger),
+              onPressed: _confirmDelete,
+            ),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: _isSaving
+                ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)))
+                : FilledButton.icon(
+                    onPressed: _saveProject,
+                    icon: const Icon(Icons.check, size: 18),
+                    label: const Text('Speichern'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: NexusTheme.success,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSection(
+              isDark,
+              'Projektname *',
+              TextField(
+                controller: _nameController,
+                decoration: _inputDecoration(isDark, 'z.B. Webseite Redesign'),
+                style: TextStyle(color: isDark ? Colors.white : NexusTheme.lightText),
+              ),
+            ),
+
+            _buildSection(
+              isDark,
+              'Ziel',
+              TextField(
+                controller: _goalController,
+                decoration: _inputDecoration(isDark, 'Was möchtest du erreichen?'),
+                style: TextStyle(color: isDark ? Colors.white : NexusTheme.lightText),
+                maxLines: 2,
+              ),
+            ),
+
+            _buildSection(
+              isDark,
+              'Status',
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: _statusOptions.map((opt) {
+                    final isSelected = _status == opt.$1;
+                    return GestureDetector(
+                      onTap: () => setState(() => _status = opt.$1),
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isSelected ? opt.$4.withOpacity(0.2) : (isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1)),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected ? opt.$4 : Colors.transparent,
+                            width: 2,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(opt.$3, size: 20, color: isSelected ? opt.$4 : (isDark ? Colors.white54 : Colors.black54)),
+                            const SizedBox(width: 8),
+                            Text(
+                              opt.$2,
+                              style: TextStyle(
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected ? opt.$4 : (isDark ? Colors.white70 : Colors.black54),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ),
-              const SizedBox(height: 20),
-              Row(
+            ),
+
+            _buildSection(
+              isDark,
+              'Fortschritt: $_progress%',
+              Column(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: project.color.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(16),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: _progress >= 100
+                          ? NexusTheme.success
+                          : _progress >= 50
+                              ? NexusTheme.projectsColor
+                              : NexusTheme.warning,
+                      inactiveTrackColor: isDark ? Colors.white12 : Colors.black12,
+                      thumbColor: _progress >= 100
+                          ? NexusTheme.success
+                          : _progress >= 50
+                              ? NexusTheme.projectsColor
+                              : NexusTheme.warning,
+                      overlayColor: NexusTheme.projectsColor.withOpacity(0.2),
+                      trackHeight: 8,
                     ),
-                    child: Icon(Icons.folder, color: project.color, size: 32),
+                    child: Slider(
+                      value: _progress.toDouble(),
+                      min: 0,
+                      max: 100,
+                      divisions: 20,
+                      onChanged: (value) => setState(() => _progress = value.round()),
+                    ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          project.name,
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : Colors.black87,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [0, 25, 50, 75, 100].map((p) {
+                      final isSelected = _progress == p;
+                      return GestureDetector(
+                        onTap: () => setState(() => _progress = p),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? NexusTheme.projectsColor.withOpacity(0.2)
+                                : (isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1)),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isSelected ? NexusTheme.projectsColor : Colors.transparent,
+                            ),
+                          ),
+                          child: Text(
+                            '$p%',
+                            style: TextStyle(
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              color: isSelected ? NexusTheme.projectsColor : (isDark ? Colors.white54 : Colors.black54),
+                            ),
                           ),
                         ),
-                        Text(
-                          project.description,
-                          style: TextStyle(
-                            color: isDark ? Colors.white60 : Colors.black54,
-                          ),
-                        ),
-                      ],
-                    ),
+                      );
+                    }).toList(),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-              Text(
-                'Fortschritt',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  value: project.progress,
-                  minHeight: 12,
-                  backgroundColor: isDark ? Colors.white12 : Colors.black12,
-                  valueColor: AlwaysStoppedAnimation(project.color),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${project.completedTasks} von ${project.tasks} Aufgaben erledigt',
-                style: TextStyle(
-                  color: isDark ? Colors.white60 : Colors.black54,
-                ),
-              ),
-              const Spacer(),
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.edit),
-                      label: const Text('Bearbeiten'),
-                    ),
+            ),
+
+            _buildSection(
+              isDark,
+              'Deadline (optional)',
+              GestureDetector(
+                onTap: _pickDeadline,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        setState(() => _projects.remove(project));
-                      },
-                      icon: Icon(Icons.delete, color: NexusTheme.danger),
-                      label: Text('Löschen', style: TextStyle(color: NexusTheme.danger)),
-                    ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.event,
+                        color: _deadline != null ? NexusTheme.projectsColor : (isDark ? Colors.white54 : Colors.black54),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        _deadline != null
+                            ? DateFormat('EEEE, d. MMMM yyyy', 'de_DE').format(_deadline!)
+                            : 'Keine Deadline gesetzt',
+                        style: TextStyle(
+                          color: _deadline != null
+                              ? (isDark ? Colors.white : NexusTheme.lightText)
+                              : (isDark ? Colors.white54 : Colors.black54),
+                        ),
+                      ),
+                      const Spacer(),
+                      if (_deadline != null)
+                        IconButton(
+                          icon: Icon(Icons.clear, color: NexusTheme.danger),
+                          onPressed: () => setState(() => _deadline = null),
+                        ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ],
-          ),
-        );
-      },
+            ),
+
+            _buildSection(
+              isDark,
+              'Nächster Schritt',
+              TextField(
+                controller: _nextStepController,
+                decoration: _inputDecoration(isDark, 'Was ist der nächste konkrete Schritt?'),
+                style: TextStyle(color: isDark ? Colors.white : NexusTheme.lightText),
+              ),
+            ),
+
+            _buildSection(
+              isDark,
+              'Notizen',
+              TextField(
+                controller: _notesController,
+                decoration: _inputDecoration(isDark, 'Zusätzliche Informationen, Links, Ideen...'),
+                style: TextStyle(color: isDark ? Colors.white : NexusTheme.lightText),
+                maxLines: 4,
+              ),
+            ),
+
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
     );
   }
 
-  void _showAddProjectDialog(BuildContext context) {
-    final nameController = TextEditingController();
-    final descController = TextEditingController();
+  Widget _buildSection(bool isDark, String label, Widget child) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white70 : Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 8),
+          child,
+        ],
+      ),
+    );
+  }
 
+  InputDecoration _inputDecoration(bool isDark, String hint) {
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    );
+  }
+
+  Future<void> _pickDeadline() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _deadline ?? DateTime.now().add(const Duration(days: 7)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+    );
+    if (picked != null) {
+      setState(() => _deadline = picked);
+    }
+  }
+
+  Future<void> _saveProject() async {
+    if (_nameController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bitte Projektname eingeben')),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      final project = Project(
+        id: widget.existing?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        name: _nameController.text,
+        goal: _goalController.text.isEmpty ? null : _goalController.text,
+        status: _status,
+        deadline: _deadline,
+        nextStep: _nextStepController.text.isEmpty ? null : _nextStepController.text,
+        notes: _notesController.text.isEmpty ? null : _notesController.text,
+        progress: _progress,
+        createdAt: widget.existing?.createdAt ?? DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await widget.onSave(project);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fehler: $e'), backgroundColor: NexusTheme.danger),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  void _confirmDelete() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Neues Projekt'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Projektname',
-                hintText: 'z.B. Webseite Redesign',
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descController,
-              decoration: const InputDecoration(
-                labelText: 'Beschreibung',
-                hintText: 'Kurze Beschreibung',
-              ),
-            ),
-          ],
-        ),
+        title: const Text('Projekt löschen?'),
+        content: const Text('Diese Aktion kann nicht rückgängig gemacht werden.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Abbrechen'),
           ),
           FilledButton(
-            onPressed: () {
-              if (nameController.text.isNotEmpty) {
-                setState(() {
-                  _projects.add(Project(
-                    id: DateTime.now().toString(),
-                    name: nameController.text,
-                    description: descController.text,
-                    progress: 0,
-                    color: NexusTheme.projectsColor,
-                    tasks: 0,
-                    completedTasks: 0,
-                  ));
-                });
-                Navigator.pop(context);
-              }
+            onPressed: () async {
+              Navigator.pop(context);
+              await widget.onDelete?.call();
+              if (mounted) Navigator.pop(context);
             },
-            child: const Text('Erstellen'),
+            style: FilledButton.styleFrom(backgroundColor: NexusTheme.danger),
+            child: const Text('Löschen'),
           ),
         ],
       ),
@@ -544,19 +934,51 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 class Project {
   final String id;
   final String name;
-  final String description;
-  final double progress;
-  final Color color;
-  final int tasks;
-  final int completedTasks;
+  final String? goal;
+  final String status;
+  final DateTime? deadline;
+  final String? nextStep;
+  final String? notes;
+  final int progress;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
   Project({
     required this.id,
     required this.name,
-    required this.description,
-    required this.progress,
-    required this.color,
-    required this.tasks,
-    required this.completedTasks,
+    this.goal,
+    this.status = 'active',
+    this.deadline,
+    this.nextStep,
+    this.notes,
+    this.progress = 0,
+    required this.createdAt,
+    required this.updatedAt,
   });
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'name': name,
+    'goal': goal,
+    'status': status,
+    'deadline': deadline?.toIso8601String(),
+    'next_step': nextStep,
+    'notes': notes,
+    'progress': progress,
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt.toIso8601String(),
+  };
+
+  factory Project.fromMap(Map<String, dynamic> map) => Project(
+    id: map['id']?.toString() ?? '',
+    name: map['name']?.toString() ?? '',
+    goal: map['goal']?.toString(),
+    status: map['status']?.toString() ?? 'active',
+    deadline: map['deadline'] != null ? DateTime.tryParse(map['deadline'].toString()) : null,
+    nextStep: map['next_step']?.toString(),
+    notes: map['notes']?.toString(),
+    progress: map['progress'] is int ? map['progress'] : int.tryParse(map['progress']?.toString() ?? '0') ?? 0,
+    createdAt: DateTime.tryParse(map['created_at']?.toString() ?? '') ?? DateTime.now(),
+    updatedAt: DateTime.tryParse(map['updated_at']?.toString() ?? '') ?? DateTime.now(),
+  );
 }

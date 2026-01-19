@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/task.dart';
+
+import 'database_web.dart' if (dart.library.io) 'database_native.dart' as db_platform;
 import '../models/event.dart';
 import '../models/lesson.dart';
 import '../models/drawing.dart';
@@ -20,15 +23,31 @@ class DatabaseService {
 
   DatabaseService._internal();
 
+  static bool _webDatabaseFailed = false;
+
   Future<Database> get database async {
+    if (kIsWeb && _webDatabaseFailed) {
+      throw Exception('Database not available on web');
+    }
+
     if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
+
+    try {
+      _database = await _initDatabase();
+      return _database!;
+    } catch (e) {
+      if (kIsWeb) {
+        _webDatabaseFailed = true;
+        throw Exception('Database not available on web: $e');
+      }
+      rethrow;
+    }
   }
 
   Future<Database> _initDatabase() async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'nexus.db');
+    await db_platform.initializeDatabaseFactory();
+
+    final path = await db_platform.getDatabasePath('nexus.db');
 
     return await openDatabase(
       path,
@@ -50,11 +69,9 @@ class DatabaseService {
     }
 
     if (oldVersion < 5) {
-      // Add lesson_type column to lessons table
       await db.execute("ALTER TABLE lessons ADD COLUMN lesson_type TEXT");
     }
 
-    // Ensure training tables exist for all upgrades
     await _createTrainingTables(db);
   }
 
@@ -1628,5 +1645,132 @@ class DatabaseService {
       {'key': 'holiday_mode', 'value': isHoliday.toString()},
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+
+  Future<void> _createProjectsTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        goal TEXT,
+        description TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
+        deadline TEXT,
+        next_step TEXT,
+        notes TEXT,
+        progress INTEGER NOT NULL DEFAULT 0,
+        color INTEGER,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<List<Map<String, dynamic>>> getProjectsList() async {
+    final db = await database;
+    await _createProjectsTables(db);
+    return await db.query('projects', orderBy: 'updated_at DESC');
+  }
+
+  Future<List<Map<String, dynamic>>> getProjectsByStatus(String status) async {
+    final db = await database;
+    await _createProjectsTables(db);
+    return await db.query(
+      'projects',
+      where: 'status = ?',
+      whereArgs: [status],
+      orderBy: 'updated_at DESC',
+    );
+  }
+
+  Future<void> saveProject(Map<String, dynamic> project) async {
+    final db = await database;
+    await _createProjectsTables(db);
+    await db.insert(
+      'projects',
+      project,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> updateProject(String id, Map<String, dynamic> updates) async {
+    final db = await database;
+    await _createProjectsTables(db);
+    updates['updated_at'] = DateTime.now().toIso8601String();
+    await db.update(
+      'projects',
+      updates,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> deleteProject(String id) async {
+    final db = await database;
+    await db.delete('projects', where: 'id = ?', whereArgs: [id]);
+  }
+
+
+  /// Cache a Vertretungsplan file (PDF or image) - new format for authenticated fetch
+  Future<void> cacheVertretungsplanFile({
+    required String data,  // base64 encoded
+    required int page,
+    required String contentType,
+  }) async {
+    final db = await database;
+    await db.delete('vertretungsplan_cache', where: 'page = ?', whereArgs: [page]);
+    await db.insert('vertretungsplan_cache', {
+      'data_base64': data,
+      'page': page,
+      'content_type': contentType,
+      'fetched_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// Get all cached Vertretungsplan files
+  Future<List<Map<String, dynamic>>> getAllCachedVertretungsplanFiles() async {
+    final db = await database;
+    final maps = await db.query(
+      'vertretungsplan_cache',
+      orderBy: 'page ASC',
+    );
+    return maps;
+  }
+
+  /// Clear all Vertretungsplan cache (for fresh fetch)
+  Future<void> clearVertretungsplanCache() async {
+    final db = await database;
+    await db.delete('vertretungsplan_cache');
+  }
+
+  Future<void> cacheVertretungsplan({
+    required String htmlContent,
+    required int page,
+  }) async {
+    await cacheVertretungsplanFile(
+      data: htmlContent,
+      page: page,
+      contentType: 'text/html',
+    );
+  }
+
+  Future<Map<String, dynamic>?> getCachedVertretungsplan(int page) async {
+    final db = await database;
+    final maps = await db.query(
+      'vertretungsplan_cache',
+      where: 'page = ?',
+      whereArgs: [page],
+    );
+    if (maps.isEmpty) return null;
+    return maps.first;
+  }
+
+  Future<DateTime?> getVertretungsplanCacheTime(int page) async {
+    final cached = await getCachedVertretungsplan(page);
+    if (cached == null) return null;
+    final fetchedAt = cached['fetched_at'] as String?;
+    if (fetchedAt == null) return null;
+    return DateTime.tryParse(fetchedAt);
   }
 }

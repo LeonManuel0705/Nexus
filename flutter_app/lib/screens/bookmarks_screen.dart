@@ -239,6 +239,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab_bookmarks',
         onPressed: _showAddBookmarkDialog,
         backgroundColor: NexusTheme.primary,
         child: const Icon(Icons.add),

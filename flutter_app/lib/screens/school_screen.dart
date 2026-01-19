@@ -1,11 +1,15 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../providers/app_provider.dart';
 import '../providers/iserv_provider.dart';
 import '../models/lesson.dart';
-import '../services/database_service.dart';
+import '../services/database_service.dart' if (dart.library.html) '../services/database_service_web.dart';
 import '../theme.dart';
+import '../widgets/iserv_webview_login.dart';
 
 class SchoolScreen extends StatefulWidget {
   const SchoolScreen({super.key});
@@ -24,13 +28,15 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
   final List<String> _days = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
   final List<String> _daysFull = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'];
 
-  // State for each section
   List<Map<String, dynamic>> _subjects = [];
   List<Map<String, dynamic>> _homework = [];
   List<Map<String, dynamic>> _tests = [];
   List<Map<String, dynamic>> _exams = [];
   List<Map<String, dynamic>> _grades = [];
   bool _isLoading = true;
+
+  final PageController _vertretungsplanPageController = PageController();
+  int _currentVertretungsplanPage = 0;
 
   @override
   void initState() {
@@ -45,12 +51,10 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
     try {
       _subjects = await _db.getSubjects();
       _homework = await _db.getHomework();
-      // Load tests, exams, grades from database
       await _loadTests();
       await _loadExams();
       await _loadGrades();
     } catch (e) {
-      // Handle error
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -137,6 +141,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
   @override
   void dispose() {
     _tabController.dispose();
+    _vertretungsplanPageController.dispose();
     super.dispose();
   }
 
@@ -149,7 +154,6 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with A/B week toggle
             Container(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
               decoration: BoxDecoration(
@@ -187,7 +191,6 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                           ],
                         ),
                       ),
-                      // A/B Week toggle
                       GestureDetector(
                         onTap: () => setState(() => _isAWeek = !_isAWeek),
                         child: Container(
@@ -233,7 +236,6 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                     ],
                   ),
                   const SizedBox(height: 16),
-                  // Sub-tabs
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
@@ -275,7 +277,6 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                 ],
               ),
             ),
-            // Content
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
@@ -308,7 +309,6 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
     }
   }
 
-  // ============== STUNDENPLAN TAB ==============
   Widget _buildStundenplanTab(AppProvider provider, bool isDark) {
     return Column(
       children: [
@@ -845,7 +845,6 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
     );
   }
 
-  // ============== SUBJECTS TAB ==============
   Widget _buildSubjectsTab(bool isDark) {
     return RefreshIndicator(
       onRefresh: _loadAllData,
@@ -994,7 +993,6 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
     }
   }
 
-  // ============== HOMEWORK TAB ==============
   Widget _buildHomeworkTab(bool isDark) {
     final openHomework = _homework.where((h) => h['completed'] != 1).toList();
     final completedHomework = _homework.where((h) => h['completed'] == 1).toList();
@@ -1147,7 +1145,6 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
     await _loadAllData();
   }
 
-  // ============== TESTS TAB ==============
   Widget _buildTestsTab(bool isDark) {
     final upcoming = _tests.where((t) {
       if (t['date'] == null) return true;
@@ -1197,7 +1194,6 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
     );
   }
 
-  // ============== EXAMS TAB ==============
   Widget _buildExamsTab(bool isDark) {
     final upcoming = _exams.where((e) {
       if (e['date'] == null) return true;
@@ -1372,7 +1368,6 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
     await _loadAllData();
   }
 
-  // ============== GRADES TAB ==============
   String _selectedSemester = 'Q1';
 
   Widget _buildGradesTab(bool isDark) {
@@ -1380,7 +1375,6 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
         ? _grades
         : _grades.where((g) => g['semester'] == _selectedSemester).toList();
 
-    // Calculate summary
     final klausurGrades = filteredGrades.where((g) => g['type'] == 'Klausur').toList();
     final sonstigeGrades = filteredGrades.where((g) => g['type'] != 'Klausur').toList();
 
@@ -1391,7 +1385,6 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
         ? sonstigeGrades.map((g) => g['points'] as int).reduce((a, b) => a + b) / sonstigeGrades.length
         : null;
 
-    // Calculate overall with 1/3 Klausur + 2/3 Sonstige weighting
     double? overallAvg;
     if (klausurAvg != null && sonstigeAvg != null) {
       overallAvg = (klausurAvg * 1 + sonstigeAvg * 2) / 3;
@@ -1406,7 +1399,6 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Semester filter
           Container(
             margin: const EdgeInsets.only(bottom: 16),
             child: SingleChildScrollView(
@@ -1448,7 +1440,6 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
             ),
           ),
 
-          // Summary card
           if (overallAvg != null)
             Container(
               padding: const EdgeInsets.all(16),
@@ -1476,11 +1467,9 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
               ),
             ),
 
-          // Full grade calculator
           _FullGradeCalculatorCard(isDark: isDark, subjects: _subjects),
           const SizedBox(height: 16),
 
-          // Add grade button
           Row(
             children: [
               _SectionHeader(title: 'Notenübersicht', isDark: isDark),
@@ -1691,7 +1680,6 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
           : NexusTheme.primaryColor;
       final courseType = subjectGrades.first['course_type'];
 
-      // Calculate with 1/3 Klausur + 2/3 Sonstige
       final klausuren = subjectGrades.where((g) => g['type'] == 'Klausur').toList();
       final sonstige = subjectGrades.where((g) => g['type'] != 'Klausur').toList();
 
@@ -1802,7 +1790,6 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
     await _loadAllData();
   }
 
-  // ============== ISERV TAB ==============
   Widget _buildIServTab(bool isDark) {
     return Consumer<IServProvider>(
       builder: (context, iservProvider, child) {
@@ -1818,7 +1805,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
         }
 
         return DefaultTabController(
-          length: 2,
+          length: 3,
           child: Column(
             children: [
               Container(
@@ -1868,6 +1855,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                   tabs: const [
                     Tab(text: 'Aufgaben'),
                     Tab(text: 'Termine'),
+                    Tab(text: 'Vertretung'),
                   ],
                   labelColor: NexusTheme.primaryColor,
                   unselectedLabelColor: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
@@ -1880,6 +1868,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                   children: [
                     _buildIServComingSoon('IServ Aufgaben', isDark),
                     _buildIServComingSoon('IServ Termine', isDark),
+                    _buildVertretungsplanTab(isDark, iservProvider),
                   ],
                 ),
               ),
@@ -1930,7 +1919,393 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
     );
   }
 
-  // ============== HELPER WIDGETS ==============
+  Widget _buildVertretungsplanTab(bool isDark, IServProvider provider) {
+    final iservUrl = provider.iservUrl;
+
+    if (iservUrl == null || !provider.isConnected) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.school_outlined,
+                size: 48,
+                color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Bitte mit IServ verbinden',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Verbinde dich oben mit deinem IServ-Account,\num den Vertretungsplan anzuzeigen.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (provider.vertretungsplanFiles.isEmpty &&
+        !provider.isVertretungsplanLoading &&
+        provider.vertretungsplanError == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        provider.fetchVertretungsplan();
+      });
+    }
+
+    if (provider.isVertretungsplanLoading) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              'Lade Vertretungsplan...',
+              style: TextStyle(
+                color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (provider.vertretungsplanError != null && provider.vertretungsplanFiles.isEmpty) {
+      final isSessionExpired = provider.vertretungsplanError!.contains('Sitzung abgelaufen') ||
+                               provider.vertretungsplanError!.contains('anmelden');
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                isSessionExpired ? Icons.login : Icons.error_outline,
+                size: 48,
+                color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                provider.vertretungsplanError!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (isSessionExpired)
+                ElevatedButton.icon(
+                  onPressed: () => _showIServWebViewLogin(context),
+                  icon: const Icon(Icons.login),
+                  label: const Text('Neu anmelden'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: NexusTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                  ),
+                )
+              else
+                ElevatedButton.icon(
+                  onPressed: () => provider.fetchVertretungsplan(),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Erneut versuchen'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: NexusTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (provider.vertretungsplanFiles.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.image_not_supported_outlined,
+                size: 48,
+                color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Kein Vertretungsplan verfügbar',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () => provider.fetchVertretungsplan(),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Aktualisieren'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: NexusTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final files = provider.vertretungsplanFiles;
+    return Column(
+      children: [
+        Container(
+          margin: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: provider.isVertretungsplanFromCache
+                ? Colors.orange.withOpacity(0.1)
+                : NexusTheme.primaryColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                provider.isVertretungsplanFromCache ? Icons.offline_bolt : Icons.info_outline,
+                color: provider.isVertretungsplanFromCache ? Colors.orange : NexusTheme.primaryColor,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  provider.isVertretungsplanFromCache
+                      ? 'Offline-Daten (${files.length} Seiten)'
+                      : 'Vertretungsplan (${files.length} Seiten)',
+                  style: TextStyle(
+                    color: provider.isVertretungsplanFromCache ? Colors.orange : NexusTheme.primaryColor,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: provider.isVertretungsplanLoading ? null : () => provider.fetchVertretungsplan(),
+                icon: provider.isVertretungsplanLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        Icons.refresh,
+                        color: provider.isVertretungsplanFromCache ? Colors.orange : NexusTheme.primaryColor,
+                        size: 20,
+                      ),
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                padding: EdgeInsets.zero,
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: PageView.builder(
+            controller: _vertretungsplanPageController,
+            itemCount: files.length,
+            onPageChanged: (index) {
+              setState(() {
+                _currentVertretungsplanPage = index;
+              });
+            },
+            itemBuilder: (context, index) {
+              return GestureDetector(
+                onTap: () => _openFullscreenVertretungsplan(context, files, index, isDark),
+                child: _buildVertretungsplanPage(files[index], isDark),
+              );
+            },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Text(
+            'Tippen für Vollbild',
+            style: TextStyle(
+              fontSize: 11,
+              color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+            ),
+          ),
+        ),
+        if (files.length > 1)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(files.length, (index) {
+                final isActive = index == _currentVertretungsplanPage;
+                return Container(
+                  width: isActive ? 10 : 8,
+                  height: isActive ? 10 : 8,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isActive
+                        ? NexusTheme.primaryColor
+                        : NexusTheme.primaryColor.withOpacity(0.3),
+                  ),
+                );
+              }),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildVertretungsplanPage(Map<String, dynamic> file, bool isDark) {
+    final data = file['data'] as String?;
+    final contentType = file['contentType'] as String? ?? '';
+
+    if (data == null || data.isEmpty) {
+      return Center(
+        child: Text(
+          'Keine Daten',
+          style: TextStyle(
+            color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+          ),
+        ),
+      );
+    }
+
+    try {
+      final bytes = base64Decode(data);
+
+      if (contentType.contains('image')) {
+        return InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 4.0,
+          child: Image.memory(
+            Uint8List.fromList(bytes),
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.broken_image, size: 48, color: NexusTheme.error),
+                    const SizedBox(height: 8),
+                    Text('Bild konnte nicht geladen werden',
+                      style: TextStyle(color: NexusTheme.error),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      }
+
+      if (contentType.contains('pdf')) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.picture_as_pdf, size: 64, color: NexusTheme.primaryColor),
+              const SizedBox(height: 16),
+              Text(
+                'PDF-Datei',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${(bytes.length / 1024).toStringAsFixed(1)} KB',
+                style: TextStyle(
+                  color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      return InteractiveViewer(
+        minScale: 0.5,
+        maxScale: 4.0,
+        child: Image.memory(
+          Uint8List.fromList(bytes),
+          fit: BoxFit.contain,
+        ),
+      );
+    } catch (e) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: NexusTheme.error),
+            const SizedBox(height: 8),
+            Text('Fehler beim Laden: $e',
+              style: TextStyle(color: NexusTheme.error, fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  void _openFullscreenVertretungsplan(
+    BuildContext context,
+    List<Map<String, dynamic>> files,
+    int initialIndex,
+    bool isDark,
+  ) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black87,
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return _FullscreenVertretungsplanViewer(
+            files: files,
+            initialIndex: initialIndex,
+            isDark: isDark,
+          );
+        },
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: animation,
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+
+  String _formatCacheTime(DateTime cachedAt) {
+    final now = DateTime.now();
+    final diff = now.difference(cachedAt);
+    if (diff.inMinutes < 1) {
+      return 'gerade eben';
+    } else if (diff.inMinutes < 60) {
+      return 'vor ${diff.inMinutes} Min.';
+    } else if (diff.inHours < 24) {
+      return 'vor ${diff.inHours} Std.';
+    } else {
+      return '${cachedAt.day}.${cachedAt.month}. ${cachedAt.hour}:${cachedAt.minute.toString().padLeft(2, '0')}';
+    }
+  }
+
   Widget _buildEmptyState({
     required IconData icon,
     required String title,
@@ -2003,9 +2378,43 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
       builder: (context) => const _IServLoginDialog(),
     );
   }
+
+  void _showIServWebViewLogin(BuildContext context) {
+    final provider = context.read<IServProvider>();
+    final iservUrl = provider.iservUrl ?? 'ehgwerder.de'; // Use saved URL or default
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => IServWebViewLogin(
+          iservUrl: iservUrl,
+          onLoginSuccess: (cookies, username) async {
+            Navigator.of(context).pop(); // Close WebView
+
+            final result = await provider.connectWithWebViewCookies(
+              iservUrl: iservUrl,
+              cookies: cookies,
+              username: username,
+            );
+
+            if (context.mounted) {
+              if (result['success'] == true) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('IServ erfolgreich verbunden')),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(result['error'] ?? 'Anmeldung fehlgeschlagen')),
+                );
+              }
+            }
+          },
+          onCancel: () => Navigator.of(context).pop(),
+        ),
+      ),
+    );
+  }
 }
 
-// ============== HELPER CLASSES ==============
 class _SectionHeader extends StatelessWidget {
   final String title;
   final bool isDark;
@@ -2326,7 +2735,6 @@ class _TestExamCard extends StatelessWidget {
   }
 }
 
-// Full Grade Calculator with all desktop features
 class _FullGradeCalculatorCard extends StatefulWidget {
   final bool isDark;
   final List<Map<String, dynamic>> subjects;
@@ -2340,18 +2748,15 @@ class _FullGradeCalculatorCard extends StatefulWidget {
 class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
   bool _isExpanded = false;
 
-  // Points <-> Grade converter
   final _pointsController = TextEditingController();
   int? _selectedGradePoints;
   String _converterResult = '';
 
-  // Target grade calculator
   final _currentAvgController = TextEditingController();
   final _gradeCountController = TextEditingController();
   final _targetAvgController = TextEditingController();
   String _targetResult = '';
 
-  // Subject grade calculator (1/3 Klausur + 2/3 Sonstige)
   final _klausur1Controller = TextEditingController();
   final _klausur2Controller = TextEditingController();
   final _klausur3Controller = TextEditingController();
@@ -2429,8 +2834,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
       return;
     }
 
-    // Formula: (currentAvg * gradeCount + x) / (gradeCount + 1) = targetAvg
-    // x = targetAvg * (gradeCount + 1) - currentAvg * gradeCount
     final neededGrade = targetAvg * (gradeCount + 1) - currentAvg * gradeCount;
 
     setState(() {
@@ -2446,7 +2849,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
   }
 
   void _calculateSubjectGrade() {
-    // Get Klausur grades
     List<double> klausurGrades = [];
     for (final controller in [_klausur1Controller, _klausur2Controller, _klausur3Controller, _klausur4Controller]) {
       final grade = double.tryParse(controller.text);
@@ -2455,13 +2857,11 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
       }
     }
 
-    // Get Sonstige grades
     List<double> sonstigeGrades = [];
     final sonstigeAvg = double.tryParse(_sonstigeAvgController.text);
     if (sonstigeAvg != null && sonstigeAvg >= 0 && sonstigeAvg <= 15) {
       sonstigeGrades.add(sonstigeAvg);
     } else if (_sonstigeGradesController.text.isNotEmpty) {
-      // Parse comma-separated grades
       final parts = _sonstigeGradesController.text.split(RegExp(r'[,;\s]+'));
       for (final part in parts) {
         final grade = double.tryParse(part.trim());
@@ -2476,7 +2876,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
       return;
     }
 
-    // Calculate averages
     double? klausurAvg = klausurGrades.isNotEmpty
         ? klausurGrades.reduce((a, b) => a + b) / klausurGrades.length
         : null;
@@ -2484,7 +2883,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
         ? sonstigeGrades.reduce((a, b) => a + b) / sonstigeGrades.length
         : null;
 
-    // Calculate final grade with 1/3 + 2/3 weighting
     double finalGrade;
     String breakdown;
     if (klausurAvg != null && sonstigeAvgCalc != null) {
@@ -2535,7 +2933,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
       ),
       child: Column(
         children: [
-          // Header (always visible, tap to expand)
           InkWell(
             onTap: () => setState(() => _isExpanded = !_isExpanded),
             borderRadius: BorderRadius.circular(16),
@@ -2556,7 +2953,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
             ),
           ),
 
-          // Expandable content
           if (_isExpanded) ...[
             const Divider(height: 1),
             Padding(
@@ -2564,7 +2960,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Section 1: Points <-> Grade Converter
                   _buildSectionTitle('Punkte ⇄ Note'),
                   const SizedBox(height: 12),
                   Row(
@@ -2631,7 +3026,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
 
                   const SizedBox(height: 24),
 
-                  // Section 2: Target Grade Calculator
                   _buildSectionTitle('Welche Note brauche ich?'),
                   const SizedBox(height: 12),
                   Row(
@@ -2702,7 +3096,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
 
                   const SizedBox(height: 24),
 
-                  // Section 3: Subject Grade Calculator (1/3 + 2/3)
                   _buildSectionTitle('Fachnote berechnen (1/3 Klausur + 2/3 Sonstige)'),
                   const SizedBox(height: 12),
                   Text('Klausuren (1/3)', style: TextStyle(fontSize: 12, color: widget.isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted)),
@@ -2769,7 +3162,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
 
                   const SizedBox(height: 24),
 
-                  // Section 4: Grade Table
                   _buildSectionTitle('Punkte-Noten-Tabelle'),
                   const SizedBox(height: 12),
                   Container(
@@ -2780,7 +3172,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
                     ),
                     child: Column(
                       children: [
-                        // Header
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           decoration: BoxDecoration(
@@ -2795,7 +3186,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
                             ],
                           ),
                         ),
-                        // Rows
                         ...List.generate(_gradeTable.length, (index) {
                           final entry = _gradeTable[index];
                           return Container(
@@ -2874,7 +3264,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
   }
 }
 
-// ============== LESSON CARD & DIALOGS ==============
 class _LessonCard extends StatelessWidget {
   final Lesson lesson;
   final VoidCallback onDelete;
@@ -3114,17 +3503,15 @@ class _LessonDialogState extends State<_LessonDialog> {
     _selectedColor = widget.lesson?.color;
     _selectedLessonType = widget.lesson?.lessonType;
 
-    // Add listener for autofill
     _subjectController.addListener(_onSubjectChanged);
   }
 
   void _onSubjectChanged() {
-    if (widget.lesson != null) return; // Don't autofill when editing
+    if (widget.lesson != null) return;
 
     final subject = _subjectController.text.trim().toLowerCase();
     if (subject.isEmpty) return;
 
-    // Find existing lesson with same subject
     final provider = context.read<AppProvider>();
     final existingLesson = provider.lessons.firstWhere(
       (l) => l.subject.toLowerCase() == subject,
@@ -3424,4 +3811,368 @@ class _IServLoginDialogState extends State<_IServLoginDialog> {
 
 void showAddLessonDialog(BuildContext context, {int? dayOfWeek}) {
   showDialog(context: context, builder: (context) => _LessonDialog(dayOfWeek: dayOfWeek));
+}
+
+class _FullscreenVertretungsplanViewer extends StatefulWidget {
+  final List<Map<String, dynamic>> files;
+  final int initialIndex;
+  final bool isDark;
+
+  const _FullscreenVertretungsplanViewer({
+    required this.files,
+    required this.initialIndex,
+    required this.isDark,
+  });
+
+  @override
+  State<_FullscreenVertretungsplanViewer> createState() => _FullscreenVertretungsplanViewerState();
+}
+
+class _FullscreenVertretungsplanViewerState extends State<_FullscreenVertretungsplanViewer> {
+  late PageController _pageController;
+  late int _currentPage;
+  bool _isZoomed = false;
+  final TransformationController _transformationController = TransformationController();
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPage = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+    _transformationController.addListener(_onTransformationChanged);
+  }
+
+  @override
+  void dispose() {
+    _transformationController.removeListener(_onTransformationChanged);
+    _transformationController.dispose();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _onTransformationChanged() {
+    final scale = _transformationController.value.getMaxScaleOnAxis();
+    final wasZoomed = _isZoomed;
+    _isZoomed = scale > 1.05; // Small threshold to avoid float precision issues
+    if (wasZoomed != _isZoomed) {
+      setState(() {});
+    }
+  }
+
+  void _resetZoom() {
+    _transformationController.value = Matrix4.identity();
+  }
+
+  void _toggleZoom(TapDownDetails details, BoxConstraints constraints) {
+    final position = details.localPosition;
+    if (_isZoomed) {
+      _transformationController.value = Matrix4.identity();
+    } else {
+      final scale = 2.5;
+      final x = -position.dx * (scale - 1);
+      final y = -position.dy * (scale - 1);
+      _transformationController.value = Matrix4.identity()
+        ..translate(x, y)
+        ..scale(scale);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final isTablet = screenSize.shortestSide >= 600;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            PageView.builder(
+              controller: _pageController,
+              physics: _isZoomed ? const NeverScrollableScrollPhysics() : const PageScrollPhysics(),
+              itemCount: widget.files.length,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentPage = index;
+                });
+                _resetZoom();
+              },
+              itemBuilder: (context, index) {
+                return _buildFullscreenImage(widget.files[index], index == _currentPage);
+              },
+            ),
+            Positioned(
+              top: isTablet ? 20 : 8,
+              right: isTablet ? 20 : 8,
+              child: IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.close,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ),
+            if (widget.files.length > 1)
+              Positioned(
+                bottom: isTablet ? 40 : 20,
+                left: 0,
+                right: 0,
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${_currentPage + 1} / ${widget.files.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(widget.files.length, (index) {
+                        final isActive = index == _currentPage;
+                        return GestureDetector(
+                          onTap: () {
+                            _pageController.animateToPage(
+                              index,
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                            );
+                          },
+                          child: Container(
+                            width: isActive ? 12 : 8,
+                            height: isActive ? 12 : 8,
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isActive ? Colors.white : Colors.white54,
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+            if (widget.files.length > 1 && _currentPage == widget.initialIndex)
+              Positioned(
+                bottom: isTablet ? 120 : 80,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.swipe, color: Colors.white70, size: 18),
+                        SizedBox(width: 8),
+                        Text(
+                          'Wischen zum Blättern',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFullscreenImage(Map<String, dynamic> file, bool isCurrentPage) {
+    final data = file['data'] as String?;
+    final contentType = file['contentType'] as String? ?? '';
+
+    if (data == null || data.isEmpty) {
+      return const Center(
+        child: Text(
+          'Keine Daten',
+          style: TextStyle(color: Colors.white70),
+        ),
+      );
+    }
+
+    try {
+      final bytes = base64Decode(data);
+
+      if (contentType.contains('image')) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            return Stack(
+              children: [
+                GestureDetector(
+                  onDoubleTapDown: isCurrentPage
+                      ? (details) => _toggleZoom(details, constraints)
+                      : null,
+                  child: InteractiveViewer(
+                    transformationController: isCurrentPage ? _transformationController : null,
+                    minScale: 0.5,
+                    maxScale: 5.0,
+                    panEnabled: true,
+                    scaleEnabled: true,
+                    child: Center(
+                      child: Image.memory(
+                        Uint8List.fromList(bytes),
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.broken_image, size: 64, color: Colors.white54),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'Bild konnte nicht geladen werden',
+                                  style: TextStyle(color: Colors.white54),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                if (isCurrentPage && _isZoomed)
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.zoom_in, color: Colors.white70, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${(_transformationController.value.getMaxScaleOnAxis()).toStringAsFixed(1)}x',
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (isCurrentPage && !_isZoomed)
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.touch_app, color: Colors.white54, size: 14),
+                          SizedBox(width: 4),
+                          Text(
+                            'Doppeltippen zum Zoomen',
+                            style: TextStyle(color: Colors.white54, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        );
+      }
+
+      if (contentType.contains('pdf')) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.picture_as_pdf, size: 80, color: Colors.white54),
+              const SizedBox(height: 16),
+              const Text(
+                'PDF-Datei',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${(bytes.length / 1024).toStringAsFixed(1)} KB',
+                style: const TextStyle(color: Colors.white54),
+              ),
+            ],
+          ),
+        );
+      }
+
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          return GestureDetector(
+            onDoubleTapDown: isCurrentPage
+                ? (details) => _toggleZoom(details, constraints)
+                : null,
+            child: InteractiveViewer(
+              transformationController: isCurrentPage ? _transformationController : null,
+              minScale: 0.5,
+              maxScale: 5.0,
+              panEnabled: true,
+              scaleEnabled: true,
+              child: Center(
+                child: Image.memory(
+                  Uint8List.fromList(bytes),
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.redAccent),
+            const SizedBox(height: 12),
+            Text(
+              'Fehler: $e',
+              style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+  }
 }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../services/database_service.dart';
+import '../services/database_service.dart' if (dart.library.html) '../services/database_service_web.dart';
 import '../theme.dart';
 
 class TrainingScreen extends StatefulWidget {
@@ -52,7 +52,6 @@ class _TrainingScreenState extends State<TrainingScreen> {
     });
 
     try {
-
       final regularMaps = await _db.getTrainingSchedule(isHoliday: false);
       final holidayMaps = await _db.getTrainingSchedule(isHoliday: true);
       final sessionMaps = await _db.getTrainingSessionsList();
@@ -65,8 +64,10 @@ class _TrainingScreenState extends State<TrainingScreen> {
       _healthLogs = healthMaps.map((m) => HealthLog.fromMap(m as Map<String, dynamic>)).toList();
       _goals = goalMaps.map((m) => TrainingGoal.fromMap(m as Map<String, dynamic>)).toList();
       _isHolidayMode = await _db.getTrainingHolidayMode();
-    } catch (e) {
-      _error = 'Fehler beim Laden der Daten';
+    } catch (e, stackTrace) {
+      debugPrint('TrainingScreen._loadData error: $e');
+      debugPrint('Stack trace: $stackTrace');
+      _error = 'Fehler beim Laden: $e';
     } finally {
       setState(() => _isLoading = false);
     }
@@ -91,51 +92,68 @@ class _TrainingScreenState extends State<TrainingScreen> {
   }
 
   Future<void> _toggleHolidayMode() async {
-    setState(() => _isHolidayMode = !_isHolidayMode);
+    final newMode = !_isHolidayMode;
+    debugPrint('Toggling holiday mode: $_isHolidayMode -> $newMode');
+    setState(() => _isHolidayMode = newMode);
     await _db.setTrainingHolidayMode(_isHolidayMode);
+    debugPrint('Holiday mode saved. Current schedule has ${_currentSchedule.length} entries');
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? _buildErrorView()
-              : RefreshIndicator(
-                  onRefresh: _loadData,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+    return Stack(
+      children: [
+        _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? _buildErrorView()
+                : RefreshIndicator(
+                    onRefresh: _loadData,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
 
-                        _buildModeToggle(isDark),
-                        const SizedBox(height: 16),
+                          _buildModeToggle(isDark),
+                          const SizedBox(height: 16),
 
-                        _buildWeekNavigation(),
-                        const SizedBox(height: 16),
+                          _buildWeekNavigation(),
+                          const SizedBox(height: 16),
 
-                        _buildPlanTypeInfo(),
-                        const SizedBox(height: 16),
+                          _buildPlanTypeInfo(),
+                          const SizedBox(height: 16),
 
-                        _buildScheduleSection(),
-                        const SizedBox(height: 24),
+                          _buildScheduleSection(),
+                          const SizedBox(height: 24),
 
-                        _buildTodaySession(),
-                        const SizedBox(height: 24),
+                          _buildTodaySession(),
+                          const SizedBox(height: 24),
 
-                        _buildHealthSection(),
-                        const SizedBox(height: 24),
+                          _buildHealthSection(),
+                          const SizedBox(height: 24),
 
-                        _buildGoalsSection(),
-                        const SizedBox(height: 80),
-                      ],
+                          _buildGoalsSection(),
+                          const SizedBox(height: 80),
+                        ],
+                      ),
                     ),
                   ),
-                );
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: FloatingActionButton(
+            heroTag: 'fab_training',
+            onPressed: _showAddOptions,
+            backgroundColor: NexusTheme.trainingColor,
+            child: const Icon(Icons.add, color: Colors.white),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildModeToggle(bool isDark) {
@@ -681,20 +699,32 @@ class _TrainingScreenState extends State<TrainingScreen> {
   }
 
   void _showEditScheduleScreen() {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final isHolidayAtOpen = _isHolidayMode;
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => _EditScheduleScreen(
+        builder: (routeContext) => _EditScheduleScreen(
           schedule: _currentSchedule,
-          isHoliday: _isHolidayMode,
+          isHoliday: isHolidayAtOpen,
           onSave: (schedule) async {
-            await _db.saveTrainingSchedule(schedule, isHoliday: _isHolidayMode);
-            await _loadData();
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
+            try {
+              debugPrint('Saving full schedule with ${schedule.length} entries, isHoliday: $isHolidayAtOpen');
+              await _db.saveTrainingSchedule(schedule, isHoliday: isHolidayAtOpen);
+              await _loadData();
+              scaffoldMessenger.showSnackBar(
                 const SnackBar(
                   content: Text('Trainingsplan gespeichert!'),
                   backgroundColor: Colors.green,
+                ),
+              );
+            } catch (e) {
+              debugPrint('Error saving schedule: $e');
+              scaffoldMessenger.showSnackBar(
+                SnackBar(
+                  content: Text('Fehler: $e'),
+                  backgroundColor: Colors.red,
                 ),
               );
             }
@@ -704,31 +734,50 @@ class _TrainingScreenState extends State<TrainingScreen> {
     );
   }
 
-  void _showEditDayDialog(int dayIndex, TrainingEntry? existing) {
-    showDialog(
+  void _showEditDayDialog(int dayIndex, TrainingEntry? existing) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final isHolidayAtOpen = _isHolidayMode;
+    final scheduleAtOpen = List<TrainingEntry>.from(_currentSchedule);
+    final dayNames = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+
+    final result = await showModalBottomSheet<TrainingEntry?>(
       context: context,
-      builder: (context) => _EditDayDialog(
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _EditDayBottomSheet(
         dayIndex: dayIndex,
+        dayName: dayNames[dayIndex],
         existing: existing,
-        onSave: (entry) async {
-          final schedule = List<TrainingEntry>.from(_currentSchedule);
-          schedule.removeWhere((e) => e.day == dayIndex);
-          if (entry != null) {
-            schedule.add(entry);
-          }
-          await _db.saveTrainingSchedule(schedule, isHoliday: _isHolidayMode);
-          await _loadData();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Tag gespeichert!'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
-        },
       ),
     );
+
+    if (result != null) {
+      try {
+        final schedule = List<TrainingEntry>.from(scheduleAtOpen);
+        schedule.removeWhere((e) => e.day == dayIndex);
+        schedule.add(result);
+        debugPrint('Saving schedule with ${schedule.length} entries, isHoliday: $isHolidayAtOpen');
+        await _db.saveTrainingSchedule(schedule, isHoliday: isHolidayAtOpen);
+        debugPrint('Schedule saved, reloading data...');
+        await _loadData();
+        debugPrint('Data reloaded. Regular: ${_regularSchedule.length}, Holiday: ${_holidaySchedule.length}');
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(
+            content: Text('Tag gespeichert!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e, stackTrace) {
+        debugPrint('Error saving day: $e');
+        debugPrint('Stack trace: $stackTrace');
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('Fehler beim Speichern: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _showHealthLogDialog(HealthLog? existing) {
@@ -1145,6 +1194,7 @@ class _EditScheduleScreen extends StatefulWidget {
 class _EditScheduleScreenState extends State<_EditScheduleScreen> {
   late List<TrainingEntry> _schedule;
   final dayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+  final dayNamesShort = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
   bool _isSaving = false;
 
   @override
@@ -1153,95 +1203,264 @@ class _EditScheduleScreenState extends State<_EditScheduleScreen> {
     _schedule = List.from(widget.schedule);
   }
 
+  Color _getTypeColor(String type) {
+    switch (type) {
+      case 'strength': return NexusTheme.primaryColor;
+      case 'cardio': return NexusTheme.accentColor;
+      case 'swimming': return NexusTheme.info;
+      case 'rest': return NexusTheme.success;
+      default: return NexusTheme.warning;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF1A1A2E) : const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: Text(widget.isHoliday ? 'Ferienplan bearbeiten' : 'Trainingsplan bearbeiten'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          widget.isHoliday ? 'Ferienplan' : 'Trainingsplan',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : NexusTheme.lightText,
+          ),
+        ),
         actions: [
-          TextButton(
-            onPressed: _isSaving ? null : () async {
-              setState(() => _isSaving = true);
-              try {
-                await widget.onSave(_schedule);
-                if (mounted) Navigator.pop(context);
-              } finally {
-                if (mounted) setState(() => _isSaving = false);
-              }
-            },
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
             child: _isSaving
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('Speichern'),
+                ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)))
+                : FilledButton.icon(
+                    onPressed: () async {
+                      setState(() => _isSaving = true);
+                      try {
+                        await widget.onSave(_schedule);
+                        if (mounted) Navigator.pop(context);
+                      } finally {
+                        if (mounted) setState(() => _isSaving = false);
+                      }
+                    },
+                    icon: const Icon(Icons.check, size: 18),
+                    label: const Text('Speichern'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: NexusTheme.success,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
           ),
         ],
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: 7,
-        itemBuilder: (context, index) {
-          final dayIndex = index + 1;
-          final entry = _schedule.where((e) => e.day == dayIndex).firstOrNull;
-          final isDark = Theme.of(context).brightness == Brightness.dark;
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 10),
+      body: Column(
+        children: [
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isDark
-                  ? Colors.white.withOpacity(0.05)
-                  : Colors.white.withOpacity(0.7),
+              gradient: LinearGradient(
+                colors: widget.isHoliday
+                    ? [NexusTheme.warning.withOpacity(0.2), NexusTheme.warning.withOpacity(0.1)]
+                    : [NexusTheme.primaryColor.withOpacity(0.2), NexusTheme.accentColor.withOpacity(0.1)],
+              ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: isDark
-                    ? Colors.white.withOpacity(0.1)
-                    : Colors.black.withOpacity(0.05),
+                color: widget.isHoliday
+                    ? NexusTheme.warning.withOpacity(0.3)
+                    : NexusTheme.primaryColor.withOpacity(0.3),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: isDark
-                      ? Colors.black.withOpacity(0.2)
-                      : Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: (widget.isHoliday ? NexusTheme.warning : NexusTheme.primaryColor).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    widget.isHoliday ? Icons.beach_access : Icons.fitness_center,
+                    color: widget.isHoliday ? NexusTheme.warning : NexusTheme.primaryColor,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.isHoliday ? 'Ferientrainingsplan' : 'Regulärer Trainingsplan',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: isDark ? Colors.white : NexusTheme.lightText,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Tippe auf einen Tag um das Training anzupassen',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? Colors.white70 : Colors.black54,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-            child: ListTile(
-              title: Text(dayNames[index]),
-              subtitle: entry != null
-                  ? Text('${entry.icon} ${entry.title}')
-                  : const Text('Nicht geplant', style: TextStyle(color: Colors.grey)),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.edit),
-                    onPressed: () => _editDay(dayIndex, entry),
-                  ),
-                  if (entry != null)
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () {
-                        setState(() {
-                          _schedule.removeWhere((e) => e.day == dayIndex);
-                        });
-                      },
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: 7,
+              itemBuilder: (context, index) {
+                final dayIndex = index + 1;
+                final entry = _schedule.where((e) => e.day == dayIndex).firstOrNull;
+                final hasEntry = entry != null;
+
+                return GestureDetector(
+                  onTap: () => _editDay(dayIndex, entry),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      gradient: hasEntry
+                          ? LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                _getTypeColor(entry.type).withOpacity(isDark ? 0.3 : 0.15),
+                                _getTypeColor(entry.type).withOpacity(isDark ? 0.15 : 0.05),
+                              ],
+                            )
+                          : null,
+                      color: hasEntry ? null : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: hasEntry
+                            ? _getTypeColor(entry.type).withOpacity(0.3)
+                            : (isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05)),
+                        width: hasEntry ? 1.5 : 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: hasEntry
+                              ? _getTypeColor(entry.type).withOpacity(0.1)
+                              : Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                ],
-              ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: hasEntry
+                                  ? _getTypeColor(entry.type).withOpacity(0.2)
+                                  : (isDark ? Colors.white.withOpacity(0.1) : Colors.grey.withOpacity(0.1)),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Center(
+                              child: hasEntry
+                                  ? Text(entry.icon, style: const TextStyle(fontSize: 24))
+                                  : Text(
+                                      dayNamesShort[index],
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: isDark ? Colors.white54 : Colors.grey,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  dayNames[index],
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                    color: isDark ? Colors.white : NexusTheme.lightText,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  hasEntry ? entry.title : 'Nicht geplant',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: hasEntry
+                                        ? (isDark ? Colors.white70 : Colors.black87)
+                                        : (isDark ? Colors.white38 : Colors.grey),
+                                  ),
+                                ),
+                                if (hasEntry && entry.muscleGroups != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    entry.muscleGroups!,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: _getTypeColor(entry.type).withOpacity(0.8),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (hasEntry)
+                                IconButton(
+                                  icon: Icon(Icons.delete_outline, color: NexusTheme.danger.withOpacity(0.7)),
+                                  onPressed: () {
+                                    setState(() {
+                                      _schedule.removeWhere((e) => e.day == dayIndex);
+                                    });
+                                  },
+                                ),
+                              Icon(
+                                Icons.chevron_right,
+                                color: isDark ? Colors.white38 : Colors.grey,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }
 
   void _editDay(int dayIndex, TrainingEntry? existing) async {
-    final result = await showDialog<TrainingEntry?>(
+    final result = await showModalBottomSheet<TrainingEntry?>(
       context: context,
-      builder: (context) => _EditDayDialog(
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _EditDayBottomSheet(
         dayIndex: dayIndex,
+        dayName: dayNames[dayIndex - 1],
         existing: existing,
-        onSave: (entry) async => Navigator.pop(context, entry),
       ),
     );
 
@@ -1251,6 +1470,263 @@ class _EditScheduleScreenState extends State<_EditScheduleScreen> {
         _schedule.add(result);
       });
     }
+  }
+}
+
+class _EditDayBottomSheet extends StatefulWidget {
+  final int dayIndex;
+  final String dayName;
+  final TrainingEntry? existing;
+
+  const _EditDayBottomSheet({
+    required this.dayIndex,
+    required this.dayName,
+    required this.existing,
+  });
+
+  @override
+  State<_EditDayBottomSheet> createState() => _EditDayBottomSheetState();
+}
+
+class _EditDayBottomSheetState extends State<_EditDayBottomSheet> {
+  late TextEditingController _titleController;
+  late TextEditingController _muscleGroupsController;
+  late TextEditingController _notesController;
+  String _type = 'strength';
+  String _icon = '🏋️';
+
+  final _typeOptions = [
+    ('strength', 'Kraft', '🏋️', NexusTheme.primaryColor),
+    ('cardio', 'Cardio', '🏃', NexusTheme.accentColor),
+    ('swimming', 'Schwimmen', '🏊', NexusTheme.info),
+    ('rest', 'Ruhetag', '😴', NexusTheme.success),
+    ('other', 'Sonstiges', '⭐', NexusTheme.warning),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.existing?.title ?? '');
+    _muscleGroupsController = TextEditingController(text: widget.existing?.muscleGroups ?? '');
+    _notesController = TextEditingController(text: widget.existing?.notes ?? '');
+    _type = widget.existing?.type ?? 'strength';
+    _icon = widget.existing?.icon ?? '🏋️';
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _muscleGroupsController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + bottomPadding),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white24 : Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Text(
+                    widget.dayName,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : NexusTheme.lightText,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (widget.existing != null)
+                    TextButton.icon(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.delete_outline, color: NexusTheme.danger, size: 18),
+                      label: Text('Löschen', style: TextStyle(color: NexusTheme.danger)),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Trainingsart',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white70 : Colors.black54,
+                ),
+              ),
+              const SizedBox(height: 12),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: _typeOptions.map((opt) {
+                    final isSelected = _type == opt.$1;
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _type = opt.$1;
+                          _icon = opt.$3;
+                          if (opt.$1 == 'rest' && _titleController.text.isEmpty) {
+                            _titleController.text = 'Ruhetag';
+                          }
+                        });
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isSelected ? opt.$4.withOpacity(0.2) : (isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1)),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected ? opt.$4 : Colors.transparent,
+                            width: 2,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(opt.$3, style: const TextStyle(fontSize: 20)),
+                            const SizedBox(width: 8),
+                            Text(
+                              opt.$2,
+                              style: TextStyle(
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected ? opt.$4 : (isDark ? Colors.white70 : Colors.black54),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Titel',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white70 : Colors.black54,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _titleController,
+                decoration: InputDecoration(
+                  hintText: 'z.B. Chest Day, Beine, etc.',
+                  filled: true,
+                  fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+              ),
+              if (_type != 'rest') ...[
+                const SizedBox(height: 20),
+                Text(
+                  'Muskelgruppen (optional)',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white70 : Colors.black54,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _muscleGroupsController,
+                  decoration: InputDecoration(
+                    hintText: 'z.B. Brust, Trizeps, Schultern',
+                    filled: true,
+                    fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              Text(
+                'Notizen (optional)',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white70 : Colors.black54,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _notesController,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  hintText: 'Zusätzliche Hinweise...',
+                  filled: true,
+                  fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    if (_titleController.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Bitte Titel eingeben')),
+                      );
+                      return;
+                    }
+                    Navigator.pop(context, TrainingEntry(
+                      day: widget.dayIndex,
+                      title: _titleController.text,
+                      type: _type,
+                      icon: _icon,
+                      muscleGroups: _muscleGroupsController.text.isEmpty ? null : _muscleGroupsController.text,
+                      notes: _notesController.text.isEmpty ? null : _notesController.text,
+                    ));
+                  },
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    backgroundColor: NexusTheme.primaryColor,
+                  ),
+                  child: const Text('Speichern', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -1313,7 +1789,6 @@ class _EditDayDialogState extends State<_EditDayDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-
             DropdownButtonFormField<String>(
               value: _type,
               decoration: const InputDecoration(labelText: 'Typ'),
@@ -1637,12 +2112,12 @@ class TrainingEntry {
   };
 
   factory TrainingEntry.fromMap(Map<String, dynamic> map) => TrainingEntry(
-    day: map['day'],
-    title: map['title'],
-    type: map['type'],
-    icon: map['icon'],
-    muscleGroups: map['muscle_groups'],
-    notes: map['notes'],
+    day: map['day'] is int ? map['day'] : int.parse(map['day'].toString()),
+    title: map['title']?.toString() ?? '',
+    type: map['type']?.toString() ?? 'strength',
+    icon: map['icon']?.toString() ?? '🏋️',
+    muscleGroups: map['muscle_groups']?.toString(),
+    notes: map['notes']?.toString(),
   );
 }
 
@@ -1673,12 +2148,12 @@ class TrainingSession {
   };
 
   factory TrainingSession.fromMap(Map<String, dynamic> map) => TrainingSession(
-    id: map['id'],
-    date: DateTime.parse(map['date']),
-    type: map['type'],
-    title: map['title'],
-    duration: map['duration'],
-    notes: map['notes'],
+    id: map['id']?.toString() ?? '',
+    date: DateTime.parse(map['date'].toString()),
+    type: map['type']?.toString() ?? 'custom',
+    title: map['title']?.toString() ?? '',
+    duration: map['duration'] is int ? map['duration'] : int.tryParse(map['duration']?.toString() ?? '60') ?? 60,
+    notes: map['notes']?.toString(),
   );
 }
 
@@ -1709,12 +2184,12 @@ class HealthLog {
   };
 
   factory HealthLog.fromMap(Map<String, dynamic> map) => HealthLog(
-    id: map['id'],
-    date: DateTime.parse(map['date']),
-    sleep: map['sleep']?.toDouble(),
-    energy: map['energy'],
-    stress: map['stress'],
-    recovery: map['recovery'],
+    id: map['id']?.toString() ?? '',
+    date: DateTime.parse(map['date'].toString()),
+    sleep: map['sleep'] is double ? map['sleep'] : double.tryParse(map['sleep']?.toString() ?? ''),
+    energy: map['energy'] is int ? map['energy'] : int.tryParse(map['energy']?.toString() ?? ''),
+    stress: map['stress'] is int ? map['stress'] : int.tryParse(map['stress']?.toString() ?? ''),
+    recovery: map['recovery'] is int ? map['recovery'] : int.tryParse(map['recovery']?.toString() ?? ''),
   );
 }
 
@@ -1751,9 +2226,9 @@ class TrainingGoal {
   };
 
   factory TrainingGoal.fromMap(Map<String, dynamic> map) => TrainingGoal(
-    id: map['id'],
-    title: map['title'],
-    targetDate: map['target_date'] != null ? DateTime.parse(map['target_date']) : null,
-    completed: map['completed'] == 1,
+    id: map['id']?.toString() ?? '',
+    title: map['title']?.toString() ?? '',
+    targetDate: map['target_date'] != null ? DateTime.tryParse(map['target_date'].toString()) : null,
+    completed: map['completed'] == 1 || map['completed'] == true,
   );
 }

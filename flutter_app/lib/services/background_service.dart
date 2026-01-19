@@ -1,7 +1,15 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:workmanager/workmanager.dart';
 import 'sync_manager.dart';
 import 'offline_queue.dart';
-import 'database_service.dart';
+import 'database_service.dart' if (dart.library.html) 'database_service_web.dart';
+
+/// Check if background tasks are supported on this platform
+bool get _isBackgroundSupported {
+  if (kIsWeb) return false;
+  return Platform.isAndroid || Platform.isIOS;
+}
 
 const String kEmailSyncTask = 'emailSync';
 const String kCalendarSyncTask = 'calendarSync';
@@ -71,6 +79,10 @@ class BackgroundService {
 
   Future<void> initialize() async {
     if (_isInitialized) return;
+    if (!_isBackgroundSupported) {
+      _isInitialized = true;
+      return;
+    }
 
     await Workmanager().initialize(
       callbackDispatcher,
@@ -81,6 +93,7 @@ class BackgroundService {
   }
 
   Future<void> registerTasks() async {
+    if (!_isBackgroundSupported) return;
     await initialize();
 
     await Workmanager().registerPeriodicTask(
@@ -141,14 +154,17 @@ class BackgroundService {
   }
 
   Future<void> cancelAllTasks() async {
+    if (!_isBackgroundSupported) return;
     await Workmanager().cancelAll();
   }
 
   Future<void> cancelTask(String taskName) async {
+    if (!_isBackgroundSupported) return;
     await Workmanager().cancelByUniqueName(taskName);
   }
 
   Future<void> syncNow() async {
+    if (!_isBackgroundSupported) return;
     await initialize();
 
     await Workmanager().registerOneOffTask(

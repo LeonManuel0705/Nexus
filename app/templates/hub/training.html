@@ -439,17 +439,14 @@ let selectedDate = new Date();
 let isHolidayMode = false;
 let calendarEvents = [];
 
-// New: Schedule entries from database
 let scheduleSettings = null;
 let scheduleEntries = [];
 let isEditMode = false;
-let viewingScheduleType = null;  // null = auto-detect, 'regular', or 'holiday'
+let viewingScheduleType = null;
 
-// Day names for display
 const DAY_NAMES = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 const FULL_DAY_NAMES = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 
-// LocalStorage keys for offline caching
 const CACHE_KEYS = {
     sessions: 'nexus-training-sessions',
     health: 'nexus-training-health',
@@ -459,7 +456,6 @@ const CACHE_KEYS = {
     lastSync: 'nexus-training-last-sync'
 };
 
-// Default templates (migration from hardcoded values)
 const DEFAULT_REGULAR_TEMPLATE = [
     { day: 1, schedule_type: 'regular', training_type: 'rest', title: 'Ruhetag', icon: '😴', notes: 'DLRG Schwimmen' },
     { day: 2, schedule_type: 'regular', training_type: 'strength', title: 'Chestday', icon: '🏋️', muscle_groups: 'Brustmuskulatur' },
@@ -480,7 +476,6 @@ const DEFAULT_HOLIDAY_TEMPLATE = [
     { day: 0, schedule_type: 'holiday', training_type: 'cardio', title: 'Leichtes Cardio', icon: '🏃', muscle_groups: 'Ausdauer' }
 ];
 
-// Load cached data immediately
 function loadCachedData() {
     try {
         const cachedSessions = localStorage.getItem(CACHE_KEYS.sessions);
@@ -502,7 +497,6 @@ function loadCachedData() {
     }
 }
 
-// Save data to cache
 function cacheData() {
     try {
         localStorage.setItem(CACHE_KEYS.sessions, JSON.stringify(sessions));
@@ -516,7 +510,6 @@ function cacheData() {
     }
 }
 
-// Check if cache is fresh (less than 5 minutes old)
 function isCacheFresh() {
     try {
         const lastSync = localStorage.getItem(CACHE_KEYS.lastSync);
@@ -529,7 +522,6 @@ function isCacheFresh() {
     }
 }
 
-// Helper function to format date as YYYY-MM-DD in local timezone
 function formatLocalDate(date) {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -538,29 +530,22 @@ function formatLocalDate(date) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Load cached data immediately for fast render
     const hasCached = loadCachedData();
 
-    // Render immediately with cached data
     if (hasCached) {
         renderWeekView();
         renderTodaySession();
         renderHealthStats();
         renderGoals();
-        // Render gym schedule from cache if we have entries
         if (scheduleEntries.length > 0) {
             renderGymSchedule();
         }
     }
 
-    // Then fetch fresh data in background
     loadTrainingData();
 
-    // Load schedule data from API
     loadScheduleData();
 
-    // Always check holiday mode - the endpoint is fast (2s timeout, defaults to school)
-    // This ensures we don't use stale holiday data
     checkHolidayMode();
 });
 
@@ -583,7 +568,6 @@ async function loadTrainingData() {
         if (healthRes.ok) healthLogs = (await healthRes.json()).logs || [];
         if (goalsRes.ok) goals = (await goalsRes.json()).goals || [];
 
-        // Cache the fresh data
         cacheData();
 
         renderWeekView();
@@ -592,7 +576,6 @@ async function loadTrainingData() {
         renderGoals();
     } catch (err) {
         console.log('Training API not available - using cached data');
-        // Data already loaded from cache, just render
         renderWeekView();
         renderTodaySession();
         renderHealthStats();
@@ -708,7 +691,6 @@ function renderHealthStats() {
     document.getElementById('stressValue').textContent = todayLog?.stress || '-';
     document.getElementById('recoveryValue').textContent = todayLog?.recovery || '-';
 
-    // Make health stats clickable if there's a log for today
     const healthStats = document.getElementById('healthStats');
     if (todayLog) {
         healthStats.style.cursor = 'pointer';
@@ -745,7 +727,6 @@ function changeWeek(delta) {
     renderWeekView();
 }
 
-// Modal functions
 function openAddSessionModal() {
     document.getElementById('sessionForm').reset();
     document.getElementById('sessionId').value = '';
@@ -756,7 +737,6 @@ function openAddSessionModal() {
 }
 
 function openEditSessionModal(id) {
-    // Convert id to number for comparison (onclick passes string)
     const numId = typeof id === 'string' ? parseInt(id, 10) : id;
     const s = sessions.find(ses => ses.id === numId || ses.id === id);
     if (!s) return;
@@ -806,7 +786,6 @@ function openAddGoalModal() {
 }
 
 function openEditGoalModal(id) {
-    // Convert id to number for comparison (onclick passes string)
     const numId = typeof id === 'string' ? parseInt(id, 10) : id;
     const g = goals.find(go => go.id === numId || go.id === id);
     if (!g) return;
@@ -917,10 +896,7 @@ async function confirmDeleteGoal() {
 function openModal(id) { document.getElementById(id).classList.add('active'); }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
-// Check if today is a holiday by looking at calendar events
-// Uses fast backend endpoint with short timeout - defaults to school mode if offline
 async function checkHolidayMode() {
-    // If offline, assume school mode (not holiday)
     if (!navigator.onLine) {
         console.log('Offline - using school mode (not holiday)');
         isHolidayMode = false;
@@ -931,7 +907,6 @@ async function checkHolidayMode() {
     }
 
     try {
-        // Use the fast holiday-check endpoint with a 2 second timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 2000);
 
@@ -945,17 +920,14 @@ async function checkHolidayMode() {
             isHolidayMode = data.is_holiday === true;
             console.log(`Holiday check: ${isHolidayMode ? 'HOLIDAY MODE' : 'school mode'} (source: ${data.source || 'none'})`);
         } else {
-            // API error - default to school mode
             console.log('Holiday check failed - using school mode');
             isHolidayMode = false;
         }
 
-        // Cache the result
         cacheData();
         updateHolidayUI();
         renderGymSchedule();
     } catch (err) {
-        // Timeout or network error - default to school mode
         if (err.name === 'AbortError') {
             console.log('Holiday check timed out - using school mode');
         } else {
@@ -989,13 +961,11 @@ function updateHolidayUI() {
     }
 }
 
-// Get the effective schedule type (auto-detect or manual override)
 function getEffectiveScheduleType() {
     if (viewingScheduleType) return viewingScheduleType;
     return isHolidayMode ? 'holiday' : 'regular';
 }
 
-// Load schedule data from API
 async function loadScheduleData() {
     try {
         const [settingsRes, entriesRes] = await Promise.all([
@@ -1007,7 +977,6 @@ async function loadScheduleData() {
             const settingsData = await settingsRes.json();
             scheduleSettings = settingsData.settings;
 
-            // If no setup completed, import default templates
             if (!scheduleSettings || !scheduleSettings.setup_completed) {
                 await initializeDefaultSchedules();
             }
@@ -1022,29 +991,24 @@ async function loadScheduleData() {
         renderGymSchedule();
     } catch (err) {
         console.log('Error loading schedule:', err);
-        // Fallback to cached/default
         renderGymSchedule();
     }
 }
 
-// Initialize with default schedules on first use
 async function initializeDefaultSchedules() {
     try {
-        // Import both regular and holiday templates
         await fetch('/api/hub/training/schedule/import', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(addUserIdToBody({ entries: [...DEFAULT_REGULAR_TEMPLATE, ...DEFAULT_HOLIDAY_TEMPLATE] }))
         });
 
-        // Mark setup as completed
         await fetch('/api/hub/training/schedule/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(addUserIdToBody({ setup_completed: true, auto_detect_holiday: true }))
         });
 
-        // Reload entries
         const entriesRes = await fetch(buildApiUrl('/api/hub/training/schedule/entries'));
         if (entriesRes.ok) {
             const data = await entriesRes.json();
@@ -1055,7 +1019,6 @@ async function initializeDefaultSchedules() {
     }
 }
 
-// Render gym schedule from database entries
 function renderGymSchedule() {
     const container = document.getElementById('gymSchedule');
     const scheduleType = getEffectiveScheduleType();
@@ -1095,7 +1058,6 @@ function renderGymSchedule() {
     }).join('');
 }
 
-// Toggle edit mode
 function toggleEditMode() {
     isEditMode = !isEditMode;
     const btn = document.getElementById('editModeBtn');
@@ -1115,7 +1077,6 @@ function toggleEditMode() {
     renderGymSchedule();
 }
 
-// Toggle between viewing regular and holiday schedule
 function toggleScheduleType() {
     const effectiveType = getEffectiveScheduleType();
     viewingScheduleType = effectiveType === 'regular' ? 'holiday' : 'regular';
@@ -1124,7 +1085,6 @@ function toggleScheduleType() {
     renderGymSchedule();
 }
 
-// Open modal for training entry
 function openTrainingEntryModal(day, scheduleType) {
     const existingEntry = scheduleEntries.find(e => e.day === day && e.schedule_type === scheduleType);
     const form = document.getElementById('trainingEntryForm');
@@ -1157,17 +1117,14 @@ function openTrainingEntryModal(day, scheduleType) {
     openModal('trainingEntryModal');
 }
 
-// Save training entry
 async function saveTrainingEntry(event) {
     event.preventDefault();
     const form = document.getElementById('trainingEntryForm');
     const formData = new FormData(form);
 
-    // Get day from hidden field or form data
     const dayValue = formData.get('day');
     const dayNum = parseInt(dayValue, 10);
 
-    // Validate required fields
     const title = formData.get('title')?.trim();
     if (!title) {
         alert('Bitte einen Titel eingeben');
@@ -1221,7 +1178,6 @@ async function saveTrainingEntry(event) {
     }
 }
 
-// Delete training entry
 async function deleteTrainingEntry() {
     const entryId = document.getElementById('trainingEntryId').value;
     if (!entryId || !confirm('Training wirklich löschen?')) return;
@@ -1235,7 +1191,6 @@ async function deleteTrainingEntry() {
     }
 }
 
-// Load default template
 async function loadDefaultTemplate() {
     if (!confirm('Standard-Trainingsplan laden? Bestehende Einträge werden überschrieben.')) return;
 
@@ -1243,14 +1198,12 @@ async function loadDefaultTemplate() {
     const template = scheduleType === 'holiday' ? DEFAULT_HOLIDAY_TEMPLATE : DEFAULT_REGULAR_TEMPLATE;
 
     try {
-        // Clear existing entries for this schedule type
         await fetch('/api/hub/training/schedule/clear', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(addUserIdToBody({ schedule_type: scheduleType }))
         });
 
-        // Import template
         await fetch('/api/hub/training/schedule/import', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1263,7 +1216,6 @@ async function loadDefaultTemplate() {
     }
 }
 
-// Confirm clear schedule
 async function confirmClearSchedule() {
     const scheduleType = getEffectiveScheduleType();
 
@@ -1281,7 +1233,6 @@ async function confirmClearSchedule() {
     }
 }
 
-// Also render today's suggested workout in the week view
 function getSuggestedWorkout(date) {
     const dayNum = date.getDay();
     const scheduleType = getEffectiveScheduleType();

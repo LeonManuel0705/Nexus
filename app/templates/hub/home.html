@@ -140,13 +140,11 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize dashboard
     updateClock();
     setInterval(updateClock, 1000);
 
     loadDashboardData();
     initNotifications();
-    // Theme toggle is handled by HubApp in hub.js
 });
 
 function updateClock() {
@@ -155,14 +153,11 @@ function updateClock() {
     const dateEl = document.getElementById('currentDate');
     const greetingEl = document.getElementById('greeting');
 
-    // Time
     timeEl.textContent = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
-    // Date
     const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
     dateEl.textContent = now.toLocaleDateString('de-DE', options);
 
-    // Greeting
     const hour = now.getHours();
     if (hour < 6) greetingEl.textContent = 'Gute Nacht';
     else if (hour < 12) greetingEl.textContent = 'Guten Morgen';
@@ -170,10 +165,8 @@ function updateClock() {
     else greetingEl.textContent = 'Guten Abend';
 }
 
-// Request notification permission on load
 async function initNotifications() {
     if ('Notification' in window && Notification.permission === 'default') {
-        // Don't ask immediately, wait for user interaction
         const askBtn = document.createElement('button');
         askBtn.className = 'notification-prompt';
         askBtn.innerHTML = '🔔 Benachrichtigungen aktivieren';
@@ -184,7 +177,6 @@ async function initNotifications() {
                 checkDeadlineNotifications();
             }
         };
-        // Add to status bar if not already granted
         if (Notification.permission !== 'granted') {
             const statusBar = document.querySelector('.status-bar');
             if (statusBar && !localStorage.getItem('notification_prompt_dismissed')) {
@@ -200,10 +192,8 @@ function checkDeadlineNotifications() {
     const lastNotified = localStorage.getItem('last_deadline_notification');
     const today = new Date().toISOString().split('T')[0];
 
-    // Only notify once per day
     if (lastNotified === today) return;
 
-    // Check for urgent deadlines
     const urgentItems = document.querySelectorAll('.deadline-item.urgent');
     if (urgentItems.length > 0) {
         const titles = Array.from(urgentItems).map(el =>
@@ -222,38 +212,31 @@ function checkDeadlineNotifications() {
 }
 
 async function loadDashboardData() {
-    // Wait for connection manager if not ready
     if (!NexusConnection.state.lastCheck) {
         await NexusConnection.init();
     }
 
     const conn = NexusConnection.state;
 
-    // Always load local data (tasks from API)
     await loadTodayTasks();
 
-    // Load calendar events (only if we have internet or IServ)
     if (conn.internetAvailable || conn.iservAvailable) {
         await loadNextEvent();
         await loadUpcomingEvents();
     }
 
-    // Load school data (only if IServ is available)
     if (conn.iservAvailable) {
         await loadSchoolAlerts();
     }
 
-    // Load weather (only if we have internet and NOT on school network)
     if (conn.internetAvailable && !conn.isSchoolNetwork) {
         loadWeather();
     } else if (conn.isSchoolNetwork) {
-        // Show school network message instead of weather
         document.getElementById('weatherDesc').textContent = 'Schulnetzwerk';
         document.getElementById('weatherTemp').textContent = '--';
         document.getElementById('weatherIcon').textContent = '🏫';
     }
 
-    // Update status bar
     updateStatusBar();
 }
 
@@ -288,7 +271,6 @@ function renderTodayTasks(tasks) {
         </div>
     `).join('');
 
-    // Update stats
     document.getElementById('statTasksOpen').textContent = tasks.filter(t => !t.completed).length;
     document.getElementById('statTasksDone').textContent = tasks.filter(t => t.completed).length;
 }
@@ -360,7 +342,6 @@ function renderUpcomingEvents(events) {
         return;
     }
 
-    // Group by date
     const grouped = {};
     events.forEach(event => {
         const date = event.start_date;
@@ -478,14 +459,12 @@ async function loadSchoolAlerts() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Helper to calculate days until date
     function daysUntil(dateStr) {
         const date = new Date(dateStr);
         date.setHours(0, 0, 0, 0);
         return Math.ceil((date - today) / (1000 * 60 * 60 * 24));
     }
 
-    // First load subjects to map subject_id to subject name
     let subjects = [];
     try {
         const subjectsRes = await fetch('/api/hub/school/subjects');
@@ -497,14 +476,12 @@ async function loadSchoolAlerts() {
         console.log('Subjects API not available');
     }
 
-    // Helper to get subject name from subject_id
     function getSubjectName(subjectId) {
         const subject = subjects.find(s => s.id === subjectId);
         return subject ? subject.name : 'Unbekannt';
     }
 
     try {
-        // Load homework - show if due in 2 days or less
         const homeworkRes = await fetch('/api/hub/school/homework');
         if (homeworkRes.ok) {
             const data = await homeworkRes.json();
@@ -529,7 +506,6 @@ async function loadSchoolAlerts() {
     }
 
     try {
-        // Load tests - show if in 3 days or less
         const testsRes = await fetch('/api/hub/school/tests');
         if (testsRes.ok) {
             const data = await testsRes.json();
@@ -553,7 +529,6 @@ async function loadSchoolAlerts() {
     }
 
     try {
-        // Load exams (Klausuren) - show if in 3 days or less
         const examsRes = await fetch('/api/hub/school/exams');
         if (examsRes.ok) {
             const data = await examsRes.json();
@@ -576,20 +551,15 @@ async function loadSchoolAlerts() {
         console.log('Exams API not available');
     }
 
-    // Sort by urgency (most urgent first)
     alerts.sort((a, b) => a.days - b.days);
 
-    // Update exam count in stats (only count Klausuren, not tests)
     const examCount = alerts.filter(a => a.type === 'exam').length;
     document.getElementById('statUpcomingExams').textContent = examCount;
 
-    // Render deadlines with countdown
     renderDeadlines(alerts);
 
-    // Update deadline status
     updateDeadlineStatus(alerts);
 
-    // Check for browser notifications (after a short delay to ensure DOM is updated)
     setTimeout(() => checkDeadlineNotifications(), 500);
 }
 
@@ -612,7 +582,6 @@ function renderDeadlines(alerts) {
         const typeIcon = alert.type === 'homework' ? '📝' : alert.type === 'test' ? '📋' : '📚';
         const typeLabel = alert.type === 'homework' ? 'Hausaufgabe' : alert.type === 'test' ? 'Test' : 'Klausur';
 
-        // Build countdown display
         let countdownHtml = '';
         if (alert.days === 0) {
             countdownHtml = '<span class="countdown-urgent">HEUTE</span>';

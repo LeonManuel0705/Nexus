@@ -257,27 +257,28 @@ document.addEventListener('DOMContentLoaded', () => {
     loadGoogleAccounts();
     loadIServStatus();
     loadTimetableSettings();
+
+    const toggleThemeBtn = document.getElementById('toggleThemeBtn');
+    if (toggleThemeBtn) {
+        toggleThemeBtn.addEventListener('click', () => {
+            console.log('Theme toggle clicked, current theme:', HubApp.state.theme);
+            HubApp.toggleTheme();
+            const isDark = HubApp.state.theme === 'dark';
+            document.getElementById('themeLabel').textContent = isDark ? 'Dunkles Theme' : 'Helles Theme';
+            console.log('Theme changed to:', HubApp.state.theme);
+        });
+    }
 });
 
 function loadSettings() {
-    // Theme - show current theme name (HubApp.state.theme is already loaded from localStorage)
     const theme = HubApp.state.theme;
     document.getElementById('themeLabel').textContent = theme === 'dark' ? 'Dunkles Theme' : 'Helles Theme';
 
-    // Location
     const location = JSON.parse(localStorage.getItem('hub_location') || 'null');
     if (location) {
         document.getElementById('locationDisplay').textContent = location.city;
     }
 }
-
-// Theme toggle - use HubApp's toggleTheme for consistency
-document.getElementById('toggleThemeBtn').addEventListener('click', () => {
-    HubApp.toggleTheme();
-    // Update local label
-    const isDark = HubApp.state.theme === 'dark';
-    document.getElementById('themeLabel').textContent = isDark ? 'Dunkles Theme' : 'Helles Theme';
-});
 
 async function loadGoogleAccounts() {
     try {
@@ -299,11 +300,9 @@ async function loadGoogleAccounts() {
                     </div>
                 `).join('');
 
-                // Show account selection if multiple accounts
                 if (data.accounts.length >= 1) {
                     accountSection.style.display = 'block';
 
-                    // Populate selects
                     const savedCalendar = localStorage.getItem('nexus-google-calendar-account') || '';
                     const savedEmail = localStorage.getItem('nexus-google-email-account') || '';
 
@@ -315,7 +314,6 @@ async function loadGoogleAccounts() {
                         `<option value="${acc.email}" ${acc.email === savedEmail ? 'selected' : ''}>${acc.email}</option>`
                     ).join('');
 
-                    // Set default if not saved
                     if (!savedCalendar && data.accounts.length > 0) {
                         localStorage.setItem('nexus-google-calendar-account', data.accounts[0].email);
                     }
@@ -341,20 +339,27 @@ function saveAccountPreference(type, email) {
 }
 
 async function connectGoogleAccount() {
+    console.log('[Nexus] connectGoogleAccount() called');
     try {
         const response = await fetch('/api/email/google/auth', { method: 'POST' });
+        console.log('[Nexus] Google auth response status:', response.status);
         if (response.ok) {
             const data = await response.json();
+            console.log('[Nexus] Google auth response data:', data);
             if (data.success && data.auth_url) {
+                console.log('[Nexus] Redirecting to:', data.auth_url);
                 window.location.href = data.auth_url;
             } else {
+                console.error('[Nexus] Google auth failed:', data.error);
                 alert(data.error || 'Fehler beim Starten der Authentifizierung');
             }
         } else {
+            console.error('[Nexus] Google auth request failed with status:', response.status);
             alert('Fehler beim Verbinden des Google-Kontos');
         }
     } catch (err) {
-        alert('Fehler beim Verbinden des Google-Kontos');
+        console.error('[Nexus] connectGoogleAccount error:', err);
+        alert('Fehler beim Verbinden des Google-Kontos: ' + err.message);
     }
 }
 
@@ -404,7 +409,6 @@ async function autoDetectLocation() {
                     document.getElementById('locationDisplay').textContent = result.name;
                 }
             }, () => {
-                // Fallback to IP detection
                 detectLocationByIP();
             });
         } else {
@@ -478,10 +482,6 @@ function closeModal(id) {
     document.getElementById(id).classList.remove('active');
 }
 
-// ==========================================
-// Timetable Settings
-// ==========================================
-
 async function loadTimetableSettings() {
     try {
         const response = await fetch('/api/hub/school/timetable/settings');
@@ -520,10 +520,6 @@ async function toggleAbWeeks(enabled) {
     }
 }
 
-// ==========================================
-// IServ Functions
-// ==========================================
-
 async function loadIServStatus() {
     try {
         const response = await fetch('/api/iserv/status');
@@ -537,7 +533,6 @@ async function loadIServStatus() {
                 data.user_info?.name || data.username || 'Verbunden';
         } else if (data.has_credentials) {
             document.getElementById('iservStatus').textContent = 'Anmeldedaten gespeichert (nicht verbunden)';
-            // Try to auto-connect
             tryAutoConnectIServ();
         } else {
             document.getElementById('iservStatus').textContent = 'Nicht verbunden';
@@ -590,7 +585,6 @@ async function connectIServ(e) {
         if (data.success) {
             closeModal('iservModal');
             loadIServStatus();
-            // Clear form
             document.getElementById('iservForm').reset();
         } else {
             errorDiv.textContent = data.error || 'Verbindung fehlgeschlagen';

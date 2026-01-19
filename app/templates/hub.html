@@ -907,9 +907,7 @@
                     const data = await response.json();
 
                     if (data.success && data.events && data.events.length > 0) {
-                        // Store macOS events separately
                         this.state.macOSEvents = data.events;
-                        // Re-render with merged events
                         this.renderCalendar();
                         this.renderEvents();
                     } else if (data.error === 'not_installed') {
@@ -923,17 +921,13 @@
             },
 
             getAllEvents() {
-                // Merge local events with macOS calendar events
                 const localEvents = this.state.events || [];
                 const macOSEvents = this.state.macOSEvents || [];
 
-                // Create a map to avoid duplicates by ID
                 const eventMap = new Map();
 
-                // Add local events first
                 localEvents.forEach(e => eventMap.set(e.id, { ...e, source: 'local' }));
 
-                // Add macOS events (won't override existing local events)
                 macOSEvents.forEach(e => {
                     if (!eventMap.has(e.id)) {
                         eventMap.set(e.id, { ...e, source: 'macos' });
@@ -984,7 +978,6 @@
                 const upcoming = allEvents
                     .filter(e => e.date >= todayStr)
                     .sort((a, b) => {
-                        // Sort by date first, then by time
                         const dateCompare = a.date.localeCompare(b.date);
                         if (dateCompare !== 0) return dateCompare;
                         return (a.time || '').localeCompare(b.time || '');
@@ -1008,13 +1001,11 @@
                     el.addEventListener('click', () => {
                         const source = el.dataset.source;
                         if (source === 'macos') {
-                            // macOS events are read-only, show info
                             const event = this.getAllEvents().find(e => e.id === el.dataset.id);
                             if (event) {
                                 alert(`📅 ${event.title}\n📆 ${event.date} ${event.time || ''}\n${event.location ? '📍 ' + event.location : ''}\n${event.description ? '\n' + event.description : ''}\n\n(From macOS Calendar - edit in Calendar app)`);
                             }
                         } else {
-                            // Local events can be edited
                             const event = this.state.events.find(e => e.id === el.dataset.id);
                             if (event) this.openEventModal(event.date, event);
                         }
