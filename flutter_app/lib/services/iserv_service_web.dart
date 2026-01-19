@@ -6,6 +6,7 @@ class IServService {
   IServService._internal();
 
   bool get isConnected => false;
+  String? get iservUrl => null;
 
   Future<Map<String, dynamic>> connect({
     required String username,
@@ -14,6 +15,18 @@ class IServService {
   }) async {
     return {'success': false, 'error': 'IServ ist auf Web nicht verfügbar'};
   }
+
+  Future<Map<String, dynamic>> connectWithWebViewCookies({
+    required String iservUrl,
+    required List<dynamic> cookies,
+    String? username,
+  }) async {
+    return {'success': false, 'error': 'IServ ist auf Web nicht verfügbar'};
+  }
+
+  Future<void> refreshWithWebViewCookies(List<dynamic> cookies) async {}
+
+  Future<bool> hasValidCookies() async => false;
 
   Future<void> disconnect() async {}
 
@@ -32,6 +45,10 @@ class IServService {
   Future<List<IServExercise>> getCachedExercises() async => [];
 
   Future<List<IServEvent>> getCachedEvents() async => [];
+
+  Future<Map<String, dynamic>> fetchVertretungsplan() async {
+    return {'success': false, 'error': 'IServ ist auf Web nicht verfügbar'};
+  }
 
   Future<void> syncAll() async {}
 }
