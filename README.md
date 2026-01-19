@@ -1,125 +1,142 @@
-# Nexus Hub
+# Nexus
 
-A personal productivity dashboard that brings together your calendar, tasks, email, school schedule, and more in one unified interface.
+A personal productivity system that brings together your calendar, tasks, email, school schedule, and more in one unified interface. Available as a native mobile app and web dashboard.
 
-## Features
+## Apps
 
-- **Dashboard** - Overview with current time, task status, and upcoming events
-- **Calendar** - Google Calendar integration with event management
-- **Tasks** - Task management with deadlines and categories
-- **Email** - Gmail integration for quick inbox access
-- **School** - Timetable and schedule management via IServ
-- **Training** - Workout and training schedule tracker
-- **Projects** - Project organization and tracking
-- **Knowledge Base** - Personal wiki and notes collection
-- **Notes** - Quick note-taking
-- **Pomodoro** - Focus timer with work/break intervals
-- **Bookmarks** - Link collection and organization
-- **Assistant** - AI-powered assistant
+### Mobile App (Flutter)
+Native Android app with offline-first architecture.
+
+**Features:**
+- Dashboard with personalized overview
+- Task management with deadlines and priorities
+- Calendar with Google Calendar sync
+- IServ integration (timetable, substitutions, homework)
+- Training tracker with workout plans
+- Email integration
+- Notes with markdown support
+- Bookmarks collection
+- Review system for spaced repetition
+
+### Web Dashboard (Flask)
+Browser-based dashboard for desktop use.
+
+**Features:**
+- All mobile features accessible via browser
+- Google OAuth authentication
+- Progressive Web App (PWA) support
+- Real-time updates via WebSocket
+
+### Landing Page (Next.js)
+Modern marketing website at [nexus website].
 
 ## Quick Start
 
-### Local Development
+### Mobile App
 
-1. Clone the repository
-2. Run the setup script (first time only):
-   ```bash
-   ./setup.sh
-   ```
-3. Start Nexus Hub:
-   ```bash
-   ./start.sh
-   ```
-4. Open http://localhost:5050 in your browser
-
-### What setup.sh does
-
-The setup script automatically:
-- Checks system requirements (Python 3, pip)
-- Creates a Python virtual environment
-- Installs all required packages (Flask, Google APIs, IServ API, etc.)
-- Creates configuration files
-- Initializes the database
-
-Your friends can simply run `./setup.sh` and follow the prompts - no manual installation needed!
-
-### Mobile Access (Android & iOS)
-
-Nexus Hub works as a Progressive Web App (PWA) on mobile devices:
-
-1. Start the server on your Mac with `./start.sh`
-2. Note the **Mobile URL** shown in the terminal (e.g., `http://192.168.1.x:5050`)
-3. On your phone, open this URL in the browser
-4. Install as app:
-   - **iOS**: Tap Share > "Add to Home Screen"
-   - **Android**: Tap menu > "Add to Home Screen" or "Install App"
-
-The mobile app works offline and syncs when connected.
-
-### Environment Variables
-
-Copy `.env.example` to `.env` and configure:
-
-```
-SECRET_KEY=your-secret-key
-FLASK_ENV=development
-
-GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your-client-secret
-GOOGLE_PROJECT_ID=your-project-id
+```bash
+cd flutter_app
+flutter pub get
+flutter run
 ```
 
-## Cloud Deployment (Render)
+### Web Dashboard
 
-Deploy your own Nexus Hub in one click - no Mac needed!
+```bash
+./setup.sh  # First time only
+./start.sh
+# Open http://localhost:5050
+```
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/LeonManuel0705/Nexus)
+### Landing Page Development
 
-**Or manually:**
-1. Fork this repository to your GitHub
-2. Go to [render.com](https://render.com) and sign up (free)
-3. Click "New" → "Blueprint" → Connect your forked repo
-4. Render will auto-configure everything from `render.yaml`
+```bash
+cd landing-page
+npm install
+npm run dev
+# Open http://localhost:3000
+```
 
-**After deployment:**
-- Your app will be at `https://your-app-name.onrender.com`
-- Add it to your phone's home screen as a PWA
-- Each user creates their own account with separate data
-
-**Note:** Free tier sleeps after 15 min inactivity (first load takes ~30 sec to wake)
-
-The `render.yaml` blueprint configures:
-- Python 3.11 web service (Frankfurt)
-- PostgreSQL database (free tier)
-- Automatic SSL/HTTPS
-
-## Tech Stack
-
-- **Backend**: Flask, Flask-SocketIO
-- **Database**: SQLite (local) / PostgreSQL (production)
-- **Frontend**: Vanilla JavaScript, CSS
-- **APIs**: Google Calendar, Gmail, IServ
-- **PWA**: Installable on Android & iOS with offline support
+Build for production:
+```bash
+npm run build
+# Output exported to ../site/
+```
 
 ## Project Structure
 
 ```
 Nexus/
-├── app/
-│   ├── app.py              # Main Flask application
-│   ├── database.py         # Database abstraction layer
-│   ├── calendar_service.py # Google Calendar integration
-│   ├── google_oauth.py     # OAuth authentication
-│   ├── iserv_service.py    # IServ API integration
-│   ├── static/             # CSS, JS, images
-│   └── templates/          # HTML templates
-├── data/                   # Local SQLite database
-├── setup.sh                # Automated setup script
-├── start.sh                # Start script
-├── requirements.txt        # Production dependencies
-├── render.yaml             # Render deployment config
-└── .env.example            # Environment template
+├── flutter_app/           # Flutter mobile app
+│   ├── lib/
+│   │   ├── screens/       # App screens
+│   │   ├── providers/     # State management
+│   │   ├── services/      # API & database services
+│   │   └── widgets/       # Reusable components
+│   └── pubspec.yaml
+├── app/                   # Flask web backend
+│   ├── app.py             # Main Flask application
+│   ├── static/            # CSS, JS, images
+│   └── templates/         # HTML templates
+├── landing-page/          # Next.js marketing site
+│   ├── app/               # Next.js app router pages
+│   ├── components/        # React components
+│   └── next.config.mjs
+├── site/                  # Static export for Netlify
+├── setup.sh               # Backend setup script
+├── start.sh               # Backend start script
+└── requirements.txt       # Python dependencies
 ```
+
+## Tech Stack
+
+**Mobile App:**
+- Flutter / Dart
+- SQLite (local database)
+- Provider (state management)
+
+**Web Backend:**
+- Flask, Flask-SocketIO
+- SQLite (local) / PostgreSQL (production)
+- Google Calendar & Gmail APIs
+- IServ API
+
+**Landing Page:**
+- Next.js 16 with App Router
+- Tailwind CSS v4
+- Framer Motion
+- Static export for Netlify
+
+## Deployment
+
+**Landing Page (Netlify):**
+- Publish directory: `site/`
+- No build command needed (pre-built)
+
+**Web Backend (Render):**
+- Uses `render.yaml` blueprint
+- PostgreSQL database included
+
+## Environment Variables
+
+Copy `.env.example` to `.env`:
+
+```
+SECRET_KEY=your-secret-key
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-client-secret
+GOOGLE_PROJECT_ID=your-project-id
+```
+
+## Roadmap
+
+See the [Roadmap](/landing-page/app/roadmap/page.tsx) for planned features including:
+- Widget customization
+- Public transit integration
+- Focus mode
+- AI assistant
+- Cloud sync (opt-in)
+- Habit tracking
 
 ## License
 
