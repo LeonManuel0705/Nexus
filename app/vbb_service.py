@@ -1,9 +1,3 @@
-\
-\
-\
-\
-\
-
 import os
 import json
 import requests
@@ -156,16 +150,6 @@ class VBBService:
     def get_route(self, from_location: Dict, to_location: Dict,
                   arrival_time: datetime = None, departure_time: datetime = None,
                   num_results: int = 5) -> Dict:
-\
-\
-\
-\
-\
-\
-\
-\
-\
-
         try:
             params = {
                 'results': num_results,
@@ -297,14 +281,6 @@ class VBBService:
 
     def get_route_to_event(self, event: Dict, current_location: Dict,
                           buffer_minutes: int = 15) -> Dict:
-\
-\
-\
-\
-\
-\
-\
-
         if not event.get('location'):
             return {'success': False, 'error': 'Event hat keinen Ort'}
 

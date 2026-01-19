@@ -90,6 +90,7 @@
         <form id="eventForm" onsubmit="saveEvent(event)">
             <input type="hidden" id="eventId" name="id">
             <input type="hidden" id="eventCalendarId" name="calendar_id">
+            <input type="hidden" id="eventRecurringId" name="recurring_event_id">
             <div class="form-group">
                 <label for="eventTitle">Titel</label>
                 <input type="text" id="eventTitle" name="title" placeholder="Termin-Titel" required>
@@ -229,6 +230,19 @@
         </div>
     </div>
 </div>
+
+<div class="modal" id="deleteEventModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Termin löschen</h3>
+            <button class="modal-close" onclick="closeModal('deleteEventModal')">&times;</button>
+        </div>
+        <div class="delete-event-body">
+            <p id="deleteEventMessage">Möchtest du diesen Termin wirklich löschen?</p>
+            <div id="deleteEventOptions" class="delete-options"></div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -240,7 +254,6 @@ let events = [];
 let calendarFilter = 'all';
 let accountFilter = 'all';  // Filter by account/source
 
-// Helper function to format date as YYYY-MM-DD in local timezone (avoids UTC offset issues)
 function formatLocalDate(date) {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -255,9 +268,6 @@ document.addEventListener('DOMContentLoaded', () => {
     syncCachedChanges(); // Sync any offline changes
 });
 
-// ==========================================
-// Offline Caching System
-// ==========================================
 
 const CACHE_KEY = 'nexus-calendar-pending-changes';
 
@@ -328,9 +338,6 @@ async function syncCachedChanges() {
     }
 }
 
-// ==========================================
-// Bundesland Selection
-// ==========================================
 
 let selectedBundesland = null;
 let bundeslaender = {};
@@ -460,7 +467,6 @@ function renderCalendar() {
     const lastDay = new Date(currentYear, currentMonth + 1, 0);
     const startDay = (firstDay.getDay() + 6) % 7; // Monday = 0
 
-    // Empty cells before first day
     for (let i = 0; i < startDay; i++) {
         container.innerHTML += '<div class="day-cell empty"></div>';
     }
@@ -478,7 +484,6 @@ function renderCalendar() {
         if (isSelected) classes += ' selected';
         if (dayEvents.length > 0) classes += ' has-events';
 
-        // Generate event preview lines (max 3)
         const eventPreviews = dayEvents.slice(0, 3).map(e => {
             const color = e.calendar_color || getCategoryColor(e.category) || '#6366f1';
             const title = e.title.length > 12 ? e.title.substring(0, 12) + '…' : e.title;
@@ -498,7 +503,6 @@ function renderCalendar() {
 
 function getEventsForDate(dateStr) {
     return events.filter(e => {
-        // Filter by category
         if (calendarFilter !== 'all') {
             if (calendarFilter === 'iserv') {
                 if (e.source !== 'iserv') return false;
@@ -508,11 +512,9 @@ function getEventsForDate(dateStr) {
                 return false;
             }
         }
-        // Filter by account/source
         if (accountFilter !== 'all') {
             const eventAccount = e.account || e.calendar || e.source || '';
             if (accountFilter.startsWith('caldav:')) {
-                // Filter for specific CalDAV account
                 if (e.source !== 'caldav' || e.account_id !== accountFilter.replace('caldav:', '')) return false;
             } else if (accountFilter === 'google') {
                 if (e.source !== 'google') return false;
@@ -523,11 +525,9 @@ function getEventsForDate(dateStr) {
             } else if (accountFilter === 'local') {
                 if (e.source !== 'local') return false;
             } else {
-                // Match by email/name
                 if (eventAccount.toLowerCase() !== accountFilter.toLowerCase()) return false;
             }
         }
-        // Check if date falls within event range (for multi-day events)
         const eventStart = e.start_date;
         const eventEnd = e.end_date || e.start_date;
         return dateStr >= eventStart && dateStr <= eventEnd;
@@ -653,17 +653,14 @@ async function loadEvents() {
     try {
         events = [];
 
-        // Calculate date range: previous month to next 2 months
         const startDate = new Date(currentYear, currentMonth - 1, 1);
         const endDate = new Date(currentYear, currentMonth + 3, 0); // Last day of month+2
 
         const startStr = formatLocalDate(startDate);
         const endStr = formatLocalDate(endDate);
 
-        // Load holidays (Feiertage + Schulferien) from database
         await loadHolidaysFromDatabase();
 
-        // Fetch Google Calendar events for the extended range (always fetch all accounts)
         const googleResponse = await fetch(`/api/calendar/events?start=${startStr}&end=${endStr}`);
         if (googleResponse.ok) {
             const data = await googleResponse.json();
@@ -675,15 +672,11 @@ async function loadEvents() {
             events = events.concat(googleEvents);
         }
 
-        // Fetch CalDAV events (Samsung, iCloud, etc.)
         await loadCalDAVEvents(startStr, endStr);
 
-        // IServ calendar events disabled (feature removed)
 
-        // Fetch local macOS calendar events
         await loadLocalCalendarEvents();
 
-        // Deduplicate events (same title + date = duplicate)
         const seen = new Map();
         events = events.filter(e => {
             const key = `${e.title.toLowerCase().trim()}|${e.start_date}`;
@@ -694,7 +687,6 @@ async function loadEvents() {
             return true;
         });
 
-        // Sort all events by date/time
         events.sort((a, b) => {
             if (a.start_date !== b.start_date) return a.start_date.localeCompare(b.start_date);
             return (a.start_time || '00:00').localeCompare(b.start_time || '00:00');
@@ -715,7 +707,6 @@ async function loadCalDAVEvents(startStr, endStr) {
         const data = await response.json();
         if (!data.success || !data.events) return;
 
-        // Add CalDAV events to the events array
         events = events.concat(data.events);
     } catch (err) {
         console.log('CalDAV events not available:', err);
@@ -724,14 +715,12 @@ async function loadCalDAVEvents(startStr, endStr) {
 
 async function loadIServEvents() {
     try {
-        // Check IServ connection status first
         const statusResponse = await fetch('/api/iserv/status');
         if (!statusResponse.ok) return;
 
         const status = await statusResponse.json();
         if (!status.connected && !status.has_credentials) return;
 
-        // If not connected but has credentials, try to connect
         if (!status.connected && status.has_credentials) {
             await fetch('/api/iserv/connect', {
                 method: 'POST',
@@ -740,7 +729,6 @@ async function loadIServEvents() {
             });
         }
 
-        // Fetch IServ events
         const eventsResponse = await fetch('/api/iserv/events');
         if (!eventsResponse.ok) return;
 
@@ -751,16 +739,12 @@ async function loadIServEvents() {
         }
         if (!data.events || data.events.length === 0) return;
 
-        // Convert IServ events to Nexus format and add to events array
         const iservEvents = data.events.map(e => {
-            // Parse IServ event format - handle multiple possible field names
             let startDate = '', startTime = '', endDate = '', endTime = '';
 
-            // Try different field names for start date/time
             const startField = e.start || e.startDate || e.dtstart || e.begin;
             if (startField) {
                 if (typeof startField === 'string') {
-                    // Handle ISO format (2024-01-15T10:00:00) or date only
                     startDate = startField.split('T')[0] || startField.split(' ')[0] || '';
                     if (startField.includes('T')) {
                         startTime = startField.split('T')[1]?.substring(0, 5) || '';
@@ -775,7 +759,6 @@ async function loadIServEvents() {
                 }
             }
 
-            // Try different field names for end date/time
             const endField = e.end || e.endDate || e.dtend || e.finish;
             if (endField) {
                 if (typeof endField === 'string') {
@@ -793,10 +776,8 @@ async function loadIServEvents() {
                 }
             }
 
-            // Get title from various possible field names
             const title = e.title || e.summary || e.subject || e.name || 'Unbenannter Termin';
 
-            // Get calendar name if available
             const calendarName = e.calendar || e.calendarName || e.source || 'IServ';
 
             return {
@@ -823,7 +804,6 @@ async function loadIServEvents() {
     }
 }
 
-// Debug function to check IServ calendar status
 async function debugIServCalendar() {
     try {
         const statusRes = await fetch('/api/iserv/status');
@@ -847,7 +827,6 @@ async function loadHolidaysFromDatabase() {
 
         const data = await response.json();
 
-        // Check if Bundesland needs to be set
         if (data.needs_bundesland) {
             checkAndShowBundeslandModal();
             return;
@@ -855,7 +834,6 @@ async function loadHolidaysFromDatabase() {
 
         if (!data.success || !data.holidays) return;
 
-        // Convert holidays to event format
         const holidays = data.holidays.map(h => {
             const isFeiertag = h.type === 'feiertag';
             return {
@@ -882,11 +860,9 @@ async function loadLocalCalendarEvents() {
     try {
         const response = await fetch('/api/calendar/local');
         if (!response.ok) {
-            // Try to trigger a sync if no data available
             if (response.status === 404) {
                 console.log('Local calendar not synced yet, triggering sync...');
                 await fetch('/api/calendar/local/sync', { method: 'POST' });
-                // Try again after sync
                 const retryResponse = await fetch('/api/calendar/local');
                 if (!retryResponse.ok) return;
                 const data = await retryResponse.json();
@@ -906,7 +882,6 @@ function processLocalEvents(data) {
     if (!data.success || !data.events) return;
 
     const localEvents = data.events.map(e => {
-        // Parse the local calendar event format
         let startDate = '', startTime = '';
 
         if (e.start) {
@@ -970,13 +945,11 @@ function openEditEventModal(eventId) {
     const ev = events.find(e => e.id === eventId);
     if (!ev) return;
 
-    // IServ events are read-only - show info modal instead
     if (ev.source === 'iserv') {
         showIServEventInfo(ev);
         return;
     }
 
-    // Holiday events are read-only
     if (ev.source === 'holiday' || ev.category === 'holiday') {
         alert(`Feiertag: ${ev.title}\n\nDatum: ${ev.start_date}\n\nFeiertage können nicht bearbeitet werden.`);
         return;
@@ -984,6 +957,7 @@ function openEditEventModal(eventId) {
 
     document.getElementById('eventId').value = ev.id;
     document.getElementById('eventCalendarId').value = ev.calendar_id || 'primary';
+    document.getElementById('eventRecurringId').value = ev.recurring_event_id || '';
     document.getElementById('eventTitle').value = ev.title;
     document.getElementById('eventDate').value = ev.start_date;
     document.getElementById('eventTime').value = ev.start_time || '';
@@ -1034,45 +1008,118 @@ async function saveEvent(e) {
             closeModal('eventModal');
             loadEvents();
         } else {
-            // Offline or error - cache the change
             cacheEventChange(eventId ? 'update' : 'create', eventData, eventId, calendarId);
             alert('Änderung wird synchronisiert, sobald eine Verbindung besteht.');
             closeModal('eventModal');
             loadEvents();
         }
     } catch (err) {
-        // Offline - cache the change
         cacheEventChange(eventId ? 'update' : 'create', eventData, eventId, calendarId);
         alert('Keine Verbindung. Änderung wird lokal gespeichert.');
         closeModal('eventModal');
     }
 }
 
-async function deleteEvent() {
+function deleteEvent() {
     const eventId = document.getElementById('eventId').value;
     const calendarId = document.getElementById('eventCalendarId').value || 'primary';
-    if (!eventId || !confirm('Termin wirklich löschen?')) return;
+    const recurringEventId = document.getElementById('eventRecurringId').value;
 
+    if (!eventId) return;
+
+    const isRecurring = !!recurringEventId;
+    const optionsDiv = document.getElementById('deleteEventOptions');
+    const messageEl = document.getElementById('deleteEventMessage');
+
+    if (isRecurring) {
+        messageEl.textContent = 'Dies ist ein wiederkehrender Termin. Was möchtest du tun?';
+        optionsDiv.innerHTML = `
+            <button class="btn-secondary" onclick="performDeleteEvent('${eventId}', '${calendarId}', false, '')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                </svg>
+                Nur dieses Mal löschen
+            </button>
+            <button class="btn-secondary btn-danger" onclick="performDeleteEvent('${eventId}', '${calendarId}', true, '${recurringEventId}')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Alle Wiederholungen löschen
+            </button>
+            <button class="btn-secondary" onclick="closeModal('deleteEventModal')">Abbrechen</button>
+        `;
+    } else {
+        messageEl.textContent = 'Möchtest du diesen Termin wirklich löschen?';
+        optionsDiv.innerHTML = `
+            <button class="btn-secondary btn-danger" onclick="performDeleteEvent('${eventId}', '${calendarId}', false, '')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Löschen
+            </button>
+            <button class="btn-secondary" onclick="closeModal('deleteEventModal')">Abbrechen</button>
+        `;
+    }
+
+    closeModal('eventModal');
+    openModal('deleteEventModal');
+}
+
+async function performDeleteEvent(eventId, calendarId, deleteAll, recurringEventId) {
     const savedAccount = localStorage.getItem('nexus-google-calendar-account') || '';
 
+    let url = `/api/calendar/events/${eventId}?account=${encodeURIComponent(savedAccount)}&calendar_id=${encodeURIComponent(calendarId)}`;
+
+    if (deleteAll && recurringEventId) {
+        url += `&delete_all=true&recurring_event_id=${encodeURIComponent(recurringEventId)}`;
+    }
+
     try {
-        const response = await fetch(`/api/calendar/events/${eventId}?account=${encodeURIComponent(savedAccount)}&calendar_id=${encodeURIComponent(calendarId)}`, { method: 'DELETE' });
+        const response = await fetch(url, { method: 'DELETE' });
         if (response.ok) {
-            closeModal('eventModal');
+            closeModal('deleteEventModal');
             loadEvents();
+            showToast(deleteAll ? 'Alle Wiederholungen gelöscht' : 'Termin gelöscht', 'success');
         } else {
-            // Offline or error - cache the deletion
-            cacheEventChange('delete', { calendar_id: calendarId }, eventId, calendarId);
-            alert('Löschung wird synchronisiert, sobald eine Verbindung besteht.');
-            closeModal('eventModal');
+            cacheEventChange('delete', { calendar_id: calendarId, delete_all: deleteAll }, eventId, calendarId);
+            showToast('Löschung wird synchronisiert, sobald eine Verbindung besteht.', 'info');
+            closeModal('deleteEventModal');
             loadEvents();
         }
     } catch (err) {
-        // Offline - cache the deletion
-        cacheEventChange('delete', { calendar_id: calendarId }, eventId, calendarId);
-        alert('Keine Verbindung. Löschung wird lokal gespeichert.');
-        closeModal('eventModal');
+        cacheEventChange('delete', { calendar_id: calendarId, delete_all: deleteAll }, eventId, calendarId);
+        showToast('Keine Verbindung. Löschung wird lokal gespeichert.', 'info');
+        closeModal('deleteEventModal');
     }
+}
+
+function showToast(message, type = 'info') {
+    const existingToast = document.querySelector('.toast-notification');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.className = `toast-notification toast-${type}`;
+    toast.textContent = message;
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: ${type === 'success' ? 'var(--success, #22c55e)' : type === 'error' ? 'var(--danger, #ef4444)' : 'var(--accent, #667eea)'};
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-weight: 500;
+        z-index: 10000;
+        animation: slideUp 0.3s ease-out;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
 }
 
 function openModal(id) {
@@ -1083,9 +1130,6 @@ function closeModal(id) {
     document.getElementById(id).classList.remove('active');
 }
 
-// ==========================================
-// VBB Route Planning
-// ==========================================
 
 let currentUserLocation = null;
 let currentRouteEvent = null;
@@ -1096,7 +1140,6 @@ function openRouteModal(eventId) {
 
     currentRouteEvent = ev;
 
-    // Set event info
     const eventStart = ev.start_time || 'Ganztägig';
     document.getElementById('routeEventInfo').innerHTML = `
         <div class="route-event-card">
@@ -1113,7 +1156,6 @@ function openRouteModal(eventId) {
 
     openModal('routeModal');
 
-    // Get user's current location
     getUserLocation();
 }
 
@@ -1156,7 +1198,6 @@ function getUserLocation() {
                 <span style="color: var(--success)">Standort gefunden</span>
             `;
 
-            // Now get the route
             getRouteToEvent();
         },
         (error) => {
@@ -1243,7 +1284,6 @@ async function getRouteToEvent() {
     `;
 
     try {
-        // Build event start datetime
         let eventStart = currentRouteEvent.start_date;
         if (currentRouteEvent.start_time) {
             eventStart += 'T' + currentRouteEvent.start_time + ':00';
@@ -1361,9 +1401,6 @@ function getProductEmoji(product) {
     return emojis[product] || '🚃';
 }
 
-// ==========================================
-// CalDAV Account Management (Samsung, iCloud, etc.)
-// ==========================================
 
 function openAddCalendarAccountModal() {
     document.getElementById('addCalendarAccountForm').reset();
@@ -1429,7 +1466,6 @@ async function loadCalendarAccounts() {
 
     select.innerHTML = '<option value="all">Alle Kalender</option>';
 
-    // Add built-in sources
     const sourcesGroup = document.createElement('optgroup');
     sourcesGroup.label = 'Quellen';
 
@@ -1449,7 +1485,6 @@ async function loadCalendarAccounts() {
     });
     select.appendChild(sourcesGroup);
 
-    // Load Google accounts
     try {
         const googleResponse = await fetch('/api/email/google/accounts');
         if (googleResponse.ok) {
@@ -1469,7 +1504,6 @@ async function loadCalendarAccounts() {
         }
     } catch (err) {}
 
-    // Load CalDAV accounts
     try {
         const caldavResponse = await fetch('/api/calendar/caldav/accounts');
         if (caldavResponse.ok) {
@@ -1507,11 +1541,9 @@ async function loadCalendarAccounts() {
         }
     } catch (err) {}
 
-    // Set initial filter value
     accountFilter = savedFilter;
     select.value = savedFilter;
 
-    // Add change handler
     select.onchange = function() {
         accountFilter = this.value;
         localStorage.setItem('nexus-calendar-filter', this.value);
@@ -2021,6 +2053,46 @@ async function loadCalendarAccounts() {
 @media (max-width: 480px) {
     .bundesland-grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Delete event options */
+.delete-event-body {
+    padding: 16px 0;
+}
+
+.delete-event-body p {
+    margin-bottom: 20px;
+    color: var(--text-secondary);
+}
+
+.delete-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.delete-options button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    justify-content: flex-start;
+    width: 100%;
+}
+
+.delete-options button svg {
+    flex-shrink: 0;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translate(-50%, 20px);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
     }
 }
 </style>

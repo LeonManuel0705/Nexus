@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'database_service.dart';
+import 'database_service.dart' if (dart.library.html) 'database_service_web.dart';
 import 'connectivity_service.dart';
 
 enum OperationType {

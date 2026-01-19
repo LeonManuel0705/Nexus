@@ -389,7 +389,9 @@ const HubApp = {
     },
 
     toggleTheme() {
+        const oldTheme = this.state.theme;
         this.state.theme = this.state.theme === 'dark' ? 'light' : 'dark';
+        console.log(`[Nexus] Theme toggled: ${oldTheme} → ${this.state.theme}`);
         document.body.setAttribute('data-theme', this.state.theme);
         document.documentElement.setAttribute('data-theme', this.state.theme);
         localStorage.setItem('nexus-theme', this.state.theme);
@@ -438,13 +440,20 @@ const HubApp = {
     },
 
     async initEmail() {
-        await this.loadEmailAccounts();
-        this.renderEmailAccountsBar();
-        if (this.state.emailAccounts.length > 0) {
-            this.state.currentEmailAccount = this.state.emailAccounts[0].email;
-            await this.loadEmails();
+        console.log('[Nexus] initEmail() starting...');
+        try {
+            await this.loadEmailAccounts();
+            this.renderEmailAccountsBar();
+            if (this.state.emailAccounts.length > 0) {
+                this.state.currentEmailAccount = this.state.emailAccounts[0].email;
+                await this.loadEmails();
+            }
+            this.initEmailEventListeners();
+            console.log('[Nexus] initEmail() completed successfully');
+        } catch (err) {
+            console.error('[Nexus] initEmail() error:', err);
+            this.initEmailEventListeners();
         }
-        this.initEmailEventListeners();
     },
 
     async loadEmailAccounts() {
@@ -727,10 +736,12 @@ const HubApp = {
     },
 
     initEmailEventListeners() {
+        console.log('[Nexus] initEmailEventListeners() starting...');
 
         const composeEmailBtn = document.getElementById('composeEmailBtn');
         if (composeEmailBtn) {
             composeEmailBtn.addEventListener('click', () => {
+                console.log('[Nexus] Compose email button clicked');
                 this.openComposeModal();
             });
         }
@@ -743,10 +754,14 @@ const HubApp = {
         }
 
         const addAccountBtn = document.getElementById('addAccountBtn');
+        console.log('[Nexus] addAccountBtn element:', addAccountBtn);
         if (addAccountBtn) {
             addAccountBtn.addEventListener('click', () => {
+                console.log('[Nexus] Add account button clicked - showing modal');
                 document.getElementById('addAccountModal').classList.add('active');
             });
+        } else {
+            console.warn('[Nexus] addAccountBtn not found in DOM!');
         }
 
         const addAccountModalClose = document.getElementById('addAccountModalClose');
@@ -926,7 +941,7 @@ const HubApp = {
     updatePomodoroSessions() {
         const sessionsEl = document.getElementById('pomodoroSessions');
         if (sessionsEl) {
-            sessionsEl.textContent = `${this.state.pomodoro.todaySessions} session${this.state.pomodoro.todaySessions !== 1 ? 's' : ''} today`;
+            sessionsEl.textContent = `${this.state.pomodoro.todaySessions} ${this.state.pomodoro.todaySessions === 1 ? 'Sitzung' : 'Sitzungen'} heute`;
         }
     },
 
@@ -940,7 +955,7 @@ const HubApp = {
 
         if (startBtn) startBtn.style.display = 'none';
         if (pauseBtn) pauseBtn.style.display = 'flex';
-        if (statusEl) statusEl.textContent = this.state.pomodoroIsWork ? 'Working...' : 'Break';
+        if (statusEl) statusEl.textContent = this.state.pomodoroIsWork ? 'Arbeiten...' : 'Pause';
 
         this.state.pomodoroTimer = setInterval(() => {
             this.state.pomodoroTimeLeft--;
@@ -962,7 +977,7 @@ const HubApp = {
 
         if (startBtn) startBtn.style.display = 'flex';
         if (pauseBtn) pauseBtn.style.display = 'none';
-        if (statusEl) statusEl.textContent = 'Paused';
+        if (statusEl) statusEl.textContent = 'Pausiert';
     },
 
     resetPomodoro() {
@@ -971,7 +986,7 @@ const HubApp = {
         this.state.pomodoroTimeLeft = this.state.pomodoro.workDuration * 60;
         this.updatePomodoroDisplay();
         const statusEl = document.getElementById('pomodoroStatus');
-        if (statusEl) statusEl.textContent = 'Ready';
+        if (statusEl) statusEl.textContent = 'Bereit';
     },
 
     pomodoroComplete() {
@@ -987,11 +1002,11 @@ const HubApp = {
             this.updatePomodoroSessions();
             this.state.pomodoroIsWork = false;
             this.state.pomodoroTimeLeft = this.state.pomodoro.breakDuration * 60;
-            if (statusEl) statusEl.textContent = 'Break time!';
+            if (statusEl) statusEl.textContent = 'Pause!';
         } else {
             this.state.pomodoroIsWork = true;
             this.state.pomodoroTimeLeft = this.state.pomodoro.workDuration * 60;
-            if (statusEl) statusEl.textContent = 'Ready';
+            if (statusEl) statusEl.textContent = 'Bereit';
         }
         this.updatePomodoroDisplay();
     },

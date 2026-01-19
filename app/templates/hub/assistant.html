@@ -264,7 +264,6 @@ let nexusData = {
     weather: null
 };
 
-// Timetable data for reference
 const TIMETABLE = {
     A: {
         1: ['Musik', 'Mathe LK', 'Deutsch', 'Physik'],
@@ -302,7 +301,6 @@ function loadChatHistory() {
 
 function saveChatHistory() {
     try {
-        // Keep only last 50 messages
         if (chatHistory.length > 50) {
             chatHistory = chatHistory.slice(-50);
         }
@@ -336,7 +334,6 @@ async function loadNexusData() {
         if (testsRes?.ok) nexusData.tests = (await testsRes.json()).tests || [];
         if (subjectsRes?.ok) nexusData.subjects = (await subjectsRes.json()).subjects || [];
 
-        // Try to get cached weather
         const weatherCache = localStorage.getItem('nexus-weather-cache');
         if (weatherCache) {
             nexusData.weather = JSON.parse(weatherCache);
@@ -349,7 +346,6 @@ async function loadNexusData() {
 async function checkAIStatus() {
     const statusEl = document.getElementById('assistantStatus');
 
-    // Check AI Assistant status (Ollama)
     try {
         const response = await fetch('/api/hub/assistant/status', {
             method: 'GET',
@@ -359,13 +355,11 @@ async function checkAIStatus() {
             const data = await response.json();
             if (data.available) {
                 ollamaAvailable = true;
-                // Get available models
                 try {
                     const modelsRes = await fetch('/api/hub/assistant/models');
                     if (modelsRes.ok) {
                         const modelsData = await modelsRes.json();
                         if (modelsData.models && modelsData.models.length > 0) {
-                            // Prefer llama3.2 or first available model
                             const preferredModel = modelsData.models.find(m => m.name.includes('llama3.2')) || modelsData.models[0];
                             ollamaModel = preferredModel.name;
                         }
@@ -382,7 +376,6 @@ async function checkAIStatus() {
         ollamaAvailable = false;
     }
 
-    // If Ollama not available, check MLX (local Apple Silicon AI) as fallback
     try {
         const mlxResponse = await fetch('/api/mlx/status', {
             method: 'GET',
@@ -401,12 +394,10 @@ async function checkAIStatus() {
         mlxAvailable = false;
     }
 
-    // No AI available - show offline mode
     statusEl.textContent = 'Offline-Modus (keine KI)';
     statusEl.style.color = 'var(--text-muted)';
 }
 
-// Legacy function name for compatibility
 async function checkOllamaStatus() {
     await checkAIStatus();
 }
@@ -426,13 +417,11 @@ async function sendMessage(e) {
     addMessageToUI('user', message);
     chatHistory.push({ role: 'user', content: message });
 
-    // Show typing indicator
     const typingId = showTypingIndicator();
 
     try {
         let response;
 
-        // Priority: 1. Ollama (fast, cloud), 2. MLX (local AI), 3. Rule-based offline
         if (ollamaAvailable) {
             response = await getOllamaResponse(message);
         } else if (mlxAvailable) {
@@ -448,7 +437,6 @@ async function sendMessage(e) {
     } catch (err) {
         removeTypingIndicator(typingId);
 
-        // Try MLX as fallback if Ollama failed
         if (mlxAvailable && !ollamaAvailable) {
             try {
                 const mlxResponse = await getMlxResponse(message);
@@ -461,7 +449,6 @@ async function sendMessage(e) {
             }
         }
 
-        // Final fallback: rule-based response
         const fallback = getOfflineResponse(message);
         addMessageToUI('assistant', fallback);
         chatHistory.push({ role: 'assistant', content: fallback });
@@ -470,13 +457,11 @@ async function sendMessage(e) {
 }
 
 async function getOllamaResponse(message) {
-    // Build context from current data
     const context = `
 Heutige Hausaufgaben: ${JSON.stringify(nexusData.homework.filter(h => !h.completed).slice(0, 5))}
 Anstehende Klausuren: ${JSON.stringify(nexusData.exams.slice(0, 3))}
 Offene Aufgaben: ${JSON.stringify(nexusData.tasks.filter(t => !t.completed).slice(0, 5))}`;
 
-    // Use unified assistant API
     const response = await fetch('/api/hub/assistant/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -530,7 +515,6 @@ function getOfflineResponse(message) {
     const dayOfWeek = today.getDay();
     const dayNames = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 
-    // Check for schedule/timetable questions
     if (msg.includes('heute') && (msg.includes('habe') || msg.includes('unterricht') || msg.includes('stunde'))) {
         return getTodayScheduleResponse();
     }
@@ -543,47 +527,38 @@ function getOfflineResponse(message) {
         return getWeekScheduleResponse();
     }
 
-    // Homework questions
     if (msg.includes('hausaufgabe') || msg.includes('homework')) {
         return getHomeworkResponse();
     }
 
-    // Exam questions
     if (msg.includes('klausur') || msg.includes('test') || msg.includes('prüfung')) {
         return getExamsResponse();
     }
 
-    // Tasks questions
     if (msg.includes('aufgabe') || msg.includes('todo') || msg.includes('task')) {
         return getTasksResponse();
     }
 
-    // Weather
     if (msg.includes('wetter')) {
         return getWeatherResponse();
     }
 
-    // Training
     if (msg.includes('training') || msg.includes('sport') || msg.includes('gym')) {
         return getTrainingResponse();
     }
 
-    // Day summary
     if (msg.includes('zusammenfassung') || msg.includes('übersicht') || msg.includes('tag')) {
         return getDaySummaryResponse();
     }
 
-    // Time
     if (msg.includes('uhrzeit') || msg.includes('wie spät')) {
         return `Es ist ${today.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr.`;
     }
 
-    // Date
     if (msg.includes('datum') || msg.includes('welcher tag')) {
         return `Heute ist ${dayNames[dayOfWeek]}, der ${today.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })}.`;
     }
 
-    // Greeting
     if (msg.includes('hallo') || msg.includes('hi') || msg.includes('hey')) {
         const hour = today.getHours();
         let greeting = 'Hallo';
@@ -593,17 +568,14 @@ function getOfflineResponse(message) {
         return `${greeting}! Wie kann ich dir helfen?`;
     }
 
-    // Math in chat - equations
     if (msg.includes('löse') || msg.includes('berechne') || msg.match(/x[²³]?\s*[+-]/) || msg.match(/=\s*0$/)) {
         return handleMathInChat(message);
     }
 
-    // Derivative in chat
     if (msg.includes('ableitung') || msg.includes('ableite') || (msg.includes('f(x)') && msg.includes("'"))) {
         return handleDerivativeInChat(message);
     }
 
-    // Essay/writing help
     if (msg.includes('schreibe') && (msg.includes('erörterung') || msg.includes('essay') || msg.includes('aufsatz') || msg.includes('analyse'))) {
         const ollamaHint = ollamaAvailable
             ? '✅ Ollama ist verbunden - du bekommst vollständige Essays generiert!'
@@ -618,7 +590,6 @@ Dort kannst du:
 ${ollamaHint}`;
     }
 
-    // Summary help
     if (msg.includes('zusammenfassung') && msg.includes('text')) {
         return `Für Textzusammenfassungen nutze den **Zusammenfassen** Button unten!
 
@@ -628,7 +599,6 @@ Du kannst:
 • Lernkarten (Q&A) erstellen`;
     }
 
-    // Default response
     return `Ich bin dein Nexus Lern-Assistent und kann dir helfen mit:
 
 **📚 Schule:**
@@ -648,12 +618,9 @@ Du kannst:
 • "Welches Training heute?" - Gym-Plan`;
 }
 
-// Handle math equations typed in chat - uses the proper numerical solver
 function handleMathInChat(message) {
-    // Extract the equation from natural language
     let eq = message.trim();
 
-    // Strategy 1: If there's a colon, take everything after it
     if (message.includes(':')) {
         const afterColon = message.split(':').pop().trim();
         if (afterColon.includes('=') && afterColon.toLowerCase().includes('x')) {
@@ -661,13 +628,10 @@ function handleMathInChat(message) {
         }
     }
 
-    // Strategy 2: Find the part that looks like an equation (contains x...=...number)
     if (eq === message.trim()) {
-        // Look for the equation part - find where x starts and take from there
         const xIndex = message.toLowerCase().indexOf('x');
         const eqIndex = message.indexOf('=');
         if (xIndex !== -1 && eqIndex !== -1 && eqIndex > xIndex) {
-            // Find the start - go back from x to find the beginning of the expression
             let start = xIndex;
             for (let i = xIndex - 1; i >= 0; i--) {
                 const c = message[i];
@@ -681,7 +645,6 @@ function handleMathInChat(message) {
         }
     }
 
-    // Strategy 3: Remove common German question phrases
     if (eq === message.trim() || eq.toLowerCase().startsWith('löse') || eq.toLowerCase().startsWith('wie')) {
         eq = message
             .replace(/wie\s+(berechnet|rechnet|löst)\s+man\s*/gi, '')
@@ -691,13 +654,10 @@ function handleMathInChat(message) {
             .trim();
     }
 
-    // Check if it contains an equation (= sign with x)
     if (eq.includes('=') && eq.includes('x')) {
-        // Store original for display
         const originalEq = eq;
         eq = eq.replace(/\s+/g, '').replace(/²/g, '^2').replace(/³/g, '^3');
 
-        // Split by = sign
         const parts = eq.split('=');
         if (parts.length !== 2) {
             return 'Gleichung muss ein = Zeichen enthalten';
@@ -706,11 +666,9 @@ function handleMathInChat(message) {
         let leftExpr = parts[0] || '0';
         let rightExpr = parts[1] || '0';
 
-        // Try to identify equation type for better analysis
         const hasX2 = eq.includes('x^2');
         const hasX3 = eq.includes('x^3');
 
-        // For quadratic equations, check discriminant first
         if (hasX2 && !hasX3) {
             const coeffs = parseQuadraticCoefficients(leftExpr, rightExpr);
             if (coeffs.isQuadratic && coeffs.a !== 0) {
@@ -722,7 +680,6 @@ function handleMathInChat(message) {
                 result += `**Diskriminante:** D = b² - 4ac = ${b}² - 4·${a}·${c} = **${D}**\n\n`;
 
                 if (D < 0) {
-                    // Complex solutions
                     const realPart = -b / (2*a);
                     const imagPart = Math.sqrt(-D) / (2*a);
                     result += `Da D < 0, gibt es **keine reellen Lösungen**.\n\n`;
@@ -747,7 +704,6 @@ function handleMathInChat(message) {
             }
         }
 
-        // Use the numerical solver for other equations
         const roots = findAllRoots(leftExpr, rightExpr, 3);
 
         if (roots.length === 0) {
@@ -758,7 +714,6 @@ function handleMathInChat(message) {
         result += `**Lösung${roots.length > 1 ? 'en' : ''}:**\n`;
         roots.forEach((root, i) => {
             const roundedRoot = Math.abs(root) < 1e-10 ? 0 : root;
-            // Verify the solution
             const verify = Math.abs(evaluateExpression(leftExpr, root) - evaluateExpression(rightExpr, root));
             result += `• x${roots.length > 1 ? '₁₂₃₄₅'[i] : ''} = **${roundedRoot.toFixed(6)}**`;
             if (verify < 1e-6) result += ' ✓';
@@ -775,7 +730,6 @@ function handleMathInChat(message) {
 • "x² + 5 = 0" (hat komplexe Lösungen)`;
 }
 
-// Helper to format coefficients nicely
 function formatCoeff(n, withSign = false) {
     if (n === 0) return '';
     if (n === 1 && !withSign) return '';
@@ -786,7 +740,6 @@ function formatCoeff(n, withSign = false) {
     return n.toString();
 }
 
-// Handle derivative in chat
 function handleDerivativeInChat(message) {
     const funcMatch = message.match(/f\(x\)\s*=\s*([^\s]+)/i);
     if (!funcMatch) {
@@ -994,7 +947,6 @@ function getDaySummaryResponse() {
 
     let summary = `**Zusammenfassung für ${today.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}:**\n\n`;
 
-    // Schedule
     if (dayOfWeek > 0 && dayOfWeek < 6) {
         const weekType = getWeekType();
         const schedule = TIMETABLE[weekType][dayOfWeek];
@@ -1005,15 +957,12 @@ function getDaySummaryResponse() {
         summary += '📚 **Unterricht:** Wochenende!\n\n';
     }
 
-    // Homework
     const openHomework = nexusData.homework.filter(h => !h.completed);
     summary += `📝 **Hausaufgaben:** ${openHomework.length} offen\n`;
 
-    // Tasks
     const openTasks = nexusData.tasks.filter(t => !t.completed);
     summary += `✅ **Aufgaben:** ${openTasks.length} offen\n`;
 
-    // Next exam
     const nextExam = nexusData.exams
         .filter(e => new Date(e.date) >= today)
         .sort((a, b) => new Date(a.date) - new Date(b.date))[0];
@@ -1027,7 +976,6 @@ function getDaySummaryResponse() {
 }
 
 function getWeekType(date = new Date()) {
-    // Reference: December 29, 2025 = A-week
     const refDate = new Date(2025, 11, 29);
     const diffWeeks = Math.floor((date - refDate) / (7 * 24 * 60 * 60 * 1000));
     return diffWeeks % 2 === 0 ? 'A' : 'B';
@@ -1042,7 +990,6 @@ function addMessageToUI(role, content, scroll = true) {
         ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`
         : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
 
-    // Convert markdown-like formatting
     let formattedContent = content
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\n/g, '<br>');
@@ -1103,7 +1050,6 @@ function clearChat() {
     `;
 }
 
-// ===== MATH HELPER =====
 let currentMathCategory = 'equation';
 
 function openMathHelper() {
@@ -1185,11 +1131,9 @@ async function solveMath() {
     const resultEl = document.getElementById('mathResult');
     const solutionEl = document.getElementById('mathSolution');
 
-    // Show loading state
     resultEl.style.display = 'block';
     solutionEl.innerHTML = '<p style="color: var(--text-muted);">Löse Aufgabe...</p>';
 
-    // First try AI-powered solution if available
     if (ollamaAvailable) {
         try {
             const response = await fetch('/api/hub/assistant/math', {
@@ -1205,7 +1149,6 @@ async function solveMath() {
             if (response.ok) {
                 const data = await response.json();
                 if (data.success && data.solution) {
-                    // Format the AI response with proper HTML
                     const formattedSolution = formatMathResponse(data.solution);
                     solutionEl.innerHTML = formattedSolution;
                     return;
@@ -1216,7 +1159,6 @@ async function solveMath() {
         }
     }
 
-    // Fallback to local JavaScript math engine
     let solution = '';
 
     try {
@@ -1250,7 +1192,6 @@ async function solveMath() {
 }
 
 function formatMathResponse(text) {
-    // Convert markdown-style formatting to HTML
     return text
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -1261,11 +1202,7 @@ function formatMathResponse(text) {
         .replace(/$/, '</p>');
 }
 
-// ===== MATH ENGINE - Proper Equation Solver =====
-
-// Parse a mathematical expression string and evaluate it for a given x value
 function evaluateExpression(expr, x) {
-    // Normalize the expression
     let normalized = expr
         .replace(/\s+/g, '')
         .replace(/²/g, '^2')
@@ -1288,23 +1225,18 @@ function evaluateExpression(expr, x) {
         .replace(/pi/gi, 'Math.PI')
         .replace(/e(?![a-z])/gi, 'Math.E');
 
-    // Replace x with the value
     normalized = normalized.replace(/x/g, `(${x})`);
 
     try {
-        // Safely evaluate the expression
         return Function('"use strict"; return (' + normalized + ')')();
     } catch (e) {
         return NaN;
     }
 }
 
-// Newton-Raphson method to find roots
 function findRootNewton(leftExpr, rightExpr, initialGuess = 0, tolerance = 1e-10, maxIterations = 100) {
-    // f(x) = left - right = 0
     const f = (x) => evaluateExpression(leftExpr, x) - evaluateExpression(rightExpr, x);
 
-    // Numerical derivative
     const df = (x) => {
         const h = 1e-8;
         return (f(x + h) - f(x - h)) / (2 * h);
@@ -1320,27 +1252,23 @@ function findRootNewton(leftExpr, rightExpr, initialGuess = 0, tolerance = 1e-10
         }
 
         if (Math.abs(dfx) < 1e-15) {
-            // Derivative too small, try different guess
             x += 0.5;
             continue;
         }
 
         x = x - fx / dfx;
 
-        // Check for divergence
         if (Math.abs(x) > 1e10) {
             return NaN;
         }
     }
 
-    // Check if we converged
     if (Math.abs(f(x)) < tolerance * 100) {
         return x;
     }
     return NaN;
 }
 
-// Find all roots by trying multiple starting points
 function findAllRoots(leftExpr, rightExpr, degree = 2) {
     const roots = [];
     const startingPoints = [-100, -50, -20, -10, -5, -2, -1, -0.5, 0, 0.5, 1, 2, 5, 10, 20, 50, 100];
@@ -1349,10 +1277,8 @@ function findAllRoots(leftExpr, rightExpr, degree = 2) {
         const root = findRootNewton(leftExpr, rightExpr, guess);
 
         if (!isNaN(root) && isFinite(root)) {
-            // Check if this root is already found (within tolerance)
             const isDuplicate = roots.some(r => Math.abs(r - root) < 1e-6);
             if (!isDuplicate) {
-                // Verify it's actually a root
                 const f = evaluateExpression(leftExpr, root) - evaluateExpression(rightExpr, root);
                 if (Math.abs(f) < 1e-6) {
                     roots.push(root);
@@ -1360,29 +1286,23 @@ function findAllRoots(leftExpr, rightExpr, degree = 2) {
             }
         }
 
-        // Stop if we found enough roots
         if (roots.length >= degree + 2) break;
     }
 
     return roots.sort((a, b) => a - b);
 }
 
-// Parse equation and extract coefficients for quadratic form ax² + bx + c = 0
 function parseQuadraticCoefficients(leftExpr, rightExpr) {
-    // Move everything to left side: left - right = 0
-    // Evaluate at specific x values to determine coefficients
     const f = (x) => evaluateExpression(leftExpr, x) - evaluateExpression(rightExpr, x);
 
-    // Use three points to solve for a, b, c in ax² + bx + c
-    const y0 = f(0);   // c
-    const y1 = f(1);   // a + b + c
-    const y_1 = f(-1); // a - b + c
+    const y0 = f(0);
+    const y1 = f(1);
+    const y_1 = f(-1);
 
     const c = y0;
     const a = (y1 + y_1) / 2 - c;
     const b = (y1 - y_1) / 2;
 
-    // Verify this is actually quadratic (check at another point)
     const y2 = f(2);
     const expected = 4 * a + 2 * b + c;
 
@@ -1393,12 +1313,9 @@ function parseQuadraticCoefficients(leftExpr, rightExpr) {
     return { a: 0, b: 0, c: 0, isQuadratic: false };
 }
 
-// Main equation solver
 function solveEquation(input) {
-    // Normalize input
     let eq = input.replace(/\s+/g, '').replace(/²/g, '^2').replace(/³/g, '^3');
 
-    // Split by = sign
     const parts = eq.split('=');
     if (parts.length !== 2) {
         return '<p class="error">Gleichung muss ein = Zeichen enthalten</p>';
@@ -1407,13 +1324,11 @@ function solveEquation(input) {
     let leftExpr = parts[0];
     let rightExpr = parts[1];
 
-    // Handle empty sides
     if (!leftExpr) leftExpr = '0';
     if (!rightExpr) rightExpr = '0';
 
     let steps = [`<div class="solution-step"><strong>Gleichung:</strong> ${input}</div>`];
 
-    // Check if it's a simple linear equation without x on both sides
     const leftHasX = leftExpr.includes('x');
     const rightHasX = rightExpr.includes('x');
 
@@ -1421,7 +1336,6 @@ function solveEquation(input) {
         return '<p class="error">Gleichung enthält keine Variable x</p>';
     }
 
-    // Try to identify the degree
     const hasX3 = eq.includes('x^3') || eq.includes('x³');
     const hasX2 = eq.includes('x^2') || eq.includes('x²');
 
@@ -1431,7 +1345,6 @@ function solveEquation(input) {
 
     steps.push(`<div class="solution-step"><strong>Umgeformt:</strong> (${leftExpr}) - (${rightExpr}) = 0</div>`);
 
-    // Try to parse as quadratic if degree is 2
     if (degree === 2) {
         const coeffs = parseQuadraticCoefficients(leftExpr, rightExpr);
 
@@ -1450,7 +1363,6 @@ function solveEquation(input) {
                 steps.push(`<div class="solution-step">x₁ = (-b + √D) / 2a = ${x1.toFixed(6)}</div>`);
                 steps.push(`<div class="solution-step">x₂ = (-b - √D) / 2a = ${x2.toFixed(6)}</div>`);
 
-                // Verify solutions
                 const verify1 = Math.abs(evaluateExpression(leftExpr, x1) - evaluateExpression(rightExpr, x1));
                 const verify2 = Math.abs(evaluateExpression(leftExpr, x2) - evaluateExpression(rightExpr, x2));
                 steps.push(`<div class="solution-step"><em>Probe: f(x₁) = ${verify1.toExponential(2)}, f(x₂) = ${verify2.toExponential(2)}</em></div>`);
@@ -1471,7 +1383,6 @@ function solveEquation(input) {
         }
     }
 
-    // Use numerical method for all other cases
     steps.push(`<div class="solution-step"><strong>Numerische Lösung:</strong></div>`);
 
     const roots = findAllRoots(leftExpr, rightExpr, degree);
@@ -1497,9 +1408,7 @@ function solveEquation(input) {
     return steps.join('');
 }
 
-// Derivative solver
 function solveDerivative(input) {
-    // Extract function
     const funcMatch = input.match(/f\(x\)\s*=\s*(.+)/i);
     if (!funcMatch) {
         return '<p>Bitte im Format f(x) = ... eingeben</p>';
@@ -1510,7 +1419,6 @@ function solveDerivative(input) {
     let derivative = '';
     let terms = [];
 
-    // Split into terms
     func = func.replace(/-/g, '+-');
     const parts = func.split('+').filter(p => p);
 
@@ -1520,13 +1428,11 @@ function solveDerivative(input) {
         term = term.trim();
         if (!term) return;
 
-        // Constant
         if (!term.includes('x')) {
             steps.push(`<div class="solution-step">• ${term} → 0 (Konstante)</div>`);
             return;
         }
 
-        // ax^n
         const powerMatch = term.match(/^(-?\d*\.?\d*)x\^?(\d*)$/);
         if (powerMatch) {
             const coef = parseFloat(powerMatch[1] || 1) || 1;
@@ -1544,7 +1450,6 @@ function solveDerivative(input) {
             return;
         }
 
-        // sin(x)
         if (term.includes('sin')) {
             const coefMatch = term.match(/^(-?\d*)/);
             const coef = parseFloat(coefMatch[1] || 1) || 1;
@@ -1553,7 +1458,6 @@ function solveDerivative(input) {
             return;
         }
 
-        // cos(x)
         if (term.includes('cos')) {
             const coefMatch = term.match(/^(-?\d*)/);
             const coef = parseFloat(coefMatch[1] || 1) || 1;
@@ -1562,14 +1466,12 @@ function solveDerivative(input) {
             return;
         }
 
-        // e^x
         if (term.includes('e^x')) {
             steps.push(`<div class="solution-step">• ${term} → e^x</div>`);
             terms.push('e^x');
             return;
         }
 
-        // ln(x)
         if (term.includes('ln')) {
             steps.push(`<div class="solution-step">• ${term} → 1/x</div>`);
             terms.push('1/x');
@@ -1583,12 +1485,10 @@ function solveDerivative(input) {
     return steps.join('');
 }
 
-// Integral solver
 function solveIntegral(input) {
     let func = input.replace(/∫/g, '').replace(/dx/gi, '').replace(/\s+/g, '');
     let bounds = null;
 
-    // Check for definite integral
     const boundsMatch = input.match(/von\s*(-?\d+\.?\d*)\s*bis\s*(-?\d+\.?\d*)/i);
     if (boundsMatch) {
         bounds = { lower: parseFloat(boundsMatch[1]), upper: parseFloat(boundsMatch[2]) };
@@ -1600,7 +1500,6 @@ function solveIntegral(input) {
     let steps = [`<div class="solution-step"><strong>Integral:</strong> ∫ ${func} dx</div>`];
     let terms = [];
 
-    // Split into terms
     func = func.replace(/-/g, '+-');
     const parts = func.split('+').filter(p => p);
 
@@ -1610,7 +1509,6 @@ function solveIntegral(input) {
         term = term.trim();
         if (!term) return;
 
-        // Constant
         if (!term.includes('x')) {
             const c = parseFloat(term);
             steps.push(`<div class="solution-step">• ${term} → ${c}x</div>`);
@@ -1618,7 +1516,6 @@ function solveIntegral(input) {
             return;
         }
 
-        // ax^n
         const powerMatch = term.match(/^(-?\d*\.?\d*)x\^?(\d*)$/);
         if (powerMatch) {
             const coef = parseFloat(powerMatch[1] || 1) || 1;
@@ -1632,28 +1529,24 @@ function solveIntegral(input) {
             return;
         }
 
-        // sin(x)
         if (term.includes('sin')) {
             steps.push(`<div class="solution-step">• ${term} → -cos(x)</div>`);
             terms.push('-cos(x)');
             return;
         }
 
-        // cos(x)
         if (term.includes('cos')) {
             steps.push(`<div class="solution-step">• ${term} → sin(x)</div>`);
             terms.push('sin(x)');
             return;
         }
 
-        // e^x
         if (term.includes('e^x')) {
             steps.push(`<div class="solution-step">• ${term} → e^x</div>`);
             terms.push('e^x');
             return;
         }
 
-        // 1/x
         if (term === '1/x') {
             steps.push(`<div class="solution-step">• ${term} → ln|x|</div>`);
             terms.push('ln|x|');
@@ -1665,11 +1558,9 @@ function solveIntegral(input) {
     steps.push(`<div class="solution-step"><strong>Stammfunktion:</strong> F(x) = ${antiderivative}</div>`);
 
     if (bounds) {
-        // Calculate definite integral
         steps.push(`<div class="solution-step"><strong>Bestimmtes Integral von ${bounds.lower} bis ${bounds.upper}:</strong></div>`);
         steps.push(`<div class="solution-step">F(${bounds.upper}) - F(${bounds.lower})</div>`);
 
-        // Simple evaluation for polynomial
         let result = 0;
         terms.forEach(term => {
             const match = term.match(/(-?\d*\.?\d*)x\^(\d+)/);
@@ -1688,11 +1579,9 @@ function solveIntegral(input) {
     return steps.join('');
 }
 
-// Vector solver
 function solveVector(input) {
     const inp = input.toLowerCase();
 
-    // Parse vector from string like (1,2,3)
     const parseVector = (str) => {
         const match = str.match(/\((-?\d+\.?\d*),\s*(-?\d+\.?\d*),?\s*(-?\d+\.?\d*)?\)/);
         if (match) {
@@ -1701,7 +1590,6 @@ function solveVector(input) {
         return null;
     };
 
-    // Magnitude/Betrag
     if (inp.includes('betrag')) {
         const vec = parseVector(input);
         if (vec) {
@@ -1716,7 +1604,6 @@ function solveVector(input) {
         }
     }
 
-    // Dot product
     if (inp.includes('·') || inp.includes('skalar')) {
         const vectors = input.match(/\((-?\d+\.?\d*),\s*(-?\d+\.?\d*),?\s*(-?\d+\.?\d*)?\)/g);
         if (vectors && vectors.length >= 2) {
@@ -1732,7 +1619,6 @@ function solveVector(input) {
         }
     }
 
-    // Cross product
     if (inp.includes('×') || inp.includes('kreuz')) {
         const vectors = input.match(/\((-?\d+\.?\d*),\s*(-?\d+\.?\d*),?\s*(-?\d+\.?\d*)?\)/g);
         if (vectors && vectors.length >= 2) {
@@ -1757,11 +1643,9 @@ function solveVector(input) {
     return '<p>Vektor-Operationen: Betrag von (x,y,z), Skalarprodukt (·), Kreuzprodukt (×)</p>';
 }
 
-// Matrix solver
 function solveMatrix(input) {
     const inp = input.toLowerCase();
 
-    // Parse 2x2 matrix
     const parse2x2 = (str) => {
         const match = str.match(/\[\[(-?\d+),(-?\d+)\],\[(-?\d+),(-?\d+)\]\]/);
         if (match) {
@@ -1770,7 +1654,6 @@ function solveMatrix(input) {
         return null;
     };
 
-    // Determinant
     if (inp.includes('det')) {
         const matrix = parse2x2(input.replace(/\s/g, ''));
         if (matrix) {
@@ -1785,7 +1668,6 @@ function solveMatrix(input) {
         }
     }
 
-    // Inverse
     if (inp.includes('inv')) {
         const matrix = parse2x2(input.replace(/\s/g, ''));
         if (matrix) {
@@ -1807,7 +1689,6 @@ function solveMatrix(input) {
         }
     }
 
-    // Multiplication
     if (inp.includes('*')) {
         const matrices = input.replace(/\s/g, '').match(/\[\[.+?\]\]/g);
         if (matrices && matrices.length >= 2) {
@@ -1829,11 +1710,9 @@ function solveMatrix(input) {
     return '<p>Matrix-Operationen: det [[a,b],[c,d]], inv [[a,b],[c,d]], Multiplikation mit *</p>';
 }
 
-// Probability solver
 function solveProbability(input) {
     const inp = input.toLowerCase();
 
-    // Binomial coefficient
     const binomCoef = (n, k) => {
         if (k > n) return 0;
         if (k === 0 || k === n) return 1;
@@ -1844,7 +1723,6 @@ function solveProbability(input) {
         return Math.round(result);
     };
 
-    // Binomial distribution B(n, p, k)
     const binomMatch = inp.match(/b\((\d+),\s*([\d.]+),\s*(\d+)\)/);
     if (binomMatch) {
         const n = parseInt(binomMatch[1]);
@@ -1862,7 +1740,6 @@ function solveProbability(input) {
         `;
     }
 
-    // Expected value E(X)
     const expMatch = inp.match(/e\(x\).*b\((\d+),\s*([\d.]+)\)/);
     if (expMatch) {
         const n = parseInt(expMatch[1]);
@@ -1880,7 +1757,6 @@ function solveProbability(input) {
         `;
     }
 
-    // Normal distribution approximation
     const normMatch = inp.match(/p\(x\s*<\s*([\d.]+)\).*n\(([\d.]+),\s*([\d.]+)\)/);
     if (normMatch) {
         const x = parseFloat(normMatch[1]);
@@ -1888,7 +1764,6 @@ function solveProbability(input) {
         const sigma = parseFloat(normMatch[3]);
         const z = (x - mu) / sigma;
 
-        // Approximate Φ(z) using error function approximation
         const erf = (x) => {
             const t = 1 / (1 + 0.5 * Math.abs(x));
             const tau = t * Math.exp(-x * x - 1.26551223 + t * (1.00002368 + t * (0.37409196 +
@@ -1915,7 +1790,6 @@ function solveProbability(input) {
         </ul>`;
 }
 
-// ===== ESSAY HELPER =====
 function openEssayHelper() {
     document.getElementById('essayModal').classList.add('active');
 }
@@ -1955,7 +1829,6 @@ async function generateEssay() {
         try {
             const wordCount = length === 'short' ? 300 : length === 'long' ? 800 : 500;
 
-            // Use unified assistant essay API
             const response = await fetch('/api/hub/assistant/essay', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1979,7 +1852,6 @@ async function generateEssay() {
         }
     }
 
-    // Offline template
     document.getElementById('essaySolution').innerHTML = getEssayTemplate(type, topic, language);
 }
 
@@ -2158,7 +2030,6 @@ function copyEssay() {
     alert('Essay kopiert!');
 }
 
-// ===== SUMMARY HELPER =====
 function openSummaryHelper() {
     document.getElementById('summaryModal').classList.add('active');
 }
@@ -2184,7 +2055,6 @@ async function generateSummary() {
 
     if (ollamaAvailable) {
         try {
-            // Map type to length parameter
             const lengthMap = {
                 'kurz': 'short',
                 'stichpunkte': 'medium',
@@ -2192,7 +2062,6 @@ async function generateSummary() {
                 'lernkarten': 'medium'
             };
 
-            // Use unified assistant summarize API
             const response = await fetch('/api/hub/assistant/summarize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -2216,7 +2085,6 @@ async function generateSummary() {
         }
     }
 
-    // Offline summary
     document.getElementById('summarySolution').innerHTML = getOfflineSummary(text, type);
 }
 
@@ -2229,7 +2097,6 @@ function getOfflineSummary(text, type) {
 
     switch (type) {
         case 'kurz':
-            // Take first few sentences
             const shortSummary = sentences.slice(0, Math.min(3, sentences.length)).join(' ');
             result = `
                 <p><strong>Kurze Zusammenfassung:</strong></p>
@@ -2275,7 +2142,6 @@ function getOfflineSummary(text, type) {
             break;
     }
 
-    // Only show tip if Ollama is not available
     if (!ollamaAvailable) {
         result += `<p class="tip">💡 <em>Für bessere Zusammenfassungen installiere Ollama für lokale KI-Unterstützung.</em></p>`;
     } else {
@@ -2316,7 +2182,6 @@ function copySummary() {
     alert('Zusammenfassung kopiert!');
 }
 
-// Add keyboard shortcuts
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         closeMathModal();

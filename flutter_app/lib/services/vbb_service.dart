@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../models/vbb.dart';
-import 'database_service.dart';
+import 'database_service.dart' if (dart.library.html) 'database_service_web.dart';
 import 'connectivity_service.dart';
 
 class VbbService {

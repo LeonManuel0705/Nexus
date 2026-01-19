@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../models/drawing.dart';
-import '../services/database_service.dart';
+import '../services/database_service.dart' if (dart.library.html) '../services/database_service_web.dart';
 
 enum DrawingTool {
   pen,

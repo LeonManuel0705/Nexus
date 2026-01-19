@@ -174,12 +174,10 @@
         HubApp.initEmail();
         HubApp.initEventListeners();
 
-        // Listen for OAuth success message from popup
         window.addEventListener('message', async (event) => {
             if (event.data?.type === 'google-oauth-success') {
                 document.getElementById('addAccountModal').classList.remove('active');
                 document.getElementById('googleAuthModal').classList.remove('active');
-                // Reload email accounts
                 await HubApp.loadEmailAccounts();
                 HubApp.renderEmailAccountsBar();
                 if (event.data.email) {
@@ -189,7 +187,6 @@
             }
         });
 
-        // Google Sign-In button handler
         const googleSignInBtn = document.getElementById('googleSignInBtn');
         if (googleSignInBtn) {
             googleSignInBtn.addEventListener('click', async () => {
@@ -198,7 +195,6 @@
                     const data = await response.json();
 
                     if (data.success && data.auth_url) {
-                        // Open popup for Google sign-in (auto-redirect flow)
                         const width = 600, height = 700;
                         const left = (screen.width - width) / 2;
                         const top = (screen.height - height) / 2;
@@ -208,13 +204,10 @@
                             `width=${width},height=${height},left=${left},top=${top},popup=yes`
                         );
 
-                        // Close the add account modal
                         document.getElementById('addAccountModal').classList.remove('active');
 
-                        // Also show fallback manual entry modal in case popup is blocked
                         document.getElementById('googleAuthLink').href = data.auth_url;
                         if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-                            // Popup blocked - show manual modal
                             document.getElementById('googleAuthModal').classList.add('active');
                         }
                     } else {
@@ -228,7 +221,6 @@
             });
         }
 
-        // Submit Google auth code (fallback for manual entry if popup blocked)
         const submitGoogleCode = document.getElementById('submitGoogleCode');
         if (submitGoogleCode) {
             submitGoogleCode.addEventListener('click', async () => {
@@ -252,7 +244,6 @@
                     if (data.success) {
                         document.getElementById('googleAuthModal').classList.remove('active');
                         document.getElementById('googleAuthCode').value = '';
-                        // Reload email accounts
                         await HubApp.loadEmailAccounts();
                         HubApp.renderEmailAccountsBar();
                         HubApp.state.currentEmailAccount = data.email;
@@ -268,7 +259,6 @@
             });
         }
 
-        // Close Google auth modal
         document.getElementById('googleAuthModalClose')?.addEventListener('click', () => {
             document.getElementById('googleAuthModal').classList.remove('active');
         });

@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/event.dart';
-import 'database_service.dart';
+import 'database_service.dart' if (dart.library.html) 'database_service_web.dart';
 
 class HolidayService {
   static final HolidayService _instance = HolidayService._internal();
@@ -12,7 +13,6 @@ class HolidayService {
   final Dio _dio = Dio();
   final DatabaseService _db = DatabaseService();
 
-  // Map of German Bundesland names to their API codes
   static const bundeslandCodes = {
     'Baden-Württemberg': 'BW',
     'Bayern': 'BY',
@@ -38,48 +38,74 @@ class HolidayService {
     return prefs.getString('user_bundesland');
   }
 
+  /// Get the user's graduation year
+  Future<int?> getGraduationYear() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('graduation_year');
+  }
+
   /// Get the Bundesland code for API calls
   String? getBundeslandCode(String bundesland) {
     return bundeslandCodes[bundesland];
   }
 
-  /// Fetch and import all holidays for the user's Bundesland
-  Future<List<Event>> importHolidays({int? year}) async {
+  /// Fetch and import all holidays for the user's Bundesland until graduation year
+  Future<List<Event>> importHolidays({int? year, bool force = false}) async {
+    print('HolidayService: Starting holiday import (force: $force)');
+
     final bundesland = await getUserBundesland();
     if (bundesland == null) {
+      print('HolidayService: No Bundesland selected');
       return [];
     }
 
     final code = getBundeslandCode(bundesland);
     if (code == null) {
+      print('HolidayService: Unknown Bundesland code for: $bundesland');
       return [];
     }
 
-    final targetYear = year ?? DateTime.now().year;
+    final graduationYear = await getGraduationYear() ?? (DateTime.now().year + 3);
+    print('HolidayService: Importing holidays for $bundesland ($code) until graduation year $graduationYear');
+
+    final currentYear = DateTime.now().year;
     final events = <Event>[];
 
-    // Fetch public holidays (Feiertage)
-    final publicHolidays = await _fetchPublicHolidays(code, targetYear);
-    events.addAll(publicHolidays);
+    for (int targetYear = currentYear; targetYear <= graduationYear; targetYear++) {
+      print('HolidayService: Fetching holidays for year $targetYear...');
 
-    // Also fetch for next year if we're in the last quarter
-    if (DateTime.now().month >= 10 && year == null) {
-      final nextYearHolidays = await _fetchPublicHolidays(code, targetYear + 1);
-      events.addAll(nextYearHolidays);
+      final publicHolidays = await _fetchPublicHolidays(code, targetYear);
+      events.addAll(publicHolidays);
+      print('HolidayService: Got ${publicHolidays.length} public holidays for $targetYear');
+
+      if (targetYear == currentYear) {
+        final prevYearSchoolHolidays = await _fetchSchoolHolidays(code, targetYear - 1);
+        events.addAll(prevYearSchoolHolidays);
+        print('HolidayService: Got ${prevYearSchoolHolidays.length} school holidays for ${targetYear - 1} (may span into $targetYear)');
+      }
+
+      final schoolHolidays = await _fetchSchoolHolidays(code, targetYear);
+      events.addAll(schoolHolidays);
+      print('HolidayService: Got ${schoolHolidays.length} school holidays for $targetYear');
     }
 
-    // Fetch school holidays (Schulferien)
-    final schoolHolidays = await _fetchSchoolHolidays(code, targetYear);
-    events.addAll(schoolHolidays);
+    final savedCount = await _saveHolidaysToDatabase(events);
 
-    // Also fetch for next year
-    if (year == null) {
-      final nextYearSchoolHolidays = await _fetchSchoolHolidays(code, targetYear + 1);
-      events.addAll(nextYearSchoolHolidays);
+    if (!kIsWeb) {
+      final db = await _db.database;
+      final verifyResult = await db.rawQuery(
+        'SELECT COUNT(*) as c FROM events WHERE category IN (?, ?)',
+        ['holiday', 'vacation']
+      );
+      final dbCount = verifyResult.first['c'] as int? ?? 0;
+      print('HolidayService: Import complete - fetched: ${events.length}, newly saved: $savedCount, total in DB: $dbCount');
+
+      if (savedCount == 0 && events.isNotEmpty && dbCount == 0) {
+        print('HolidayService: WARNING - No holidays saved to database! Check for errors above.');
+      }
+    } else {
+      print('HolidayService: Fetched ${events.length} holiday events (web platform - not persisted)');
     }
-
-    // Save to database
-    await _saveHolidaysToDatabase(events);
 
     return events;
   }
@@ -87,6 +113,8 @@ class HolidayService {
   /// Fetch public holidays from feiertage-api.de
   Future<List<Event>> _fetchPublicHolidays(String bundeslandCode, int year) async {
     try {
+      print('HolidayService: Fetching public holidays for $bundeslandCode/$year');
+
       final response = await _dio.get(
         'https://feiertage-api.de/api/',
         queryParameters: {
@@ -100,10 +128,20 @@ class HolidayService {
       );
 
       if (response.statusCode != 200 || response.data == null) {
-        return [];
+        print('HolidayService: Public holidays API failed - status: ${response.statusCode}');
+        return _fetchPublicHolidaysNager(bundeslandCode, year);
       }
 
-      final Map<String, dynamic> data = response.data;
+      Map<String, dynamic> data;
+      if (response.data is Map) {
+        data = Map<String, dynamic>.from(response.data as Map);
+      } else if (response.data is String) {
+        data = jsonDecode(response.data as String) as Map<String, dynamic>;
+      } else {
+        print('HolidayService: Unexpected response type for public holidays');
+        return _fetchPublicHolidaysNager(bundeslandCode, year);
+      }
+
       final events = <Event>[];
       final now = DateTime.now();
 
@@ -131,9 +169,10 @@ class HolidayService {
         ));
       }
 
+      print('HolidayService: Got ${events.length} public holidays');
       return events;
     } catch (e) {
-      // Fallback to date.nager.at API
+      print('HolidayService: Error fetching public holidays: $e - trying fallback');
       return _fetchPublicHolidaysNager(bundeslandCode, year);
     }
   }
@@ -158,7 +197,6 @@ class HolidayService {
       final now = DateTime.now();
 
       for (final holiday in data) {
-        // Check if holiday applies to this Bundesland
         final counties = holiday['counties'] as List<dynamic>?;
         final isNational = counties == null || counties.isEmpty;
         final appliesToBundesland = isNational ||
@@ -197,58 +235,85 @@ class HolidayService {
   /// Fetch school holidays from ferien-api.de
   Future<List<Event>> _fetchSchoolHolidays(String bundeslandCode, int year) async {
     try {
+      print('HolidayService: Fetching school holidays for $bundeslandCode/$year');
+
       final response = await _dio.get(
         'https://ferien-api.de/api/v1/holidays/$bundeslandCode/$year',
         options: Options(
-          receiveTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 15),
           sendTimeout: const Duration(seconds: 10),
+          responseType: ResponseType.json, // Ensure JSON parsing
         ),
       );
 
       if (response.statusCode != 200 || response.data == null) {
+        print('HolidayService: Failed to fetch school holidays - status: ${response.statusCode}');
         return [];
       }
 
-      final List<dynamic> data = response.data;
+      List<dynamic> data;
+      if (response.data is List) {
+        data = response.data as List<dynamic>;
+      } else if (response.data is String) {
+        data = jsonDecode(response.data as String) as List<dynamic>;
+      } else {
+        print('HolidayService: Unexpected response type: ${response.data.runtimeType}');
+        return [];
+      }
+
+      print('HolidayService: Got ${data.length} school holidays');
+
       final events = <Event>[];
       final now = DateTime.now();
 
       for (final holiday in data) {
-        final name = holiday['name'] as String?;
-        final startStr = holiday['start'] as String?;
-        final endStr = holiday['end'] as String?;
+        try {
+          final name = holiday['name'] as String?;
+          final startStr = holiday['start'] as String?;
+          final endStr = holiday['end'] as String?;
 
-        if (name == null || startStr == null || endStr == null) continue;
+          if (name == null || startStr == null || endStr == null) {
+            print('HolidayService: Skipping holiday with missing data');
+            continue;
+          }
 
-        // Parse ISO 8601 dates
-        final start = DateTime.parse(startStr);
-        final end = DateTime.parse(endStr);
-        final id = 'vacation_${bundeslandCode}_${startStr}_${name.hashCode}';
+          final start = DateTime.parse(startStr);
+          final end = DateTime.parse(endStr);
+          final id = 'vacation_${bundeslandCode}_${startStr}_${name.hashCode}';
 
-        // Translate common vacation names to German
-        final translatedName = _translateVacationName(name);
+          final translatedName = _translateVacationName(name);
 
-        events.add(Event(
-          id: id,
-          title: translatedName,
-          description: 'Schulferien',
-          startTime: DateTime(start.year, start.month, start.day, 0, 0),
-          endTime: DateTime(end.year, end.month, end.day, 23, 59),
-          allDay: true,
-          category: 'vacation',
-          color: '#22C55E', // Green color for vacations
-          createdAt: now,
-          updatedAt: now,
-        ));
+          events.add(Event(
+            id: id,
+            title: translatedName,
+            description: 'Schulferien',
+            startTime: DateTime(start.year, start.month, start.day, 0, 0),
+            endTime: DateTime(end.year, end.month, end.day, 23, 59),
+            allDay: true,
+            category: 'vacation',
+            color: '#22C55E', // Green color for vacations
+            createdAt: now,
+            updatedAt: now,
+          ));
+
+          print('HolidayService: Added vacation: $translatedName ($startStr - $endStr)');
+        } catch (e) {
+          print('HolidayService: Error parsing holiday entry: $e');
+          continue;
+        }
       }
 
+      print('HolidayService: Successfully created ${events.length} vacation events');
       return events;
     } catch (e) {
+      print('HolidayService: Error fetching school holidays: $e');
       return [];
     }
   }
 
   /// Translate vacation names to German
+  /// API returns names like "osterferien nordrhein-westfalen 2025"
+  /// We want to extract just "Osterferien"
   String _translateVacationName(String name) {
     final translations = {
       'winterferien': 'Winterferien',
@@ -257,6 +322,9 @@ class HolidayService {
       'sommerferien': 'Sommerferien',
       'herbstferien': 'Herbstferien',
       'weihnachtsferien': 'Weihnachtsferien',
+      'frühjahrsferien': 'Frühjahrsferien',
+      'himmelfahrt': 'Himmelfahrtsferien',
+      'fronleichnam': 'Fronleichnam',
     };
 
     final lowerName = name.toLowerCase();
@@ -265,29 +333,57 @@ class HolidayService {
         return entry.value;
       }
     }
+
+    final firstWord = name.split(' ').first;
+    if (firstWord.isNotEmpty) {
+      return firstWord[0].toUpperCase() + firstWord.substring(1).toLowerCase();
+    }
     return name;
   }
 
   /// Save holidays to database (avoiding duplicates)
-  Future<void> _saveHolidaysToDatabase(List<Event> events) async {
+  /// Returns the number of events successfully saved
+  Future<int> _saveHolidaysToDatabase(List<Event> events) async {
+    if (kIsWeb) {
+      print('HolidayService: Skipping DB save on web platform');
+      return 0;
+    }
+
     final db = await _db.database;
+    int savedCount = 0;
+    int skippedCount = 0;
+    int errorCount = 0;
 
     for (final event in events) {
-      // Check if event already exists
-      final existing = await db.query(
-        'events',
-        where: 'id = ?',
-        whereArgs: [event.id],
-      );
+      try {
+        final existing = await db.query(
+          'events',
+          where: 'id = ?',
+          whereArgs: [event.id],
+        );
 
-      if (existing.isEmpty) {
-        await db.insert('events', event.toMap());
+        if (existing.isEmpty) {
+          await db.insert('events', event.toMap());
+          savedCount++;
+          print('HolidayService: Saved event: ${event.title}');
+        } else {
+          skippedCount++;
+        }
+      } catch (e) {
+        errorCount++;
+        print('HolidayService: ERROR saving event "${event.title}": $e');
+        print('HolidayService: Event data: ${event.toMap()}');
       }
     }
+
+    print('HolidayService: Database save complete - saved: $savedCount, skipped (duplicates): $skippedCount, errors: $errorCount');
+    return savedCount;
   }
 
   /// Delete all imported holidays
   Future<void> clearHolidays() async {
+    if (kIsWeb) return;
+
     final db = await _db.database;
     await db.delete(
       'events',
@@ -303,24 +399,63 @@ class HolidayService {
   }
 
   /// Check if holidays have been imported for the current year
+  /// Returns true only if BOTH public holidays AND school holidays exist
   Future<bool> hasImportedHolidays() async {
+    if (kIsWeb) return true;
+
     final db = await _db.database;
     final year = DateTime.now().year;
     final startOfYear = DateTime(year, 1, 1);
-    final endOfYear = DateTime(year, 12, 31);
+    final endOfYear = DateTime(year + 1, 6, 30);
 
-    final result = await db.query(
+    final holidays = await db.query(
       'events',
-      where: 'category IN (?, ?) AND start_time >= ? AND start_time <= ?',
-      whereArgs: ['holiday', 'vacation', startOfYear.toIso8601String(), endOfYear.toIso8601String()],
+      where: 'category = ? AND start_time >= ? AND start_time <= ?',
+      whereArgs: ['holiday', startOfYear.toIso8601String(), endOfYear.toIso8601String()],
       limit: 1,
     );
 
-    return result.isNotEmpty;
+    final vacations = await db.query(
+      'events',
+      where: 'category = ? AND start_time >= ? AND start_time <= ?',
+      whereArgs: ['vacation', startOfYear.toIso8601String(), endOfYear.toIso8601String()],
+      limit: 1,
+    );
+
+    final hasHolidays = holidays.isNotEmpty;
+    final hasVacations = vacations.isNotEmpty;
+
+    print('HolidayService: hasImportedHolidays - holidays: $hasHolidays, vacations: $hasVacations');
+
+    return hasHolidays && hasVacations;
+  }
+
+  /// Get counts of imported holidays and vacations
+  Future<Map<String, int>> getHolidayCounts() async {
+    if (kIsWeb) return {'holidays': 0, 'vacations': 0};
+
+    final db = await _db.database;
+
+    final holidays = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM events WHERE category = ?',
+      ['holiday'],
+    );
+
+    final vacations = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM events WHERE category = ?',
+      ['vacation'],
+    );
+
+    return {
+      'holidays': holidays.first['count'] as int? ?? 0,
+      'vacations': vacations.first['count'] as int? ?? 0,
+    };
   }
 
   /// Get all holidays from database
   Future<List<Event>> getHolidays() async {
+    if (kIsWeb) return [];
+
     final db = await _db.database;
     final results = await db.query(
       'events',

@@ -354,7 +354,6 @@
 
 {% block scripts %}
 <script>
-// Drawing state
 let canvas, ctx;
 let isDrawing = false;
 let currentTool = 'pen';
@@ -375,23 +374,19 @@ function initCanvas() {
     canvas = document.getElementById('drawingCanvas');
     ctx = canvas.getContext('2d');
 
-    // Set canvas size
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Mouse events
     canvas.addEventListener('mousedown', startDrawing);
     canvas.addEventListener('mousemove', draw);
     canvas.addEventListener('mouseup', stopDrawing);
     canvas.addEventListener('mouseout', stopDrawing);
 
-    // Touch events
     canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
     canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
     canvas.addEventListener('touchend', stopDrawing);
     canvas.addEventListener('touchcancel', stopDrawing);
 
-    // Prevent scrolling while drawing
     canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 }
 
@@ -407,7 +402,6 @@ function resizeCanvas() {
 
     ctx.scale(dpr, dpr);
 
-    // Redraw content
     drawBackground();
     redrawStrokes();
 }
@@ -633,7 +627,6 @@ function saveDrawing() {
         date: new Date().toISOString()
     });
 
-    // Keep only last 20 drawings
     if (drawings.length > 20) {
         drawings.pop();
     }
@@ -641,7 +634,6 @@ function saveDrawing() {
     localStorage.setItem('nexus_drawings', JSON.stringify(drawings));
     loadSavedDrawings();
 
-    // Clear canvas after save
     strokes = [];
     drawBackground();
     document.getElementById('canvasHint').classList.remove('hidden');

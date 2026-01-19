@@ -1,14 +1,3 @@
-\
-\
-\
-\
-\
-\
-\
-\
-\
-\
-
 import os
 import json
 import base64
@@ -423,14 +412,6 @@ def send_gmail(from_email: str, to_email: str, subject: str, body: str) -> Dict:
 
 def fetch_google_calendar_events(days_ahead: int = 30, account_email: str = None,
                                   start_date: str = None, end_date: str = None) -> Dict:
-\
-\
-\
-\
-\
-\
-\
-
     tokens = load_tokens()
 
     if not tokens:
@@ -522,7 +503,8 @@ def fetch_google_calendar_events(days_ahead: int = 30, account_email: str = None
                         "calendar": cal_name,
                         "calendar_id": cal_id,
                         "calendar_color": cal_color,
-                        "source": "google"
+                        "source": "google",
+                        "recurring_event_id": event.get('recurringEventId', None)
                     })
             except Exception as cal_err:
 
@@ -728,9 +710,10 @@ def update_google_calendar_event(
 def delete_google_calendar_event(
     event_id: str,
     calendar_id: str = 'primary',
-    account_email: str = None
+    account_email: str = None,
+    delete_all_occurrences: bool = False,
+    recurring_event_id: str = None
 ) -> Dict:
-
     tokens = load_tokens()
 
     if not tokens:
@@ -748,12 +731,18 @@ def delete_google_calendar_event(
     try:
         service = build('calendar', 'v3', credentials=creds)
 
-        service.events().delete(
-            calendarId=calendar_id,
-            eventId=event_id
-        ).execute()
-
-        return {"success": True, "message": "Event deleted successfully"}
+        if delete_all_occurrences and recurring_event_id:
+            service.events().delete(
+                calendarId=calendar_id,
+                eventId=recurring_event_id
+            ).execute()
+            return {"success": True, "message": "Alle Wiederholungen gelöscht"}
+        else:
+            service.events().delete(
+                calendarId=calendar_id,
+                eventId=event_id
+            ).execute()
+            return {"success": True, "message": "Termin gelöscht"}
 
     except Exception as e:
         return {"success": False, "error": str(e)}

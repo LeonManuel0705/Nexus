@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../providers/iserv_provider.dart';
 import '../models/iserv.dart';
 import '../theme.dart';
@@ -17,7 +18,7 @@ class _IServScreenState extends State<IServScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<IServProvider>().initialize();
     });
@@ -30,118 +31,113 @@ class _IServScreenState extends State<IServScreen> with SingleTickerProviderStat
   }
 
   void _showLoginDialog() {
+    final urlController = TextEditingController();
     final usernameController = TextEditingController();
     final passwordController = TextEditingController();
-    final urlController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: NexusTheme.darkCard,
-        title: const Text('Mit IServ verbinden'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: urlController,
-                decoration: const InputDecoration(
-                  labelText: 'IServ URL',
-                  hintText: 'z.B. gymnasium.iserv.de',
-                  prefixIcon: Icon(Icons.public),
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: usernameController,
-                decoration: const InputDecoration(
-                  labelText: 'Benutzername',
-                  prefixIcon: Icon(Icons.person),
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Passwort',
-                  prefixIcon: Icon(Icons.lock),
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Abbrechen'),
-          ),
-          Consumer<IServProvider>(
-            builder: (context, provider, child) {
-              return Column(
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) {
+          bool isLoading = false;
+          String? errorMessage;
+
+          return AlertDialog(
+            backgroundColor: NexusTheme.darkCard,
+            title: const Text('Mit IServ verbinden'),
+            content: SingleChildScrollView(
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  if (provider.error != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(
-                        provider.error!,
-                        style: TextStyle(
-                          color: NexusTheme.error,
-                          fontSize: 12,
-                        ),
-                      ),
+                  const Text(
+                    'Gib deine IServ-Zugangsdaten ein.',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: urlController,
+                    decoration: const InputDecoration(
+                      labelText: 'IServ URL',
+                      hintText: 'z.B. gymnasium.iserv.de',
+                      prefixIcon: Icon(Icons.public),
+                      border: OutlineInputBorder(),
                     ),
-                  ElevatedButton(
-                    onPressed: provider.isLoading
+                    keyboardType: TextInputType.url,
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: usernameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Benutzername',
+                      prefixIcon: Icon(Icons.person),
+                      border: OutlineInputBorder(),
+                    ),
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: passwordController,
+                    decoration: const InputDecoration(
+                      labelText: 'Passwort',
+                      prefixIcon: Icon(Icons.lock),
+                      border: OutlineInputBorder(),
+                    ),
+                    obscureText: true,
+                    textInputAction: TextInputAction.done,
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Abbrechen'),
+              ),
+              StatefulBuilder(
+                builder: (context, setButtonState) {
+                  bool buttonLoading = false;
+
+                  return ElevatedButton(
+                    onPressed: buttonLoading
                         ? null
                         : () async {
-                            if (usernameController.text.trim().isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
+                            final url = urlController.text.trim();
+                            final username = usernameController.text.trim();
+                            final password = passwordController.text;
+
+                            if (url.isEmpty || username.isEmpty || password.isEmpty) {
+                              ScaffoldMessenger.of(this.context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Bitte Benutzername eingeben'),
+                                  content: Text('Bitte alle Felder ausfüllen'),
                                   backgroundColor: Colors.red,
                                 ),
                               );
                               return;
                             }
-                            if (passwordController.text.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Bitte Passwort eingeben'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                              return;
-                            }
-                            if (urlController.text.trim().isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Bitte IServ URL eingeben'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                              return;
-                            }
+
+                            setButtonState(() => buttonLoading = true);
+
+                            final provider = this.context.read<IServProvider>();
                             final result = await provider.connect(
-                              username: usernameController.text.trim(),
-                              password: passwordController.text,
-                              iservUrl: urlController.text.trim(),
+                              username: username,
+                              password: password,
+                              iservUrl: url,
                             );
-                            if (result['success'] == true && mounted) {
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
+
+                            if (!mounted) return;
+
+                            if (result['success'] == true) {
+                              Navigator.pop(dialogContext);
+                              ScaffoldMessenger.of(this.context).showSnackBar(
                                 const SnackBar(
                                   content: Text('Erfolgreich mit IServ verbunden'),
                                   backgroundColor: Colors.green,
                                 ),
                               );
-                            } else if (result['success'] != true && mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
+                            } else {
+                              setButtonState(() => buttonLoading = false);
+                              ScaffoldMessenger.of(this.context).showSnackBar(
                                 SnackBar(
                                   content: Text(result['error'] ?? 'Anmeldung fehlgeschlagen'),
                                   backgroundColor: Colors.red,
@@ -149,19 +145,19 @@ class _IServScreenState extends State<IServScreen> with SingleTickerProviderStat
                               );
                             }
                           },
-                    child: provider.isLoading
+                    child: buttonLoading
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : const Text('Verbinden'),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
+                        : const Text('Anmelden'),
+                  );
+                },
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -197,6 +193,7 @@ class _IServScreenState extends State<IServScreen> with SingleTickerProviderStat
             Tab(text: 'Nachrichten'),
             Tab(text: 'Aufgaben'),
             Tab(text: 'Termine'),
+            Tab(text: 'Vertretung'),
           ],
         ),
       ),
@@ -243,6 +240,7 @@ class _IServScreenState extends State<IServScreen> with SingleTickerProviderStat
                     _NotificationsTab(notifications: provider.notifications),
                     _ExercisesTab(exercises: provider.exercises),
                     _EventsTab(events: provider.events),
+                    const _VertretungsplanTab(),
                   ],
                 ),
               ),
@@ -254,6 +252,7 @@ class _IServScreenState extends State<IServScreen> with SingleTickerProviderStat
         builder: (context, provider, child) {
           if (provider.isConnected) {
             return FloatingActionButton.extended(
+              heroTag: 'fab_iserv_disconnect',
               onPressed: () => _showDisconnectDialog(provider),
               backgroundColor: NexusTheme.error,
               icon: const Icon(Icons.logout),
@@ -261,6 +260,7 @@ class _IServScreenState extends State<IServScreen> with SingleTickerProviderStat
             );
           }
           return FloatingActionButton.extended(
+            heroTag: 'fab_iserv_connect',
             onPressed: _showLoginDialog,
             backgroundColor: NexusTheme.primary,
             icon: const Icon(Icons.login),
@@ -714,6 +714,327 @@ class _EmptyTabView extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _VertretungsplanTab extends StatefulWidget {
+  const _VertretungsplanTab();
+
+  @override
+  State<_VertretungsplanTab> createState() => _VertretungsplanTabState();
+}
+
+class _VertretungsplanTabState extends State<_VertretungsplanTab>
+    with SingleTickerProviderStateMixin {
+  late TabController _innerTabController;
+  InAppWebViewController? _webViewController;
+
+  @override
+  void initState() {
+    super.initState();
+    _innerTabController = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadVertretungsplan();
+    });
+  }
+
+  @override
+  void dispose() {
+    _innerTabController.dispose();
+    super.dispose();
+  }
+
+  void _loadVertretungsplan() {
+    context.read<IServProvider>().fetchVertretungsplan();
+  }
+
+  String _formatCacheTime(DateTime? cachedAt) {
+    if (cachedAt == null) return '';
+    final now = DateTime.now();
+    final diff = now.difference(cachedAt);
+
+    if (diff.inMinutes < 1) {
+      return 'gerade eben';
+    } else if (diff.inMinutes < 60) {
+      return 'vor ${diff.inMinutes} Min.';
+    } else if (diff.inHours < 24) {
+      return 'vor ${diff.inHours} Std.';
+    } else {
+      return '${cachedAt.day}.${cachedAt.month}. ${cachedAt.hour}:${cachedAt.minute.toString().padLeft(2, '0')}';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<IServProvider>(
+      builder: (context, provider, child) {
+        if (provider.isVertretungsplanLoading && provider.vertretungsplanHtml == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (provider.vertretungsplanError != null && provider.vertretungsplanHtml == null) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: NexusTheme.error.withOpacity(0.5),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    provider.vertretungsplanError!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white.withOpacity(0.7)),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: _loadVertretungsplan,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Erneut versuchen'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          children: [
+            if (provider.isVertretungsplanFromCache)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                color: Colors.orange.withOpacity(0.15),
+                child: Row(
+                  children: [
+                    const Icon(Icons.offline_bolt, color: Colors.orange, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Offline-Modus${provider.vertretungsplanCachedAt != null ? ' (${_formatCacheTime(provider.vertretungsplanCachedAt)})' : ''}',
+                        style: const TextStyle(color: Colors.orange, fontSize: 13),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: provider.isVertretungsplanLoading ? null : _loadVertretungsplan,
+                      child: provider.isVertretungsplanLoading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Aktualisieren'),
+                    ),
+                  ],
+                ),
+              ),
+
+            Container(
+              color: NexusTheme.darkSurface,
+              child: TabBar(
+                controller: _innerTabController,
+                tabs: const [
+                  Tab(text: 'Infobildschirm'),
+                  Tab(text: 'Info'),
+                ],
+              ),
+            ),
+
+            Expanded(
+              child: TabBarView(
+                controller: _innerTabController,
+                children: [
+                  _buildWebViewContent(provider.vertretungsplanHtml),
+                  _buildInfoContent(provider.vertretungsplanHtml),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildWebViewContent(String? html) {
+    if (html == null || html.isEmpty) {
+      return _EmptyTabView(
+        icon: Icons.web,
+        message: 'Keine Daten verfügbar',
+      );
+    }
+
+    return InAppWebView(
+      initialData: InAppWebViewInitialData(
+        data: html,
+        baseUrl: WebUri('https://ehgwerder.de'),
+      ),
+      initialSettings: InAppWebViewSettings(
+        javaScriptEnabled: true,
+        supportZoom: true,
+        builtInZoomControls: true,
+        displayZoomControls: false,
+        transparentBackground: true,
+      ),
+      onWebViewCreated: (controller) {
+        _webViewController = controller;
+      },
+    );
+  }
+
+  Widget _buildInfoContent(String? html) {
+    if (html == null || html.isEmpty) {
+      return _EmptyTabView(
+        icon: Icons.info_outline,
+        message: 'Keine Informationen verfügbar',
+      );
+    }
+
+    final infoSections = <Map<String, String>>[];
+
+    final titleMatch = RegExp(r'<title>([^<]+)</title>', caseSensitive: false).firstMatch(html);
+    final title = titleMatch?.group(1)?.trim() ?? 'Vertretungsplan';
+
+    final dateMatch = RegExp(r'(\d{1,2}\.\d{1,2}\.\d{4})', caseSensitive: false).firstMatch(html);
+    final date = dateMatch?.group(1);
+
+    final infoPatterns = [
+      RegExp(r'<div[^>]*class="[^"]*info[^"]*"[^>]*>(.*?)</div>', caseSensitive: false, dotAll: true),
+      RegExp(r'<p[^>]*class="[^"]*message[^"]*"[^>]*>(.*?)</p>', caseSensitive: false, dotAll: true),
+      RegExp(r'<span[^>]*class="[^"]*notice[^"]*"[^>]*>(.*?)</span>', caseSensitive: false, dotAll: true),
+    ];
+
+    for (final pattern in infoPatterns) {
+      final matches = pattern.allMatches(html);
+      for (final match in matches) {
+        final content = match.group(1)?.replaceAll(RegExp(r'<[^>]+>'), '').trim();
+        if (content != null && content.isNotEmpty) {
+          infoSections.add({'type': 'info', 'content': content});
+        }
+      }
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Card(
+          color: NexusTheme.darkCard,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: NexusTheme.primary.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.school, color: NexusTheme.primary),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          if (date != null)
+                            Text(
+                              date,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.6),
+                                fontSize: 14,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        if (infoSections.isEmpty)
+          Card(
+            color: NexusTheme.darkCard,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: Colors.white.withOpacity(0.5),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Keine zusätzlichen Informationen',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ...infoSections.map((section) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Card(
+              color: NexusTheme.darkCard,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  section['content'] ?? '',
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ),
+            ),
+          )),
+
+        const SizedBox(height: 24),
+
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: NexusTheme.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: NexusTheme.primary.withOpacity(0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.lightbulb_outline, color: NexusTheme.primary, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Wechsel zu "Infobildschirm" für die vollständige Ansicht',
+                  style: TextStyle(
+                    color: NexusTheme.primary,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

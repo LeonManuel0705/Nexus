@@ -7,7 +7,7 @@
     <div class="widget-header" style="justify-content: center;">
         <div style="text-align: center;">
             <h2 class="widget-title" data-i18n="pomodoro_title">Pomodoro Timer</h2>
-            <span class="pomodoro-sessions" id="pomodoroSessions">0 sessions today</span>
+            <span class="pomodoro-sessions" id="pomodoroSessions">0 Sitzungen heute</span>
         </div>
     </div>
 
@@ -24,7 +24,7 @@
                     stroke-dasharray="283" stroke-dashoffset="0" transform="rotate(-90 50 50)"/>
         </svg>
         <div class="pomodoro-time" id="pomodoroTime">25:00</div>
-        <div class="pomodoro-status" id="pomodoroStatus" data-i18n="ready">Ready</div>
+        <div class="pomodoro-status" id="pomodoroStatus" data-i18n="ready">Bereit</div>
     </div>
 
     <div class="pomodoro-controls">
@@ -49,22 +49,22 @@
 </section>
 
 <section class="widget glass-card">
-    <h2 class="widget-title" style="margin-bottom: 16px;" data-i18n="how_it_works">How it works</h2>
+    <h2 class="widget-title" style="margin-bottom: 16px;" data-i18n="how_it_works">So funktioniert's</h2>
     <div style="color: var(--text-secondary); line-height: 1.8;">
-        <p><strong>1.</strong> <span data-i18n="work_focus">Work for 25 minutes with full focus</span></p>
-        <p><strong>2.</strong> <span data-i18n="take_break">Take a 5-minute break</span></p>
-        <p><strong>3.</strong> <span data-i18n="repeat_track">Repeat and track your sessions</span></p>
+        <p><strong>1.</strong> <span data-i18n="work_focus">Arbeite 25 Minuten mit voller Konzentration</span></p>
+        <p><strong>2.</strong> <span data-i18n="take_break">Mache eine 5-minütige Pause</span></p>
+        <p><strong>3.</strong> <span data-i18n="repeat_track">Wiederhole und verfolge deine Sitzungen</span></p>
     </div>
 </section>
 
 <section class="widget glass-card">
-    <h2 class="widget-title" style="margin-bottom: 16px;" data-i18n="timer_settings">Timer Settings</h2>
+    <h2 class="widget-title" style="margin-bottom: 16px;" data-i18n="timer_settings">Timer-Einstellungen</h2>
     <div class="form-group">
-        <label for="workDuration" data-i18n="work_duration">Work Duration (min)</label>
+        <label for="workDuration" data-i18n="work_duration">Arbeitszeit (Min.)</label>
         <input type="number" id="workDuration" min="1" max="60" value="25">
     </div>
     <div class="form-group" style="margin-bottom: 0;">
-        <label for="breakDuration" data-i18n="break_duration">Break Duration (min)</label>
+        <label for="breakDuration" data-i18n="break_duration">Pausenzeit (Min.)</label>
         <input type="number" id="breakDuration" min="1" max="30" value="5">
     </div>
 </section>
@@ -94,7 +94,7 @@
         HubApp.initPomodoro();
         HubApp.initEventListeners();
         initPomodoroEnhancements();
-        loadStudyStats();
+        await loadStudyStats();
     });
 
     async function loadSubjects() {
@@ -119,7 +119,6 @@
     }
 
     function initPomodoroEnhancements() {
-        // Subject selection
         const subjectSelect = document.getElementById('pomodoroSubject');
         if (subjectSelect) {
             subjectSelect.addEventListener('change', (e) => {
@@ -128,17 +127,14 @@
             });
         }
 
-        // Stats range
         const statsRange = document.getElementById('statsRange');
         if (statsRange) {
             statsRange.addEventListener('change', () => loadStudyStats());
         }
 
-        // Override pomodoroComplete to save to backend
         const originalComplete = HubApp.pomodoroComplete.bind(HubApp);
         HubApp.pomodoroComplete = function() {
             if (this.state.pomodoroIsWork) {
-                // Save session to backend before calling original
                 saveSession(this.state.pomodoro.workDuration);
             }
             originalComplete();
@@ -169,7 +165,14 @@
         if (!container) return;
 
         try {
-            const res = await fetch(`/api/pomodoro/stats?range=${range}`);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            const res = await fetch(`/api/pomodoro/stats?range=${range}`, {
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
             if (res.ok) {
                 const data = await res.json();
                 renderStudyStats(data);
@@ -177,7 +180,12 @@
                 container.innerHTML = '<div class="empty-state">Noch keine Daten</div>';
             }
         } catch (err) {
-            container.innerHTML = '<div class="empty-state">Statistiken nicht verfügbar</div>';
+            console.error('Error loading study stats:', err);
+            if (err.name === 'AbortError') {
+                container.innerHTML = '<div class="empty-state">Zeitüberschreitung - bitte Seite neu laden</div>';
+            } else {
+                container.innerHTML = '<div class="empty-state">Statistiken nicht verfügbar</div>';
+            }
         }
     }
 

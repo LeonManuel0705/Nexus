@@ -27,13 +27,11 @@
     <link rel="stylesheet" href="/static/css/loading.css">
     {% block head %}{% endblock %}
     <script>
-        // Apply theme immediately to prevent flash
         (function() {
             var theme = localStorage.getItem('nexus-theme') || localStorage.getItem('hub_theme') || 'dark';
             document.documentElement.setAttribute('data-theme', theme);
         })();
 
-        // Mobile detection - used globally to disable heavy animations
         window.isMobile = window.matchMedia('(max-width: 768px)').matches ||
                           window.matchMedia('(pointer: coarse)').matches ||
                           /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -41,7 +39,6 @@
 </head>
 <body>
     <script>
-        // Apply theme to body as well
         document.body.setAttribute('data-theme', localStorage.getItem('nexus-theme') || localStorage.getItem('hub_theme') || 'dark');
     </script>
 
@@ -282,7 +279,6 @@
     <script src="/static/js/connection-manager.js?v=3"></script>
 
     <script>
-    // Single-user mode - simplified helper functions for API compatibility
     function getCurrentUserId() {
         return null; // Single-user mode - no user ID needed
     }
@@ -301,7 +297,6 @@
         return data; // Single-user mode - return unchanged
     }
 
-    // Connection state management with NexusConnection
     function updateOfflineBanner() {
         const banner = document.getElementById('offlineBanner');
         const bannerText = banner.querySelector('span');
@@ -319,16 +314,13 @@
         }
     }
 
-    // Initialize connection manager on page load
     document.addEventListener('DOMContentLoaded', async () => {
         await NexusConnection.init();
         updateOfflineBanner();
     });
 
-    // Listen for connection state changes
     window.addEventListener('nexus-connection-ready', updateOfflineBanner);
 
-    // Listen for browser online/offline events as backup
     window.addEventListener('online', () => {
         NexusConnection.refresh().then(updateOfflineBanner);
     });
@@ -342,7 +334,6 @@
     <script>
     let quickNoteSubjects = [];
 
-    // Load subjects for homework
     async function loadQuickNoteSubjects() {
         try {
             const res = await fetch('/api/hub/school/subjects');
@@ -367,7 +358,6 @@
         document.getElementById('quickNoteModal').classList.remove('active');
     }
 
-    // Show/hide fields based on type
     document.getElementById('quickNoteType').addEventListener('change', function() {
         const type = this.value;
         const subjectGroup = document.getElementById('quickNoteSubjectGroup');
@@ -434,9 +424,7 @@
 
             if (res.ok) {
                 closeQuickNoteModal();
-                // Show success feedback
                 showQuickNoteFeedback('Gespeichert!');
-                // Reload if on relevant page
                 if (window.location.pathname.includes('/hub/tasks') ||
                     window.location.pathname.includes('/hub/school')) {
                     setTimeout(() => location.reload(), 500);
@@ -453,7 +441,6 @@
         setTimeout(() => fab.classList.remove('success'), 1500);
     }
 
-    // Keyboard shortcut: Ctrl+Shift+N to open quick note
     document.addEventListener('keydown', function(e) {
         if (e.ctrlKey && e.shiftKey && e.key === 'N') {
             e.preventDefault();
@@ -463,7 +450,6 @@
     </script>
 
     <script>
-    // Register service worker for PWA
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', async () => {
             try {
@@ -472,12 +458,10 @@
                 });
                 console.log('[PWA] Service Worker registered:', registration.scope);
 
-                // Check for updates
                 registration.addEventListener('updatefound', () => {
                     const newWorker = registration.installing;
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            // New version available
                             if (confirm('Neue Version verfügbar! Jetzt aktualisieren?')) {
                                 newWorker.postMessage({ type: 'SKIP_WAITING' });
                                 window.location.reload();
@@ -486,11 +470,9 @@
                     });
                 });
 
-                // Listen for messages from service worker
                 navigator.serviceWorker.addEventListener('message', (event) => {
                     if (event.data && event.data.type === 'SYNC_READY') {
                         console.log('[PWA] Back online - sync available');
-                        // Could trigger data sync here
                     }
                 });
             } catch (error) {
@@ -498,28 +480,23 @@
             }
         });
 
-        // Handle controller change (new SW activated)
         navigator.serviceWorker.addEventListener('controllerchange', () => {
             console.log('[PWA] New service worker activated');
         });
     }
 
-    // Install prompt for PWA
     let deferredPrompt = null;
 
     window.addEventListener('beforeinstallprompt', (e) => {
-        // Prevent Chrome 67+ from showing the mini-infobar
         e.preventDefault();
         deferredPrompt = e;
 
-        // Show custom install button if not already installed
         if (!window.matchMedia('(display-mode: standalone)').matches) {
             showInstallButton();
         }
     });
 
     function showInstallButton() {
-        // Create install button if it doesn't exist
         if (!document.getElementById('pwaInstallBtn')) {
             const btn = document.createElement('button');
             btn.id = 'pwaInstallBtn';
@@ -551,7 +528,6 @@
         deferredPrompt = null;
     }
 
-    // Hide install button if already in standalone mode
     window.addEventListener('appinstalled', () => {
         console.log('[PWA] App installed successfully');
         document.getElementById('pwaInstallBtn')?.remove();
@@ -560,8 +536,6 @@
     </script>
 
     <script>
-    // Smooth page transitions - fade entire page for seamless experience
-    // Disabled on mobile for snappier navigation
     document.addEventListener('DOMContentLoaded', () => {
         if (window.isMobile) return; // Skip transition setup on mobile
 

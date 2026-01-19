@@ -433,7 +433,6 @@ class _EmailScreenState extends State<EmailScreen> {
           },
         ),
 
-        // FAB
         Positioned(
           right: 16,
           bottom: 16,
@@ -441,6 +440,7 @@ class _EmailScreenState extends State<EmailScreen> {
             builder: (context, provider, child) {
               if (!provider.hasAccounts) {
                 return FloatingActionButton.extended(
+                  heroTag: 'fab_email_add',
                   onPressed: _showAddAccountDialog,
                   backgroundColor: NexusTheme.primaryColor,
                   icon: const Icon(Icons.add, color: Colors.white),
@@ -448,6 +448,7 @@ class _EmailScreenState extends State<EmailScreen> {
                 );
               }
               return FloatingActionButton(
+                heroTag: 'fab_email_compose',
                 onPressed: _showComposeDialog,
                 backgroundColor: NexusTheme.primaryColor,
                 child: const Icon(Icons.edit, color: Colors.white),
@@ -471,7 +472,6 @@ class _NoAccountView extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Header
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -524,7 +524,6 @@ class _NoAccountView extends StatelessWidget {
 
         const SizedBox(height: 80),
 
-        // Empty state
         Container(
           padding: const EdgeInsets.all(32),
           decoration: BoxDecoration(
@@ -613,7 +612,6 @@ class _EmailListView extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Header
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -678,7 +676,6 @@ class _EmailListView extends StatelessWidget {
 
           const SizedBox(height: 20),
 
-          // Stats row
           Row(
             children: [
               Expanded(child: _buildStatCard(
@@ -703,7 +700,6 @@ class _EmailListView extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // Section header
           Row(
             children: [
               Container(
@@ -1012,7 +1008,6 @@ class _EmailDetailView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Header bar
         Container(
           padding: const EdgeInsets.all(8),
           margin: const EdgeInsets.all(16),
@@ -1066,7 +1061,6 @@ class _EmailDetailView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Email content card
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -1083,7 +1077,6 @@ class _EmailDetailView extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Subject
                       Text(
                         email.subject,
                         style: TextStyle(
@@ -1094,7 +1087,6 @@ class _EmailDetailView extends StatelessWidget {
                       ),
                       const SizedBox(height: 20),
 
-                      // Sender info
                       Row(
                         children: [
                           Container(
@@ -1159,7 +1151,6 @@ class _EmailDetailView extends StatelessWidget {
                       Divider(color: isDark ? Colors.white12 : Colors.black12),
                       const SizedBox(height: 16),
 
-                      // Body
                       Text(
                         email.bodyPlain ?? '',
                         style: TextStyle(
@@ -1169,7 +1160,6 @@ class _EmailDetailView extends StatelessWidget {
                         ),
                       ),
 
-                      // Attachments
                       if (email.hasAttachments && email.attachments != null) ...[
                         const SizedBox(height: 24),
                         Divider(color: isDark ? Colors.white12 : Colors.black12),
@@ -1224,7 +1214,6 @@ class _EmailDetailView extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
-                // Action buttons
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(

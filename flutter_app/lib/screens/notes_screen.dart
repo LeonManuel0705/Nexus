@@ -76,258 +76,558 @@ class _NotesScreenState extends State<NotesScreen> {
     final provider = context.read<NotesProvider>();
     if (provider.activeNoteId == null) return;
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: NexusTheme.darkCard,
-        title: const Text('Notiz löschen?'),
-        content: const Text('Diese Notiz wird dauerhaft gelöscht.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Abbrechen'),
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              await provider.deleteNote(provider.activeNoteId!);
-              _textController.text = provider.activeNote?.content ?? '';
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: NexusTheme.error,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[400],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: NexusTheme.danger.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(Icons.delete_outline, color: NexusTheme.danger, size: 32),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Notiz löschen?',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Diese Notiz wird dauerhaft gelöscht.',
+                style: TextStyle(
+                  color: isDark ? Colors.white60 : Colors.black54,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text('Abbrechen'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () async {
+                        await provider.deleteNote(provider.activeNoteId!);
+                        _textController.text = provider.activeNote?.content ?? '';
+                        Navigator.pop(context);
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: NexusTheme.danger,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text('Löschen'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Consumer<NotesProvider>(
+      builder: (context, provider, child) {
+        if (provider.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        return Stack(
+          children: [
+            ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _buildHeader(context, isDark, provider),
+                const SizedBox(height: 20),
+
+                Row(
+                  children: [
+                    Expanded(child: _buildStatCard(
+                      context,
+                      isDark: isDark,
+                      icon: Icons.note,
+                      value: '${provider.totalNotes}',
+                      label: 'Notizen',
+                      color: NexusTheme.notesColor,
+                    )),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildStatCard(
+                      context,
+                      isDark: isDark,
+                      icon: Icons.text_fields,
+                      value: '${provider.activeNote?.wordCount ?? 0}',
+                      label: 'Wörter',
+                      color: NexusTheme.primary,
+                    )),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                _buildSectionHeader(
+                  context,
+                  isDark: isDark,
+                  title: 'Deine Notizen',
+                  icon: Icons.folder_outlined,
+                  iconColor: NexusTheme.notesColor,
+                ),
+                const SizedBox(height: 12),
+
+                _buildNoteTabs(context, isDark, provider),
+
+                const SizedBox(height: 20),
+
+                _buildSectionHeader(
+                  context,
+                  isDark: isDark,
+                  title: 'Editor',
+                  icon: Icons.edit_note,
+                  iconColor: NexusTheme.primary,
+                  trailing: provider.hasUnsavedChanges
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.circle, size: 8, color: Colors.orange),
+                              SizedBox(width: 4),
+                              Text(
+                                'Speichert...',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.orange,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : null,
+                ),
+                const SizedBox(height: 12),
+
+                _buildEditor(context, isDark, provider),
+
+                const SizedBox(height: 100),
+              ],
             ),
-            child: const Text('Löschen'),
+
+            Positioned(
+              right: 16,
+              bottom: 16,
+              child: FloatingActionButton(
+                heroTag: 'fab_notes',
+                onPressed: _createNewNote,
+                backgroundColor: NexusTheme.notesColor,
+                child: const Icon(Icons.add, color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, bool isDark, NotesProvider provider) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withOpacity(0.05)
+            : Colors.white.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withOpacity(0.1)
+              : Colors.black.withOpacity(0.05),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: NexusTheme.notesColor.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.sticky_note_2, color: NexusTheme.notesColor, size: 28),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Schnelle Notizen',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                Text(
+                  'Gedanken festhalten',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? Colors.white60 : Colors.black54,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (provider.activeNoteId != null)
+            IconButton(
+              onPressed: _deleteCurrentNote,
+              icon: Icon(
+                Icons.delete_outline,
+                color: isDark ? Colors.white54 : Colors.black45,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(
+    BuildContext context, {
+    required bool isDark,
+    required String title,
+    required IconData icon,
+    required Color iconColor,
+    Widget? trailing,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 16, color: iconColor),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
+        ),
+        if (trailing != null) ...[
+          const Spacer(),
+          trailing,
+        ],
+      ],
+    );
+  }
+
+  Widget _buildStatCard(
+    BuildContext context, {
+    required bool isDark,
+    required IconData icon,
+    required String value,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withOpacity(0.05)
+            : Colors.white.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withOpacity(0.1)
+              : Colors.black.withOpacity(0.05),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white54 : Colors.black54,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: NexusTheme.darkBackground,
-      appBar: AppBar(
-        title: const Text('Schnelle Notizen'),
-        backgroundColor: NexusTheme.darkSurface,
-        actions: [
-          Consumer<NotesProvider>(
-            builder: (context, provider, child) {
-              return Row(
-                children: [
-                  if (provider.hasUnsavedChanges)
-                    const Padding(
-                      padding: EdgeInsets.only(right: 8),
-                      child: Icon(
-                        Icons.circle,
-                        size: 8,
-                        color: Colors.orange,
-                      ),
-                    ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: provider.activeNoteId != null
-                        ? _deleteCurrentNote
-                        : null,
-                  ),
-                ],
-              );
-            },
+  Widget _buildNoteTabs(BuildContext context, bool isDark, NotesProvider provider) {
+    if (provider.notes.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: isDark
+              ? Colors.white.withOpacity(0.05)
+              : Colors.white.withOpacity(0.7),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withOpacity(0.1)
+                : Colors.black.withOpacity(0.05),
           ),
-        ],
-      ),
-      body: Consumer<NotesProvider>(
-        builder: (context, provider, child) {
-          if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.note_add_outlined,
+              size: 48,
+              color: isDark ? Colors.white38 : Colors.black26,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Keine Notizen',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: isDark ? Colors.white70 : Colors.black54,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Tippe auf + um eine Notiz zu erstellen',
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.white38 : Colors.black38,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
-          return Column(
-            children: [
-
-              Container(
-                height: 48,
+    return SizedBox(
+      height: 44,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: provider.notes.length,
+        itemBuilder: (context, index) {
+          final note = provider.notes[index];
+          final isActive = note.id == provider.activeNoteId;
+          return Padding(
+            padding: EdgeInsets.only(right: index < provider.notes.length - 1 ? 10 : 0),
+            child: GestureDetector(
+              onTap: () => _switchNote(note.id),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: NexusTheme.darkSurface,
-                  border: Border(
-                    bottom: BorderSide(color: NexusTheme.darkBorder),
+                  color: isActive
+                      ? NexusTheme.notesColor
+                      : (isDark
+                          ? Colors.white.withOpacity(0.05)
+                          : Colors.white.withOpacity(0.7)),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isActive
+                        ? NexusTheme.notesColor
+                        : (isDark
+                            ? Colors.white.withOpacity(0.1)
+                            : Colors.black.withOpacity(0.05)),
                   ),
                 ),
+                alignment: Alignment.center,
                 child: Row(
                   children: [
-                    Expanded(
-                      child: provider.notes.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'Keine Notizen',
-                                style: TextStyle(color: Colors.white54),
-                              ),
-                            )
-                          : ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 8,
-                              ),
-                              itemCount: provider.notes.length,
-                              itemBuilder: (context, index) {
-                                final note = provider.notes[index];
-                                final isActive = note.id == provider.activeNoteId;
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: _NoteTab(
-                                    title: note.preview.isEmpty
-                                        ? 'Notiz ${index + 1}'
-                                        : note.preview,
-                                    isActive: isActive,
-                                    onTap: () => _switchNote(note.id),
-                                  ),
-                                );
-                              },
-                            ),
+                    Icon(
+                      Icons.description,
+                      size: 16,
+                      color: isActive
+                          ? Colors.white
+                          : (isDark ? Colors.white54 : Colors.black45),
                     ),
-
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border(
-                          left: BorderSide(color: NexusTheme.darkBorder),
-                        ),
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.add),
-                        onPressed: _createNewNote,
-                        tooltip: 'Neue Notiz',
+                    const SizedBox(width: 8),
+                    Text(
+                      (note.preview.isEmpty
+                              ? 'Notiz ${index + 1}'
+                              : note.preview)
+                          .length > 12
+                          ? '${(note.preview.isEmpty ? 'Notiz ${index + 1}' : note.preview).substring(0, 12)}...'
+                          : (note.preview.isEmpty ? 'Notiz ${index + 1}' : note.preview),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isActive
+                            ? Colors.white
+                            : (isDark ? Colors.white70 : Colors.black87),
+                        fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
               ),
-
-              Expanded(
-                child: provider.notes.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.note_add_outlined,
-                              size: 64,
-                              color: Colors.white.withOpacity(0.2),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Erstelle eine neue Notiz',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.5),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            ElevatedButton.icon(
-                              onPressed: _createNewNote,
-                              icon: const Icon(Icons.add),
-                              label: const Text('Neue Notiz'),
-                            ),
-                          ],
-                        ),
-                      )
-                    : TextField(
-                        controller: _textController,
-                        maxLines: null,
-                        expands: true,
-                        textAlignVertical: TextAlignVertical.top,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          height: 1.6,
-                        ),
-                        decoration: const InputDecoration(
-                          hintText: 'Schreibe etwas...',
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.all(20),
-                        ),
-                        onChanged: _onTextChanged,
-                      ),
-              ),
-
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                decoration: BoxDecoration(
-                  color: NexusTheme.darkSurface,
-                  border: Border(
-                    top: BorderSide(color: NexusTheme.darkBorder),
-                  ),
-                ),
-                child: SafeArea(
-                  top: false,
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.text_fields,
-                        size: 16,
-                        color: Colors.white.withOpacity(0.5),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${provider.activeNote?.wordCount ?? 0} Wörter',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.white.withOpacity(0.5),
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        '${provider.totalNotes} Notiz${provider.totalNotes != 1 ? 'en' : ''}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.white.withOpacity(0.5),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+            ),
           );
         },
       ),
     );
   }
-}
 
-class _NoteTab extends StatelessWidget {
-  final String title;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  const _NoteTab({
-    required this.title,
-    required this.isActive,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          color: isActive
-              ? NexusTheme.primary.withOpacity(0.2)
-              : NexusTheme.darkCard,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isActive ? NexusTheme.primary : NexusTheme.darkBorder,
-          ),
+  Widget _buildEditor(BuildContext context, bool isDark, NotesProvider provider) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withOpacity(0.05)
+            : Colors.white.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withOpacity(0.1)
+              : Colors.black.withOpacity(0.05),
         ),
-        alignment: Alignment.center,
-        child: Text(
-          title.length > 15 ? '${title.substring(0, 15)}...' : title,
-          style: TextStyle(
-            fontSize: 13,
-            color: isActive ? NexusTheme.primary : Colors.white70,
-            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+      ),
+      child: Column(
+        children: [
+          Container(
+            height: 300,
+            padding: const EdgeInsets.all(16),
+            child: provider.notes.isEmpty
+                ? Center(
+                    child: Text(
+                      'Erstelle eine Notiz um zu beginnen',
+                      style: TextStyle(
+                        color: isDark ? Colors.white38 : Colors.black38,
+                      ),
+                    ),
+                  )
+                : TextField(
+                    controller: _textController,
+                    maxLines: null,
+                    expands: true,
+                    textAlignVertical: TextAlignVertical.top,
+                    style: TextStyle(
+                      fontSize: 15,
+                      height: 1.6,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Schreibe etwas...',
+                      hintStyle: TextStyle(
+                        color: isDark ? Colors.white38 : Colors.black38,
+                      ),
+                      border: InputBorder.none,
+                    ),
+                    onChanged: _onTextChanged,
+                  ),
           ),
-        ),
+
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(
+                  color: isDark
+                      ? Colors.white.withOpacity(0.1)
+                      : Colors.black.withOpacity(0.05),
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.schedule,
+                  size: 14,
+                  color: isDark ? Colors.white38 : Colors.black38,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Automatisches Speichern',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? Colors.white38 : Colors.black38,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: NexusTheme.notesColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${provider.activeNote?.wordCount ?? 0} Wörter',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: NexusTheme.notesColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

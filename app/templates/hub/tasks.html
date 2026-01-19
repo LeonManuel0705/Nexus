@@ -225,7 +225,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadAllTasks() {
     try {
-        // Load both tasks and homework in parallel
         const [tasksRes, homeworkRes, subjectsRes] = await Promise.all([
             fetch(buildApiUrl('/api/hub/tasks', { filter: currentFilter })),
             fetch('/api/hub/school/homework'),
@@ -261,10 +260,8 @@ async function loadTasks() {
 function renderTasks() {
     const container = document.getElementById('taskList');
 
-    // Filter homework based on current filter
     const filteredHomework = filterHomework(homework);
 
-    // Convert homework to task-like format for unified rendering
     const homeworkAsTasks = filteredHomework.map(h => {
         const subject = subjects.find(s => s.id === h.subject_id);
         return {
@@ -281,7 +278,6 @@ function renderTasks() {
         };
     });
 
-    // Combine tasks and homework
     const allItems = [...tasks, ...homeworkAsTasks];
 
     if (allItems.length === 0) {
@@ -298,7 +294,6 @@ function renderTasks() {
         return;
     }
 
-    // Group by priority and homework
     const highPriority = allItems.filter(t => t.priority === 'high' && !t.completed);
     const homeworkItems = allItems.filter(t => t.isHomework && !t.completed);
     const normalPriority = allItems.filter(t => t.priority === 'medium' && !t.completed && !t.isHomework);
@@ -478,7 +473,6 @@ function openEditTaskModal(taskId) {
     document.getElementById('editTaskRepeatType').value = task.repeat_type || 'none';
     document.getElementById('editTaskRepeatEndDate').value = task.repeat_end_date || '';
 
-    // Set repeat days checkboxes
     const repeatDays = task.repeat_days ? JSON.parse(task.repeat_days) : [];
     document.querySelectorAll('input[name="edit_repeat_day"]').forEach(cb => {
         cb.checked = repeatDays.includes(parseInt(cb.value));
@@ -492,7 +486,6 @@ async function saveTask(event) {
     event.preventDefault();
     const formData = new FormData(event.target);
 
-    // Collect repeat days
     const repeatDays = [];
     document.querySelectorAll('input[name="repeat_day"]:checked').forEach(cb => {
         repeatDays.push(parseInt(cb.value));
@@ -533,7 +526,6 @@ async function updateTask(event) {
     const taskId = document.getElementById('editTaskId').value;
     const formData = new FormData(event.target);
 
-    // Collect repeat days
     const repeatDays = [];
     document.querySelectorAll('input[name="edit_repeat_day"]:checked').forEach(cb => {
         repeatDays.push(parseInt(cb.value));
@@ -612,14 +604,12 @@ function showDeleteOptions() {
 
 async function deleteTaskCompletely(taskId) {
     try {
-        // Try to delete all occurrences first (works for both single and recurring)
         const response = await fetch(`/api/hub/tasks/${taskId}/delete-all`, { method: 'DELETE' });
         if (response.ok) {
             closeModal('deleteTaskModal');
             loadTasks();
             showToast('Aufgabe gelöscht', 'success');
         } else {
-            // Fallback to simple delete
             const fallbackResponse = await fetch(`/api/hub/tasks/${taskId}`, { method: 'DELETE' });
             if (fallbackResponse.ok) {
                 closeModal('deleteTaskModal');
@@ -657,7 +647,6 @@ async function skipTaskOccurrence(taskId) {
 }
 
 function showToast(message, type = 'info') {
-    // Simple toast notification
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     toast.textContent = message;
@@ -691,10 +680,8 @@ function toggleRepeatOptions(prefix) {
     const optionsDiv = document.getElementById(`${prefix}RepeatOptions`);
     const endDiv = document.getElementById(`${prefix}RepeatEnd`);
 
-    // Show weekday selector only for custom type
     optionsDiv.style.display = repeatType === 'custom' ? 'block' : 'none';
 
-    // Show end date for any repeat type except 'none'
     endDiv.style.display = repeatType !== 'none' ? 'block' : 'none';
 }
 </script>

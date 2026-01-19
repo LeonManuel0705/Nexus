@@ -913,11 +913,7 @@ let currentCalendarDate = new Date();
 let iservConnected = false;
 let currentSemesterFilter = 'Q1'; // Current semester filter (Q1, Q2, Q3, Q4, or 'all' for combined)
 
-// ==========================================
-// STUNDENPLAN - Timetable System with A/B Week Rotation
-// ==========================================
 
-// Block times
 const BLOCK_TIMES = [
     { block: 1, start: '08:00', end: '09:30' },
     { block: 2, start: '09:50', end: '11:20' },
@@ -925,55 +921,41 @@ const BLOCK_TIMES = [
     { block: 4, start: '13:30', end: '15:00' }
 ];
 
-// Reference date for A/B week calculation - loaded from API or default
-// Default: January 12, 2026 = A-week, so current week (Jan 5-11) = B-week
 let REFERENCE_A_WEEK = new Date(2026, 0, 12);
 
-// Dynamic timetable data - loaded from API
 let TIMETABLE_A = { 1: [null, null, null, null], 2: [null, null, null, null], 3: [null, null, null, null], 4: [null, null, null, null], 5: [null, null, null, null] };
 let TIMETABLE_B = { 1: [null, null, null, null], 2: [null, null, null, null], 3: [null, null, null, null], 4: [null, null, null, null], 5: [null, null, null, null] };
 
-// Raw timetable entries from API (for editing)
 let timetableEntries = [];
 
-// Timetable settings
 let timetableSettings = {
     has_ab_weeks: true,
     setup_completed: false,
     reference_date: null
 };
 
-// Edit mode state
 let isEditMode = false;
 let selectedSetupOption = 'empty'; // 'template' or 'empty'
 
-// Day names in German
 const DAY_NAMES = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 const DAY_NAMES_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
-// State
 let viewingWeek = null; // null = current week, 'A' or 'B' = forced view
 let stundenplanInterval = null;
 let timetableLoaded = false;
 
-// ==========================================
-// TIMETABLE API FUNCTIONS
-// ==========================================
 
-// Load timetable settings from API
 async function loadTimetableSettings() {
     try {
         const response = await fetch(buildApiUrl('/api/hub/school/timetable/settings'));
         if (response.ok) {
             const data = await response.json();
-            // Merge with defaults to ensure all properties exist
             timetableSettings = {
                 has_ab_weeks: data.has_ab_weeks !== undefined ? Boolean(data.has_ab_weeks) : true,
                 setup_completed: Boolean(data.setup_completed),
                 reference_date: data.reference_date || null
             };
 
-            // Update reference date if provided
             if (data.reference_date) {
                 REFERENCE_A_WEEK = new Date(data.reference_date);
             }
@@ -986,7 +968,6 @@ async function loadTimetableSettings() {
     return timetableSettings;
 }
 
-// Load timetable entries from API
 async function loadTimetableEntries() {
     try {
         const response = await fetch(buildApiUrl('/api/hub/school/timetable/entries'));
@@ -1002,15 +983,12 @@ async function loadTimetableEntries() {
     return [];
 }
 
-// Transform API entries to TIMETABLE_A/TIMETABLE_B format
 function transformEntriesToTimetables() {
     console.log('[Timetable] Transforming entries:', timetableEntries.length);
 
-    // Reset timetables
     TIMETABLE_A = { 1: [null, null, null, null], 2: [null, null, null, null], 3: [null, null, null, null], 4: [null, null, null, null], 5: [null, null, null, null] };
     TIMETABLE_B = { 1: [null, null, null, null], 2: [null, null, null, null], 3: [null, null, null, null], 4: [null, null, null, null], 5: [null, null, null, null] };
 
-    // First pass: add 'both' entries
     for (const entry of timetableEntries) {
         const day = entry.day;
         const blockIndex = entry.block - 1;
@@ -1033,7 +1011,6 @@ function transformEntriesToTimetables() {
         TIMETABLE_B[day][blockIndex] = { ...lessonData };
     }
 
-    // Second pass: add specific week entries (A or B) - these override 'both'
     for (const entry of timetableEntries) {
         const day = entry.day;
         const blockIndex = entry.block - 1;
@@ -1060,52 +1037,40 @@ function transformEntriesToTimetables() {
         }
     }
 
-    // Debug: Log final timetables
     console.log('[Timetable] TIMETABLE_A[1]:', TIMETABLE_A[1]);
     console.log('[Timetable] TIMETABLE_B[1]:', TIMETABLE_B[1]);
 }
 
-// Initialize timetable - load from API
 async function initTimetable() {
-    // Show loading state
     const loadingEl = document.getElementById('timetableLoading');
     if (loadingEl) loadingEl.style.display = 'flex';
 
     try {
-        // Load settings and entries in parallel
         await Promise.all([loadTimetableSettings(), loadTimetableEntries()]);
         timetableLoaded = true;
 
-        // Hide loading
         if (loadingEl) loadingEl.style.display = 'none';
 
-        // Check if Bundesland is set (always check, even if timetable exists)
         checkBundeslandSetting();
 
-        // Check if setup is needed (only for new users)
         if (!timetableSettings.setup_completed && timetableEntries.length === 0) {
-            // Will be shown after Bundesland selection if needed
             if (timetableSettings.bundesland) {
                 showSetupWizard();
             }
         }
 
-        // Initialize the stundenplan display
         initStundenplan();
 
-        // Update week group visibility based on settings
         updateWeekGroupVisibility();
     } catch (error) {
         console.error('Error initializing timetable:', error);
         if (loadingEl) loadingEl.style.display = 'none';
         showToast('Fehler beim Laden des Stundenplans', 'error');
 
-        // Still initialize with empty data
         initStundenplan();
     }
 }
 
-// Save timetable settings
 async function saveTimetableSettings(settings) {
     try {
         const response = await fetch('/api/hub/school/timetable/settings', {
@@ -1124,7 +1089,6 @@ async function saveTimetableSettings(settings) {
     return null;
 }
 
-// Create a timetable entry
 async function createTimetableEntry(entry) {
     try {
         const response = await fetch('/api/hub/school/timetable/entries', {
@@ -1143,7 +1107,6 @@ async function createTimetableEntry(entry) {
     return null;
 }
 
-// Update a timetable entry
 async function updateTimetableEntry(id, entry) {
     try {
         const response = await fetch(`/api/hub/school/timetable/entries/${id}`, {
@@ -1162,7 +1125,6 @@ async function updateTimetableEntry(id, entry) {
     return null;
 }
 
-// Delete a timetable entry
 async function deleteTimetableEntry(id) {
     try {
         const response = await fetch(`/api/hub/school/timetable/entries/${id}`, {
@@ -1178,7 +1140,6 @@ async function deleteTimetableEntry(id) {
     return false;
 }
 
-// Clear all timetable entries
 async function clearAllTimetableEntries() {
     try {
         const response = await fetch('/api/hub/school/timetable/clear', {
@@ -1197,17 +1158,14 @@ async function clearAllTimetableEntries() {
     return false;
 }
 
-// Import default template
 async function importDefaultTemplate() {
     try {
-        // First get the default template
         const templateRes = await fetch('/api/hub/school/timetable/default-template');
         if (!templateRes.ok) {
             throw new Error('Failed to load template');
         }
         const templateData = await templateRes.json();
 
-        // Import the template
         const importRes = await fetch('/api/hub/school/timetable/import', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1224,21 +1182,16 @@ async function importDefaultTemplate() {
     return false;
 }
 
-// ==========================================
-// BUNDESLAND SELECTION FUNCTIONS
-// ==========================================
 
 let selectedBundesland = null;
 let bundeslaender = {};
 
 async function checkBundeslandSetting() {
-    // Check if Bundesland is set, show modal if not
     try {
         const response = await fetch('/api/hub/bundesland');
         const data = await response.json();
 
         if (data.success && !data.bundesland) {
-            // No Bundesland set, show selection modal
             bundeslaender = data.bundeslaender || {};
             showBundeslandModal();
         }
@@ -1251,7 +1204,6 @@ function showBundeslandModal() {
     const grid = document.getElementById('bundeslandGrid');
     if (!grid) return;
 
-    // Populate the grid with Bundesland options
     grid.innerHTML = Object.entries(bundeslaender).map(([code, name]) => `
         <div class="bundesland-card" data-code="${code}" onclick="selectBundesland('${code}')">
             <span class="bundesland-code">${code}</span>
@@ -1265,13 +1217,11 @@ function showBundeslandModal() {
 function selectBundesland(code) {
     selectedBundesland = code;
 
-    // Update UI
     document.querySelectorAll('.bundesland-card').forEach(card => {
         card.classList.remove('selected');
     });
     document.querySelector(`.bundesland-card[data-code="${code}"]`)?.classList.add('selected');
 
-    // Enable the save button
     document.getElementById('saveBundeslandBtn').disabled = false;
 }
 
@@ -1282,7 +1232,6 @@ async function saveBundeslandSelection() {
     const loading = document.getElementById('bundeslandLoading');
     const actions = document.getElementById('bundeslandActions');
 
-    // Show loading state with progress
     grid.style.display = 'none';
     actions.style.display = 'none';
     loading.style.display = 'flex';
@@ -1295,7 +1244,6 @@ async function saveBundeslandSelection() {
         <span class="import-progress-text" id="importProgressText">Verbinde mit feiertage-api.de...</span>
     `;
 
-    // Animate progress bar
     const progressBar = document.getElementById('importProgressBar');
     const progressText = document.getElementById('importProgressText');
     let progress = 0;
@@ -1329,12 +1277,10 @@ async function saveBundeslandSelection() {
             setTimeout(() => {
                 closeModal('bundeslandModal');
 
-                // Show success message
                 const importedCount = data.imported_count || 0;
                 const bundeslandName = data.bundesland_name || selectedBundesland;
                 showToast(`${bundeslandName}: ${importedCount} Feiertage und Schulferien importiert!`, 'success');
 
-                // Now show setup wizard if needed
                 if (!timetableSettings.setup_completed && timetableEntries.length === 0) {
                     showSetupWizard();
                 }
@@ -1346,7 +1292,6 @@ async function saveBundeslandSelection() {
         clearInterval(progressInterval);
         console.error('Error saving Bundesland:', error);
 
-        // Reset modal to allow retry
         loading.style.display = 'none';
         grid.style.display = 'grid';
         actions.style.display = 'flex';
@@ -1358,15 +1303,11 @@ async function saveBundeslandSelection() {
 function skipBundeslandSelection() {
     closeModal('bundeslandModal');
 
-    // Show setup wizard if needed
     if (!timetableSettings.setup_completed && timetableEntries.length === 0) {
         showSetupWizard();
     }
 }
 
-// ==========================================
-// SETUP WIZARD FUNCTIONS
-// ==========================================
 
 function showSetupWizard() {
     openModal('setupWizardModal');
@@ -1379,7 +1320,6 @@ function closeSetupWizard() {
 function selectSetupOption(option) {
     selectedSetupOption = option;
 
-    // Update UI
     document.querySelectorAll('.setup-option-card').forEach(card => {
         card.classList.remove('selected');
     });
@@ -1387,8 +1327,6 @@ function selectSetupOption(option) {
 }
 
 function updateWeekTypeSelection() {
-    // This function is called when the radio button changes
-    // The value is read from the radio button when starting setup
 }
 
 async function startSetup() {
@@ -1400,13 +1338,10 @@ async function startSetup() {
     btn.textContent = 'Wird eingerichtet...';
 
     try {
-        // Calculate reference date for A/B weeks
-        // Set current week as B-week by making NEXT Monday the A-week reference
         let referenceDate = null;
         if (hasAbWeeks) {
             const now = new Date();
             const dayOfWeek = now.getDay();
-            // Get next Monday (if today is Monday, get the Monday after)
             const daysUntilNextMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
             const nextMonday = new Date(now);
             nextMonday.setDate(now.getDate() + daysUntilNextMonday);
@@ -1415,14 +1350,12 @@ async function startSetup() {
             REFERENCE_A_WEEK = nextMonday;
         }
 
-        // Save settings
         await saveTimetableSettings({
             has_ab_weeks: hasAbWeeks,
             reference_date: referenceDate,
             setup_completed: true
         });
 
-        // Import template if selected
         if (selectedSetupOption === 'template') {
             const success = await importDefaultTemplate();
             if (!success) {
@@ -1434,7 +1367,6 @@ async function startSetup() {
         updateWeekGroupVisibility();
         updateStundenplanDisplay();
 
-        // If empty was selected, turn on edit mode
         if (selectedSetupOption === 'empty') {
             toggleEditMode();
         }
@@ -1456,9 +1388,6 @@ function updateWeekGroupVisibility() {
     }
 }
 
-// ==========================================
-// EDIT MODE FUNCTIONS
-// ==========================================
 
 function toggleEditMode() {
     isEditMode = !isEditMode;
@@ -1479,26 +1408,22 @@ function toggleEditMode() {
         document.body.classList.remove('edit-mode-active');
     }
 
-    // Re-render the week overview to show/hide edit controls
     const weekType = viewingWeek || getWeekType(new Date());
     updateWeekOverview(weekType);
 }
 
 function openLessonModal(day, block, weekType) {
-    // Find existing entry for this slot
     const existingEntry = findEntryForSlot(day, block, weekType);
 
     const title = document.getElementById('lessonModalTitle');
     const deleteBtn = document.getElementById('deleteLessonBtn');
     const form = document.getElementById('lessonForm');
 
-    // Reset form
     form.reset();
     document.getElementById('lessonId').value = '';
     document.getElementById('lessonDay').value = day;
     document.getElementById('lessonBlock').value = block;
 
-    // Update subject suggestions
     updateSubjectSuggestions();
 
     if (existingEntry) {
@@ -1511,11 +1436,9 @@ function openLessonModal(day, block, weekType) {
         document.getElementById('lessonTeacher').value = existingEntry.teacher || '';
         document.getElementById('lessonColor').value = existingEntry.color || '#4285f4';
 
-        // Set type radio
         const typeRadio = document.querySelector(`input[name="subject_type"][value="${existingEntry.subject_type || 'GK'}"]`);
         if (typeRadio) typeRadio.checked = true;
 
-        // Set week radio - validate week value to prevent issues
         const validWeeks = ['A', 'B', 'both'];
         const entryWeek = existingEntry.week && validWeeks.includes(existingEntry.week)
             ? existingEntry.week
@@ -1526,7 +1449,6 @@ function openLessonModal(day, block, weekType) {
         title.textContent = `Block ${block}, ${DAY_NAMES[day]} hinzufügen`;
         deleteBtn.style.display = 'none';
 
-        // Default week selection based on current view
         if (!timetableSettings.has_ab_weeks) {
             document.querySelector('input[name="week"][value="both"]').checked = true;
         } else {
@@ -1541,14 +1463,12 @@ function openLessonModal(day, block, weekType) {
 }
 
 function findEntryForSlot(day, block, weekType) {
-    // First try to find an exact week match
     const exactMatch = timetableEntries.find(entry => {
         const entryWeek = entry.week || 'both';
         return entry.day === day && entry.block === block && entryWeek === weekType;
     });
     if (exactMatch) return exactMatch;
 
-    // Fall back to 'both' entries
     return timetableEntries.find(entry => {
         const entryWeek = entry.week || 'both';
         return entry.day === day && entry.block === block && entryWeek === 'both';
@@ -1559,10 +1479,8 @@ function updateSubjectSuggestions() {
     const datalist = document.getElementById('subjectSuggestions');
     datalist.innerHTML = '';
 
-    // Get unique subjects from existing entries
     const uniqueSubjects = [...new Set(timetableEntries.map(e => e.subject))];
 
-    // Also add subjects from the subjects list
     subjects.forEach(s => {
         if (!uniqueSubjects.includes(s.name)) {
             uniqueSubjects.push(s.name);
@@ -1577,7 +1495,6 @@ function updateSubjectSuggestions() {
 }
 
 function autoFillFromExistingSubject() {
-    // Only auto-fill when adding new entry, not editing
     const lessonId = document.getElementById('lessonId').value;
     if (lessonId) return;
 
@@ -1585,26 +1502,21 @@ function autoFillFromExistingSubject() {
     const subjectName = subjectInput.value.trim();
     if (!subjectName) return;
 
-    // Find existing entry with this subject
     const existingEntry = timetableEntries.find(e =>
         e.subject.toLowerCase() === subjectName.toLowerCase()
     );
 
     if (existingEntry) {
-        // Auto-fill teacher
         if (existingEntry.teacher) {
             document.getElementById('lessonTeacher').value = existingEntry.teacher;
         }
-        // Auto-fill room
         if (existingEntry.room) {
             document.getElementById('lessonRoom').value = existingEntry.room;
         }
-        // Auto-fill color
         if (existingEntry.color) {
             document.getElementById('lessonColor').value = existingEntry.color;
             updateLessonColorPreview();
         }
-        // Auto-fill subject type
         if (existingEntry.subject_type) {
             const typeRadio = document.querySelector(`input[name="subject_type"][value="${existingEntry.subject_type}"]`);
             if (typeRadio) typeRadio.checked = true;
@@ -1705,55 +1617,42 @@ async function confirmClearTimetable() {
     }
 }
 
-// ==========================================
-// WEEK TYPE CALCULATION
-// ==========================================
 
-// Calculate which week (A or B) for a given date
 function getWeekType(date) {
-    // If no A/B weeks, always return 'A'
     if (!timetableSettings.has_ab_weeks) {
         return 'A';
     }
 
     const d = new Date(date);
-    // Get the Monday of the given week
     const dayOfWeek = d.getDay();
     const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
     const monday = new Date(d);
     monday.setDate(d.getDate() + mondayOffset);
     monday.setHours(0, 0, 0, 0);
 
-    // Calculate weeks since reference
     const refMonday = new Date(REFERENCE_A_WEEK);
     refMonday.setHours(0, 0, 0, 0);
 
     const diffTime = monday.getTime() - refMonday.getTime();
     const diffWeeks = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
 
-    // Even weeks from reference = A, Odd = B
     return diffWeeks % 2 === 0 ? 'A' : 'B';
 }
 
-// Get the schedule for a specific day
 function getScheduleForDay(date, forceWeekType = null) {
     const weekType = forceWeekType || getWeekType(date);
     const timetable = weekType === 'A' ? TIMETABLE_A : TIMETABLE_B;
 
     let dayOfWeek = date.getDay();
-    // Convert Sunday (0) to 7 for easier handling, then adjust
     if (dayOfWeek === 0) dayOfWeek = 7;
 
-    // Weekend
     if (dayOfWeek > 5) return null;
 
     return timetable[dayOfWeek] || null;
 }
 
-// Get current block based on time
 function getCurrentBlock() {
     const now = new Date();
-    // Use seconds for more accurate time calculation
     const currentSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
@@ -1766,15 +1665,12 @@ function getCurrentBlock() {
         const startSeconds = startMinutes * 60;
         const endSeconds = endMinutes * 60;
 
-        // Use < for end time (if it's 12:50:00 exactly, the block is over)
         if (currentSeconds >= startSeconds && currentSeconds < endSeconds) {
-            // Calculate remaining minutes, rounding up to show "1 Min" when < 1 min left
             const remainingSeconds = endSeconds - currentSeconds;
             const remainingMinutes = Math.ceil(remainingSeconds / 60);
             return { blockIndex: i, status: 'in_block', block, remainingMinutes };
         }
 
-        // Check if in break before next block
         if (i < BLOCK_TIMES.length - 1) {
             const nextBlock = BLOCK_TIMES[i + 1];
             const [nextStartH, nextStartM] = nextBlock.start.split(':').map(Number);
@@ -1788,7 +1684,6 @@ function getCurrentBlock() {
         }
     }
 
-    // Before school
     const [firstStartH, firstStartM] = BLOCK_TIMES[0].start.split(':').map(Number);
     const firstStartSeconds = (firstStartH * 60 + firstStartM) * 60;
     if (currentSeconds < firstStartSeconds) {
@@ -1797,33 +1692,26 @@ function getCurrentBlock() {
         return { blockIndex: 0, status: 'before_school', block: BLOCK_TIMES[0], minutesUntil };
     }
 
-    // After school
     return { blockIndex: -1, status: 'after_school', block: null };
 }
 
-// Initialize Stundenplan
 function initStundenplan() {
     updateStundenplanDisplay();
-    // Update countdown every minute (lightweight), full update every 5 minutes
     if (stundenplanInterval) clearInterval(stundenplanInterval);
     stundenplanInterval = setInterval(updateCountdownOnly, 60000);
 }
 
-// Lightweight countdown update - only updates the "Noch X Min" text and progress bar
-// Does NOT re-render the entire page
 function updateCountdownOnly() {
     const now = new Date();
     const dayOfWeek = now.getDay();
     const statusText = document.getElementById('statusText');
     const progressFill = document.querySelector('.progress-fill');
 
-    // Skip update on weekends or if elements don't exist
     if (dayOfWeek === 0 || dayOfWeek === 6 || !statusText) return;
 
     const blockInfo = getCurrentBlock();
 
     if (blockInfo.status === 'before_school') {
-        // Update minutes until first lesson - use pre-calculated value from getCurrentBlock
         const weekType = viewingWeek || getWeekType(now);
         const schedule = getScheduleForDay(now, weekType);
         let firstLessonBlockIndex = 0;
@@ -1835,7 +1723,6 @@ function updateCountdownOnly() {
                 }
             }
         }
-        // Recalculate for the actual first lesson (might not be block 0)
         const currentSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
         const [startH, startM] = BLOCK_TIMES[firstLessonBlockIndex].start.split(':').map(Number);
         const startSeconds = (startH * 60 + startM) * 60;
@@ -1845,10 +1732,8 @@ function updateCountdownOnly() {
     } else if (blockInfo.status === 'break') {
         statusText.textContent = `Pause - noch ${blockInfo.minutesUntil} Min`;
     } else if (blockInfo.status === 'in_block' && blockInfo.block) {
-        // Use pre-calculated remaining minutes from getCurrentBlock
         statusText.textContent = `Noch ${blockInfo.remainingMinutes} Min`;
 
-        // Update progress bar
         if (progressFill) {
             const [startH, startM] = blockInfo.block.start.split(':').map(Number);
             const [endH, endM] = blockInfo.block.end.split(':').map(Number);
@@ -1859,26 +1744,21 @@ function updateCountdownOnly() {
             progressFill.style.width = `${Math.min(100, Math.max(0, progress))}%`;
         }
     } else if (blockInfo.status === 'after_school') {
-        // Only update status text, don't refresh entire page
         statusText.textContent = 'Schulschluss';
     }
 }
 
-// Check if school is over for today (after 15:00)
 function isSchoolOverForToday() {
     const now = new Date();
     const currentHour = now.getHours();
     const currentMinutes = now.getMinutes();
-    // School ends at 15:00 (3 PM)
     return currentHour > 15 || (currentHour === 15 && currentMinutes > 0);
 }
 
-// Get the next school day from a given date
 function getNextSchoolDay(fromDate) {
     const next = new Date(fromDate);
     next.setDate(next.getDate() + 1);
 
-    // Skip weekends
     while (next.getDay() === 0 || next.getDay() === 6) {
         next.setDate(next.getDate() + 1);
     }
@@ -1886,9 +1766,6 @@ function getNextSchoolDay(fromDate) {
     return next;
 }
 
-// Find next occurrence of a subject in the timetable
-// Returns the date when this subject next occurs (considering A/B week rotation)
-// If we're currently IN that lesson, skip to the NEXT occurrence (homework is for next time)
 function findNextSubjectOccurrence(subjectName) {
     if (!subjectName) return null;
 
@@ -1896,9 +1773,7 @@ function findNextSubjectOccurrence(subjectName) {
     const now = new Date();
     let checkDate = new Date(now);
 
-    // Check up to 14 days ahead (covers 2 full weeks = both A and B weeks)
     for (let i = 0; i < 14; i++) {
-        // Skip weekends
         const dayOfWeek = checkDate.getDay();
         if (dayOfWeek !== 0 && dayOfWeek !== 6) {
             const weekType = getWeekType(checkDate);
@@ -1906,19 +1781,12 @@ function findNextSubjectOccurrence(subjectName) {
             const daySchedule = timetable[dayOfWeek];
 
             if (daySchedule) {
-                // Check if this subject appears on this day
                 for (let blockIdx = 0; blockIdx < daySchedule.length; blockIdx++) {
                     const lesson = daySchedule[blockIdx];
                     if (lesson && lesson.subject.toLowerCase().trim() === normalizedName) {
-                        // For today, we need to check if we've already had or are currently in this lesson
                         if (i === 0) {
                             const currentBlock = getCurrentBlock();
 
-                            // Skip this lesson if:
-                            // - We're currently IN this block (in_block and same block index)
-                            // - We're in a break AFTER this block
-                            // - We've already passed this block
-                            // - School is over
                             const isCurrentlyInThisLesson =
                                 currentBlock.status === 'in_block' && currentBlock.blockIndex === blockIdx;
                             const hasPassedThisLesson =
@@ -1927,14 +1795,11 @@ function findNextSubjectOccurrence(subjectName) {
                             const isInBreakAfterThis =
                                 currentBlock.status === 'break' && currentBlock.blockIndex > blockIdx;
 
-                            // Only count this lesson if we haven't reached it yet
                             if (currentBlock.status === 'before_school' ||
                                 (currentBlock.blockIndex < blockIdx && !isCurrentlyInThisLesson)) {
                                 return checkDate;
                             }
-                            // If we're in or past this lesson, continue searching for next occurrence
                         } else {
-                            // Future day - this counts
                             return checkDate;
                         }
                     }
@@ -1948,20 +1813,17 @@ function findNextSubjectOccurrence(subjectName) {
     return null;
 }
 
-// Get subject name from subjects list by ID
 function getSubjectNameById(subjectId) {
     const subject = subjects.find(s => s.id === subjectId);
     return subject ? subject.name : null;
 }
 
-// Update homework due date based on selected subject
 function updateHomeworkDueDateSuggestion() {
     const subjectSelect = document.getElementById('homeworkSubject');
     const dueDateInput = document.getElementById('homeworkDue');
     const subjectId = subjectSelect.value;
 
     if (!subjectId || dueDateInput.value) {
-        // Don't update if no subject selected or date already set
         return;
     }
 
@@ -1970,7 +1832,6 @@ function updateHomeworkDueDateSuggestion() {
 
     const nextOccurrence = findNextSubjectOccurrence(subjectName);
     if (nextOccurrence) {
-        // Format as YYYY-MM-DD for the date input
         const year = nextOccurrence.getFullYear();
         const month = String(nextOccurrence.getMonth() + 1).padStart(2, '0');
         const day = String(nextOccurrence.getDate()).padStart(2, '0');
@@ -1978,36 +1839,28 @@ function updateHomeworkDueDateSuggestion() {
     }
 }
 
-// Update all displays
 function updateStundenplanDisplay() {
     const now = new Date();
     const schoolOver = isSchoolOverForToday();
 
-    // Determine which day to show as "today" and "tomorrow"
     let todayDate = new Date(now);
     let tomorrowDate;
 
-    // If school is over or it's weekend, show next school day as "today"
     const isWeekend = now.getDay() === 0 || now.getDay() === 6;
 
     if (schoolOver || isWeekend) {
-        // After school ends or on weekends, show next school day
         todayDate = getNextSchoolDay(now);
         tomorrowDate = getNextSchoolDay(todayDate);
     } else {
-        // During school day, show actual today and tomorrow
         tomorrowDate = getNextSchoolDay(now);
     }
 
-    // Calculate week types for the display dates
     const todayWeekType = getWeekType(todayDate);
     const tomorrowWeekType = getWeekType(tomorrowDate);
 
-    // For display purposes, use viewing week override OR actual week type
     const displayWeekType = viewingWeek || todayWeekType;
     const actualWeekType = getWeekType(now);
 
-    // Update week indicator - hide A/B elements if not using A/B weeks
     const weekBadge = document.getElementById('currentWeekBadge');
     const weekLabel = document.getElementById('currentWeekLabel');
     const toggleWeekBtn = document.querySelector('.week-toggle button:first-child');
@@ -2034,31 +1887,22 @@ function updateStundenplanDisplay() {
     document.getElementById('currentWeekDate').textContent =
         `${weekStart.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })} - ${weekEnd.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })}`;
 
-    // Update toggle button (only visible if A/B weeks enabled)
     if (timetableSettings.has_ab_weeks) {
         const otherWeek = displayWeekType === 'A' ? 'B' : 'A';
-        // When viewingWeek is set, we're showing a forced view - button should return to default
-        // When viewingWeek is null, we're showing the default - button should switch to other week
         document.getElementById('toggleWeekText').textContent = viewingWeek
             ? `${todayWeekType}-Woche zeigen`  // Return to the default displayed week
             : `${otherWeek}-Woche zeigen`;      // Switch to the other week
     }
 
-    // Update current lesson (always based on actual now, not toggled week)
     updateCurrentLesson(actualWeekType);
 
-    // Update today's schedule - ALWAYS use the actual week type for that date
-    // The toggle should NOT affect Today/Tomorrow - only the Wochenübersicht
     updateDaySchedule('today', todayDate, todayWeekType, schoolOver || isWeekend);
 
-    // Update tomorrow's schedule - ALWAYS use the actual week type for that date
     updateDaySchedule('tomorrow', tomorrowDate, tomorrowWeekType, false);
 
-    // Update week overview - THIS is the only thing affected by the toggle
     updateWeekOverview(displayWeekType);
 }
 
-// Update current lesson display
 function updateCurrentLesson(weekType) {
     const now = new Date();
     const dayOfWeek = now.getDay();
@@ -2066,7 +1910,6 @@ function updateCurrentLesson(weekType) {
     const statusText = document.getElementById('statusText');
     const statusDot = document.querySelector('.status-dot');
 
-    // Weekend check
     if (dayOfWeek === 0 || dayOfWeek === 6) {
         statusText.textContent = 'Wochenende';
         statusDot.className = 'status-dot inactive';
@@ -2101,7 +1944,6 @@ function updateCurrentLesson(weekType) {
     }
 
     if (blockInfo.status === 'before_school') {
-        // Find the actual first lesson of the day (might not be in block 0)
         let firstLesson = null;
         let firstLessonBlockIndex = -1;
         if (schedule) {
@@ -2114,7 +1956,6 @@ function updateCurrentLesson(weekType) {
             }
         }
 
-        // Calculate time until the actual first lesson starts
         let minutesUntilFirstLesson = blockInfo.minutesUntil;
         if (firstLessonBlockIndex > 0) {
             const now = new Date();
@@ -2174,11 +2015,9 @@ function updateCurrentLesson(weekType) {
         return;
     }
 
-    // Currently in a block (status is 'in_block')
     const currentLesson = schedule ? schedule[blockInfo.blockIndex] : null;
 
     if (currentLesson) {
-        // Calculate progress using seconds for accuracy
         const now = new Date();
         const [startH, startM] = blockInfo.block.start.split(':').map(Number);
         const [endH, endM] = blockInfo.block.end.split(':').map(Number);
@@ -2186,7 +2025,6 @@ function updateCurrentLesson(weekType) {
         const endSeconds = (endH * 60 + endM) * 60;
         const currentSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
         const progress = ((currentSeconds - startSeconds) / (endSeconds - startSeconds)) * 100;
-        // Use pre-calculated remaining minutes from getCurrentBlock
         const remainingMinutes = blockInfo.remainingMinutes;
 
         statusText.textContent = `Noch ${remainingMinutes} Min`;
@@ -2214,7 +2052,6 @@ function updateCurrentLesson(weekType) {
         statusText.textContent = 'Freistunde';
         statusDot.className = 'status-dot free';
 
-        // Find next lesson
         let nextLesson = null;
         let nextBlockIndex = -1;
         if (schedule) {
@@ -2254,7 +2091,6 @@ function updateCurrentLesson(weekType) {
     }
 }
 
-// Update day schedule (today or tomorrow)
 function updateDaySchedule(which, date, weekType, isNextDay = false) {
     const containerId = which === 'today' ? 'todaySchedule' : 'tomorrowSchedule';
     const titleId = which === 'today' ? 'todayTitle' : 'tomorrowTitle';
@@ -2265,12 +2101,10 @@ function updateDaySchedule(which, date, weekType, isNextDay = false) {
     const dayName = DAY_NAMES[dayOfWeek];
     const dateWeekType = getWeekType(date);
 
-    // Update title with date and week type indicator
     const dateStr = date.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' });
 
     if (which === 'today') {
         if (isNextDay) {
-            // School is over or it's weekend - showing next school day
             title.innerHTML = `Nächster Schultag - ${dayName} <span class="week-type-badge type-${dateWeekType.toLowerCase()}">${dateWeekType}</span>`;
         } else {
             title.innerHTML = `Heute - ${dayName} <span class="week-type-badge type-${dateWeekType.toLowerCase()}">${dateWeekType}</span>`;
@@ -2279,7 +2113,6 @@ function updateDaySchedule(which, date, weekType, isNextDay = false) {
         title.innerHTML = `Danach - ${dayName} (${dateStr}) <span class="week-type-badge type-${dateWeekType.toLowerCase()}">${dateWeekType}</span>`;
     }
 
-    // Weekend
     if (dayOfWeek === 0 || dayOfWeek === 6) {
         container.innerHTML = `
             <div class="schedule-empty glass-card">
@@ -2343,14 +2176,12 @@ function updateDaySchedule(which, date, weekType, isNextDay = false) {
     }).join('');
 }
 
-// Update week overview
 function updateWeekOverview(weekType) {
     console.log('[Timetable] updateWeekOverview called with weekType:', weekType);
     const container = document.getElementById('weekGrid');
     const timetable = weekType === 'A' ? TIMETABLE_A : TIMETABLE_B;
     console.log('[Timetable] Using timetable for day 1:', timetable[1]);
 
-    // Update the week badge in the section title (for debugging/clarity)
     const weekBadge = document.getElementById('weekOverviewBadge');
     if (weekBadge && timetableSettings.has_ab_weeks) {
         weekBadge.textContent = weekType;
@@ -2371,7 +2202,6 @@ function updateWeekOverview(weekType) {
     }
     html += '</div>';
 
-    // Loop through ALL block times (should be 4)
     for (let block = 0; block < BLOCK_TIMES.length; block++) {
         html += '<div class="week-row">';
         html += `<div class="week-cell time-col"><span class="block-num">${block + 1}</span><span class="block-time-small">${BLOCK_TIMES[block].start} - ${BLOCK_TIMES[block].end}</span></div>`;
@@ -2382,7 +2212,6 @@ function updateWeekOverview(weekType) {
             const blockInfo = getCurrentBlock();
             const isCurrent = isToday && blockInfo && blockInfo.blockIndex === block && blockInfo.status === 'in_block';
 
-            // Add click handler for edit mode
             const clickHandler = isEditMode ? `onclick="openLessonModal(${day}, ${block + 1}, '${weekType}')"` : '';
             const editableClass = isEditMode ? 'editable' : '';
 
@@ -2415,10 +2244,7 @@ function updateWeekOverview(weekType) {
     container.innerHTML = html;
 }
 
-// Toggle between viewing current week and other week
 function toggleWeekView() {
-    // Get the currently DISPLAYED week type (not the real-world week)
-    // This is important because on weekends, we show next Monday which might be a different week
     const now = new Date();
     let displayedDate = new Date(now);
     const dayOfWeek = now.getDay();
@@ -2434,10 +2260,8 @@ function toggleWeekView() {
     console.log('[Timetable] toggleWeekView: displayedWeekType =', displayedWeekType, ', viewingWeek before =', viewingWeek);
 
     if (viewingWeek === null) {
-        // Switch to the OTHER week (opposite of what's displayed)
         viewingWeek = displayedWeekType === 'A' ? 'B' : 'A';
     } else {
-        // Switch back to the default displayed week
         viewingWeek = null;
     }
 
@@ -2445,22 +2269,15 @@ function toggleWeekView() {
     updateStundenplanDisplay();
 }
 
-// ==========================================
-// TEACHER EMAIL INTEGRATION
-// ==========================================
 
-// Construct teacher email from name (fallback when IServ search fails)
 function constructTeacherEmail(teacherName, domain) {
     if (!teacherName || !domain) return null;
 
-    // Extract last name from formats like "Frau Neumann", "Herr Meyer-Schäfer"
     const nameParts = teacherName.trim().split(' ');
     if (nameParts.length < 2) return null;
 
-    // Get everything after the title (Frau/Herr)
     const lastName = nameParts.slice(1).join('-').toLowerCase();
 
-    // Handle special characters for email
     const emailName = lastName
         .replace(/ä/g, 'ae')
         .replace(/ö/g, 'oe')
@@ -2470,24 +2287,19 @@ function constructTeacherEmail(teacherName, domain) {
 
     if (!emailName) return null;
 
-    // Clean domain (remove https:// if present)
     const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
     return `${emailName}@${cleanDomain}`;
 }
 
-// Open IServ email compose with teacher
 async function emailTeacher(teacherName) {
-    // Show loading indicator
     const loadingToast = showToast('Suche Lehrer in IServ...', 'info');
 
     try {
-        // First check if IServ is connected
         const statusRes = await fetch('/api/iserv/status');
         const statusData = await statusRes.json();
 
         if (!statusData.connected) {
-            // Try to connect with stored credentials
             const connectRes = await fetch('/api/iserv/connect', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -2502,8 +2314,6 @@ async function emailTeacher(teacherName) {
             }
         }
 
-        // Search for the teacher in IServ
-        // Extract the last name from the teacher name (e.g., "Frau Neumann" -> "Neumann")
         const nameParts = teacherName.split(' ');
         const searchName = nameParts[nameParts.length - 1]; // Get last name
 
@@ -2513,32 +2323,25 @@ async function emailTeacher(teacherName) {
         hideToast(loadingToast);
 
         if (searchData.success && searchData.users && searchData.users.length > 0) {
-            // Debug: Log the user data to see structure
             console.log('IServ search results:', searchData.users);
 
-            // Get the IServ domain from status
             const iservDomain = statusData.iserv_url || 'ehg-werder.de';
 
-            // Find the best match (prioritize teachers)
             let teacherEmail = null;
             let teacherFullName = null;
 
             for (const user of searchData.users) {
-                // Extract user info - IServ returns various field names
-                // Common fields: act (account), name, firstname, lastname, email, mail
                 const accountName = user.act || user.account || user.username || user.login;
                 const firstName = user.firstname || user.givenname || user.vorname || '';
                 const lastName = user.lastname || user.surname || user.nachname || user.name || '';
                 const fullName = user.name || user.displayName || user.cn ||
                     (firstName && lastName ? `${firstName} ${lastName}` : lastName || firstName);
 
-                // Build email from account name
                 let userEmail = user.email || user.mail;
                 if (!userEmail && accountName) {
                     userEmail = `${accountName}@${iservDomain}`;
                 }
 
-                // Check if this matches our search
                 const searchLower = searchName.toLowerCase();
                 const fullNameLower = fullName.toLowerCase();
                 const lastNameLower = lastName.toLowerCase();
@@ -2550,7 +2353,6 @@ async function emailTeacher(teacherName) {
                 }
             }
 
-            // Fallback to first result if no exact match
             if (!teacherEmail && searchData.users.length > 0) {
                 const firstUser = searchData.users[0];
                 const accountName = firstUser.act || firstUser.account || firstUser.username || firstUser.login;
@@ -2563,10 +2365,8 @@ async function emailTeacher(teacherName) {
             }
 
             if (teacherEmail && !teacherEmail.includes('undefined')) {
-                // Open the email compose modal with pre-filled recipient
                 openIServEmailCompose(teacherEmail, teacherFullName, teacherName);
             } else {
-                // Fallback: Try to construct email from last name
                 const fallbackEmail = constructTeacherEmail(teacherName, iservDomain);
                 if (fallbackEmail) {
                     openIServEmailCompose(fallbackEmail, teacherName, teacherName);
@@ -2575,7 +2375,6 @@ async function emailTeacher(teacherName) {
                 }
             }
         } else {
-            // No search results - try to construct email from name directly
             const statusRes2 = await fetch('/api/iserv/status');
             const statusData2 = await statusRes2.json();
             const iservDomain = statusData2.iserv_url || 'ehg-werder.de';
@@ -2593,9 +2392,7 @@ async function emailTeacher(teacherName) {
     }
 }
 
-// Open IServ email compose modal
 function openIServEmailCompose(toEmail, toName, originalTeacherName) {
-    // Check if email modal already exists, if not create it
     let modal = document.getElementById('iservEmailModal');
     if (!modal) {
         modal = document.createElement('div');
@@ -2637,18 +2434,15 @@ function openIServEmailCompose(toEmail, toName, originalTeacherName) {
         document.body.appendChild(modal);
     }
 
-    // Pre-fill the form
     document.getElementById('emailTo').value = toEmail;
     document.getElementById('emailRecipientName').textContent = toName || originalTeacherName;
     document.getElementById('emailSubject').value = '';
     document.getElementById('emailBody').value = '';
 
-    // Focus on subject field
     openModal('iservEmailModal');
     setTimeout(() => document.getElementById('emailSubject').focus(), 100);
 }
 
-// Send email via IServ
 async function sendIServEmail(event) {
     event.preventDefault();
 
@@ -2685,7 +2479,6 @@ async function sendIServEmail(event) {
     }
 }
 
-// Toast notification helpers
 let activeToasts = [];
 
 function showToast(message, type = 'info') {
@@ -2697,10 +2490,8 @@ function showToast(message, type = 'info') {
     `;
     document.body.appendChild(toast);
 
-    // Animate in
     setTimeout(() => toast.classList.add('visible'), 10);
 
-    // Auto-hide after 4 seconds for non-info toasts
     if (type !== 'info') {
         setTimeout(() => {
             toast.classList.remove('visible');
@@ -2719,15 +2510,10 @@ function hideToast(toast) {
     }
 }
 
-// ==========================================
-// AUTO-IMPORT SUBJECTS FROM TIMETABLE
-// ==========================================
 
-// Extract unique subjects from timetable
 function getSubjectsFromTimetable() {
     const subjectMap = new Map();
 
-    // Combine both A and B week timetables
     const timetables = [TIMETABLE_A, TIMETABLE_B];
 
     for (const timetable of timetables) {
@@ -2738,7 +2524,6 @@ function getSubjectsFromTimetable() {
             for (const lesson of lessons) {
                 if (!lesson) continue;
 
-                // Use subject name as key to avoid duplicates
                 if (!subjectMap.has(lesson.subject)) {
                     subjectMap.set(lesson.subject, {
                         name: lesson.subject,
@@ -2754,11 +2539,9 @@ function getSubjectsFromTimetable() {
     return Array.from(subjectMap.values());
 }
 
-// Import subjects from timetable to Fächer
 async function importSubjectsFromTimetable() {
     const timetableSubjects = getSubjectsFromTimetable();
 
-    // Filter out subjects that already exist
     const existingNames = subjects.map(s => s.name.toLowerCase());
     const newSubjects = timetableSubjects.filter(ts =>
         !existingNames.includes(ts.name.toLowerCase())
@@ -2769,7 +2552,6 @@ async function importSubjectsFromTimetable() {
         return;
     }
 
-    // Extended color palette for subjects
     const colors = [
         '#667eea', // Purple-blue
         '#48bb78', // Green
@@ -2837,7 +2619,6 @@ async function importSubjectsFromTimetable() {
     }
 }
 
-// Update the import banner based on existing subjects
 function updateImportBanner() {
     const banner = document.getElementById('importFromStundenplanBanner');
     if (!banner) return;
@@ -2858,29 +2639,21 @@ function updateImportBanner() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Load school data (always available locally)
     loadSchoolData();
 
-    // Initialize timetable from API (this calls initStundenplan after loading)
     initTimetable();
 
-    // Wait for connection manager to be ready before IServ checks
     if (!NexusConnection.state.lastCheck) {
         await NexusConnection.init();
     }
 
-    // Only check IServ if connection manager says it should be available
-    // or if we're on school network (where IServ always works)
     if (NexusConnection.shouldCallIServ() || NexusConnection.isOnSchoolNetwork()) {
         checkIServConnection();
-        // Auto-load Vertretungsplan with cache-first approach
         preloadVertretungsplan();
     } else if (!NexusConnection.isOffline()) {
-        // We have internet but no IServ - might still try if credentials exist
         checkIServConnection();
     }
 
-    // Auto-fill lesson details when subject is selected from existing entries
     const lessonSubjectInput = document.getElementById('lessonSubject');
     if (lessonSubjectInput) {
         lessonSubjectInput.addEventListener('input', autoFillFromExistingSubject);
@@ -2888,44 +2661,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// Preload Vertretungsplan from cache immediately, then refresh if online
 async function preloadVertretungsplan() {
     const container = document.getElementById('vertretungsplanContainer');
     if (!container) return;
 
     try {
-        // Try to load (backend will serve cache if offline)
         const response = await fetch('/api/iserv/vertretungsplan?display_id=3');
         const data = await response.json();
 
         if (data.success && data.pdfs) {
-            // Successfully got data (from cache or fresh)
             renderVertretungsplanData(data);
 
-            // If it was cached and we're online, refresh in background
             if (data.cached_at && navigator.onLine) {
                 console.log('Vertretungsplan loaded from cache, refreshing in background...');
-                // Small delay to not block initial render
                 setTimeout(() => {
                     refreshVertretungsplanBackground();
                 }, 2000);
             }
         }
-        // If no success, leave the initial message - user can click "Laden"
     } catch (err) {
         console.log('Vertretungsplan preload not available');
     }
 }
 
-// Refresh Vertretungsplan in background without changing UI until done
 async function refreshVertretungsplanBackground() {
     try {
-        // Force a fresh fetch by reconnecting
         const response = await fetch('/api/iserv/vertretungsplan?display_id=3&refresh=true');
         const data = await response.json();
 
         if (data.success && data.pdfs && !data.cached_at) {
-            // Got fresh data, update the display
             console.log('Vertretungsplan refreshed from server');
             renderVertretungsplanData(data);
         }
@@ -2934,12 +2698,10 @@ async function refreshVertretungsplanBackground() {
     }
 }
 
-// Render Vertretungsplan data (extracted from loadVertretungsplan for reuse)
 function renderVertretungsplanData(data) {
     const container = document.getElementById('vertretungsplanContainer');
     if (!container || !data.pdfs) return;
 
-    // Build cache info header
     let cacheInfo = '';
     if (data.cached_at) {
         const cacheDate = new Date(data.cached_at);
@@ -2950,7 +2712,6 @@ function renderVertretungsplanData(data) {
         cacheInfo = '<span class="cache-info fresh">Aktuell</span>';
     }
 
-    // Build pages HTML
     let pagesHtml = '';
     data.pdfs.forEach(pdf => {
         if (pdf.type === 'image' || (pdf.content_type && pdf.content_type.includes('image'))) {
@@ -2972,7 +2733,6 @@ function renderVertretungsplanData(data) {
                 </div>
             `;
         } else {
-            // PDF - embed with object tag
             pagesHtml += `
                 <div class="vertretungsplan-page">
                     <div class="vertretungsplan-page-header">
@@ -3049,16 +2809,13 @@ function showTab(tabName) {
     document.getElementById(tabName + 'Tab').classList.remove('hidden');
     event.target.classList.add('active');
 
-    // Auto-load Vertretungsplan when IServ tab is opened
     if (tabName === 'iserv') {
         const container = document.getElementById('vertretungsplanContainer');
-        // Only auto-load if we haven't loaded yet (still showing initial message)
         if (container && container.querySelector('.vertretungsplan-info')) {
             loadVertretungsplan();
         }
     }
 
-    // Load IServ calendar events when calendar tab is opened
     if (tabName === 'calendar') {
         renderCalendar();
         loadIServCalendarEvents();
@@ -3181,7 +2938,6 @@ function formatDate(dateStr) {
     return date.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
-// Color preview update
 function updateColorPreview() {
     const select = document.getElementById('subjectColor');
     const swatch = document.getElementById('colorPreviewSwatch');
@@ -3191,7 +2947,6 @@ function updateColorPreview() {
 
     swatch.style.backgroundColor = color;
 
-    // Add white border for very light colors
     if (color === '#ffffff' || color === '#90cdf4' || color === '#e2e8f0' || color === '#ecc94b') {
         swatch.classList.add('white-border');
     } else {
@@ -3201,7 +2956,6 @@ function updateColorPreview() {
     label.textContent = colorName;
 }
 
-// Modal functions
 function openAddSubjectModal() {
     document.getElementById('subjectForm').reset();
     document.getElementById('subjectId').value = '';
@@ -3218,7 +2972,6 @@ function openEditSubjectModal(id) {
     document.getElementById('subjectTeacher').value = s.teacher || '';
     document.getElementById('subjectRoom').value = s.room || '';
     document.getElementById('subjectColor').value = s.color || '#667eea';
-    // Set course type radio
     const courseType = s.course_type || 'GK';
     const courseTypeRadio = document.querySelector(`input[name="subject_course_type"][value="${courseType}"]`);
     if (courseTypeRadio) courseTypeRadio.checked = true;
@@ -3232,9 +2985,7 @@ function openAddHomeworkModal() {
     document.getElementById('homeworkId').value = '';
     document.getElementById('deleteHomeworkBtn').style.display = 'none';
 
-    // Add event listener for auto-detecting due date when subject is selected
     const subjectSelect = document.getElementById('homeworkSubject');
-    // Remove any existing listener first
     subjectSelect.removeEventListener('change', updateHomeworkDueDateSuggestion);
     subjectSelect.addEventListener('change', updateHomeworkDueDateSuggestion);
 
@@ -3398,18 +3149,13 @@ async function deleteExam() {
 function openModal(id) { document.getElementById(id).classList.add('active'); }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
-// ==========================================
-// IServ Functions
-// ==========================================
 
 async function checkIServConnection() {
-    // Check for cached IServ status (1 minute cache)
     const cachedStatus = sessionStorage.getItem('iserv_status');
     if (cachedStatus) {
         try {
             const parsed = JSON.parse(cachedStatus);
             if (Date.now() - parsed.timestamp < 60000) {
-                // Use cached status
                 applyIServStatus(parsed.data);
                 return;
             }
@@ -3420,7 +3166,6 @@ async function checkIServConnection() {
         const response = await fetch('/api/iserv/status');
         const data = await response.json();
 
-        // Cache the result
         sessionStorage.setItem('iserv_status', JSON.stringify({
             data: data,
             timestamp: Date.now()
@@ -3438,10 +3183,8 @@ function applyIServStatus(data) {
         document.getElementById('iservBanner').style.display = 'flex';
         document.getElementById('iservBannerText').textContent =
             `IServ verbunden (${data.user_info?.name || data.username || 'Benutzer'})`;
-        // Load IServ data when connected
         loadIServData();
     } else if (data.has_credentials) {
-        // Try to connect (but don't cache this attempt)
         connectToIServ();
     }
 }
@@ -3459,13 +3202,11 @@ async function connectToIServ() {
             document.getElementById('iservBanner').style.display = 'flex';
             document.getElementById('iservBannerText').textContent = 'IServ verbunden';
 
-            // Update cache with connected status
             sessionStorage.setItem('iserv_status', JSON.stringify({
                 data: { connected: true },
                 timestamp: Date.now()
             }));
 
-            // Load IServ data when connected
             loadIServData();
         }
     } catch (err) {
@@ -3482,11 +3223,7 @@ async function refreshIServData() {
     await loadIServData();
 }
 
-// ==========================================
-// VERTRETUNGSPLAN
-// ==========================================
 
-// My courses for filtering (11th grade)
 const MY_COURSES = [
     'Mathe LK', 'Englisch LK', 'Deutsch GK', 'Physik GK', 'Musik GK',
     'Geschichte GK', 'Geografie GK', 'Politische Bildung GK', 'Psychologie GK',
@@ -3502,11 +3239,9 @@ async function loadVertretungsplan() {
         const data = await response.json();
 
         if (!data.success) {
-            // Determine the appropriate error message and action
             let errorIcon, errorTitle, errorMessage, actionButton = '';
 
             if (data.needs_setup) {
-                // IServ not configured - direct to settings
                 errorIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="3"></circle>
                     <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"></path>
@@ -3515,7 +3250,6 @@ async function loadVertretungsplan() {
                 errorMessage = data.error || 'Richte IServ in den Einstellungen ein, um den Vertretungsplan zu laden.';
                 actionButton = `<a href="/hub/settings" class="btn-primary small" style="margin-top: 12px;">Zu den Einstellungen</a>`;
             } else if (data.needs_reconnect) {
-                // Credentials exist but connection failed - prompt re-login
                 errorIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"></path>
                     <polyline points="10 17 15 12 10 7"></polyline>
@@ -3525,7 +3259,6 @@ async function loadVertretungsplan() {
                 errorMessage = data.error || 'Die Anmeldung bei IServ ist abgelaufen. Bitte melde dich erneut an.';
                 actionButton = `<a href="/hub/settings" class="btn-primary small" style="margin-top: 12px;">Erneut anmelden</a>`;
             } else if (data.offline) {
-                // Offline with no cache
                 errorIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M1 1l22 22"></path>
                     <path d="M16.72 11.06A10.94 10.94 0 0119 12.55"></path>
@@ -3539,7 +3272,6 @@ async function loadVertretungsplan() {
                 errorMessage = data.error || 'Kein Cache vorhanden. Verbinde dich mit dem Internet, um den Vertretungsplan zu laden.';
                 actionButton = `<button class="btn-secondary small" onclick="loadVertretungsplan()" style="margin-top: 12px;">Erneut versuchen</button>`;
             } else {
-                // Generic error
                 errorIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"></circle>
                     <line x1="12" y1="8" x2="12" y2="12"></line>
@@ -3550,7 +3282,6 @@ async function loadVertretungsplan() {
                 actionButton = `<button class="btn-secondary small" onclick="loadVertretungsplan()" style="margin-top: 12px;">Erneut versuchen</button>`;
             }
 
-            // Build debug info section
             let debugInfo = '';
             if (data.html_preview || data.searched_urls || data.media_elements) {
                 debugInfo = `<details style="margin-top: 12px; font-size: 11px; text-align: left;">
@@ -3585,7 +3316,6 @@ async function loadVertretungsplan() {
             return;
         }
 
-        // New PDF format with multiple pages
         if (data.pdfs && data.pdfs.length > 0) {
             let cacheInfo;
             if (data.from_cache) {
@@ -3610,7 +3340,6 @@ async function loadVertretungsplan() {
             let pagesHtml = '';
             data.pdfs.forEach((pdf, index) => {
                 if (pdf.type === 'pdf') {
-                    // Embed PDF using iframe or object
                     pagesHtml += `
                         <div class="vertretungsplan-page">
                             <div class="vertretungsplan-page-header">
@@ -3634,7 +3363,6 @@ async function loadVertretungsplan() {
                         </div>
                     `;
                 } else if (pdf.type === 'image') {
-                    // Display image directly
                     pagesHtml += `
                         <div class="vertretungsplan-page">
                             <div class="vertretungsplan-page-header">
@@ -3675,7 +3403,6 @@ async function loadVertretungsplan() {
             return;
         }
 
-        // Legacy format handling (type = 'image' or 'html')
         if (data.type === 'image') {
             container.innerHTML = `
                 <div class="vertretungsplan-image-wrapper">
@@ -3717,8 +3444,6 @@ async function loadVertretungsplan() {
 }
 
 function analyzeVertretungsplanImage(base64Data) {
-    // This is a placeholder for OCR analysis
-    // In a real implementation, we would use an OCR service or library
     const noteEl = document.querySelector('.vertretungsplan-note');
     if (noteEl) {
         setTimeout(() => {
@@ -3743,7 +3468,6 @@ async function loadIServData() {
     document.getElementById('iservNotConnectedMessage').style.display = 'none';
     document.getElementById('iservContent').style.display = 'block';
 
-    // Load exercises
     try {
         const exercisesRes = await fetch('/api/iserv/exercises');
         const exercisesData = await exercisesRes.json();
@@ -3779,7 +3503,6 @@ async function loadIServData() {
         console.error('IServ exercises error:', err);
     }
 
-    // Load events
     try {
         const eventsRes = await fetch('/api/iserv/events');
         const eventsData = await eventsRes.json();
@@ -3801,7 +3524,6 @@ async function loadIServData() {
         document.getElementById('iservEvents').innerHTML = '<div class="empty-state small">Fehler beim Laden</div>';
     }
 
-    // Load notifications
     try {
         const notifRes = await fetch('/api/iserv/notifications');
         const notifData = await notifRes.json();
@@ -3823,7 +3545,6 @@ async function loadIServData() {
         document.getElementById('iservNotifications').innerHTML = '<div class="empty-state small">Fehler beim Laden</div>';
     }
 
-    // Also load IServ calendar events for Schulkalender
     await loadIServCalendarEvents();
 }
 
@@ -3849,7 +3570,6 @@ function escapeHtml(str) {
 }
 
 function importAsHomework(title, dueDate, description, course) {
-    // Find a matching subject by course name
     let subjectId = '';
     if (course) {
         const matchingSubject = subjects.find(s =>
@@ -3861,13 +3581,11 @@ function importAsHomework(title, dueDate, description, course) {
         }
     }
 
-    // Pre-fill the homework form
     document.getElementById('homeworkForm').reset();
     document.getElementById('homeworkId').value = '';
     document.getElementById('homeworkTitle').value = title || '';
     document.getElementById('homeworkNotes').value = description || '';
 
-    // Set the due date if provided
     if (dueDate) {
         const d = new Date(dueDate);
         if (!isNaN(d.getTime())) {
@@ -3875,7 +3593,6 @@ function importAsHomework(title, dueDate, description, course) {
         }
     }
 
-    // Set the subject if found
     if (subjectId) {
         document.getElementById('homeworkSubject').value = subjectId;
     }
@@ -3884,9 +3601,6 @@ function importAsHomework(title, dueDate, description, course) {
     openModal('homeworkModal');
 }
 
-// ==========================================
-// CALENDAR FUNCTIONS
-// ==========================================
 
 const MONTHS_DE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
@@ -3897,37 +3611,30 @@ function renderCalendar() {
     const year = currentCalendarDate.getFullYear();
     const month = currentCalendarDate.getMonth();
 
-    // Update title
     document.getElementById('calendarMonthTitle').textContent = `${MONTHS_DE[month]} ${year}`;
 
-    // Get first day of month and total days
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
 
-    // Get day of week for first day (0 = Sunday, convert to Monday start)
     let startDay = firstDay.getDay();
     startDay = startDay === 0 ? 6 : startDay - 1; // Convert to Monday = 0
 
-    // Get today for highlighting
     const today = new Date();
     const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
 
     let html = '';
 
-    // Empty cells before first day
     for (let i = 0; i < startDay; i++) {
         html += '<div class="calendar-day empty"></div>';
     }
 
-    // Days of month
     for (let day = 1; day <= daysInMonth; day++) {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const isToday = isCurrentMonth && today.getDate() === day;
         const dayOfWeek = (startDay + day - 1) % 7;
         const isWeekend = dayOfWeek >= 5;
 
-        // Find events for this day
         const dayEvents = calendarEvents.filter(e => e.date === dateStr);
         const dayIservEvents = iservCalendarEvents.filter(e => {
             const eventDate = e.date ? e.date.split('T')[0] : '';
@@ -4005,8 +3712,6 @@ function getCategoryLabel(category) {
 }
 
 async function loadIServCalendarEvents() {
-    // Schulkalender was removed - this function is now a no-op
-    // Keeping it to avoid errors from existing calls
     return;
 }
 
@@ -4048,7 +3753,6 @@ function renderIServCalendarEvents() {
 }
 
 function openDayEvents(dateStr) {
-    // Open add event modal with date pre-filled
     document.getElementById('calendarEventForm').reset();
     document.getElementById('calendarEventId').value = '';
     document.getElementById('calendarEventDate').value = dateStr;
@@ -4138,11 +3842,7 @@ function refreshSchoolCalendar() {
     }
 }
 
-// ==========================================
-// GRADES FUNCTIONS
-// ==========================================
 
-// Grade Calculator Functions
 const POINTS_TO_GRADE = {
     15: '1+', 14: '1', 13: '1-',
     12: '2+', 11: '2', 10: '2-',
@@ -4239,7 +3939,6 @@ function calculateNeededGrade() {
         return;
     }
 
-    // Calculate needed grade: (targetAvg * (gradeCount + 1)) - (currentAvg * gradeCount)
     const totalNeeded = targetAvg * (gradeCount + 1);
     const totalCurrent = currentAvg * gradeCount;
     const neededPoints = totalNeeded - totalCurrent;
@@ -4272,7 +3971,6 @@ function calculateNeededGrade() {
 function calculateSubjectGrade() {
     const resultEl = document.getElementById('klausurCalcResult');
 
-    // Get Klausur grades (filter out empty inputs)
     const klausurInputs = [
         document.getElementById('klausur1').value,
         document.getElementById('klausur2').value,
@@ -4280,11 +3978,9 @@ function calculateSubjectGrade() {
         document.getElementById('klausur4').value
     ].filter(v => v !== '').map(v => parseFloat(v));
 
-    // Get Sonstige grades - either from average input or from individual grades
     let sonstigeAvg = parseFloat(document.getElementById('sonstigeAvgInput').value);
     const sonstigeGradesStr = document.getElementById('sonstigeGrades').value.trim();
 
-    // Parse individual sonstige grades if provided
     let sonstigeGrades = [];
     if (sonstigeGradesStr) {
         sonstigeGrades = sonstigeGradesStr.split(/[,;]\s*/)
@@ -4292,38 +3988,31 @@ function calculateSubjectGrade() {
             .filter(v => !isNaN(v) && v >= 0 && v <= 15);
     }
 
-    // Calculate sonstige average from individual grades if provided
     if (sonstigeGrades.length > 0) {
         sonstigeAvg = sonstigeGrades.reduce((a, b) => a + b, 0) / sonstigeGrades.length;
     }
 
-    // Validate inputs
     if (klausurInputs.length === 0 && isNaN(sonstigeAvg)) {
         resultEl.innerHTML = '<span class="error">Bitte mindestens eine Klausur oder sonstige Note eingeben</span>';
         return;
     }
 
-    // Calculate Klausur average
     let klausurAvg = null;
     if (klausurInputs.length > 0) {
         klausurAvg = klausurInputs.reduce((a, b) => a + b, 0) / klausurInputs.length;
     }
 
-    // Calculate final grade
     let finalGrade;
     let breakdown = '';
 
     if (klausurAvg !== null && !isNaN(sonstigeAvg)) {
-        // Both Klausur and Sonstige - apply 1/3 + 2/3 weighting
         finalGrade = (klausurAvg * (1/3)) + (sonstigeAvg * (2/3));
         breakdown = `Klausur-Ø: ${klausurAvg.toFixed(1)}P × ⅓ = ${(klausurAvg / 3).toFixed(2)}P<br>
                      Sonstige-Ø: ${sonstigeAvg.toFixed(1)}P × ⅔ = ${(sonstigeAvg * 2 / 3).toFixed(2)}P`;
     } else if (klausurAvg !== null) {
-        // Only Klausur grades
         finalGrade = klausurAvg;
         breakdown = `Nur Klausuren: ${klausurAvg.toFixed(1)}P (keine sonstigen Noten)`;
     } else {
-        // Only Sonstige grades
         finalGrade = sonstigeAvg;
         breakdown = `Nur sonstige Noten: ${sonstigeAvg.toFixed(1)}P (keine Klausuren)`;
     }
@@ -4342,11 +4031,9 @@ function calculateSubjectGrade() {
         </div>`;
 }
 
-// Set semester filter and re-render grades
 function setSemesterFilter(semester) {
     currentSemesterFilter = semester;
 
-    // Update tab buttons
     document.querySelectorAll('.semester-tab').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.semester === semester);
     });
@@ -4358,12 +4045,10 @@ function renderGrades() {
     const container = document.getElementById('gradesBySubject');
     if (!container) return;
 
-    // Filter grades by semester (unless showing all)
     const filteredGrades = currentSemesterFilter === 'all'
         ? grades
         : grades.filter(g => (g.semester || 'Q1') === currentSemesterFilter);
 
-    // Show/hide combined view elements
     const showCombined = currentSemesterFilter === 'all';
     document.getElementById('klausurAvgDisplay').style.display = showCombined ? 'flex' : 'none';
     document.getElementById('sonstigeAvgDisplay').style.display = showCombined ? 'flex' : 'none';
@@ -4384,7 +4069,6 @@ function renderGrades() {
         return;
     }
 
-    // Group grades by subject
     const gradesBySubject = {};
     filteredGrades.forEach(grade => {
         const subjectId = grade.subject_id;
@@ -4394,14 +4078,10 @@ function renderGrades() {
         gradesBySubject[subjectId].push(grade);
     });
 
-    // Calculate subject average with 1/3 Klausur rule
-    // For combined view: average all Klausuren across semesters, average all other grades,
-    // then apply 1/3 + 2/3 weighting
     function calculateSubjectAverage(subjectGrades) {
         const klausuren = subjectGrades.filter(g => g.type === 'klausur');
         const otherGrades = subjectGrades.filter(g => g.type !== 'klausur');
 
-        // If no Klausur exists, all grades count equally
         if (klausuren.length === 0) {
             if (subjectGrades.length === 0) return { avg: null, klausurAvg: null, otherAvg: null };
             const total = subjectGrades.reduce((sum, g) => sum + g.points, 0);
@@ -4409,22 +4089,18 @@ function renderGrades() {
             return { avg, klausurAvg: null, otherAvg: avg };
         }
 
-        // Klausuren count 1/3, other grades count 2/3
         const klausurAvg = klausuren.reduce((sum, g) => sum + g.points, 0) / klausuren.length;
 
         if (otherGrades.length === 0) {
-            // Only Klausuren exist - they count 100%
             return { avg: klausurAvg, klausurAvg, otherAvg: null };
         }
 
         const otherAvg = otherGrades.reduce((sum, g) => sum + g.points, 0) / otherGrades.length;
 
-        // 1/3 Klausur + 2/3 other grades
         const avg = (klausurAvg * (1/3)) + (otherAvg * (2/3));
         return { avg, klausurAvg, otherAvg };
     }
 
-    // Calculate overall averages (LK counts double)
     let totalWeightedSum = 0;
     let totalWeight = 0;
     let totalKlausurSum = 0, totalKlausurCount = 0;
@@ -4434,7 +4110,6 @@ function renderGrades() {
         const result = calculateSubjectAverage(subjectGrades);
         const subject = subjects.find(s => s.id === subjectId);
         const courseType = subject?.course_type || 'GK';
-        // LK counts double (weight 2), GK and SK count once (weight 1)
         const weight = courseType === 'LK' ? 2 : 1;
 
         if (result.avg !== null) {
@@ -4456,7 +4131,6 @@ function renderGrades() {
         : '--';
     document.getElementById('overallAverage').textContent = overallAvg !== '--' ? overallAvg + 'P' : '--';
 
-    // Update combined view averages
     if (showCombined) {
         const klausurAvg = totalKlausurCount > 0
             ? (totalKlausurSum / totalKlausurCount).toFixed(1) + 'P'
@@ -4468,18 +4142,14 @@ function renderGrades() {
         document.getElementById('sonstigeAverage').textContent = sonstigeAvg;
     }
 
-    // Render grades grouped by subject
     container.innerHTML = Object.entries(gradesBySubject).map(([subjectId, subjectGrades]) => {
         const subject = subjects.find(s => s.id === subjectId) || { name: 'Unbekannt', color: '#6366f1' };
 
-        // Calculate subject average using the 1/3 Klausur rule
         const result = calculateSubjectAverage(subjectGrades);
         const subjectAvg = result.avg !== null ? result.avg.toFixed(1) : '--';
 
-        // Check if subject has Klausuren for info display
         const hasKlausur = subjectGrades.some(g => g.type === 'klausur');
 
-        // Sort grades by date (newest first)
         subjectGrades.sort((a, b) => new Date(b.date) - new Date(a.date));
 
         return `<div class="subject-grades glass-card">

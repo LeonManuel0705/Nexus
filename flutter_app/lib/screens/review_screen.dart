@@ -12,7 +12,6 @@ class ReviewScreen extends StatefulWidget {
 class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  // Daily review state
   final _dailyAchievedController = TextEditingController();
   final _dailyGoodController = TextEditingController();
   final _dailyBetterController = TextEditingController();
@@ -20,14 +19,12 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
   final _dailyGratefulController = TextEditingController();
   int _dailyEnergy = 5;
 
-  // Weekly review state
   final _weeklyHighlightsController = TextEditingController();
   final _weeklyProgressController = TextEditingController();
   final _weeklyChallengesController = TextEditingController();
   final _weeklyLearningsController = TextEditingController();
   final _weeklyGoalsController = TextEditingController();
 
-  // History
   List<ReviewEntry> _dailyReviews = [];
   List<WeeklyReviewEntry> _weeklyReviews = [];
 
@@ -196,7 +193,6 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
 
     return Column(
       children: [
-        // Tab Bar
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
@@ -222,7 +218,6 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
             ],
           ),
         ),
-        // Tab Content
         Expanded(
           child: TabBarView(
             controller: _tabController,
@@ -243,7 +238,6 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(
             children: [
               Container(
@@ -282,7 +276,6 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
           ),
           const SizedBox(height: 24),
 
-          // Questions
           _buildQuestionField(
             isDark: isDark,
             icon: Icons.check_circle_outline,
@@ -333,11 +326,9 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
           ),
           const SizedBox(height: 24),
 
-          // Energy Level
           _buildEnergySlider(isDark),
           const SizedBox(height: 24),
 
-          // Save Button
           _buildSaveButton(_saveDailyReview),
           const SizedBox(height: 100),
         ],
@@ -355,7 +346,6 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(
             children: [
               Container(
@@ -394,7 +384,6 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
           ),
           const SizedBox(height: 24),
 
-          // Questions
           _buildQuestionField(
             isDark: isDark,
             icon: Icons.star_outline,
@@ -445,7 +434,6 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
           ),
           const SizedBox(height: 24),
 
-          // Save Button
           _buildSaveButton(_saveWeeklyReview),
           const SizedBox(height: 100),
         ],
@@ -549,7 +537,6 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
                   ],
                 ),
               ),
-              // Energy indicator
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -1088,8 +1075,6 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
     );
   }
 }
-
-// Models
 
 class ReviewEntry {
   final String id;

@@ -18,7 +18,7 @@ class NexusTheme {
   static const Color accent2 = Color(0xFF764BA2);
   static const Color accent3 = Color(0xFFF093FB);
 
-  static const Color darkBackground = Color(0xFF0F172A);
+  static const Color darkBackground = Color(0xFF0F0F1A); // Desktop: #0f0f1a
   static const Color darkSurface = Color(0xFF1E293B);
   static const Color darkCard = Color(0xFF1E293B);
   static const Color darkCardHover = Color(0xFF334155);
@@ -27,7 +27,7 @@ class NexusTheme {
   static const Color darkTextMuted = Color(0xFF64748B);
   static const Color darkBorder = Color(0xFF334155);
 
-  static const Color lightBackground = Color(0xFFF8FAFC);
+  static const Color lightBackground = Color(0xFFFAFBFC); // Desktop: #fafbfc
   static const Color lightSurface = Color(0xFFFFFFFF);
   static const Color lightCard = Color(0xFFFFFFFF);
   static const Color lightText = Color(0xFF0F172A);
@@ -61,6 +61,7 @@ class NexusTheme {
   static const Color reviewColor = Color(0xFF10B981);
   static const Color schoolColor = Color(0xFF3B82F6);
   static const Color calendarColor = Color(0xFF6366F1);
+  static const Color notesColor = Color(0xFFFACC15);
 
   static ThemeData darkTheme = ThemeData(
     useMaterial3: true,
