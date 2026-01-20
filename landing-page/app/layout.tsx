@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { PageTransition } from '@/components/page-transition'
+import { IOSInstallBanner } from '@/components/ios-install-banner'
 import './globals.css'
 
 const inter = Inter({ 
@@ -51,6 +52,7 @@ export default function RootLayout({
         <PageTransition>
           {children}
         </PageTransition>
+        <IOSInstallBanner />
         <Analytics />
       </body>
     </html>

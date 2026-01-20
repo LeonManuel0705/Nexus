@@ -7,10 +7,10 @@ import {
   CheckSquare,
   GraduationCap,
   Dumbbell,
-  Mail,
-  LayoutDashboard
+  Mail
 } from "lucide-react"
 import type { Metadata } from "next"
+import { ImageLightbox } from "@/components/ui/image-lightbox"
 
 export const metadata: Metadata = {
   title: "Features - Nexus",
@@ -18,18 +18,6 @@ export const metadata: Metadata = {
 }
 
 const mainFeatures = [
-  {
-    icon: LayoutDashboard,
-    title: "Dashboard",
-    description: "Dein personalisierter Startpunkt für jeden Tag.",
-    details: [
-      "Heutige Tasks und Termine auf einen Blick",
-      "Anstehende Deadlines und Prüfungen",
-      "Schnellzugriff auf alle Module",
-      "Anpassbare Widgets"
-    ],
-    color: "primary"
-  },
   {
     icon: Calendar,
     title: "Kalender",
@@ -40,7 +28,8 @@ const mainFeatures = [
       "Mehrere Kalender verwalten",
       "Offline-Funktionalität"
     ],
-    color: "accent"
+    color: "accent",
+    image: "/screenshots/calendar.png"
   },
   {
     icon: GraduationCap,
@@ -52,7 +41,8 @@ const mainFeatures = [
       "Vertretungsplan-Integration",
       "Hausaufgaben-Tracking"
     ],
-    color: "primary"
+    color: "primary",
+    image: "/screenshots/school.png"
   },
   {
     icon: CheckSquare,
@@ -64,7 +54,8 @@ const mainFeatures = [
       "Projekte organisieren",
       "Wiederkehrende Aufgaben"
     ],
-    color: "accent"
+    color: "accent",
+    image: "/screenshots/tasks.png"
   },
   {
     icon: Dumbbell,
@@ -76,7 +67,8 @@ const mainFeatures = [
       "Fortschritt visualisieren",
       "Übungsbibliothek"
     ],
-    color: "primary"
+    color: "primary",
+    image: "/screenshots/training.png"
   },
   {
     icon: Mail,
@@ -88,7 +80,8 @@ const mainFeatures = [
       "Schnelle Suche",
       "Anhänge verwalten"
     ],
-    color: "accent"
+    color: "accent",
+    image: "/screenshots/email.png"
   },
 ]
 
@@ -174,8 +167,13 @@ export default function FeaturesPage() {
 
                   {}
                   <div className="md:[direction:ltr]">
-                    <div className="aspect-[4/3] rounded-xl border border-border/50 bg-card/50 flex items-center justify-center">
-                      <feature.icon className="w-16 h-16 text-muted-foreground/30" />
+                    <div className="rounded-xl border border-border/50 bg-card/50 overflow-hidden shadow-lg">
+                      <ImageLightbox
+                        src={feature.image}
+                        alt={`${feature.title} Screenshot`}
+                        width={800}
+                        height={600}
+                      />
                     </div>
                   </div>
                 </div>

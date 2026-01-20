@@ -150,6 +150,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onChanged: (_) => provider.toggleTheme(),
                   isDark: isDark,
                 ),
+                const Divider(height: 1),
+                _buildSwitchTile(
+                  icon: Icons.science,
+                  title: 'Demo-Modus',
+                  subtitle: provider.demoMode
+                      ? 'Zeigt Beispieldaten an'
+                      : 'Zeigt echte Daten an',
+                  value: provider.demoMode,
+                  onChanged: (_) => provider.toggleDemoMode(),
+                  isDark: isDark,
+                ),
+                if (provider.demoMode)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, size: 16, color: Colors.amber[700]),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Demo-Modus aktiv - Es werden Beispieldaten angezeigt.',
+                              style: TextStyle(fontSize: 12, color: Colors.amber[800]),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 20),

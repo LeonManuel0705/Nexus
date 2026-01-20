@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/task.dart';
 import '../models/event.dart';
 import '../models/lesson.dart';
 import '../models/quick_note.dart';
 import '../services/database_service.dart' if (dart.library.html) '../services/database_service_web.dart';
+import '../services/demo_data_service.dart';
 
 class AppProvider extends ChangeNotifier {
   final DatabaseService _db = DatabaseService();
+  final DemoDataService _demo = DemoDataService();
   final _uuid = const Uuid();
 
   List<Task> _tasks = [];
@@ -17,32 +20,50 @@ class AppProvider extends ChangeNotifier {
   int _todayEventCount = 0;
   bool _isLoading = true;
   ThemeMode _themeMode = ThemeMode.dark;
+  bool _demoMode = false;
 
-  List<Task> get tasks => _tasks;
-  List<Event> get events => _events;
-  List<Lesson> get lessons => _lessons;
-  int get openTaskCount => _openTaskCount;
-  int get todayEventCount => _todayEventCount;
+  List<Task> get tasks => _demoMode ? _demo.getDemoTasks() : _tasks;
+  List<Event> get events => _demoMode ? _demo.getDemoEvents() : _events;
+  List<Lesson> get lessons => _demoMode ? _demo.getDemoLessons() : _lessons;
+  int get openTaskCount => _demoMode ? _demo.getDemoOpenTaskCount() : _openTaskCount;
+  int get todayEventCount => _demoMode ? _demo.getDemoTodayEventCount() : _todayEventCount;
   bool get isLoading => _isLoading;
   ThemeMode get themeMode => _themeMode;
+  bool get demoMode => _demoMode;
 
   Future<void> initialize() async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      await Future.wait([
-        loadTasks(),
-        loadEvents(),
-        loadLessons(),
-        loadStats(),
-      ]);
+      final prefs = await SharedPreferences.getInstance();
+      _demoMode = prefs.getBool('demo_mode') ?? false;
+
+      if (!_demoMode) {
+        await Future.wait([
+          loadTasks(),
+          loadEvents(),
+          loadLessons(),
+          loadStats(),
+        ]);
+      }
     } catch (e) {
       debugPrint('AppProvider initialize error: $e');
     }
 
     _isLoading = false;
     notifyListeners();
+  }
+
+  Future<void> setDemoMode(bool enabled) async {
+    _demoMode = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('demo_mode', enabled);
+    notifyListeners();
+  }
+
+  Future<void> toggleDemoMode() async {
+    await setDemoMode(!_demoMode);
   }
 
   Future<void> refresh() async {
@@ -59,10 +80,12 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<List<Task>> getTodayTasks() async {
+    if (_demoMode) return _demo.getDemoTodayTasks();
     return await _db.getTodayTasks();
   }
 
   Future<List<Task>> getOpenTasks() async {
+    if (_demoMode) return _demo.getDemoOpenTasks();
     return await _db.getOpenTasks();
   }
 
@@ -122,10 +145,12 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<List<Event>> getTodayEvents() async {
+    if (_demoMode) return _demo.getDemoTodayEvents();
     return await _db.getTodayEvents();
   }
 
   Future<List<Event>> getUpcomingEvents({int days = 7}) async {
+    if (_demoMode) return _demo.getDemoUpcomingEvents(days: days);
     return await _db.getUpcomingEvents(days: days);
   }
 
@@ -181,10 +206,14 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<List<Lesson>> getTodayLessons() async {
+    if (_demoMode) return _demo.getDemoTodayLessons();
     return await _db.getTodayLessons();
   }
 
   Future<List<Lesson>> getLessonsByDay(int dayOfWeek) async {
+    if (_demoMode) {
+      return _demo.getDemoLessons().where((l) => l.dayOfWeek == dayOfWeek).toList();
+    }
     return await _db.getLessonsByDay(dayOfWeek);
   }
 
@@ -250,6 +279,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<List<Map<String, dynamic>>> getSubjects() async {
+    if (_demoMode) return _demo.getDemoSubjects();
     return await _db.getSubjects();
   }
 
@@ -286,10 +316,12 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<List<Map<String, dynamic>>> getHomework() async {
+    if (_demoMode) return _demo.getDemoHomework();
     return await _db.getHomework();
   }
 
   Future<List<Map<String, dynamic>>> getOpenHomework() async {
+    if (_demoMode) return _demo.getDemoOpenHomework();
     return await _db.getOpenHomework();
   }
 

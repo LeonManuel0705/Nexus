@@ -1,53 +1,12 @@
+"use client"
+
+import { useState } from "react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { PlatformCard } from "@/components/ui/platform-card"
+import { IOSInstallModal } from "@/components/ios-install-modal"
 import { ArrowRight } from "lucide-react"
 import Link from "next/link"
-import type { Metadata } from "next"
-
-export const metadata: Metadata = {
-  title: "Download - Nexus",
-  description: "Lade Nexus herunter für Android, iOS, macOS oder Linux. Kostenlos, privat und offline nutzbar.",
-}
-
-const platforms = [
-  {
-    iconName: "Smartphone" as const,
-    name: "Android",
-    description: "Native APK für maximale Performance",
-    downloadLabel: "APK herunterladen",
-    downloadUrl: "#android",
-    badge: "Empfohlen",
-    features: ["Native Performance", "Alle Features", "Offline-Modus"]
-  },
-  {
-    iconName: "Globe" as const,
-    name: "iOS / iPadOS",
-    description: "Progressive Web App für Apple-Geräte",
-    downloadLabel: "PWA installieren",
-    downloadUrl: "#ios",
-    badge: null,
-    features: ["Safari öffnen", "Teilen antippen", "Zum Home-Bildschirm"]
-  },
-  {
-    iconName: "Monitor" as const,
-    name: "macOS",
-    description: "Desktop-App für den Mac",
-    downloadLabel: "Für Mac laden",
-    downloadUrl: "#macos",
-    badge: null,
-    features: ["Native App", "Menübar-Integration", "Tastenkürzel"]
-  },
-  {
-    iconName: "Monitor" as const,
-    name: "Linux",
-    description: "AppImage für alle Distributionen",
-    downloadLabel: "AppImage laden",
-    downloadUrl: "#linux",
-    badge: null,
-    features: ["AppImage Format", "Keine Installation", "Alle Distros"]
-  },
-]
 
 const requirements = [
   { platform: "Android", requirement: "Android 8.0 oder höher" },
@@ -57,11 +16,13 @@ const requirements = [
 ]
 
 export default function DownloadPage() {
+  const [isIOSModalOpen, setIsIOSModalOpen] = useState(false)
+
   return (
     <>
       <Navigation />
       <main className="pt-24">
-        {}
+        {/* Hero */}
         <section className="py-16 md:py-24">
           <div className="mx-auto max-w-4xl px-6 text-center">
             <h1 className="text-4xl md:text-5xl font-semibold tracking-tight mb-6">
@@ -69,24 +30,66 @@ export default function DownloadPage() {
               <span className="text-foreground"> herunterladen</span>
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Wähle deine Plattform und starte in unter 5 Minuten. 
+              Wähle deine Plattform und starte in unter 5 Minuten.
               Dein System aufzubauen war noch nie so einfach.
             </p>
           </div>
         </section>
 
-        {}
+        {/* Platform Cards */}
         <section className="py-8 md:py-16">
           <div className="mx-auto max-w-6xl px-6">
             <div className="grid sm:grid-cols-2 gap-6">
-              {platforms.map((platform) => (
-                <PlatformCard key={platform.name} {...platform} />
-              ))}
+              {/* Android */}
+              <PlatformCard
+                iconName="Smartphone"
+                name="Android"
+                description="Native APK für maximale Performance"
+                downloadLabel="APK herunterladen"
+                downloadUrl="/downloads/Nexus.apk"
+                badge="Empfohlen"
+                features={["Native Performance", "Alle Features", "Offline-Modus"]}
+                isDownload={true}
+              />
+
+              {/* iOS / iPadOS */}
+              <PlatformCard
+                iconName="Globe"
+                name="iOS / iPadOS"
+                description="Progressive Web App für Apple-Geräte"
+                downloadLabel="Installieren"
+                onClick={() => setIsIOSModalOpen(true)}
+                badge={null}
+                features={["Safari öffnen", "Teilen antippen", "Zum Home-Bildschirm"]}
+              />
+
+              {/* macOS */}
+              <PlatformCard
+                iconName="Monitor"
+                name="macOS"
+                description="Native Desktop-App für Mac"
+                downloadLabel="ZIP herunterladen"
+                downloadUrl="/downloads/Nexus-macOS.zip"
+                badge={null}
+                features={["Native App", "Schneller Start", "Offline-Modus"]}
+                isDownload={true}
+              />
+
+              {/* Linux */}
+              <PlatformCard
+                iconName="Monitor"
+                name="Linux"
+                description="Web-App für alle Distributionen"
+                downloadLabel="Web-App öffnen"
+                downloadUrl="/pwa/index.html"
+                badge={null}
+                features={["Browser-basiert", "Alle Features", "Keine Installation"]}
+              />
             </div>
           </div>
         </section>
 
-        {}
+        {/* Steps */}
         <section className="py-16 md:py-24 bg-gradient-to-b from-background to-[oklch(0.12_0.02_280)]">
           <div className="mx-auto max-w-4xl px-6">
             <div className="text-center mb-12">
@@ -141,13 +144,13 @@ export default function DownloadPage() {
           </div>
         </section>
 
-        {}
+        {/* System Requirements */}
         <section className="py-16 md:py-24">
           <div className="mx-auto max-w-4xl px-6">
             <h2 className="text-2xl font-semibold text-foreground mb-8 text-center">
               Systemanforderungen
             </h2>
-            
+
             <div className="grid sm:grid-cols-2 gap-4">
               {requirements.map((req) => (
                 <div
@@ -162,7 +165,7 @@ export default function DownloadPage() {
           </div>
         </section>
 
-        {}
+        {/* Support */}
         <section className="py-16 md:py-24 bg-gradient-to-b from-background to-[oklch(0.12_0.02_280)]">
           <div className="mx-auto max-w-4xl px-6 text-center">
             <h2 className="text-2xl font-semibold text-foreground mb-4">
@@ -182,6 +185,9 @@ export default function DownloadPage() {
         </section>
       </main>
       <Footer />
+
+      {/* iOS Install Modal */}
+      <IOSInstallModal isOpen={isIOSModalOpen} onClose={() => setIsIOSModalOpen(false)} />
     </>
   )
 }

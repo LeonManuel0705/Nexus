@@ -7,7 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../theme.dart';
 
 class UpdateService {
-  // Hardcoded current version
   static const String currentVersion = '0.2';
   static const String currentVersionName = '0.2 Closed Beta';
 
@@ -37,7 +36,6 @@ class UpdateService {
         }
       }
     } on TimeoutException {
-      // No internet connection (timeout)
       debugPrint('Update check: Connection timeout');
     } catch (e) {
       debugPrint('Update check error: $e');
@@ -134,7 +132,6 @@ class UpdateDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header with gradient accent
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
@@ -150,7 +147,6 @@ class UpdateDialog extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  // Update icon with glow
                   Container(
                     width: 64,
                     height: 64,
@@ -176,7 +172,6 @@ class UpdateDialog extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // Title
                   Text(
                     'Neues Update verfügbar',
                     style: TextStyle(
@@ -186,7 +181,6 @@ class UpdateDialog extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // Version badge
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                     decoration: BoxDecoration(
@@ -214,7 +208,6 @@ class UpdateDialog extends StatelessWidget {
               ),
             ),
 
-            // Changelog section
             if (updateInfo.changelog.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
@@ -268,7 +261,6 @@ class UpdateDialog extends StatelessWidget {
                 ),
               ),
 
-            // Divider
             Container(
               height: 1,
               margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -284,12 +276,10 @@ class UpdateDialog extends StatelessWidget {
               ),
             ),
 
-            // Actions
             Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  // Update button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -350,7 +340,6 @@ class UpdateDialog extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // Skip button
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
                     style: TextButton.styleFrom(
@@ -371,7 +360,6 @@ class UpdateDialog extends StatelessWidget {
               ),
             ),
 
-            // Current version footer
             Container(
               padding: const EdgeInsets.only(bottom: 16),
               child: Text(

@@ -171,7 +171,6 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _checkForUpdates() async {
-    // Small delay to let the UI settle
     await Future.delayed(const Duration(seconds: 2));
 
     if (!mounted) return;
@@ -198,26 +197,17 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _importHolidaysIfNeeded() async {
     try {
-      print('main.dart: Checking if holidays need to be imported...');
       final holidayService = HolidayService();
       final hasHolidays = await holidayService.hasImportedHolidays();
-      print('main.dart: hasImportedHolidays() returned: $hasHolidays');
 
       if (!hasHolidays) {
-        print('main.dart: Starting holiday import...');
-        final events = await holidayService.importHolidays();
-        print('main.dart: Holiday import complete, got ${events.length} events');
+        await holidayService.importHolidays();
 
         if (mounted) {
-          print('main.dart: Refreshing AppProvider to load new events...');
           context.read<AppProvider>().refresh();
         }
-      } else {
-        print('main.dart: Holidays already imported, skipping');
       }
-    } catch (e, stackTrace) {
-      print('main.dart: ERROR during holiday import: $e');
-      print('main.dart: Stack trace: $stackTrace');
+    } catch (_) {
     }
   }
 
