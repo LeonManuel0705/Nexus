@@ -15,9 +15,11 @@ interface PlatformCardProps {
   name: string
   description: string
   downloadLabel: string
-  downloadUrl: string
+  downloadUrl?: string
+  onClick?: () => void
   badge: string | null
   features: string[]
+  isDownload?: boolean
 }
 
 export function PlatformCard({
@@ -26,10 +28,19 @@ export function PlatformCard({
   description,
   downloadLabel,
   downloadUrl,
+  onClick,
   badge,
   features,
+  isDownload = false,
 }: PlatformCardProps) {
   const Icon = iconMap[iconName]
+
+  const buttonContent = (
+    <>
+      <Download className="w-4 h-4" />
+      {downloadLabel}
+    </>
+  )
 
   return (
     <AnimatedCard className="relative p-6 md:p-8 bg-card/50">
@@ -60,13 +71,29 @@ export function PlatformCard({
             ))}
           </ul>
 
-          <Link
-            href={downloadUrl}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
-          >
-            <Download className="w-4 h-4" />
-            {downloadLabel}
-          </Link>
+          {onClick ? (
+            <button
+              onClick={onClick}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              {buttonContent}
+            </button>
+          ) : isDownload && downloadUrl ? (
+            <a
+              href={downloadUrl}
+              download
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              {buttonContent}
+            </a>
+          ) : downloadUrl ? (
+            <Link
+              href={downloadUrl}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              {buttonContent}
+            </Link>
+          ) : null}
         </div>
       </div>
     </AnimatedCard>

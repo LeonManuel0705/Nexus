@@ -74,7 +74,6 @@ class IServProvider extends ChangeNotifier {
   }
 
   Future<void> initialize() async {
-    print('IServProvider: Initializing...');
     _isLoading = true;
     notifyListeners();
 
@@ -82,30 +81,22 @@ class IServProvider extends ChangeNotifier {
       await _loadCachedData();
 
       final credentials = await _service.getSavedCredentials();
-      print('IServProvider: Saved credentials found: ${credentials != null}');
 
       if (credentials != null) {
         _username = credentials.username;
-        print('IServProvider: Username: $_username, URL: ${credentials.iservUrl}');
 
         if (_connectivity.isOnline.value) {
-          print('IServProvider: Online, attempting auto-reconnect...');
           final connected = await _service.autoReconnect();
           _isConnected = connected;
-          print('IServProvider: Auto-reconnect result: $connected, iservUrl: ${_service.iservUrl}');
 
           if (connected) {
             await syncData();
           }
-        } else {
-          print('IServProvider: Offline, skipping auto-reconnect');
         }
       }
-    } catch (e) {
-      print('IServProvider: Error during initialization: $e');
+    } catch (_) {
     } finally {
       _isLoading = false;
-      print('IServProvider: Initialization complete. isConnected: $_isConnected');
       notifyListeners();
     }
   }
@@ -245,27 +236,21 @@ class IServProvider extends ChangeNotifier {
       final hasValidCookies = await _service.hasValidCookies();
 
       if (iservUrl != null && !hasValidCookies) {
-        print('IServProvider: No valid cookies in Dio, trying WebView CookieManager');
         try {
           final cookieManager = CookieManager.instance();
           final cookies = await cookieManager.getCookies(url: WebUri(iservUrl));
-          print('IServProvider: Got ${cookies.length} cookies from WebView CookieManager');
 
           if (cookies.isNotEmpty) {
             await _service.refreshWithWebViewCookies(cookies);
           } else {
-            print('IServProvider: No WebView cookies - session likely expired');
             _vertretungsplanError = 'Sitzung abgelaufen. Bitte erneut mit IServ anmelden.';
             _vertretungsplanFiles = [];
             _isVertretungsplanLoading = false;
             notifyListeners();
             return;
           }
-        } catch (e) {
-          print('IServProvider: Failed to get WebView cookies: $e');
+        } catch (_) {
         }
-      } else if (hasValidCookies) {
-        print('IServProvider: Using existing Dio session with valid cookies');
       }
 
       final result = await _service.fetchVertretungsplan();
