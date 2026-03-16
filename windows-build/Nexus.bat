@@ -13,53 +13,30 @@ echo.
 set "NEXUS_DIR=%~dp0"
 cd /d "%NEXUS_DIR%"
 
-:: ─── Check Python ────────────────────────────────────────
-where python >nul 2>&1
-if %errorlevel% equ 0 (
-    for /f "tokens=*" %%i in ('python --version 2^>^&1') do set PYVER=%%i
-    echo   Python: !PYVER!
-    set "PYTHON=python"
-    goto :python_found
+:: ─── Use bundled Python ─────────────────────────────────
+set "PYTHON=%NEXUS_DIR%python\python.exe"
+
+if not exist "%PYTHON%" (
+    echo   [ERROR] Bundled Python not found at python\python.exe
+    echo   Please re-download Nexus from nexus-lifehub.netlify.app
+    pause
+    exit /b 1
 )
 
-where python3 >nul 2>&1
-if %errorlevel% equ 0 (
-    for /f "tokens=*" %%i in ('python3 --version 2^>^&1') do set PYVER=%%i
-    echo   Python: !PYVER!
-    set "PYTHON=python3"
-    goto :python_found
-)
+for /f "tokens=*" %%i in ('"%PYTHON%" --version 2^>^&1') do set PYVER=%%i
+echo   Python: !PYVER! (bundled)
 
-echo   [ERROR] Python 3 wurde nicht gefunden.
-echo.
-echo   Bitte installiere Python 3.9+ von:
-echo   https://www.python.org/downloads/
-echo.
-echo   WICHTIG: Setze bei der Installation den Haken bei
-echo   "Add Python to PATH"
-echo.
-pause
-exit /b 1
-
-:python_found
-
-:: ─── Setup venv ──────────────────────────────────────────
-if not exist "venv\Scripts\python.exe" (
-    echo.
-    echo   → Erstelle Python-Umgebung...
-    %PYTHON% -m venv venv
-    if %errorlevel% neq 0 (
-        echo   [ERROR] Konnte keine virtuelle Umgebung erstellen.
-        pause
-        exit /b 1
+:: ─── Bootstrap pip if needed ─────────────────────────────
+if not exist "%NEXUS_DIR%python\Scripts\pip.exe" (
+    if exist "%NEXUS_DIR%python\get-pip.py" (
+        echo   → Installiere pip...
+        "%PYTHON%" "%NEXUS_DIR%python\get-pip.py" --no-warn-script-location >nul 2>&1
     )
 )
 
-set "VENV_PYTHON=venv\Scripts\python.exe"
-
 :: ─── Install dependencies ────────────────────────────────
-:: Hash-check: only pip install if requirements changed
-set "HASH_FILE=venv\.req_hash"
+set "PIP=%NEXUS_DIR%python\Scripts\pip.exe"
+set "HASH_FILE=%NEXUS_DIR%.req_hash"
 set "NEED_INSTALL=0"
 
 if not exist "%HASH_FILE%" (
@@ -74,12 +51,10 @@ if not exist "%HASH_FILE%" (
 
 if "!NEED_INSTALL!" equ "1" (
     echo   → Installiere Abhaengigkeiten (kann 1-2 Minuten dauern^)...
-    "%VENV_PYTHON%" -m pip install --upgrade pip >nul 2>&1
-    "%VENV_PYTHON%" -m pip install -r requirements.txt >nul 2>&1
-    if %errorlevel% neq 0 (
-        echo   [ERROR] pip install fehlgeschlagen.
-        pause
-        exit /b 1
+    "%PIP%" install -r requirements.txt --no-warn-script-location -q 2>&1 | findstr /i "error" >nul 2>&1
+    if %errorlevel% equ 0 (
+        echo   [WARNUNG] Einige Pakete konnten nicht installiert werden.
+        echo   Nexus wird trotzdem versucht zu starten...
     )
     for /f "tokens=*" %%h in ('certutil -hashfile requirements.txt SHA256 2^>nul ^| findstr /v "hash certutil"') do (
         echo %%h>"%HASH_FILE%"
@@ -102,7 +77,7 @@ for /f "tokens=5" %%p in ('netstat -aon ^| findstr ":5050 " ^| findstr "LISTENIN
 :: Start server in background
 set "NEXUS_HOST=127.0.0.1"
 set "FLASK_ENV=production"
-start /b "" "%VENV_PYTHON%" -m app.app >nul 2>&1
+start /b "" "%PYTHON%" -m app.app >nul 2>&1
 
 :: Wait for server to start
 set "RETRIES=0"

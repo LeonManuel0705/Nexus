@@ -84,7 +84,7 @@ var NexusNotifications = {
 
             calendar:          this._getBool('cat-calendar', true),
             calendarReminders: this._getArr('cat-calendar-reminders', null),
-            calendarLead:      this._getInt('cat-calendar-lead', 15), // legacy fallback
+            calendarLead:      this._getInt('cat-calendar-lead', 15),
 
             tasks:        this._getBool('cat-tasks', true),
 
@@ -252,7 +252,6 @@ var NexusNotifications = {
                 var now = new Date();
                 var today = now.toISOString().split('T')[0];
 
-                // Support multiple reminder offsets; fall back to legacy single value
                 var reminders = self._settings.calendarReminders || [self._settings.calendarLead];
 
                 data.events.forEach(function(evt) {
@@ -264,12 +263,12 @@ var NexusNotifications = {
                     evtDate.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
 
                     var diffMin = (evtDate.getTime() - now.getTime()) / 60000;
-                    if (diffMin <= 0) return; // event already started
+                    if (diffMin <= 0) return;
 
                     var evtId = evt.event_id || evt.title;
 
                     reminders.forEach(function(leadMinutes) {
-                        if (diffMin > leadMinutes) return; // not yet in this window
+                        if (diffMin > leadMinutes) return;
                         var key = 'calendar:' + evtId + ':' + today + ':r' + leadMinutes;
                         if (self._wasShown(key)) return;
 
@@ -452,7 +451,6 @@ var NexusNotifications = {
         if (key && this._wasShown(key)) return;
 
         if (this._isInFlutterWebView()) {
-            // Route through Flutter → macOS native notification system (no in-app toast)
             try {
                 window.flutter_inappwebview.callHandler('showNativeNotification', {
                     title: title,
@@ -460,7 +458,6 @@ var NexusNotifications = {
                 });
             } catch (e) {}
         } else {
-            // Browser fallback: show in-app toast + Web Notification API
             if (this._settings.sound) this._playSound();
             this._showToast(category, title, body, url);
 
@@ -529,16 +526,13 @@ var NexusNotifications = {
         var color = this._getCategoryColor(category);
         var iconPath = this._getCategoryIcon(category);
 
-        // Wrapper — no background, no border, just holds the blur layer + content
         var toast = document.createElement('div');
         toast.style.cssText = 'pointer-events:auto;position:relative;overflow:visible;cursor:pointer;opacity:0;transform:translateX(40px);transition:opacity 0.3s ease,transform 0.3s ease;max-width:100%;';
 
-        // Blur layer with gradient-masked edges (fades from full blur → none)
         var blurLayer = document.createElement('div');
         blurLayer.style.cssText = 'position:absolute;inset:-8px;border-radius:22px;backdrop-filter:blur(30px) saturate(160%);-webkit-backdrop-filter:blur(30px) saturate(160%);-webkit-mask-image:linear-gradient(to right,transparent 0%,black 8%,black 92%,transparent 100%),linear-gradient(to bottom,transparent 0%,black 15%,black 85%,transparent 100%);-webkit-mask-composite:source-in;mask-image:linear-gradient(to right,transparent 0%,black 8%,black 92%,transparent 100%),linear-gradient(to bottom,transparent 0%,black 15%,black 85%,transparent 100%);mask-composite:intersect;pointer-events:none;';
         toast.appendChild(blurLayer);
 
-        // Content layer sits above the blur
         var content = document.createElement('div');
         content.style.cssText = 'position:relative;z-index:1;display:flex;align-items:flex-start;gap:12px;padding:14px 16px;';
 

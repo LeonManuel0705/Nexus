@@ -1455,7 +1455,6 @@ def replace_all_timetable_periods():
 
     db.replace_all_timetable_periods(validated)
 
-    # Update block_count in timetable settings
     conn = db.get_connection()
     existing = conn.execute('SELECT id FROM hub_timetable_settings LIMIT 1').fetchone()
     if existing:

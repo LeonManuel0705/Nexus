@@ -92,7 +92,6 @@ void main() async {
     } catch (_) {
     }
 
-    // Store current version for background update checks
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('current_app_version', BuildInfo.version);
@@ -259,9 +258,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
 
     final updateInfo = await UpdateService.checkForUpdate();
     if (updateInfo != null && mounted) {
-      // Send system notification (notification bar)
       UpdateService.sendUpdateNotification(updateInfo);
-      // Show in-app dialog
       UpdateService.showUpdateDialog(context, updateInfo);
     }
   }
@@ -405,12 +402,10 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     _isNavigating = true;
     _currentIndex = screenIndex;
 
-    // Sidebar spring animation — starts immediately
     _sidebarAnimController.animateWith(
       SpringSimulation(_sidebarSpring, 0, 1, 0),
     );
 
-    // Phase 1: Fade out old section (100ms)
     _pageTransitionController.stop();
     await _pageTransitionController.animateTo(0,
       duration: const Duration(milliseconds: 100),
@@ -418,14 +413,11 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     );
     if (!mounted) { _isNavigating = false; return; }
 
-    // Switch the displayed screen while invisible
     setState(() => _displayIndex = screenIndex);
 
-    // Wait a frame for layout
     await Future.delayed(const Duration(milliseconds: 32));
     if (!mounted) { _isNavigating = false; return; }
 
-    // Phase 2: Fade + slide in new section (200ms)
     await _pageTransitionController.animateTo(1,
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOut,
@@ -464,7 +456,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     });
   }
 
-  // Bottom pill nav items
   static const _pillNavItems = [
     (index: 0, icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard, label: 'Home'),
     (index: 1, icon: Icons.task_alt_outlined, activeIcon: Icons.task_alt, label: 'Aufgaben'),
@@ -472,7 +463,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     (index: 2, icon: Icons.calendar_today_outlined, activeIcon: Icons.calendar_today, label: 'Kalender'),
   ];
 
-  // All menu items for the full-screen menu drawer
   static const _menuItems = [
     (index: 0, icon: Icons.dashboard_outlined, label: 'Dashboard', color: Color(0xFF6366F1)),
     (index: 1, icon: Icons.task_alt_outlined, label: 'Aufgaben', color: Color(0xFF6366F1)),
