@@ -1,0 +1,612 @@
+{% extends "hub/base.html" %}
+{% set active_tab = 'review' %}
+
+{% block title %}Review - Nexus{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Review</h1>
+            <p class="page-subtitle">Reflexion & Planung</p>
+        </div>
+        <div class="page-actions">
+            <button class="btn-primary" onclick="saveReview()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+                Speichern
+            </button>
+        </div>
+    </div>
+
+    <div class="filter-tabs">
+        <button class="filter-tab active" onclick="showReviewType('daily')">Tages-Review</button>
+        <button class="filter-tab" onclick="showReviewType('weekly')">Wochen-Review</button>
+        <button class="filter-tab" onclick="showReviewType('history')">Verlauf</button>
+    </div>
+
+    <div class="review-content" id="dailyReview">
+        <section class="review-section">
+            <div class="review-header">
+                <h3 class="review-title">Tages-Review</h3>
+                <span class="review-date" id="dailyDate"></span>
+            </div>
+
+            <div class="review-questions">
+                <div class="review-question">
+                    <label class="question-label">Was habe ich heute erreicht?</label>
+                    <textarea class="question-input" id="dailyAchieved" rows="3" placeholder="Welche Aufgaben hast du erledigt? Was hast du gelernt?"></textarea>
+                </div>
+
+                <div class="review-question">
+                    <label class="question-label">Was lief gut?</label>
+                    <textarea class="question-input" id="dailyWentWell" rows="3" placeholder="Worüber freust du dich? Was war positiv?"></textarea>
+                </div>
+
+                <div class="review-question">
+                    <label class="question-label">Was hätte besser laufen können?</label>
+                    <textarea class="question-input" id="dailyImprove" rows="3" placeholder="Was hat nicht so gut geklappt? Was würdest du anders machen?"></textarea>
+                </div>
+
+                <div class="review-question">
+                    <label class="question-label">Fokus für morgen</label>
+                    <textarea class="question-input" id="dailyTomorrow" rows="2" placeholder="Was sind die wichtigsten Dinge für morgen?"></textarea>
+                </div>
+
+                <div class="review-question">
+                    <label class="question-label">Energie-Level (1-10)</label>
+                    <div class="energy-scale" id="energyScale">
+                        <button type="button" data-value="1">1</button>
+                        <button type="button" data-value="2">2</button>
+                        <button type="button" data-value="3">3</button>
+                        <button type="button" data-value="4">4</button>
+                        <button type="button" data-value="5">5</button>
+                        <button type="button" data-value="6">6</button>
+                        <button type="button" data-value="7">7</button>
+                        <button type="button" data-value="8">8</button>
+                        <button type="button" data-value="9">9</button>
+                        <button type="button" data-value="10">10</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div class="review-content hidden" id="weeklyReview">
+        <section class="review-section">
+            <div class="review-header">
+                <h3 class="review-title">Wochen-Review</h3>
+                <span class="review-date" id="weeklyDate"></span>
+            </div>
+
+            <div class="review-questions">
+                <div class="review-question">
+                    <label class="question-label">Highlights der Woche</label>
+                    <textarea class="question-input" id="weeklyHighlights" rows="3" placeholder="Was waren die besten Momente?"></textarea>
+                </div>
+
+                <div class="review-question">
+                    <label class="question-label">Fortschritt bei Zielen</label>
+                    <textarea class="question-input" id="weeklyProgress" rows="3" placeholder="Welche Fortschritte hast du bei deinen Zielen gemacht?"></textarea>
+                </div>
+
+                <div class="review-question">
+                    <label class="question-label">Herausforderungen</label>
+                    <textarea class="question-input" id="weeklyChallenges" rows="3" placeholder="Was war schwierig? Wie bist du damit umgegangen?"></textarea>
+                </div>
+
+                <div class="review-question">
+                    <label class="question-label">Learnings</label>
+                    <textarea class="question-input" id="weeklyLearnings" rows="3" placeholder="Was hast du diese Woche gelernt?"></textarea>
+                </div>
+
+                <div class="review-question">
+                    <label class="question-label">Ziele für nächste Woche</label>
+                    <textarea class="question-input" id="weeklyNextGoals" rows="3" placeholder="Was willst du nächste Woche erreichen?"></textarea>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div class="review-content hidden" id="historyReview">
+        <section class="review-section">
+            <div class="review-header">
+                <h3 class="review-title">Vergangene Reviews</h3>
+            </div>
+            <div class="review-history" id="reviewHistory">
+                <div class="empty-state">
+                    <span>Noch keine Reviews gespeichert</span>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
+
+<div class="modal" id="reviewViewModal">
+    <div class="modal-content review-view-modal">
+        <div class="modal-header">
+            <h3>Review ansehen</h3>
+            <button class="modal-close" onclick="closeReviewModal()">&times;</button>
+        </div>
+        <div class="review-view-content" id="reviewViewContent">
+
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="deleteViewedReview()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                </svg>
+                Löschen
+            </button>
+            <button class="btn-primary" onclick="closeReviewModal()">Schließen</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ g.csp_nonce }}">
+let currentType = 'daily';
+let dailyEnergy = null;
+let reviews = [];
+let currentViewingReviewId = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    initDates();
+    initEnergyScale();
+    loadReviews();
+    loadCurrentReview();
+});
+
+function initDates() {
+    const today = new Date();
+    document.getElementById('dailyDate').textContent = today.toLocaleDateString('de-DE', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    });
+
+    const weekStart = getWeekStart(today);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    document.getElementById('weeklyDate').textContent =
+        `${weekStart.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })} - ${weekEnd.toLocaleDateString('de-DE', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+}
+
+function getWeekStart(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(d.setDate(diff));
+}
+
+function initEnergyScale() {
+    document.querySelectorAll('#energyScale button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#energyScale button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            dailyEnergy = parseInt(btn.dataset.value);
+        });
+    });
+}
+
+function showReviewType(type) {
+    currentType = type;
+    document.querySelectorAll('.review-content').forEach(c => c.classList.add('hidden'));
+    document.getElementById(type + 'Review').classList.remove('hidden');
+    document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+
+    if (type === 'history') loadReviewHistory();
+}
+
+async function loadReviews() {
+    try {
+        const response = await fetch('/api/hub/reviews');
+        if (response.ok) {
+            const data = await response.json();
+            reviews = data.reviews || [];
+        }
+    } catch (err) {
+        console.log('Reviews API not available');
+    }
+}
+
+async function loadCurrentReview() {
+    const today = new Date().toISOString().split('T')[0];
+    const todayReview = reviews.find(r => r.date === today && r.type === 'daily');
+    if (todayReview) {
+        document.getElementById('dailyAchieved').value = todayReview.achieved || '';
+        document.getElementById('dailyWentWell').value = todayReview.went_well || '';
+        document.getElementById('dailyImprove').value = todayReview.improve || '';
+        document.getElementById('dailyTomorrow').value = todayReview.tomorrow || '';
+        if (todayReview.energy) {
+            dailyEnergy = todayReview.energy;
+            document.querySelector(`#energyScale button[data-value="${todayReview.energy}"]`)?.classList.add('active');
+        }
+    }
+
+    const weekStart = getWeekStart(new Date()).toISOString().split('T')[0];
+    const weekReview = reviews.find(r => r.date === weekStart && r.type === 'weekly');
+    if (weekReview) {
+        document.getElementById('weeklyHighlights').value = weekReview.highlights || '';
+        document.getElementById('weeklyProgress').value = weekReview.progress || '';
+        document.getElementById('weeklyChallenges').value = weekReview.challenges || '';
+        document.getElementById('weeklyLearnings').value = weekReview.learnings || '';
+        document.getElementById('weeklyNextGoals').value = weekReview.next_goals || '';
+    }
+}
+
+function loadReviewHistory() {
+    const container = document.getElementById('reviewHistory');
+    if (!reviews.length) {
+        container.innerHTML = '<div class="empty-state"><span>Noch keine Reviews gespeichert</span></div>';
+        return;
+    }
+
+    const sorted = [...reviews].sort((a, b) => new Date(b.date) - new Date(a.date));
+    container.innerHTML = sorted.map(r => `
+        <div class="history-item">
+            <div class="history-header">
+                <span class="history-date">${new Date(r.date).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                <div class="history-actions">
+                    <span class="tag">${r.type === 'daily' ? 'Tag' : 'Woche'}</span>
+                    <button class="delete-review-btn" onclick="event.stopPropagation(); confirmDeleteReview('${escapeHtml(String(r.id))}')" title="Löschen">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="history-preview" onclick="viewReview('${escapeHtml(String(r.id))}')">${getReviewPreview(r)}</div>
+        </div>
+    `).join('');
+}
+
+function getReviewPreview(review) {
+    if (review.type === 'daily') {
+        return escapeHtml(review.achieved?.substring(0, 80) || 'Kein Inhalt');
+    }
+    return escapeHtml(review.highlights?.substring(0, 80) || 'Kein Inhalt');
+}
+
+function viewReview(id) {
+    const numId = typeof id === 'string' ? parseInt(id, 10) : id;
+    const review = reviews.find(r => r.id === numId || r.id === id);
+    if (!review) return;
+
+    let content = '';
+    const dateStr = new Date(review.date).toLocaleDateString('de-DE', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    });
+
+    if (review.type === 'daily') {
+        content = `
+            <div class="review-view-section">
+                <h4 class="review-view-title">Tages-Review</h4>
+                <span class="review-view-date">${dateStr}</span>
+            </div>
+            ${review.achieved ? `<div class="review-view-item"><span class="review-view-label">Was habe ich erreicht?</span><p>${escapeHtml(review.achieved)}</p></div>` : ''}
+            ${review.went_well ? `<div class="review-view-item"><span class="review-view-label">Was lief gut?</span><p>${escapeHtml(review.went_well)}</p></div>` : ''}
+            ${review.improve ? `<div class="review-view-item"><span class="review-view-label">Was hätte besser laufen können?</span><p>${escapeHtml(review.improve)}</p></div>` : ''}
+            ${review.tomorrow ? `<div class="review-view-item"><span class="review-view-label">Fokus für morgen</span><p>${escapeHtml(review.tomorrow)}</p></div>` : ''}
+            ${review.energy ? `<div class="review-view-item"><span class="review-view-label">Energie-Level</span><div class="energy-display">${review.energy}<span>/10</span></div></div>` : ''}
+        `;
+    } else {
+        content = `
+            <div class="review-view-section">
+                <h4 class="review-view-title">Wochen-Review</h4>
+                <span class="review-view-date">${dateStr}</span>
+            </div>
+            ${review.highlights ? `<div class="review-view-item"><span class="review-view-label">Highlights der Woche</span><p>${escapeHtml(review.highlights)}</p></div>` : ''}
+            ${review.progress ? `<div class="review-view-item"><span class="review-view-label">Fortschritt bei Zielen</span><p>${escapeHtml(review.progress)}</p></div>` : ''}
+            ${review.challenges ? `<div class="review-view-item"><span class="review-view-label">Herausforderungen</span><p>${escapeHtml(review.challenges)}</p></div>` : ''}
+            ${review.learnings ? `<div class="review-view-item"><span class="review-view-label">Learnings</span><p>${escapeHtml(review.learnings)}</p></div>` : ''}
+            ${review.next_goals ? `<div class="review-view-item"><span class="review-view-label">Ziele für nächste Woche</span><p>${escapeHtml(review.next_goals)}</p></div>` : ''}
+        `;
+    }
+
+    document.getElementById('reviewViewContent').innerHTML = content;
+    document.getElementById('reviewViewModal').classList.add('active');
+    currentViewingReviewId = id;
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function closeReviewModal() {
+    document.getElementById('reviewViewModal').classList.remove('active');
+    currentViewingReviewId = null;
+}
+
+function deleteViewedReview() {
+    if (currentViewingReviewId) {
+        confirmDeleteReview(currentViewingReviewId);
+        closeReviewModal();
+    }
+}
+
+function confirmDeleteReview(id) {
+    const numId = typeof id === 'string' ? parseInt(id, 10) : id;
+    const review = reviews.find(r => r.id === numId || r.id === id);
+    if (!review) {
+        console.error('Review not found:', id);
+        return;
+    }
+
+    if (confirm(`${review.type === 'daily' ? 'Tages' : 'Wochen'}-Review vom ${new Date(review.date).toLocaleDateString('de-DE')} wirklich löschen?`)) {
+        deleteReview(review.id);
+    }
+}
+
+async function deleteReview(id) {
+    try {
+        const response = await fetch(`/api/hub/reviews/${id}`, { method: 'DELETE' });
+        if (response.ok) {
+            showNotification('Review gelöscht!');
+            await loadReviews();
+            loadReviewHistory();
+        } else {
+            alert('Fehler beim Löschen');
+        }
+    } catch (err) {
+        console.error('Error deleting review:', err);
+        alert('Fehler beim Löschen');
+    }
+}
+
+async function saveReview() {
+    let data;
+    let date;
+
+    if (currentType === 'daily') {
+        date = new Date().toISOString().split('T')[0];
+        data = {
+            type: 'daily',
+            date: date,
+            achieved: document.getElementById('dailyAchieved').value,
+            went_well: document.getElementById('dailyWentWell').value,
+            improve: document.getElementById('dailyImprove').value,
+            tomorrow: document.getElementById('dailyTomorrow').value,
+            energy: dailyEnergy
+        };
+    } else if (currentType === 'weekly') {
+        date = getWeekStart(new Date()).toISOString().split('T')[0];
+        data = {
+            type: 'weekly',
+            date: date,
+            highlights: document.getElementById('weeklyHighlights').value,
+            progress: document.getElementById('weeklyProgress').value,
+            challenges: document.getElementById('weeklyChallenges').value,
+            learnings: document.getElementById('weeklyLearnings').value,
+            next_goals: document.getElementById('weeklyNextGoals').value
+        };
+    }
+
+    try {
+        const existingReview = reviews.find(r => r.date === date && r.type === data.type);
+        const url = existingReview ? `/api/hub/reviews/${existingReview.id}` : '/api/hub/reviews';
+        const method = existingReview ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            showNotification('Review gespeichert!');
+            loadReviews();
+        }
+    } catch (err) {
+        console.error('Error saving review:', err);
+    }
+}
+
+function showNotification(message) {
+    const notification = document.createElement('div');
+    notification.className = 'notification';
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 3000);
+}
+</script>
+
+<style>
+.energy-scale {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.energy-scale button {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-xs);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.energy-scale button:hover {
+    border-color: var(--accent);
+    background: var(--accent-light);
+}
+
+.energy-scale button.active {
+    background: var(--accent-gradient);
+    color: white;
+    border-color: transparent;
+}
+
+.review-date {
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.history-item {
+    padding: 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    margin-bottom: 10px;
+    transition: all var(--transition-fast);
+}
+
+.history-item:hover {
+    border-color: var(--accent);
+}
+
+.history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.history-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.delete-review-btn {
+    padding: 4px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: var(--radius-xs);
+    transition: all var(--transition-fast);
+    opacity: 0;
+}
+
+.history-item:hover .delete-review-btn {
+    opacity: 1;
+}
+
+.delete-review-btn:hover {
+    color: var(--error);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.history-date {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.history-preview {
+    font-size: 13px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.notification {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--success);
+    color: white;
+    padding: 12px 24px;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    z-index: 3000;
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* Review View Modal Styles */
+.review-view-modal {
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.review-view-content {
+    padding: 16px 0;
+}
+
+.review-view-section {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.review-view-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.review-view-date {
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.review-view-item {
+    margin-bottom: 16px;
+}
+
+.review-view-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.review-view-item p {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+    margin: 0;
+}
+
+.energy-display {
+    display: inline-flex;
+    align-items: baseline;
+    font-size: 32px;
+    font-weight: 700;
+    background: var(--accent-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.energy-display span {
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--card-border);
+}
+
+.modal-footer .btn-secondary svg {
+    margin-right: 6px;
+}
+</style>
+{% endblock %}

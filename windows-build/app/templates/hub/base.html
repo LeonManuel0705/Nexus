@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="de" id="htmlRoot">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{% block title %}Nexus{% endblock %}</title>
+
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Nexus">
+    <link rel="apple-touch-icon" href="/static/images/icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/static/images/icons/icon-152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/images/icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="167x167" href="/static/images/icons/icon-192.png">
+
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="Nexus Hub">
+    <meta name="msapplication-TileColor" content="#667eea">
+    <meta name="msapplication-TileImage" content="/static/images/icons/icon-144.png">
+
+    <link rel="stylesheet" href="/static/css/hub.css?v={{ cache_bust }}">
+    <link rel="stylesheet" href="/static/css/loading.css">
+    {% block head %}{% endblock %}
+    <link rel="preload" as="image" href="/static/images/nexus-logo.png">
+    <style>
+    /* Critical inline CSS — sidebar skeleton renders before hub.css loads */
+    html { background: #fafbfc; background-attachment: fixed; }
+    html[data-theme="dark"] { background: #0f0f1a; }
+    body { background: transparent; overscroll-behavior-y: none; }
+    .sidebar {
+        position: fixed;
+        top: 0; left: 0;
+        width: 240px;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        padding: 20px;
+        z-index: 100;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: 16px;
+    }
+    [data-theme="dark"] .sidebar {
+        background: rgba(26, 26, 46, 0.85);
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+    .sidebar-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding-bottom: 24px;
+        margin-bottom: 8px;
+        flex-shrink: 0;
+    }
+    .sidebar-logo {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        object-fit: contain;
+    }
+    @media (max-width: 768px) {
+        .sidebar {
+            top: auto; bottom: 0; right: 0;
+            width: 100%; height: auto;
+            flex-direction: row;
+            padding: 0;
+            border-radius: 20px 20px 0 0;
+            z-index: 1000;
+        }
+        .sidebar-header { display: none; }
+    }
+    </style>
+    <script nonce="{{ g.csp_nonce }}">
+        (function() {
+            var serverTheme = '{{ user_theme }}';
+            var theme = serverTheme || localStorage.getItem('nexus-theme') || 'dark';
+            var themeMode = localStorage.getItem('nexus-theme-mode') || 'manual';
+            if (themeMode === 'system') {
+                theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            document.documentElement.setAttribute('data-theme', theme);
+            window.__serverTheme = serverTheme;
+        })();
+
+        window.isMobile = window.matchMedia('(max-width: 768px)').matches ||
+                          window.matchMedia('(pointer: coarse)').matches ||
+                          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    </script>
+</head>
+<body>
+    <script nonce="{{ g.csp_nonce }}">
+        (function() {
+            var serverTheme = window.__serverTheme || '{{ user_theme }}';
+            var theme = serverTheme || localStorage.getItem('nexus-theme') || 'dark';
+            var themeMode = localStorage.getItem('nexus-theme-mode') || 'manual';
+
+            if (themeMode === 'system') {
+                theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                localStorage.setItem('nexus-theme', theme);
+            } else if (themeMode === 'schedule') {
+                try {
+                    var sched = JSON.parse(localStorage.getItem('nexus-theme-schedule') || '{}');
+                    if (sched.light_time && sched.dark_time) {
+                        var now = new Date();
+                        var nowMin = now.getHours() * 60 + now.getMinutes();
+                        var lp = sched.light_time.split(':');
+                        var dp = sched.dark_time.split(':');
+                        var lightMin = parseInt(lp[0]) * 60 + parseInt(lp[1]);
+                        var darkMin = parseInt(dp[0]) * 60 + parseInt(dp[1]);
+
+                        // Check if a schedule boundary was crossed since the manual override
+                        var override = localStorage.getItem('nexus-theme-manual-override');
+                        if (override) {
+                            var overrideDate = new Date(parseInt(override));
+                            var overrideMin = overrideDate.getHours() * 60 + overrideDate.getMinutes();
+                            // If we crossed a boundary since the override, clear it
+                            var crossedLight = (overrideMin < lightMin && nowMin >= lightMin) ||
+                                               (overrideDate.toDateString() !== now.toDateString());
+                            var crossedDark = (overrideMin < darkMin && nowMin >= darkMin) ||
+                                              (overrideDate.toDateString() !== now.toDateString());
+                            if (crossedLight || crossedDark) {
+                                localStorage.removeItem('nexus-theme-manual-override');
+                                override = null;
+                            }
+                        }
+
+                        if (!override) {
+                            if (lightMin < darkMin) {
+                                theme = (nowMin >= lightMin && nowMin < darkMin) ? 'light' : 'dark';
+                            } else {
+                                theme = (nowMin >= darkMin && nowMin < lightMin) ? 'dark' : 'light';
+                            }
+                            localStorage.setItem('nexus-theme', theme);
+                        }
+                    }
+                } catch(e) {}
+            }
+
+            document.body.setAttribute('data-theme', theme);
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+
+    <div class="hub-background">
+        <div class="gradient-orb orb-1"></div>
+        <div class="gradient-orb orb-2"></div>
+        <div class="gradient-orb orb-3"></div>
+    </div>
+
+    <div class="hub-layout">
+
+        <aside class="sidebar glass-card">
+            <div class="sidebar-header">
+                <img src="/static/images/nexus-logo.png" alt="Nexus" class="sidebar-logo">
+                <div>
+                    <h1 class="sidebar-title">Nexus</h1>
+                    <span class="version-tag">{{ app_version }}</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="/hub" class="nav-item {% if active_tab == 'dashboard' %}active{% endif %}" data-section="dashboard">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    <span>Dashboard</span>
+                </a>
+
+                <div class="nav-section-label">Alltag</div>
+
+                <a href="/hub/tasks" class="nav-item {% if active_tab == 'tasks' %}active{% endif %}" data-section="tasks">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 11l3 3L22 4"></path>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                    </svg>
+                    <span>Aufgaben</span>
+                </a>
+
+                <a href="/hub/pomodoro" class="nav-item {% if active_tab == 'pomodoro' %}active{% endif %}" data-section="pomodoro">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    <span>Pomodoro</span>
+                </a>
+
+                <a href="/hub/calendar" class="nav-item {% if active_tab == 'calendar' %}active{% endif %}" data-section="calendar">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <span>Kalender</span>
+                </a>
+
+                <a href="/hub/vbb" class="nav-item {% if active_tab == 'vbb' %}active{% endif %}" data-section="vbb">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"></path>
+                    </svg>
+                    <span>Fahrplan</span>
+                </a>
+
+                <div class="nav-section-label">Bereiche</div>
+
+                <a href="/hub/school" class="nav-item {% if active_tab == 'school' %}active{% endif %}" data-section="school">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+                        <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+                    </svg>
+                    <span>Schule</span>
+                </a>
+
+                <a href="/hub/training" class="nav-item {% if active_tab == 'training' %}active{% endif %}" data-section="training">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+                        <path d="M6 8H5a4 4 0 0 0 0 8h1"></path>
+                        <line x1="6" y1="12" x2="18" y2="12"></line>
+                        <line x1="9" y1="8" x2="9" y2="16"></line>
+                        <line x1="15" y1="8" x2="15" y2="16"></line>
+                    </svg>
+                    <span>Training</span>
+                </a>
+
+                <a href="/hub/projects" class="nav-item {% if active_tab == 'projects' %}active{% endif %}" data-section="projects">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>Projekte</span>
+                </a>
+
+                <a href="/hub/knowledge" class="nav-item {% if active_tab == 'knowledge' %}active{% endif %}" data-section="knowledge">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    </svg>
+                    <span>Wissen</span>
+                </a>
+
+                <a href="/hub/bookmarks" class="nav-item {% if active_tab == 'bookmarks' %}active{% endif %}" data-section="bookmarks">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>Lesezeichen</span>
+                </a>
+
+                <div class="nav-section-label">System</div>
+
+                <a href="/hub/email" class="nav-item {% if active_tab == 'email' %}active{% endif %}" data-section="email">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                        <polyline points="22,6 12,13 2,6"></polyline>
+                    </svg>
+                    <span>E-Mail</span>
+                    <span class="nav-badge" id="emailBadge" style="display: none;">0</span>
+                </a>
+
+                <a href="/hub/review" class="nav-item {% if active_tab == 'review' %}active{% endif %}" data-section="review">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                    </svg>
+                    <span>Review</span>
+                </a>
+
+                <a href="/hub/mousepad" class="nav-item {% if active_tab == 'mousepad' %}active{% endif %}" data-section="mousepad">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                        <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                        <path d="M2 2l7.586 7.586"></path>
+                        <circle cx="11" cy="11" r="2"></circle>
+                    </svg>
+                    <span>Mousepad</span>
+                </a>
+
+                <a href="/hub/assistant" class="nav-item {% if active_tab == 'assistant' %}active{% endif %}" data-section="assistant">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>Assistent</span>
+                </a>
+
+                <a href="/hub/settings" class="nav-item {% if active_tab == 'settings' %}active{% endif %}" data-section="settings">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <span>Einstellungen</span>
+                </a>
+            </nav>
+            <script nonce="{{ g.csp_nonce }}">
+            // Inline: create sidebar highlight IMMEDIATELY to prevent flash
+            (function() {
+                if (window.isMobile) return;
+                var nav = document.querySelector('.sidebar-nav');
+                if (!nav) return;
+                nav.style.position = 'relative';
+                var h = document.createElement('div');
+                h.className = 'sidebar-highlight';
+                h.id = 'sidebarHighlight';
+                h.style.cssText = 'left:0;right:0;opacity:0;';
+                nav.insertBefore(h, nav.firstChild);
+                var active = nav.querySelector('.nav-item.active');
+                if (active) active.classList.add('active-no-bg');
+            })();
+            </script>
+
+            <div class="sidebar-footer">
+                <button type="button" class="icon-btn theme-toggle" id="sidebarThemeToggle" title="Theme wechseln">
+                    <svg class="sun-icon {% if user_theme == 'dark' %}hidden{% endif %}" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <svg class="moon-icon {% if user_theme != 'dark' %}hidden{% endif %}" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+                <script nonce="{{ g.csp_nonce }}">
+                // Hide sidebar theme toggle if mode is system or schedule
+                (function() {
+                    var mode = localStorage.getItem('nexus-theme-mode') || 'manual';
+                    var btn = document.getElementById('sidebarThemeToggle');
+                    if (btn && mode !== 'manual') btn.style.display = 'none';
+                })();
+                document.getElementById('sidebarThemeToggle').addEventListener('click', function() {
+                    if (typeof HubApp !== 'undefined' && HubApp.toggleTheme) {
+                        HubApp.toggleTheme();
+                    } else {
+                        // Fallback: toggle theme directly
+                        var root = document.documentElement;
+                        var body = document.body;
+                        var current = root.getAttribute('data-theme') || 'dark';
+                        var next = current === 'dark' ? 'light' : 'dark';
+                        root.classList.add('theme-transitioning');
+                        root.setAttribute('data-theme', next);
+                        body.setAttribute('data-theme', next);
+                        localStorage.setItem('nexus-theme', next);
+                        var sun = document.querySelector('.sun-icon');
+                        var moon = document.querySelector('.moon-icon');
+                        if (sun && moon) {
+                            sun.classList.toggle('hidden', next === 'dark');
+                            moon.classList.toggle('hidden', next !== 'dark');
+                        }
+                        var themeLabel = document.getElementById('themeLabel');
+                        if (themeLabel) themeLabel.textContent = next === 'dark' ? 'Dunkles Theme' : 'Helles Theme';
+                        setTimeout(function() { root.classList.remove('theme-transitioning'); }, 500);
+                        fetch('/api/hub/theme', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ theme: next })
+                        }).then(function(res) {
+                            if (!res.ok) console.error('Theme save failed:', res.status);
+                        }).catch(function(e) { console.error('Theme save error:', e); });
+                    }
+                });
+                </script>
+            </div>
+        </aside>
+
+        <main class="main-content" style="opacity:0;transform:translateY(10px)">
+            {% block content %}{% endblock %}
+        </main>
+        <script nonce="{{ g.csp_nonce }}">
+        // Fade in .main-content once DOM is ready (don't wait for external resources
+        // like Google Fonts — that blocks forever on slow/dead internet)
+        (function() {
+            var mc = document.querySelector('.main-content');
+            if (!mc) return;
+            function fadeIn() {
+                requestAnimationFrame(function() {
+                    mc.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
+                    mc.style.opacity = '1';
+                    mc.style.transform = 'translateY(0)';
+                });
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', fadeIn);
+            } else {
+                fadeIn();
+            }
+        })();
+        </script>
+    </div>
+
+    <button class="fab-button" id="fabButton" onclick="openQuickNoteModal()" title="Schnelle Notiz">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+    </button>
+
+    <div class="modal" id="quickNoteModal">
+        <div class="modal-content quick-note-modal">
+            <div class="modal-header">
+                <h3>Schnelle Notiz</h3>
+                <button class="modal-close" onclick="closeQuickNoteModal()">&times;</button>
+            </div>
+            <form id="quickNoteForm" onsubmit="saveQuickNote(event)">
+                <div class="form-group">
+                    <label for="quickNoteType">Typ</label>
+                    <select id="quickNoteType" name="type">
+                        <option value="note">Notiz</option>
+                        <option value="homework">Hausaufgabe</option>
+                        <option value="task">Aufgabe</option>
+                        <option value="idea">Idee</option>
+                    </select>
+                </div>
+                <div class="form-group" id="quickNoteSubjectGroup" style="display: none;">
+                    <label for="quickNoteSubject">Fach</label>
+                    <select id="quickNoteSubject" name="subject_id"></select>
+                </div>
+                <div class="form-group">
+                    <label for="quickNoteTitle">Titel</label>
+                    <input type="text" id="quickNoteTitle" name="title" placeholder="Kurze Beschreibung..." required>
+                </div>
+                <div class="form-group">
+                    <label for="quickNoteContent">Inhalt</label>
+                    <textarea id="quickNoteContent" name="content" rows="4" placeholder="Details..."></textarea>
+                </div>
+                <div class="form-group" id="quickNoteDueDateGroup" style="display: none;">
+                    <label for="quickNoteDueDate">Fällig am</label>
+                    <input type="date" id="quickNoteDueDate" name="due_date">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% block modals %}{% endblock %}
+
+    
+
+    <div class="offline-overlay" id="offlineOverlay">
+        <div class="offline-overlay-card glass-card">
+            <div class="offline-overlay-icon-circle">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <line x1="1" y1="1" x2="23" y2="23"></line>
+                    <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
+                    <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
+                    <path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path>
+                    <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
+                    <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+                    <line x1="12" y1="20" x2="12.01" y2="20"></line>
+                </svg>
+            </div>
+            <h3 class="offline-overlay-title">Keine Internetverbindung</h3>
+            <div class="offline-overlay-badge">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                    <line x1="12" y1="2" x2="12" y2="12"></line>
+                </svg>
+                <span>Offline</span>
+            </div>
+            <p class="offline-overlay-text">Diese Funktion benötigt eine aktive Internetverbindung und ist im Offline-Modus nicht verfügbar.</p>
+            <button class="btn-primary offline-overlay-btn" onclick="dismissOfflineOverlay()">Verstanden</button>
+        </div>
+    </div>
+
+    <div class="app-loading-overlay" id="appLoadingOverlay">
+        <div class="app-loading-content">
+            <div class="app-loading-spinner"></div>
+            <div class="app-loading-text" id="appLoadingText">Loading...</div>
+            <div class="app-loading-bar">
+                <div class="app-loading-progress"></div>
+            </div>
+        </div>
+    </div>
+
+    <script nonce="{{ g.csp_nonce }}" src="/static/js/hub.js?v=5"></script>
+    <script nonce="{{ g.csp_nonce }}" src="/static/js/nexus-offline.js?v=4"></script>
+    <script nonce="{{ g.csp_nonce }}" src="/static/js/connection-manager.js?v=4"></script>
+    <script nonce="{{ g.csp_nonce }}" src="/static/js/nexus-notifications.js?v=1"></script>
+
+    <script nonce="{{ g.csp_nonce }}">
+    function getCurrentUserId() {
+        return null; // Single-user mode - no user ID needed
+    }
+
+    function buildApiUrl(baseUrl, params = {}) {
+        const url = new URL(baseUrl, window.location.origin);
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+                url.searchParams.set(key, value);
+            }
+        });
+        return url.toString();
+    }
+
+    function addUserIdToBody(data = {}) {
+        return data; // Single-user mode - return unchanged
+    }
+
+    function updateOfflineBanner() {
+        let banner = document.getElementById('offlineBanner');
+
+        if (NexusConnection.isOffline()) {
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.className = 'offline-banner';
+                banner.id = 'offlineBanner';
+                banner.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path><path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg><span>Offline-Modus</span>';
+                document.body.appendChild(banner);
+                requestAnimationFrame(() => banner.classList.add('visible'));
+            }
+        } else if (banner) {
+            banner.classList.remove('visible');
+            banner.addEventListener('transitionend', () => banner.remove(), { once: true });
+            setTimeout(() => { if (banner.parentNode) banner.remove(); }, 400);
+        }
+    }
+
+    function loadGoogleFonts() {
+        if (document.getElementById('googleFontsLink')) return;
+        var preconnect = document.createElement('link');
+        preconnect.rel = 'preconnect';
+        preconnect.href = 'https://fonts.googleapis.com';
+        document.head.appendChild(preconnect);
+        // Load fonts non-blocking: use media="print" so it doesn't block render,
+        // then swap to media="all" once loaded. Abort after 3s on slow connections.
+        var link = document.createElement('link');
+        link.id = 'googleFontsLink';
+        link.rel = 'stylesheet';
+        link.media = 'print';
+        link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap';
+        link.onload = function() { this.media = 'all'; };
+        document.head.appendChild(link);
+        // Safety: if fonts don't load within 3s, remove the link to prevent
+        // stalled connections from accumulating across page navigations
+        setTimeout(function() {
+            if (link.media === 'print' && link.parentNode) {
+                link.parentNode.removeChild(link);
+                if (preconnect.parentNode) preconnect.parentNode.removeChild(preconnect);
+            }
+        }, 3000);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        NexusConnection.init();
+        updateOfflineBanner();
+        if (navigator.onLine) {
+            loadGoogleFonts();
+        }
+        // Initialize notification system
+        if (typeof NexusNotifications !== 'undefined') {
+            NexusNotifications.init();
+        }
+    });
+
+    window.addEventListener('nexus-connection-ready', updateOfflineBanner);
+
+    window.addEventListener('online', () => {
+        NexusConnection.refresh().then(() => {
+            updateOfflineBanner();
+            if (!NexusConnection.isOffline()) loadGoogleFonts();
+        });
+    });
+    window.addEventListener('offline', () => {
+        NexusConnection.state.internetAvailable = false;
+        NexusConnection.state.iservAvailable = false;
+        NexusConnection.saveState(); // Persist so other pages see it immediately
+        updateOfflineBanner();
+    });
+    </script>
+
+    <script nonce="{{ g.csp_nonce }}">
+    function showOfflineOverlay() {
+        document.getElementById('offlineOverlay').classList.add('active');
+    }
+
+    function dismissOfflineOverlay() {
+        document.getElementById('offlineOverlay').classList.remove('active');
+    }
+
+    /**
+     * Call on page init for pages that require internet.
+     * Returns true if offline (and shows the overlay), false if online.
+     */
+    function checkOfflineForFeature() {
+        if (!navigator.onLine || NexusConnection.isOffline()) {
+            showOfflineOverlay();
+            return true;
+        }
+        return false;
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    let quickNoteSubjects = [];
+
+    async function loadQuickNoteSubjects() {
+        try {
+            const res = await fetch('/api/hub/school/subjects');
+            if (res.ok) {
+                const data = await res.json();
+                quickNoteSubjects = data.subjects || [];
+                const select = document.getElementById('quickNoteSubject');
+                select.innerHTML = '<option value="">Fach wählen...</option>' +
+                    quickNoteSubjects.map(s => `<option value="${escapeHtml(String(s.id))}">${escapeHtml(s.name)}</option>`).join('');
+            }
+        } catch (e) {}
+    }
+
+    function openQuickNoteModal() {
+        document.getElementById('quickNoteForm').reset();
+        loadQuickNoteSubjects();
+        document.getElementById('quickNoteModal').classList.add('active');
+        document.getElementById('quickNoteTitle').focus();
+    }
+
+    function closeQuickNoteModal() {
+        document.getElementById('quickNoteModal').classList.remove('active');
+    }
+
+    document.getElementById('quickNoteType').addEventListener('change', function() {
+        const type = this.value;
+        const subjectGroup = document.getElementById('quickNoteSubjectGroup');
+        const dueDateGroup = document.getElementById('quickNoteDueDateGroup');
+
+        if (type === 'homework') {
+            subjectGroup.style.display = 'block';
+            dueDateGroup.style.display = 'block';
+        } else if (type === 'task') {
+            subjectGroup.style.display = 'none';
+            dueDateGroup.style.display = 'block';
+        } else {
+            subjectGroup.style.display = 'none';
+            dueDateGroup.style.display = 'none';
+        }
+    });
+
+    async function saveQuickNote(e) {
+        e.preventDefault();
+        const type = document.getElementById('quickNoteType').value;
+        const title = document.getElementById('quickNoteTitle').value;
+        const content = document.getElementById('quickNoteContent').value;
+        const subjectId = document.getElementById('quickNoteSubject').value;
+        const dueDate = document.getElementById('quickNoteDueDate').value;
+
+        try {
+            let url, data;
+
+            switch(type) {
+                case 'homework':
+                    url = '/api/hub/school/homework';
+                    data = {
+                        title: title,
+                        subject_id: subjectId,
+                        notes: content,
+                        due_date: dueDate
+                    };
+                    break;
+                case 'task':
+                    url = '/api/hub/tasks';
+                    data = {
+                        title: title,
+                        description: content,
+                        due_date: dueDate
+                    };
+                    break;
+                case 'note':
+                case 'idea':
+                default:
+                    url = '/api/hub/quick-notes';
+                    data = {
+                        type: type,
+                        title: title,
+                        content: content
+                    };
+                    break;
+            }
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                closeQuickNoteModal();
+                showQuickNoteFeedback('Gespeichert!');
+                if (window.location.pathname.includes('/hub/tasks') ||
+                    window.location.pathname.includes('/hub/school')) {
+                    setTimeout(() => location.reload(), 500);
+                }
+            }
+        } catch (err) {
+            console.error('Error saving quick note:', err);
+        }
+    }
+
+    function showQuickNoteFeedback(message) {
+        const fab = document.getElementById('fabButton');
+        fab.classList.add('success');
+        setTimeout(() => fab.classList.remove('success'), 1500);
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.shiftKey && e.key === 'N') {
+            e.preventDefault();
+            openQuickNoteModal();
+        }
+    });
+    </script>
+
+    <script nonce="{{ g.csp_nonce }}">
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', async () => {
+            try {
+                // Force clear old caches on version bump
+                const expectedCache = 'nexus-static-v4';
+                const keys = await caches.keys();
+                const hasOld = keys.some(k => k.startsWith('nexus-') && k !== expectedCache && k !== 'nexus-dynamic-v4' && k !== 'nexus-hub-v4');
+                if (hasOld) {
+                    await Promise.all(keys.filter(k => k.startsWith('nexus-')).map(k => caches.delete(k)));
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(regs.map(r => r.unregister()));
+                    window.location.reload();
+                    return;
+                }
+
+                const registration = await navigator.serviceWorker.register('/static/sw.js', {
+                    scope: '/',
+                    updateViaCache: 'none'
+                });
+                await registration.update();
+                console.log('[PWA] Service Worker registered:', registration.scope);
+
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            newWorker.postMessage({ type: 'SKIP_WAITING' });
+                            window.location.reload();
+                        }
+                    });
+                });
+
+                navigator.serviceWorker.addEventListener('message', (event) => {
+                    if (event.data && event.data.type === 'SYNC_READY') {
+                        console.log('[PWA] Back online - sync available');
+                    }
+                });
+            } catch (error) {
+                console.error('[PWA] Service Worker registration failed:', error);
+            }
+        });
+
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            console.log('[PWA] New service worker activated');
+        });
+    }
+
+    let deferredPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+
+        if (!window.matchMedia('(display-mode: standalone)').matches) {
+            showInstallButton();
+        }
+    });
+
+    function showInstallButton() {
+        if (!document.getElementById('pwaInstallBtn')) {
+            const btn = document.createElement('button');
+            btn.id = 'pwaInstallBtn';
+            btn.className = 'pwa-install-btn';
+            btn.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                App installieren
+            `;
+            btn.onclick = installPWA;
+            document.body.appendChild(btn);
+        }
+    }
+
+    async function installPWA() {
+        if (!deferredPrompt) return;
+
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+
+        if (outcome === 'accepted') {
+            console.log('[PWA] User accepted installation');
+            document.getElementById('pwaInstallBtn')?.remove();
+        }
+
+        deferredPrompt = null;
+    }
+
+    window.addEventListener('appinstalled', () => {
+        console.log('[PWA] App installed successfully');
+        document.getElementById('pwaInstallBtn')?.remove();
+        deferredPrompt = null;
+    });
+    </script>
+
+    <script nonce="{{ g.csp_nonce }}">
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.isMobile) return;
+
+        const sidebarNav = document.querySelector('.sidebar-nav');
+        const navItems = Array.from(sidebarNav ? sidebarNav.querySelectorAll('.nav-item') : []);
+        const highlight = document.getElementById('sidebarHighlight');
+
+        if (!sidebarNav || !highlight || navItems.length === 0) return;
+
+        const navRect = sidebarNav.getBoundingClientRect();
+        const activeItem = sidebarNav.querySelector('.nav-item.active');
+        if (!activeItem) return;
+
+        const activeIndex = navItems.indexOf(activeItem);
+        const activeRect = activeItem.getBoundingClientRect();
+        const targetTop = activeRect.top - navRect.top;
+        const targetHeight = activeRect.height;
+
+        // Check if we're navigating from a different section
+        const prevIndex = sessionStorage.getItem('nexus-prev-nav');
+        sessionStorage.removeItem('nexus-prev-nav');
+
+        if (prevIndex !== null && parseInt(prevIndex) !== activeIndex) {
+            // Start highlight at the PREVIOUS item's position (no transition)
+            const prevItem = navItems[parseInt(prevIndex)];
+            if (prevItem) {
+                const prevRect = prevItem.getBoundingClientRect();
+                highlight.style.transition = 'none';
+                highlight.style.top = (prevRect.top - navRect.top) + 'px';
+                highlight.style.height = prevRect.height + 'px';
+                highlight.style.opacity = '1';
+
+                // Force reflow, then animate to the active item (0.3s)
+                void highlight.offsetHeight;
+                highlight.style.transition = 'top 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), height 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                highlight.style.top = targetTop + 'px';
+                highlight.style.height = targetHeight + 'px';
+            }
+        } else {
+            // First load or same section — snap to active item
+            highlight.style.transition = 'none';
+            highlight.style.top = targetTop + 'px';
+            highlight.style.height = targetHeight + 'px';
+            highlight.style.opacity = '1';
+        }
+
+        // Click handler: store current index and navigate
+        let isNavigating = false;
+        navItems.forEach((link, idx) => {
+            link.addEventListener('click', function(e) {
+                const href = this.getAttribute('href');
+                if (!href || href === window.location.pathname || href.startsWith('http')) return;
+                if (isNavigating) return;
+                e.preventDefault();
+                isNavigating = true;
+                // Safety: reset after 3s so clicks aren't permanently blocked
+                // if navigation stalls (e.g. slow internet)
+                setTimeout(() => { isNavigating = false; }, 3000);
+
+                // Store current active index so the new page can animate from it
+                sessionStorage.setItem('nexus-prev-nav', String(activeIndex));
+                window.location.href = href;
+            });
+        });
+    });
+    </script>
+
+    <style>
+
+    .sidebar-nav .nav-item {
+        position: relative;
+        z-index: 1;
+    }
+    .sidebar-nav .nav-item.active-no-bg {
+        background: transparent !important;
+        box-shadow: none !important;
+        color: white;
+    }
+    .sidebar-highlight {
+        position: absolute;
+        pointer-events: none;
+        z-index: 0;
+        border-radius: 8px;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.32), rgba(118, 75, 162, 0.22));
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+    }
+    </style>
+
+    <script nonce="{{ g.csp_nonce }}">
+    // Theme auto-switching: system preference listener + schedule interval
+    (function() {
+        var themeMode = localStorage.getItem('nexus-theme-mode') || 'manual';
+
+        function applyTheme(target) {
+            if (typeof HubApp !== 'undefined' && HubApp.state) {
+                if (HubApp.state.theme === target) return;
+                HubApp.state.theme = target;
+                if (HubApp.updateThemeIcon) HubApp.updateThemeIcon();
+            }
+            document.body.setAttribute('data-theme', target);
+            document.documentElement.setAttribute('data-theme', target);
+            localStorage.setItem('nexus-theme', target);
+            fetch('/api/hub/theme', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ theme: target })
+            }).catch(function() {});
+            var label = document.getElementById('themeLabel');
+            if (label) label.textContent = target === 'dark' ? 'Dunkles Theme' : 'Helles Theme';
+        }
+
+        // System theme: listen for OS changes in real-time
+        if (themeMode === 'system') {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+                if (localStorage.getItem('nexus-theme-mode') !== 'system') return;
+                applyTheme(e.matches ? 'dark' : 'light');
+            });
+        }
+
+        // Schedule: check every 60 seconds
+        if (themeMode === 'schedule') {
+            setInterval(function() {
+                if (localStorage.getItem('nexus-theme-mode') !== 'schedule') return;
+                try {
+                    var sched = JSON.parse(localStorage.getItem('nexus-theme-schedule') || '{}');
+                    if (!sched.light_time || !sched.dark_time) return;
+                    var now = new Date();
+                    var nowMin = now.getHours() * 60 + now.getMinutes();
+                    var lp = sched.light_time.split(':');
+                    var dp = sched.dark_time.split(':');
+                    var lightMin = parseInt(lp[0]) * 60 + parseInt(lp[1]);
+                    var darkMin = parseInt(dp[0]) * 60 + parseInt(dp[1]);
+
+                    // Clear manual override if a schedule boundary was crossed
+                    var override = localStorage.getItem('nexus-theme-manual-override');
+                    if (override) {
+                        var oDate = new Date(parseInt(override));
+                        var oMin = oDate.getHours() * 60 + oDate.getMinutes();
+                        var crossedLight = (oMin < lightMin && nowMin >= lightMin) ||
+                                           (oDate.toDateString() !== now.toDateString());
+                        var crossedDark = (oMin < darkMin && nowMin >= darkMin) ||
+                                          (oDate.toDateString() !== now.toDateString());
+                        if (crossedLight || crossedDark) {
+                            localStorage.removeItem('nexus-theme-manual-override');
+                            override = null;
+                        }
+                    }
+                    if (override) return;
+
+                    var target;
+                    if (lightMin < darkMin) {
+                        target = (nowMin >= lightMin && nowMin < darkMin) ? 'light' : 'dark';
+                    } else {
+                        target = (nowMin >= darkMin && nowMin < lightMin) ? 'dark' : 'light';
+                    }
+                    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+                    if (current !== target) applyTheme(target);
+                } catch(e) {}
+            }, 60000);
+        }
+
+        // On first load, also sync theme preferences from server to localStorage
+        // (in case localStorage was cleared but DB has preferences)
+        fetch('/api/hub/theme-preferences').then(function(res) {
+            if (!res.ok) return;
+            return res.json();
+        }).then(function(data) {
+            if (!data || !data.success) return;
+            var mode = data.theme_mode || 'manual';
+            localStorage.setItem('nexus-theme-mode', mode);
+            if (data.schedule) {
+                localStorage.setItem('nexus-theme-schedule', JSON.stringify(data.schedule));
+            }
+            // If mode changed from what we initially set, re-apply
+            if (mode !== themeMode) {
+                if (mode === 'system') {
+                    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    applyTheme(prefersDark ? 'dark' : 'light');
+                } else if (mode === 'schedule' && !localStorage.getItem('nexus-theme-manual-override')) {
+                    try {
+                        var sched = data.schedule;
+                        if (sched && sched.light_time && sched.dark_time) {
+                            var now = new Date();
+                            var nowMin = now.getHours() * 60 + now.getMinutes();
+                            var lp = sched.light_time.split(':');
+                            var dp = sched.dark_time.split(':');
+                            var lightMin = parseInt(lp[0]) * 60 + parseInt(lp[1]);
+                            var darkMin = parseInt(dp[0]) * 60 + parseInt(dp[1]);
+                            var target;
+                            if (lightMin < darkMin) {
+                                target = (nowMin >= lightMin && nowMin < darkMin) ? 'light' : 'dark';
+                            } else {
+                                target = (nowMin >= darkMin && nowMin < lightMin) ? 'dark' : 'light';
+                            }
+                            applyTheme(target);
+                        }
+                    } catch(e) {}
+                }
+            }
+        }).catch(function() {});
+    })();
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

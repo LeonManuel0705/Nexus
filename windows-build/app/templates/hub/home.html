@@ -1,0 +1,754 @@
+{% extends "hub/base.html" %}
+{% set active_tab = 'dashboard' %}
+
+{% block title %}Dashboard - Nexus{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+
+    <section class="dashboard-hero">
+        <div class="hero-time">
+            <span class="time-display" id="currentTime">--:--</span>
+            <span class="date-display" id="currentDate">--. --- ----</span>
+        </div>
+        <div class="hero-greeting" id="greeting">Guten Tag</div>
+    </section>
+
+    <section class="status-bar glass-card">
+        <div class="status-item" id="statusTasks">
+            <span class="status-icon status-ok">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            </span>
+            <span class="status-text">Aufgaben laden...</span>
+        </div>
+        <div class="status-item" id="statusDeadlines">
+            <span class="status-icon status-ok">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+            </span>
+            <span class="status-text">Keine Deadlines</span>
+        </div>
+        <div class="status-item" id="statusTraining">
+            <span class="status-icon status-neutral">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+                    <path d="M6 8H5a4 4 0 0 0 0 8h1"></path>
+                    <line x1="6" y1="12" x2="18" y2="12"></line>
+                </svg>
+            </span>
+            <span class="status-text">Training heute</span>
+        </div>
+    </section>
+
+    <div class="dashboard-grid">
+
+        <section class="widget glass-card widget-next-event">
+            <div class="widget-header">
+                <h3>Nächster Termin</h3>
+            </div>
+            <div class="next-event-content" id="nextEventContent">
+                <div class="next-event-placeholder">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <span>Keine anstehenden Termine</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="widget glass-card widget-tasks">
+            <div class="widget-header">
+                <h3>Heute erledigen</h3>
+                <a href="/hub/tasks" class="widget-link">Alle →</a>
+            </div>
+            <div class="task-list" id="todayTasks">
+                <div class="empty-state">
+                    <span>Keine Aufgaben für heute</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="widget glass-card widget-alerts widget-deadlines">
+            <div class="widget-header">
+                <h3>Deadlines</h3>
+                <a href="/hub/school" class="widget-link">Schule →</a>
+            </div>
+            <div class="deadlines-list" id="deadlinesList">
+                <div class="empty-state">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>Keine anstehenden Deadlines</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="widget glass-card widget-stats">
+            <div class="widget-header">
+                <h3>Diese Woche</h3>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-value" id="statTasksDone">0</span>
+                    <span class="stat-label">Erledigt</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="statTasksOpen">0</span>
+                    <span class="stat-label">Offen</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="statTrainingSessions">0</span>
+                    <span class="stat-label">Training</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="statUpcomingExams">0</span>
+                    <span class="stat-label">Klausuren</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="widget glass-card widget-upcoming">
+            <div class="widget-header">
+                <h3>Kommende Tage</h3>
+                <a href="/hub/calendar" class="widget-link">Kalender →</a>
+            </div>
+            <div class="upcoming-list" id="upcomingList">
+                <div class="empty-state">
+                    <span>Keine Termine in den nächsten 3 Tagen</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="widget glass-card widget-weather" id="weatherWidget">
+            <div class="weather-content">
+                <div class="weather-icon" id="weatherIcon">☀️</div>
+                <div class="weather-temp" id="weatherTemp">--°</div>
+                <div class="weather-desc" id="weatherDesc">Wetter laden...</div>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ g.csp_nonce }}">
+document.addEventListener('DOMContentLoaded', () => {
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    loadDashboardData();
+    initNotifications();
+
+    window.addEventListener('nexus-resume', () => {
+        updateClock();
+        loadDashboardData();
+    });
+});
+
+function updateClock() {
+    const now = new Date();
+    const timeEl = document.getElementById('currentTime');
+    const dateEl = document.getElementById('currentDate');
+    const greetingEl = document.getElementById('greeting');
+
+    timeEl.textContent = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+    const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+    dateEl.textContent = now.toLocaleDateString('de-DE', options);
+
+    const hour = now.getHours();
+    if (hour < 6) greetingEl.textContent = 'Gute Nacht';
+    else if (hour < 12) greetingEl.textContent = 'Guten Morgen';
+    else if (hour < 18) greetingEl.textContent = 'Guten Tag';
+    else greetingEl.textContent = 'Guten Abend';
+}
+
+async function initNotifications() {
+    // NexusNotifications (loaded in base.html) handles all notification logic.
+    // Show a one-time permission prompt on the home page for first-visit discovery.
+    if ('Notification' in window && Notification.permission === 'default') {
+        if (localStorage.getItem('nexus-notif-enabled') !== 'true' &&
+            !localStorage.getItem('notification_prompt_dismissed')) {
+            const askBtn = document.createElement('button');
+            askBtn.className = 'notification-prompt';
+            askBtn.innerHTML = '\uD83D\uDD14 Benachrichtigungen aktivieren';
+            askBtn.onclick = async () => {
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    askBtn.remove();
+                    localStorage.setItem('nexus-notif-enabled', 'true');
+                    if (typeof NexusNotifications !== 'undefined') {
+                        NexusNotifications.restart();
+                    }
+                }
+            };
+            const statusBar = document.querySelector('.status-bar');
+            if (statusBar) statusBar.appendChild(askBtn);
+        }
+    }
+}
+
+async function loadDashboardData() {
+    // Weather needs internet (calls open-meteo.com) — only load when online
+    if (navigator.onLine) loadWeather();
+
+    // Always load local data immediately (tasks are local DB, no internet needed)
+    const loads = [loadTodayTasks()];
+
+    // Only add network-dependent loads if we know we're online
+    const conn = NexusConnection.state;
+    if (conn.internetAvailable || conn.iservAvailable) {
+        loads.push(loadNextEvent());
+        loads.push(loadUpcomingEvents());
+    }
+
+    if (conn.iservAvailable) {
+        loads.push(loadSchoolAlerts());
+    }
+
+    await Promise.allSettled(loads);
+
+    updateStatusBar();
+
+    // If connectivity wasn't checked yet, load network-dependent data after check completes
+    if (!conn.lastCheck && navigator.onLine) {
+        window.addEventListener('nexus-connection-ready', async (e) => {
+            const freshConn = e.detail || NexusConnection.state;
+            const extraLoads = [];
+            if (freshConn.internetAvailable || freshConn.iservAvailable) {
+                extraLoads.push(loadNextEvent());
+                extraLoads.push(loadUpcomingEvents());
+            }
+            if (freshConn.iservAvailable) {
+                extraLoads.push(loadSchoolAlerts());
+            }
+            if (extraLoads.length) {
+                await Promise.allSettled(extraLoads);
+                updateStatusBar();
+            }
+        }, { once: true });
+    }
+}
+
+async function loadTodayTasks() {
+    try {
+        const response = await fetch('/api/hub/tasks?filter=today');
+        if (response.ok) {
+            const data = await response.json();
+            renderTodayTasks(data.tasks || []);
+        }
+    } catch (err) {
+        console.log('Tasks API not available yet');
+    }
+}
+
+function renderTodayTasks(tasks) {
+    const container = document.getElementById('todayTasks');
+
+    if (!tasks || tasks.length === 0) {
+        container.innerHTML = '<div class="empty-state"><span>Keine Aufgaben für heute</span></div>';
+        return;
+    }
+
+    const topTasks = tasks.slice(0, 5);
+    container.innerHTML = topTasks.map(task => `
+        <div class="task-item ${task.completed ? 'completed' : ''}" data-id="${escapeHtml(String(task.id))}">
+            <button class="task-checkbox ${task.completed ? 'checked' : ''}" onclick="toggleTask('${escapeHtml(String(task.id))}')">
+                ${task.completed ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ''}
+            </button>
+            <span class="task-title">${escapeHtml(task.title)}</span>
+            ${task.priority === 'high' ? '<span class="task-priority high">!</span>' : ''}
+        </div>
+    `).join('');
+
+    document.getElementById('statTasksOpen').textContent = tasks.filter(t => !t.completed).length;
+    document.getElementById('statTasksDone').textContent = tasks.filter(t => t.completed).length;
+}
+
+async function loadNextEvent() {
+    try {
+        const response = await fetch('/api/calendar/events?days=7');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.events && data.events.length > 0) {
+                renderNextEvent(data.events[0]);
+            }
+        }
+    } catch (err) {
+        console.log('Calendar API not available');
+    }
+}
+
+function renderNextEvent(event) {
+    const container = document.getElementById('nextEventContent');
+    const eventDate = new Date(event.start_date + (event.start_time ? 'T' + event.start_time : ''));
+    const now = new Date();
+    const diffMs = eventDate - now;
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    let timeUntil = '';
+    if (diffHours > 24) {
+        const days = Math.floor(diffHours / 24);
+        timeUntil = `in ${days} Tag${days > 1 ? 'en' : ''}`;
+    } else if (diffHours > 0) {
+        timeUntil = `in ${diffHours}h ${diffMins}min`;
+    } else if (diffMins > 0) {
+        timeUntil = `in ${diffMins} Minuten`;
+    } else {
+        timeUntil = 'Jetzt';
+    }
+
+    container.innerHTML = `
+        <div class="next-event">
+            <div class="event-time-until">${timeUntil}</div>
+            <div class="event-title">${escapeHtml(event.title)}</div>
+            <div class="event-details">
+                ${event.start_time || 'Ganztägig'} ${event.location ? '• ' + escapeHtml(event.location) : ''}
+            </div>
+        </div>
+    `;
+}
+
+async function loadUpcomingEvents() {
+    try {
+        const response = await fetch('/api/calendar/events?days=3');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.events) {
+                renderUpcomingEvents(data.events);
+            }
+        }
+    } catch (err) {
+        console.log('Calendar API not available');
+    }
+}
+
+function renderUpcomingEvents(events) {
+    const container = document.getElementById('upcomingList');
+
+    if (!events || events.length === 0) {
+        container.innerHTML = '<div class="empty-state"><span>Keine Termine in den nächsten 3 Tagen</span></div>';
+        return;
+    }
+
+    const grouped = {};
+    events.forEach(event => {
+        const date = event.start_date;
+        if (!grouped[date]) grouped[date] = [];
+        grouped[date].push(event);
+    });
+
+    let html = '';
+    Object.entries(grouped).slice(0, 3).forEach(([date, dayEvents]) => {
+        const dateObj = new Date(date);
+        const isToday = dateObj.toDateString() === new Date().toDateString();
+        const isTomorrow = dateObj.toDateString() === new Date(Date.now() + 86400000).toDateString();
+
+        let dateLabel = dateObj.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
+        if (isToday) dateLabel = 'Heute';
+        if (isTomorrow) dateLabel = 'Morgen';
+
+        html += `<div class="upcoming-day">
+            <div class="upcoming-date">${dateLabel}</div>
+            ${dayEvents.slice(0, 2).map(e => `
+                <div class="upcoming-event">
+                    <span class="event-time">${e.start_time || '○'}</span>
+                    <span class="event-name">${escapeHtml(e.title)}</span>
+                </div>
+            `).join('')}
+        </div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+async function loadWeather() {
+    try {
+        const response = await fetch('/api/hub/weather');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.current) {
+                updateWeather(data.current);
+            }
+        }
+    } catch (err) {
+        console.log('Weather not available');
+    }
+}
+
+function updateWeather(current) {
+    if (!current) return;
+
+    const temp = Math.round(current.temperature_2m);
+    const code = current.weather_code;
+
+    document.getElementById('weatherTemp').textContent = temp + '°';
+
+    const weatherIcons = {
+        0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️',
+        45: '🌫️', 48: '🌫️',
+        51: '🌦️', 53: '🌧️', 55: '🌧️',
+        61: '🌧️', 63: '🌧️', 65: '🌧️',
+        71: '🌨️', 73: '🌨️', 75: '❄️',
+        80: '🌦️', 81: '🌧️', 82: '⛈️',
+        95: '⛈️', 96: '⛈️', 99: '⛈️'
+    };
+
+    const weatherDescs = {
+        0: 'Klar', 1: 'Heiter', 2: 'Bewölkt', 3: 'Bedeckt',
+        45: 'Nebel', 48: 'Nebel',
+        51: 'Niesel', 53: 'Niesel', 55: 'Niesel',
+        61: 'Regen', 63: 'Regen', 65: 'Starkregen',
+        71: 'Schnee', 73: 'Schnee', 75: 'Schneefall',
+        80: 'Schauer', 81: 'Schauer', 82: 'Starkregen',
+        95: 'Gewitter', 96: 'Gewitter', 99: 'Gewitter'
+    };
+
+    document.getElementById('weatherIcon').textContent = weatherIcons[code] || '🌡️';
+    document.getElementById('weatherDesc').textContent = weatherDescs[code] || '';
+}
+
+function updateStatusBar() {
+    const statusTasks = document.getElementById('statusTasks');
+    const openTasks = parseInt(document.getElementById('statTasksOpen').textContent) || 0;
+
+    if (openTasks === 0) {
+        statusTasks.querySelector('.status-text').textContent = 'Alle Aufgaben erledigt';
+        statusTasks.querySelector('.status-icon').className = 'status-icon status-ok';
+    } else {
+        statusTasks.querySelector('.status-text').textContent = `${openTasks} Aufgabe${openTasks > 1 ? 'n' : ''} offen`;
+        statusTasks.querySelector('.status-icon').className = openTasks > 5 ? 'status-icon status-warning' : 'status-icon status-neutral';
+    }
+}
+
+async function toggleTask(taskId) {
+    try {
+        await fetch(`/api/hub/tasks/${taskId}/toggle`, { method: 'POST' });
+        loadTodayTasks();
+    } catch (err) {}
+}
+
+async function loadSchoolAlerts() {
+    const alerts = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    function daysUntil(dateStr) {
+        const date = new Date(dateStr);
+        date.setHours(0, 0, 0, 0);
+        return Math.ceil((date - today) / (1000 * 60 * 60 * 24));
+    }
+
+    let subjects = [];
+    try {
+        const subjectsRes = await fetch('/api/hub/school/subjects');
+        if (subjectsRes.ok) {
+            const data = await subjectsRes.json();
+            subjects = data.subjects || [];
+        }
+    } catch (err) {
+        console.log('Subjects API not available');
+    }
+
+    function getSubjectName(subjectId) {
+        const subject = subjects.find(s => s.id === subjectId);
+        return subject ? subject.name : 'Unbekannt';
+    }
+
+    try {
+        const homeworkRes = await fetch('/api/hub/school/homework');
+        if (homeworkRes.ok) {
+            const data = await homeworkRes.json();
+            const homework = data.homework || [];
+            homework.forEach(hw => {
+                if (hw.completed) return;
+                const days = daysUntil(hw.due_date);
+                if (days <= 2 && days >= 0) {
+                    alerts.push({
+                        type: 'homework',
+                        icon: '📝',
+                        title: hw.title,
+                        subject: getSubjectName(hw.subject_id),
+                        days: days,
+                        urgency: days === 0 ? 'urgent' : days === 1 ? 'warning' : 'normal'
+                    });
+                }
+            });
+        }
+    } catch (err) {
+        console.log('Homework API not available');
+    }
+
+    try {
+        const testsRes = await fetch('/api/hub/school/tests');
+        if (testsRes.ok) {
+            const data = await testsRes.json();
+            const tests = data.tests || [];
+            tests.forEach(test => {
+                const days = daysUntil(test.date);
+                if (days <= 3 && days >= 0) {
+                    alerts.push({
+                        type: 'test',
+                        icon: '📋',
+                        title: test.title || 'Test',
+                        subject: getSubjectName(test.subject_id),
+                        days: days,
+                        urgency: days === 0 ? 'urgent' : days === 1 ? 'warning' : 'normal'
+                    });
+                }
+            });
+        }
+    } catch (err) {
+        console.log('Tests API not available');
+    }
+
+    try {
+        const examsRes = await fetch('/api/hub/school/exams');
+        if (examsRes.ok) {
+            const data = await examsRes.json();
+            const exams = data.exams || [];
+            exams.forEach(exam => {
+                const days = daysUntil(exam.date);
+                if (days <= 3 && days >= 0) {
+                    alerts.push({
+                        type: 'exam',
+                        icon: '📚',
+                        title: exam.title || 'Klausur',
+                        subject: getSubjectName(exam.subject_id),
+                        days: days,
+                        urgency: days === 0 ? 'urgent' : days <= 1 ? 'warning' : 'normal'
+                    });
+                }
+            });
+        }
+    } catch (err) {
+        console.log('Exams API not available');
+    }
+
+    alerts.sort((a, b) => a.days - b.days);
+
+    const examCount = alerts.filter(a => a.type === 'exam').length;
+    document.getElementById('statUpcomingExams').textContent = examCount;
+
+    renderDeadlines(alerts);
+
+    updateDeadlineStatus(alerts);
+
+    setTimeout(() => checkDeadlineNotifications(), 500);
+}
+
+function renderDeadlines(alerts) {
+    const container = document.getElementById('deadlinesList');
+
+    if (!alerts || alerts.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Keine anstehenden Deadlines</span>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = alerts.slice(0, 5).map(alert => {
+        const typeIcon = alert.type === 'homework' ? '📝' : alert.type === 'test' ? '📋' : '📚';
+        const typeLabel = alert.type === 'homework' ? 'Hausaufgabe' : alert.type === 'test' ? 'Test' : 'Klausur';
+
+        let countdownHtml = '';
+        if (alert.days === 0) {
+            countdownHtml = '<span class="countdown-urgent">HEUTE</span>';
+        } else if (alert.days === 1) {
+            countdownHtml = '<span class="countdown-warning">Morgen</span>';
+        } else {
+            countdownHtml = `<span class="countdown-days">${alert.days}</span><span class="countdown-label">Tage</span>`;
+        }
+
+        return `
+            <div class="deadline-item ${alert.urgency}">
+                <div class="deadline-countdown">
+                    ${countdownHtml}
+                </div>
+                <div class="deadline-content">
+                    <div class="deadline-title">${escapeHtml(alert.title)}</div>
+                    <div class="deadline-meta">
+                        <span class="deadline-type">${typeIcon} ${typeLabel}</span>
+                        <span class="deadline-subject">${escapeHtml(alert.subject)}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function updateDeadlineStatus(alerts) {
+    const statusEl = document.getElementById('statusDeadlines');
+    const urgentCount = alerts.filter(a => a.urgency === 'urgent').length;
+    const warningCount = alerts.filter(a => a.urgency === 'warning').length;
+
+    if (urgentCount > 0) {
+        statusEl.querySelector('.status-text').textContent = `${urgentCount} dringend heute!`;
+        statusEl.querySelector('.status-icon').className = 'status-icon status-error';
+    } else if (warningCount > 0) {
+        statusEl.querySelector('.status-text').textContent = `${warningCount} morgen fällig`;
+        statusEl.querySelector('.status-icon').className = 'status-icon status-warning';
+    } else if (alerts.length > 0) {
+        statusEl.querySelector('.status-text').textContent = `${alerts.length} bald fällig`;
+        statusEl.querySelector('.status-icon').className = 'status-icon status-neutral';
+    } else {
+        statusEl.querySelector('.status-text').textContent = 'Keine Deadlines';
+        statusEl.querySelector('.status-icon').className = 'status-icon status-ok';
+    }
+}
+</script>
+<style>
+/* Deadline Widget Styles */
+.widget-deadlines {
+    grid-column: span 1;
+}
+
+.deadlines-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.deadline-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--bg-tertiary);
+    transition: transform 0.2s;
+}
+
+.deadline-item:hover {
+    transform: translateX(4px);
+}
+
+.deadline-item.urgent {
+    background: rgba(239, 68, 68, 0.15);
+    border-left: 3px solid #ef4444;
+}
+
+.deadline-item.warning {
+    background: rgba(245, 158, 11, 0.15);
+    border-left: 3px solid #f59e0b;
+}
+
+.deadline-item.normal {
+    border-left: 3px solid var(--accent-color);
+}
+
+.deadline-countdown {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 50px;
+    padding: 6px;
+    border-radius: 8px;
+    background: var(--bg-secondary);
+}
+
+.deadline-item.urgent .deadline-countdown {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.deadline-item.warning .deadline-countdown {
+    background: rgba(245, 158, 11, 0.2);
+}
+
+.countdown-days {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+}
+
+.countdown-label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.countdown-urgent {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #ef4444;
+    animation: pulse 1.5s infinite;
+}
+
+.countdown-warning {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #f59e0b;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.deadline-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.deadline-title {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.deadline-meta {
+    display: flex;
+    gap: 8px;
+    margin-top: 2px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.deadline-type {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.deadline-subject {
+    color: var(--text-secondary);
+}
+
+/* Notification prompt */
+.notification-prompt {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.notification-prompt:hover {
+    opacity: 0.9;
+}
+</style>
+{% endblock %}

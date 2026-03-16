@@ -1,0 +1,2968 @@
+{% extends "hub/base.html" %}
+{% set active_tab = 'calendar' %}
+
+{% block title %}Kalender - Nexus{% endblock %}
+
+{% block content %}
+<div class="page-container" style="max-width: 1100px;">
+    <div class="cal-page-header">
+        <div class="cal-header-left">
+            <div class="cal-header-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+            </div>
+            <div>
+                <h1 class="cal-title">Kalender</h1>
+                <p class="cal-subtitle">Deine Termine im Überblick</p>
+            </div>
+        </div>
+        <div class="page-actions">
+            <select id="calendarAccountSelect" class="account-select" title="Kalender-Account">
+                <option value="">Laden...</option>
+            </select>
+            <button class="add-btn small" onclick="openAddCalendarAccountModal()" title="Kalender-Account hinzufügen">+</button>
+            <button class="btn-primary" onclick="openAddEventModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Neuer Termin
+            </button>
+        </div>
+    </div>
+
+    <div class="cal-filters">
+        <button class="cal-filter active" data-filter="all" onclick="setCalendarFilter('all')">
+            <span class="cal-filter-dot" style="background: var(--accent-gradient);"></span>Alle
+        </button>
+        <button class="cal-filter" data-filter="school" onclick="setCalendarFilter('school')">
+            <span class="cal-filter-dot" style="background: #667eea;"></span>Schule
+        </button>
+        <button class="cal-filter" data-filter="training" onclick="setCalendarFilter('training')">
+            <span class="cal-filter-dot" style="background: #48bb78;"></span>Training
+        </button>
+        <button class="cal-filter" data-filter="personal" onclick="setCalendarFilter('personal')">
+            <span class="cal-filter-dot" style="background: #9f7aea;"></span>Privat
+        </button>
+        <button class="cal-filter" data-filter="holiday" onclick="setCalendarFilter('holiday')">
+            <span class="cal-filter-dot" style="background: #e74c3c;"></span>Feiertage
+        </button>
+    </div>
+
+    <div class="calendar-layout">
+
+        <section class="widget glass-card calendar-widget">
+            <div class="cal-month-header">
+                <div class="cal-month-nav">
+                    <button class="cal-nav-btn" onclick="changeMonth(-1)" title="Vorheriger Monat">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <span class="cal-month-label" id="calendarMonth">Monat Jahr</span>
+                    <button class="cal-nav-btn" onclick="changeMonth(1)" title="Nächster Monat">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
+                </div>
+                <button class="cal-today-btn" onclick="goToToday()" title="Heute">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    Heute
+                </button>
+            </div>
+
+            <div class="calendar-grid">
+                <div class="calendar-weekdays" id="calendarWeekdays">
+                    <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span class="weekend">Sa</span><span class="weekend">So</span>
+                </div>
+                <div class="calendar-days" id="calendarDays"></div>
+            </div>
+        </section>
+
+        <section class="widget glass-card events-widget">
+            <div class="cal-events-header">
+                <h3 class="cal-events-date" id="eventsTitle">Heute</h3>
+                <span class="cal-events-badge" id="eventCount">0 Termine</span>
+            </div>
+            <div class="events-list" id="eventsList">
+                <div class="cal-empty-state">
+                    <div class="cal-empty-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                            <line x1="8" y1="14" x2="10" y2="14"></line>
+                            <line x1="14" y1="14" x2="16" y2="14"></line>
+                            <line x1="8" y1="18" x2="10" y2="18"></line>
+                        </svg>
+                    </div>
+                    <span>Keine Termine an diesem Tag</span>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+
+<div class="modal" id="eventModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="eventModalTitle">Neuer Termin</h3>
+            <button class="modal-close" onclick="closeModal('eventModal')">&times;</button>
+        </div>
+        <form id="eventForm" onsubmit="saveEvent(event)">
+            <input type="hidden" id="eventId" name="id">
+            <input type="hidden" id="eventCalendarId" name="calendar_id">
+            <input type="hidden" id="eventRecurringId" name="recurring_event_id">
+            <input type="hidden" id="eventSource" name="event_source">
+            <div class="form-group">
+                <label for="eventCalendarSource">Speichern in</label>
+                <select id="eventCalendarSource">
+                    <option value="local">Nexus (Lokal)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="eventTitle">Titel</label>
+                <input type="text" id="eventTitle" name="title" placeholder="Termin-Titel" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="eventDate">Datum</label>
+                    <input type="date" id="eventDate" name="start_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="eventTime">Uhrzeit</label>
+                    <input type="time" id="eventTime" name="start_time">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="eventEndDate">Ende Datum</label>
+                    <input type="date" id="eventEndDate" name="end_date">
+                </div>
+                <div class="form-group">
+                    <label for="eventEndTime">Ende Uhrzeit</label>
+                    <input type="time" id="eventEndTime" name="end_time">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="eventCategory">Kategorie</label>
+                <select id="eventCategory" name="category">
+                    <option value="personal">Privat</option>
+                    <option value="school">Schule</option>
+                    <option value="training">Training</option>
+                    <option value="work">Arbeit</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="eventLocation">Ort</label>
+                <input type="text" id="eventLocation" name="location" placeholder="Ort hinzufügen">
+            </div>
+            <div class="form-group">
+                <label for="eventDescription">Beschreibung</label>
+                <textarea id="eventDescription" name="description" rows="3" placeholder="Notizen..."></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-secondary btn-danger" id="deleteEventBtn" style="display: none;" onclick="deleteEvent()">Löschen</button>
+                <button type="submit" class="btn-primary">Speichern</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal" id="routeModal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h3 id="routeModalTitle">Route planen</h3>
+            <button class="modal-close" onclick="closeModal('routeModal')">&times;</button>
+        </div>
+        <div class="route-content">
+            <div class="route-info">
+                <div class="route-event-info" id="routeEventInfo"></div>
+                <div class="route-location-status" id="locationStatus">
+                    <svg class="spinner" width="16" height="16" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" opacity="0.3"/>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="2" fill="none"/>
+                    </svg>
+                    <span>Standort wird ermittelt...</span>
+                </div>
+            </div>
+            <div class="route-results" id="routeResults">
+                <div class="empty-state">
+                    <span>Warte auf Standort...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="addCalendarAccountModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Kalender-Account hinzufügen</h3>
+            <button class="modal-close" onclick="closeModal('addCalendarAccountModal')">&times;</button>
+        </div>
+        <form id="addCalendarAccountForm" onsubmit="addCalendarAccount(event)">
+            <div class="form-group">
+                <label for="calAccountProvider">Anbieter</label>
+                <select id="calAccountProvider" name="provider" onchange="updateCalendarProviderFields()">
+                    <option value="samsung">Samsung Calendar</option>
+                    <option value="icloud">Apple iCloud</option>
+                    <option value="caldav">Anderer CalDAV</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="calAccountName">Name (optional)</label>
+                <input type="text" id="calAccountName" name="name" placeholder="z.B. Samsung Privat">
+            </div>
+            <div class="form-group">
+                <label for="calAccountUsername">Benutzername / E-Mail</label>
+                <input type="text" id="calAccountUsername" name="username" required placeholder="email@example.com">
+            </div>
+            <div class="form-group">
+                <label for="calAccountPassword">Passwort / App-Passwort</label>
+                <input type="password" id="calAccountPassword" name="password" required>
+            </div>
+            <div class="form-group" id="calAccountUrlGroup" style="display: none;">
+                <label for="calAccountUrl">CalDAV-URL</label>
+                <input type="url" id="calAccountUrl" name="url" placeholder="https://caldav.example.com/">
+            </div>
+            <p class="form-hint" id="calAccountHint">
+                Samsung: Verwende dein Samsung-Konto und Passwort.
+            </p>
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">Hinzufügen</button>
+            </div>
+            <div id="calAccountError" class="form-error" style="display: none;"></div>
+        </form>
+    </div>
+</div>
+
+<div class="modal" id="bundeslandModal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h3>Wähle dein Bundesland</h3>
+            <button class="modal-close" onclick="closeModal('bundeslandModal')">&times;</button>
+        </div>
+        <div class="bundesland-wizard-content">
+            <p class="setup-intro">Für korrekte Feiertage und Schulferien:</p>
+            <div class="bundesland-grid" id="bundeslandGrid">
+
+            </div>
+            <div class="bundesland-loading" id="bundeslandLoading" style="display: none;">
+                <div class="loading-spinner"></div>
+                <span>Feiertage und Schulferien werden importiert...</span>
+            </div>
+            <div class="setup-actions" id="bundeslandActions">
+                <button class="btn-secondary" onclick="skipBundeslandSelection()">Später einrichten</button>
+                <button class="btn-primary" onclick="saveBundeslandSelection()" id="saveBundeslandBtn" disabled>Speichern</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="deleteEventModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Termin löschen</h3>
+            <button class="modal-close" onclick="closeModal('deleteEventModal')">&times;</button>
+        </div>
+        <div class="delete-event-body">
+            <p id="deleteEventMessage">Möchtest du diesen Termin wirklich löschen?</p>
+            <div id="deleteEventOptions" class="delete-options"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ g.csp_nonce }}">
+let currentMonth = new Date().getMonth();
+let currentYear = new Date().getFullYear();
+let selectedDate = new Date();
+let events = [];
+let calendarFilter = 'all';
+let accountFilter = 'all';  // Filter by account/source
+
+function formatLocalDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    renderCalendar();
+    loadEvents();
+    loadCalendarAccounts();
+    syncCachedChanges(); // Sync any offline changes
+
+    // Override global quick-note FAB to open add-event modal on the calendar page
+    const fab = document.getElementById('fabButton');
+    if (fab) {
+        fab.onclick = () => openAddEventModal();
+        fab.title = 'Neuer Termin';
+    }
+});
+
+const CACHE_KEY = 'nexus-calendar-pending-changes';
+
+function getCachedChanges() {
+    try {
+        return JSON.parse(localStorage.getItem(CACHE_KEY) || '[]');
+    } catch {
+        return [];
+    }
+}
+
+function saveCachedChanges(changes) {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(changes));
+}
+
+function cacheEventChange(action, eventData, eventId = null, calendarId = 'primary') {
+    const changes = getCachedChanges();
+    changes.push({
+        action, // 'create', 'update', 'delete'
+        eventData,
+        eventId,
+        calendarId,
+        timestamp: new Date().toISOString()
+    });
+    saveCachedChanges(changes);
+}
+
+async function syncCachedChanges() {
+    const changes = getCachedChanges();
+    if (changes.length === 0) return;
+
+    const remaining = [];
+    const savedAccount = localStorage.getItem('nexus-google-calendar-account') || '';
+
+    for (const change of changes) {
+        try {
+            let url, method;
+            const calendarId = change.calendarId || change.eventData?.calendar_id || 'primary';
+
+            if (change.action === 'create') {
+                url = '/api/calendar/events';
+                method = 'POST';
+            } else if (change.action === 'update') {
+                url = `/api/calendar/events/${change.eventId}`;
+                method = 'PUT';
+            } else if (change.action === 'delete') {
+                url = `/api/calendar/events/${change.eventId}?account=${encodeURIComponent(savedAccount)}&calendar_id=${encodeURIComponent(calendarId)}`;
+                method = 'DELETE';
+            }
+
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: change.action !== 'delete' ? JSON.stringify(change.eventData) : undefined
+            });
+
+            if (!response.ok) {
+                remaining.push(change); // Keep for retry
+            }
+        } catch {
+            remaining.push(change); // Keep for retry
+        }
+    }
+
+    saveCachedChanges(remaining);
+    if (remaining.length < changes.length) {
+        loadEvents(); // Reload if any changes synced
+    }
+}
+
+let selectedBundesland = null;
+let bundeslaender = {};
+
+async function checkAndShowBundeslandModal() {
+    try {
+        const response = await fetch('/api/hub/bundesland');
+        const data = await response.json();
+
+        if (data.success && !data.bundesland) {
+            bundeslaender = data.bundeslaender || {};
+            showBundeslandModal();
+        }
+    } catch (error) {
+        console.error('Error checking Bundesland:', error);
+    }
+}
+
+function showBundeslandModal() {
+    const grid = document.getElementById('bundeslandGrid');
+    if (!grid) return;
+
+    grid.innerHTML = Object.entries(bundeslaender).map(([code, name]) => `
+        <div class="bundesland-card" data-code="${escapeHtml(code)}" onclick="selectBundesland('${escapeHtml(code)}')">
+            <span class="bundesland-code">${escapeHtml(code)}</span>
+            <span class="bundesland-name">${escapeHtml(name)}</span>
+        </div>
+    `).join('');
+
+    openModal('bundeslandModal');
+}
+
+function selectBundesland(code) {
+    selectedBundesland = code;
+
+    document.querySelectorAll('.bundesland-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    document.querySelector(`.bundesland-card[data-code="${code}"]`)?.classList.add('selected');
+
+    document.getElementById('saveBundeslandBtn').disabled = false;
+}
+
+async function saveBundeslandSelection() {
+    if (!selectedBundesland) return;
+
+    const grid = document.getElementById('bundeslandGrid');
+    const loading = document.getElementById('bundeslandLoading');
+    const actions = document.getElementById('bundeslandActions');
+
+    grid.style.display = 'none';
+    actions.style.display = 'none';
+    loading.style.display = 'flex';
+    loading.innerHTML = `
+        <div class="loading-spinner"></div>
+        <span>Feiertage und Schulferien werden importiert...</span>
+        <div class="import-progress-container">
+            <div class="import-progress-bar" id="importProgressBar"></div>
+        </div>
+        <span class="import-progress-text" id="importProgressText">Verbinde mit feiertage-api.de...</span>
+    `;
+
+    const progressBar = document.getElementById('importProgressBar');
+    const progressText = document.getElementById('importProgressText');
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress > 85) progress = 85;
+        progressBar.style.width = progress + '%';
+
+        if (progress < 30) {
+            progressText.textContent = 'Feiertage werden geladen...';
+        } else if (progress < 60) {
+            progressText.textContent = 'Schulferien werden geladen...';
+        } else {
+            progressText.textContent = 'Daten werden gespeichert...';
+        }
+    }, 300);
+
+    try {
+        const response = await fetch('/api/hub/bundesland', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bundesland: selectedBundesland })
+        });
+        const data = await response.json();
+
+        clearInterval(progressInterval);
+        progressBar.style.width = '100%';
+        progressText.textContent = 'Fertig!';
+
+        if (data.success) {
+            setTimeout(() => {
+                closeModal('bundeslandModal');
+                const importedCount = data.imported_count || 0;
+                const bundeslandName = data.bundesland_name || selectedBundesland;
+                showToast(`${bundeslandName}: ${importedCount} Feiertage und Schulferien importiert!`, 'success');
+                loadEvents(); // Reload events to show new holidays
+            }, 500);
+        } else {
+            throw new Error(data.error || 'Import fehlgeschlagen');
+        }
+    } catch (error) {
+        clearInterval(progressInterval);
+        console.error('Error saving Bundesland:', error);
+
+        loading.style.display = 'none';
+        grid.style.display = 'grid';
+        actions.style.display = 'flex';
+
+        showToast('Import fehlgeschlagen: ' + error.message, 'error');
+    }
+}
+
+function skipBundeslandSelection() {
+    closeModal('bundeslandModal');
+}
+
+function renderCalendar() {
+    const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+
+    // Only animate the month label when the month actually changed
+    const labelEl = document.getElementById('calendarMonth');
+    if (_monthSlideDir !== 0) {
+        const outClass = _monthSlideDir > 0 ? 'month-label-changing-fwd' : 'month-label-changing-bwd';
+        const inClass  = _monthSlideDir > 0 ? 'month-label-appear-fwd'   : 'month-label-appear-bwd';
+        labelEl.classList.remove('month-label-changing-fwd','month-label-changing-bwd','month-label-appear-fwd','month-label-appear-bwd');
+        labelEl.classList.add(outClass);
+        setTimeout(() => {
+            labelEl.textContent = `${monthNames[currentMonth]} ${currentYear}`;
+            labelEl.classList.remove(outClass);
+            labelEl.classList.add(inClass);
+            labelEl.addEventListener('animationend', () => labelEl.classList.remove(inClass), { once: true });
+        }, 120);
+    } else {
+        labelEl.textContent = `${monthNames[currentMonth]} ${currentYear}`;
+    }
+
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    const lastDay = new Date(currentYear, currentMonth + 1, 0);
+    const startDay = (firstDay.getDay() + 6) % 7; // Monday = 0
+
+    const today = new Date();
+    const todayDow = (today.getDay() + 6) % 7; // Monday = 0
+
+    document.querySelectorAll('#calendarWeekdays span').forEach((el, i) => {
+        el.classList.toggle('current-day', i === todayDow &&
+            currentMonth === today.getMonth() && currentYear === today.getFullYear());
+    });
+
+    // Build the new grid HTML (always 6 rows = 42 cells to prevent height jumps)
+    let html = '';
+    for (let i = 0; i < startDay; i++) {
+        html += '<div class="day-cell empty"></div>';
+    }
+    for (let day = 1; day <= lastDay.getDate(); day++) {
+        const date = new Date(currentYear, currentMonth, day);
+        const dateStr = formatLocalDate(date);
+        const dow = (date.getDay() + 6) % 7;
+        const isToday = date.toDateString() === today.toDateString();
+        const isSelected = date.toDateString() === selectedDate.toDateString();
+        const isWeekend = dow >= 5;
+        const dayEvents = getEventsForDate(dateStr);
+
+        let classes = 'day-cell';
+        if (isToday) classes += ' today';
+        if (isSelected) classes += ' selected';
+        if (isWeekend) classes += ' weekend';
+        if (dayEvents.length > 0) classes += ' has-events';
+
+        const eventPreviews = dayEvents.slice(0, 3).map(e => {
+            const rawColor = e.calendar_color || getCategoryColor(e.category) || '#6366f1';
+            const color = /^#[0-9a-fA-F]{3,8}$/.test(rawColor) ? rawColor : '#6366f1';
+            const title = e.title.length > 12 ? e.title.substring(0, 12) + '…' : e.title;
+            return `<div class="event-preview" style="background: ${color};" title="${escapeHtml(e.title)}">${escapeHtml(title)}</div>`;
+        }).join('');
+        const moreCount = dayEvents.length > 3 ? `<div class="event-more">+${dayEvents.length - 3}</div>` : '';
+
+        html += `<div class="${classes}" onclick="selectDate(${day})">
+            <span class="day-number">${day}</span>
+            <div class="day-events">${eventPreviews}${moreCount}</div>
+        </div>`;
+    }
+    // Pad to 42 cells (6 rows × 7 cols) so the grid height never changes
+    const totalCells = startDay + lastDay.getDate();
+    for (let i = totalCells; i < 42; i++) {
+        html += '<div class="day-cell empty filler"></div>';
+    }
+
+    const container = document.getElementById('calendarDays');
+
+    if (_monthSlideDir !== 0) {
+        // Cross-fade slide: animate old content out, swap, animate new in
+        const dir = _monthSlideDir;
+        _monthSlideDir = 0;
+
+        container.classList.add(dir > 0 ? 'slide-out-left' : 'slide-out-right');
+        container.addEventListener('animationend', () => {
+            container.classList.remove('slide-out-left', 'slide-out-right');
+            container.innerHTML = html;
+            void container.offsetWidth;
+            container.classList.add(dir > 0 ? 'slide-in-from-right' : 'slide-in-from-left');
+            container.addEventListener('animationend', () => {
+                container.classList.remove('slide-in-from-right', 'slide-in-from-left');
+            }, { once: true });
+        }, { once: true });
+    } else {
+        container.innerHTML = html;
+    }
+}
+
+function getEventsForDate(dateStr) {
+    return events.filter(e => {
+        if (calendarFilter !== 'all') {
+            if (calendarFilter === 'iserv') {
+                if (e.source !== 'iserv') return false;
+            } else if (calendarFilter === 'holiday') {
+                if (e.source !== 'holiday' && e.category !== 'holiday') return false;
+            } else if (e.category !== calendarFilter && e.source !== calendarFilter) {
+                return false;
+            }
+        }
+        if (accountFilter !== 'all') {
+            const eventAccount = e.account || e.calendar || e.source || '';
+            if (accountFilter.startsWith('caldav:')) {
+                if (e.source !== 'caldav' || e.account_id !== accountFilter.replace('caldav:', '')) return false;
+            } else if (accountFilter === 'google') {
+                if (e.source !== 'google') return false;
+            } else if (accountFilter === 'iserv') {
+                if (e.source !== 'iserv') return false;
+            } else if (accountFilter === 'holiday') {
+                if (e.source !== 'holiday') return false;
+            } else if (accountFilter === 'nexus') {
+                if (e.source !== 'nexus') return false;
+            } else if (accountFilter === 'local') {
+                if (e.source !== 'local') return false;
+            } else {
+                if (eventAccount.toLowerCase() !== accountFilter.toLowerCase()) return false;
+            }
+        }
+        const eventStart = e.start_date;
+        const eventEnd = e.end_date || e.start_date;
+        return dateStr >= eventStart && dateStr <= eventEnd;
+    });
+}
+
+function getCategoryColor(category) {
+    const colors = {
+        'school': '#38bdf8',
+        'training': '#f97316',
+        'personal': '#9f7aea',
+        'work': '#ed8936',
+        'iserv': '#3498db',
+        'holiday': '#e74c3c'
+    };
+    return colors[category] || '#6366f1';
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function checkHasEvents(date) {
+    const dateStr = formatLocalDate(date);
+    return events.some(e => e.start_date === dateStr);
+}
+
+function selectDate(day) {
+    selectedDate = new Date(currentYear, currentMonth, day);
+    renderCalendar();
+    // Pulse the selected cell (non-empty cells are ordered day 1…N)
+    const cells = document.querySelectorAll('#calendarDays .day-cell:not(.empty)');
+    const el = cells[day - 1];
+    if (el) {
+        el.classList.add('day-pulse');
+        el.addEventListener('animationend', () => el.classList.remove('day-pulse'), { once: true });
+    }
+    updateEventsForDate();
+}
+
+function buildEventListHTML(dayEvents) {
+    if (dayEvents.length === 0) {
+        return `<div class="cal-empty-state">
+            <div class="cal-empty-icon">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                    <line x1="8" y1="14" x2="10" y2="14"></line>
+                    <line x1="14" y1="14" x2="16" y2="14"></line>
+                    <line x1="8" y1="18" x2="10" y2="18"></line>
+                </svg>
+            </div>
+            <span>Keine Termine an diesem Tag</span>
+        </div>`;
+    }
+    return dayEvents.map((e, i) => {
+        const safeCalColor = /^#[0-9a-fA-F]{3,8}$/.test(e.calendar_color) ? e.calendar_color : '';
+        const borderColor = safeCalColor || getCategoryColor(e.category || 'personal');
+        const calendarName = e.calendar || getCategoryLabel(e.category);
+        const hasLocation = e.location && e.location.trim().length > 0;
+        const timeStr = e.start_time || 'Ganztägig';
+        const isAllDay = !e.start_time;
+        return `<div class="cal-event-card category-${escapeHtml(e.category || 'personal')}" data-event-id="${escapeHtml(String(e.id))}" style="border-left-color: ${borderColor}; animation-delay: ${i * 0.06}s;">
+            <div class="cal-event-time ${isAllDay ? 'all-day' : ''}">${escapeHtml(timeStr)}</div>
+            <div class="cal-event-body" onclick="openEditEventModal('${escapeHtml(String(e.id))}')">
+                <div class="cal-event-title">${escapeHtml(e.title)}</div>
+                ${hasLocation ? `<div class="cal-event-location">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 5.4 7 12 8 12s8-6.6 8-12a8 8 0 0 0-8-8z"/></svg>
+                    ${escapeHtml(e.location)}
+                </div>` : ''}
+            </div>
+            <div class="cal-event-meta">
+                ${hasLocation ? `<button class="cal-route-btn" onclick="event.stopPropagation(); openRouteModal('${escapeHtml(String(e.id))}')" title="Route planen">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l18-5-5 18-4-8-9-5z"/></svg>
+                </button>` : ''}
+                <span class="cal-event-tag" style="--tag-color: ${borderColor};">${escapeHtml(calendarName)}</span>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function updateEventsForDate() {
+    const dateStr = formatLocalDate(selectedDate);
+    const dayEvents = getEventsForDate(dateStr);
+
+    const today = new Date();
+    let title = 'Termine';
+    if (selectedDate.toDateString() === today.toDateString()) {
+        title = 'Heute';
+    } else if (selectedDate.toDateString() === new Date(today.getTime() + 86400000).toDateString()) {
+        title = 'Morgen';
+    } else {
+        title = selectedDate.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+    }
+
+    // Animate title/badge update
+    const titleEl = document.getElementById('eventsTitle');
+    const badgeEl = document.getElementById('eventCount');
+    titleEl.classList.add('panel-header-updating');
+    setTimeout(() => {
+        titleEl.textContent = title;
+        badgeEl.textContent = `${dayEvents.length} Termin${dayEvents.length !== 1 ? 'e' : ''}`;
+        titleEl.classList.remove('panel-header-updating');
+        titleEl.classList.add('panel-header-updated');
+        titleEl.addEventListener('animationend', () => titleEl.classList.remove('panel-header-updated'), { once: true });
+        // Pulse badge when count > 0
+        if (dayEvents.length > 0) {
+            badgeEl.classList.add('badge-pop');
+            badgeEl.addEventListener('animationend', () => badgeEl.classList.remove('badge-pop'), { once: true });
+        }
+    }, 100);
+
+    const container = document.getElementById('eventsList');
+    const newHTML = buildEventListHTML(dayEvents);
+
+    // Freeze current height for smooth transition
+    const oldHeight = container.offsetHeight;
+    container.style.minHeight = oldHeight + 'px';
+
+    // Step 1: fade current content out
+    container.classList.add('events-content-leaving');
+
+    setTimeout(() => {
+        // Step 2: swap content
+        container.innerHTML = newHTML;
+        container.classList.remove('events-content-leaving');
+
+        // Step 3: animate height to new natural height
+        const newHeight = container.scrollHeight;
+        if (Math.abs(newHeight - oldHeight) > 10) {
+            container.style.transition = 'min-height 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)';
+            container.style.minHeight = newHeight + 'px';
+            container.addEventListener('transitionend', () => {
+                container.style.minHeight = '';
+                container.style.transition = '';
+            }, { once: true });
+        } else {
+            container.style.minHeight = '';
+        }
+
+        // Step 4: fade new content in
+        container.classList.add('events-content-entering');
+        requestAnimationFrame(() => {
+            container.classList.remove('events-content-entering');
+        });
+    }, 140);
+}
+
+function getCategoryLabel(cat) {
+    const labels = { 'personal': 'Privat', 'school': 'Schule', 'training': 'Training', 'work': 'Arbeit', 'iserv': 'IServ', 'holiday': 'Feiertag' };
+    return labels[cat] || cat;
+}
+
+let _monthSlideDir = 0;
+
+function changeMonth(delta) {
+    _monthSlideDir = delta;
+    currentMonth += delta;
+    if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+    if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+    renderCalendar();
+    loadEvents(false); // selected date unchanged — don't re-render the events panel
+}
+
+function goToToday() {
+    const today = new Date();
+    currentMonth = today.getMonth();
+    currentYear = today.getFullYear();
+    selectedDate = today;
+    renderCalendar();
+    updateEventsForDate();
+}
+
+function setCalendarFilter(filter) {
+    calendarFilter = filter;
+    document.querySelectorAll('.cal-filter').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.filter === filter);
+    });
+    renderCalendar();
+    updateEventsForDate();
+}
+
+async function loadEvents(updatePanel = true) {
+    try {
+        events = [];
+
+        const startDate = new Date(currentYear, currentMonth - 1, 1);
+        const endDate = new Date(currentYear, currentMonth + 3, 0); // Last day of month+2
+
+        const startStr = formatLocalDate(startDate);
+        const endStr = formatLocalDate(endDate);
+
+        await loadHolidaysFromDatabase();
+
+        const googleResponse = await fetch(`/api/calendar/events?start=${startStr}&end=${endStr}`);
+        if (googleResponse.ok) {
+            const data = await googleResponse.json();
+            const googleEvents = (data.events || []).map(e => ({
+                ...e,
+                source: e.source || 'google',
+                account: e.calendar || 'Google'
+            }));
+            events = events.concat(googleEvents);
+        }
+
+        await loadCalDAVEvents(startStr, endStr);
+
+        await loadNexusCalendarEvents();
+
+        await loadLocalCalendarEvents();
+
+        const seen = new Map();
+        events = events.filter(e => {
+            const key = `${e.title.toLowerCase().trim()}|${e.start_date}`;
+            if (seen.has(key)) {
+                return false; // Skip duplicate
+            }
+            seen.set(key, true);
+            return true;
+        });
+
+        events.sort((a, b) => {
+            if (a.start_date !== b.start_date) return a.start_date.localeCompare(b.start_date);
+            return (a.start_time || '00:00').localeCompare(b.start_time || '00:00');
+        });
+
+        renderCalendar();
+        if (updatePanel) updateEventsForDate();
+    } catch (err) {
+        console.log('Calendar API not available:', err);
+    }
+}
+
+async function loadCalDAVEvents(startStr, endStr) {
+    try {
+        const response = await fetch(`/api/calendar/caldav/events?start=${startStr}&end=${endStr}`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (!data.success || !data.events) return;
+
+        events = events.concat(data.events);
+    } catch (err) {
+        console.log('CalDAV events not available:', err);
+    }
+}
+
+async function loadIServEvents() {
+    try {
+        const statusResponse = await fetch('/api/iserv/status');
+        if (!statusResponse.ok) return;
+
+        const status = await statusResponse.json();
+        if (!status.connected && !status.has_credentials) return;
+
+        if (!status.connected && status.has_credentials) {
+            await fetch('/api/iserv/connect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+        }
+
+        const eventsResponse = await fetch('/api/iserv/events');
+        if (!eventsResponse.ok) return;
+
+        const data = await eventsResponse.json();
+        if (!data.success) {
+            console.log('IServ events error:', data.error);
+            return;
+        }
+        if (!data.events || data.events.length === 0) return;
+
+        const iservEvents = data.events.map(e => {
+            let startDate = '', startTime = '', endDate = '', endTime = '';
+
+            const startField = e.start || e.startDate || e.dtstart || e.begin;
+            if (startField) {
+                if (typeof startField === 'string') {
+                    startDate = startField.split('T')[0] || startField.split(' ')[0] || '';
+                    if (startField.includes('T')) {
+                        startTime = startField.split('T')[1]?.substring(0, 5) || '';
+                    } else if (startField.includes(' ')) {
+                        startTime = startField.split(' ')[1]?.substring(0, 5) || '';
+                    }
+                } else if (startField.dateTime) {
+                    startDate = startField.dateTime.split('T')[0];
+                    startTime = startField.dateTime.split('T')[1]?.substring(0, 5) || '';
+                } else if (startField.date) {
+                    startDate = startField.date;
+                }
+            }
+
+            const endField = e.end || e.endDate || e.dtend || e.finish;
+            if (endField) {
+                if (typeof endField === 'string') {
+                    endDate = endField.split('T')[0] || endField.split(' ')[0] || '';
+                    if (endField.includes('T')) {
+                        endTime = endField.split('T')[1]?.substring(0, 5) || '';
+                    } else if (endField.includes(' ')) {
+                        endTime = endField.split(' ')[1]?.substring(0, 5) || '';
+                    }
+                } else if (endField.dateTime) {
+                    endDate = endField.dateTime.split('T')[0];
+                    endTime = endField.dateTime.split('T')[1]?.substring(0, 5) || '';
+                } else if (endField.date) {
+                    endDate = endField.date;
+                }
+            }
+
+            const title = e.title || e.summary || e.subject || e.name || 'Unbenannter Termin';
+
+            const calendarName = e.calendar || e.calendarName || e.source || 'IServ';
+
+            return {
+                id: `iserv_${e.id || e.uid || e.eventId || Math.random().toString(36).substr(2, 9)}`,
+                title: title,
+                start_date: startDate,
+                start_time: startTime,
+                end_date: endDate || startDate,
+                end_time: endTime,
+                location: e.location || e.place || '',
+                description: e.description || e.notes || e.body || '',
+                category: 'iserv',
+                calendar: calendarName,
+                calendar_color: e.color || e.backgroundColor || '#3498db',
+                source: 'iserv',
+                all_day: e.allDay || e.isAllDay || !startTime
+            };
+        }).filter(e => e.start_date); // Filter out events without valid dates
+
+        events = events.concat(iservEvents);
+        console.log(`Loaded ${iservEvents.length} events from IServ calendar`);
+    } catch (err) {
+        console.error('IServ calendar error:', err);
+    }
+}
+
+async function debugIServCalendar() {
+    try {
+        const statusRes = await fetch('/api/iserv/status');
+        const status = await statusRes.json();
+        console.log('IServ Status:', status);
+
+        if (status.connected || status.has_credentials) {
+            const eventsRes = await fetch('/api/iserv/events');
+            const events = await eventsRes.json();
+            console.log('IServ Events Response:', events);
+        }
+    } catch (e) {
+        console.error('Debug IServ failed:', e);
+    }
+}
+
+async function loadHolidaysFromDatabase() {
+    try {
+        const response = await fetch('/api/calendar/holidays');
+        if (!response.ok) return;
+
+        const data = await response.json();
+
+        if (data.needs_bundesland) {
+            checkAndShowBundeslandModal();
+            return;
+        }
+
+        if (!data.success || !data.holidays) return;
+
+        const holidays = data.holidays.map(h => {
+            const isFeiertag = h.type === 'feiertag';
+            return {
+                id: `${h.type}_${h.start}_${h.name.replace(/\s+/g, '_')}`,
+                title: h.name,
+                start_date: h.start,
+                end_date: h.end || h.start,
+                start_time: null,
+                all_day: true,
+                category: 'holiday',
+                source: 'holiday',
+                calendar: isFeiertag ? 'Feiertage' : 'Schulferien',
+                calendar_color: isFeiertag ? '#e74c3c' : '#718096'
+            };
+        });
+
+        events = events.concat(holidays);
+    } catch (err) {
+        console.log('Holidays not available:', err);
+    }
+}
+
+async function loadNexusCalendarEvents() {
+    try {
+        const response = await fetch('/api/hub/school/calendar');
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!data.events) return;
+
+        const nexusEvents = data.events.map(e => ({
+            id: `nexus_${e.id}`,
+            _rawId: e.id,
+            title: e.title || 'Unbenannt',
+            start_date: e.date || '',
+            start_time: e.time || null,
+            end_date: e.end_date || e.date || '',
+            end_time: e.end_time || null,
+            location: e.location || '',
+            description: e.description || '',
+            all_day: !e.time,
+            category: e.category || 'personal',
+            source: 'nexus',
+            calendar: 'Nexus',
+            calendar_color: '#6c63ff'
+        })).filter(e => e.start_date);
+
+        events = events.concat(nexusEvents);
+    } catch (err) {
+        console.log('Nexus calendar not available:', err);
+    }
+}
+
+async function loadLocalCalendarEvents() {
+    try {
+        const response = await fetch('/api/calendar/local');
+        if (!response.ok) {
+            if (response.status === 404) {
+                console.log('Local calendar not synced yet, triggering sync...');
+                await fetch('/api/calendar/local/sync', { method: 'POST' });
+                const retryResponse = await fetch('/api/calendar/local');
+                if (!retryResponse.ok) return;
+                const data = await retryResponse.json();
+                processLocalEvents(data);
+            }
+            return;
+        }
+
+        const data = await response.json();
+        processLocalEvents(data);
+    } catch (err) {
+        console.log('Local calendar not available:', err);
+    }
+}
+
+function processLocalEvents(data) {
+    if (!data.success || !data.events) return;
+
+    const localEvents = data.events.map(e => {
+        let startDate = '', startTime = '';
+
+        if (e.start) {
+            if (e.start.includes(' ')) {
+                const parts = e.start.split(' ');
+                startDate = parts[0];
+                startTime = parts[1]?.substring(0, 5) || '';
+            } else if (e.start.length === 10) {
+                startDate = e.start;
+            } else {
+                startDate = e.start.split('T')[0] || e.start;
+                startTime = e.start.split('T')[1]?.substring(0, 5) || '';
+            }
+        }
+
+        let endDate = '', endTime = '';
+        if (e.end) {
+            if (e.end.includes(' ')) {
+                const parts = e.end.split(' ');
+                endDate = parts[0];
+                endTime = parts[1]?.substring(0, 5) || '';
+            } else if (e.end.length === 10) {
+                endDate = e.end;
+            } else {
+                endDate = e.end.split('T')[0] || e.end;
+                endTime = e.end.split('T')[1]?.substring(0, 5) || '';
+            }
+        }
+
+        return {
+            id: `local_${e.title?.replace(/\s+/g, '_')}_${startDate}`,
+            title: e.title || 'Unbenannt',
+            start_date: startDate,
+            start_time: startTime || null,
+            end_date: endDate || startDate,
+            end_time: endTime || null,
+            location: e.location || '',
+            description: e.notes || '',
+            all_day: e.all_day || !startTime,
+            category: 'personal',
+            source: 'local',
+            calendar: 'Lokaler Kalender',
+            calendar_color: '#9f7aea'  // Purple for local events
+        };
+    }).filter(e => e.start_date);
+
+    events = events.concat(localEvents);
+}
+
+// Loaded calendar accounts for the "save to" selector
+let _calendarSelectorAccounts = null;
+
+async function populateCalendarSelector(preselect = null) {
+    const sel = document.getElementById('eventCalendarSource');
+    sel.innerHTML = '<option value="local">Nexus (Lokal)</option>';
+
+    if (!_calendarSelectorAccounts) {
+        _calendarSelectorAccounts = { google: [], caldav: [] };
+        try {
+            const r = await fetch('/api/email/google/accounts');
+            if (r.ok) {
+                const d = await r.json();
+                _calendarSelectorAccounts.google = d.accounts || [];
+            }
+        } catch (_) {}
+        try {
+            const r = await fetch('/api/calendar/caldav/accounts');
+            if (r.ok) {
+                const d = await r.json();
+                _calendarSelectorAccounts.caldav = d.accounts || [];
+            }
+        } catch (_) {}
+    }
+
+    if (_calendarSelectorAccounts.google.length > 0) {
+        const grp = document.createElement('optgroup');
+        grp.label = 'Google Kalender';
+        _calendarSelectorAccounts.google.forEach(acc => {
+            const o = document.createElement('option');
+            o.value = `google:primary:${acc.email}`;
+            o.textContent = `Google – ${acc.email}`;
+            grp.appendChild(o);
+        });
+        sel.appendChild(grp);
+    }
+
+    if (_calendarSelectorAccounts.caldav.length > 0) {
+        const grp = document.createElement('optgroup');
+        grp.label = 'CalDAV';
+        _calendarSelectorAccounts.caldav.forEach(acc => {
+            const calUrl = acc.calendars?.[0]?.url || '';
+            const o = document.createElement('option');
+            o.value = `caldav:${acc.id}:${calUrl}`;
+            o.textContent = acc.name || acc.username;
+            grp.appendChild(o);
+        });
+        sel.appendChild(grp);
+    }
+
+    if (preselect) sel.value = preselect;
+}
+
+function openAddEventModal() {
+    document.getElementById('eventForm').reset();
+    document.getElementById('eventId').value = '';
+    document.getElementById('eventSource').value = '';
+    document.getElementById('eventCalendarId').value = 'primary';
+    document.getElementById('eventModalTitle').textContent = 'Neuer Termin';
+    document.getElementById('deleteEventBtn').style.display = 'none';
+    document.getElementById('eventDate').value = formatLocalDate(selectedDate);
+    populateCalendarSelector('local');
+    openModal('eventModal');
+}
+
+function openEditEventModal(eventId) {
+    const ev = events.find(e => e.id === eventId);
+    if (!ev) return;
+
+    if (ev.source === 'iserv') {
+        showIServEventInfo(ev);
+        return;
+    }
+
+    if (ev.source === 'holiday' || ev.category === 'holiday') {
+        showToast(`Feiertage können nicht bearbeitet werden.`, 'info');
+        return;
+    }
+
+    // Determine which calendar source to pre-select
+    let sourceValue = 'local';
+    if (ev.source === 'google') {
+        sourceValue = `google:${ev.calendar_id || 'primary'}:${ev.account || ''}`;
+    } else if (ev.source === 'caldav') {
+        sourceValue = `caldav:${ev.account_id || ''}:`;
+    }
+
+    document.getElementById('eventId').value = ev.id;
+    document.getElementById('eventSource').value = ev.source || '';
+    document.getElementById('eventCalendarId').value = ev.calendar_id || 'primary';
+    document.getElementById('eventRecurringId').value = ev.recurring_event_id || '';
+    document.getElementById('eventTitle').value = ev.title;
+    document.getElementById('eventDate').value = ev.start_date;
+    document.getElementById('eventTime').value = ev.start_time || '';
+    document.getElementById('eventEndDate').value = ev.end_date || '';
+    document.getElementById('eventEndTime').value = ev.end_time || '';
+    document.getElementById('eventCategory').value = ev.category || 'personal';
+    document.getElementById('eventLocation').value = ev.location || '';
+    document.getElementById('eventDescription').value = ev.description || '';
+    document.getElementById('eventModalTitle').textContent = 'Termin bearbeiten';
+    document.getElementById('deleteEventBtn').style.display = 'block';
+
+    populateCalendarSelector(sourceValue);
+    openModal('eventModal');
+}
+
+function showIServEventInfo(ev) {
+    const timeDisplay = ev.start_time ? `${ev.start_time}${ev.end_time ? ' – ' + ev.end_time : ''}` : 'Ganztägig';
+    showToast(`IServ: ${ev.title} – ${ev.start_date} ${timeDisplay} (nur in IServ bearbeitbar)`, 'info');
+}
+
+async function saveEvent(e) {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const eventId = formData.get('id');
+    const source = document.getElementById('eventCalendarSource').value;
+
+    const title = formData.get('title');
+    const startDate = formData.get('start_date');
+    const startTime = formData.get('start_time') || null;
+    const endDate = formData.get('end_date') || null;
+    const endTime = formData.get('end_time') || null;
+    const category = formData.get('category');
+    const location = formData.get('location') || '';
+    const description = formData.get('description') || '';
+
+    let url, method, body;
+
+    if (source === 'local' || !source) {
+        // Save to Nexus local calendar — strip "nexus_" prefix for the API
+        const rawId = eventId ? eventId.replace(/^nexus_/, '') : null;
+        const isEdit = rawId && formData.get('event_source') === 'nexus';
+        url = isEdit ? `/api/hub/school/calendar/${rawId}` : '/api/hub/school/calendar';
+        method = isEdit ? 'PUT' : 'POST';
+        body = { title, date: startDate, time: startTime, end_date: endDate, end_time: endTime, category, description, location };
+
+    } else if (source.startsWith('google:')) {
+        const parts = source.split(':');
+        const calId = parts[1] || 'primary';
+        const account = parts.slice(2).join(':');
+        url = eventId ? `/api/calendar/events/${eventId}` : '/api/calendar/events';
+        method = eventId ? 'PUT' : 'POST';
+        body = { title, date: startDate, time: startTime, end_date: endDate, end_time: endTime, category, location, description, account, calendar_id: calId };
+
+    } else if (source.startsWith('caldav:')) {
+        const parts = source.split(':');
+        const accountId = parts[1];
+        const calUrl = parts.slice(2).join(':');
+        url = '/api/calendar/caldav/events';
+        method = 'POST';
+        body = { account_id: accountId, calendar_url: calUrl, title, start_date: startDate, start_time: startTime, end_date: endDate, end_time: endTime, description, location };
+    }
+
+    const saveBtn = e.target.querySelector('[type="submit"]');
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="btn-spinner"></span>Speichern…';
+    }
+
+    try {
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok && (data.success !== false)) {
+            closeModal('eventModal');
+            _calendarSelectorAccounts = null; // Reset cache so next open is fresh
+            // Slight delay so modal exit animation plays before list reloads
+            setTimeout(() => {
+                loadEvents();
+                showToast('Termin gespeichert', 'success');
+            }, 220);
+        } else {
+            showToast(data.error || `Fehler beim Speichern (${response.status})`, 'error');
+        }
+    } catch (err) {
+        showToast('Netzwerkfehler – bitte erneut versuchen', 'error');
+    } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = 'Speichern'; }
+    }
+}
+
+function deleteEvent() {
+    const eventId = document.getElementById('eventId').value;
+    const calendarId = document.getElementById('eventCalendarId').value || 'primary';
+    const recurringEventId = document.getElementById('eventRecurringId').value;
+
+    if (!eventId) return;
+
+    const isRecurring = !!recurringEventId;
+    const optionsDiv = document.getElementById('deleteEventOptions');
+    const messageEl = document.getElementById('deleteEventMessage');
+
+    if (isRecurring) {
+        messageEl.textContent = 'Dies ist ein wiederkehrender Termin. Was möchtest du tun?';
+        optionsDiv.innerHTML = `
+            <button class="btn-secondary" onclick="performDeleteEvent('${escapeHtml(String(eventId))}', '${escapeHtml(String(calendarId))}', false, '')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                </svg>
+                Nur dieses Mal löschen
+            </button>
+            <button class="btn-secondary btn-danger" onclick="performDeleteEvent('${escapeHtml(String(eventId))}', '${escapeHtml(String(calendarId))}', true, '${escapeHtml(String(recurringEventId))}')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Alle Wiederholungen löschen
+            </button>
+            <button class="btn-secondary" onclick="closeModal('deleteEventModal')">Abbrechen</button>
+        `;
+    } else {
+        messageEl.textContent = 'Möchtest du diesen Termin wirklich löschen?';
+        optionsDiv.innerHTML = `
+            <button class="btn-secondary btn-danger" onclick="performDeleteEvent('${escapeHtml(String(eventId))}', '${escapeHtml(String(calendarId))}', false, '')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Löschen
+            </button>
+            <button class="btn-secondary" onclick="closeModal('deleteEventModal')">Abbrechen</button>
+        `;
+    }
+
+    closeModal('eventModal');
+    openModal('deleteEventModal');
+}
+
+async function performDeleteEvent(eventId, calendarId, deleteAll, recurringEventId) {
+    // Detect Nexus local events by ID or source
+    const ev = events.find(e => e.id === eventId);
+    const isNexus = ev && (ev.source === 'nexus' || (ev.source !== 'google' && ev.source !== 'caldav' && ev.source !== 'iserv' && ev.source !== 'holiday' && ev.source !== 'local' && !ev.source?.includes('iserv')));
+
+    // Nexus local events: strip the "nexus_" prefix added during load
+    const rawId = isNexus ? eventId.replace(/^nexus_/, '') : eventId;
+
+    let url, method = 'DELETE';
+    if (isNexus) {
+        url = `/api/hub/school/calendar/${rawId}`;
+    } else {
+        const savedAccount = localStorage.getItem('nexus-google-calendar-account') || '';
+        url = `/api/calendar/events/${eventId}?account=${encodeURIComponent(savedAccount)}&calendar_id=${encodeURIComponent(calendarId)}`;
+        if (deleteAll && recurringEventId) {
+            url += `&delete_all=true&recurring_event_id=${encodeURIComponent(recurringEventId)}`;
+        }
+    }
+
+    // Animate the event card out before the API call
+    const card = document.querySelector(`.cal-event-card[data-event-id="${CSS.escape(eventId)}"]`);
+    if (card) {
+        card.classList.add('card-removing');
+    }
+
+    try {
+        const response = await fetch(url, { method });
+        if (response.ok) {
+            closeModal('deleteEventModal');
+            setTimeout(() => {
+                // Optimistically remove from local array so the panel updates instantly
+                events = events.filter(e => String(e.id) !== String(eventId));
+                renderCalendar();        // refresh grid dots
+                updateEventsForDate();   // show empty state immediately if no events left
+                loadEvents(false);       // sync with server silently (no second panel update)
+                showToast(deleteAll ? 'Alle Wiederholungen gelöscht' : 'Termin gelöscht', 'success');
+            }, card ? 320 : 0);
+        } else {
+            if (card) card.classList.remove('card-removing');
+            const d = await response.json().catch(() => ({}));
+            showToast(d.error || 'Fehler beim Löschen', 'error');
+        }
+    } catch (err) {
+        if (card) card.classList.remove('card-removing');
+        showToast('Netzwerkfehler – bitte erneut versuchen', 'error');
+    }
+}
+
+function showToast(message, type = 'info') {
+    const existingToast = document.querySelector('.toast-notification');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.className = `toast-notification toast-${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    // Auto-dismiss with fade-out
+    const timer = setTimeout(() => {
+        toast.classList.add('toast-hiding');
+        toast.addEventListener('animationend', () => toast.remove(), { once: true });
+    }, 2800);
+
+    toast.addEventListener('click', () => {
+        clearTimeout(timer);
+        toast.classList.add('toast-hiding');
+        toast.addEventListener('animationend', () => toast.remove(), { once: true });
+    });
+}
+
+function openModal(id) {
+    const modal = document.getElementById(id);
+    modal.classList.remove('modal-closing');
+    modal.classList.add('active');
+}
+
+function closeModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal.classList.contains('active')) return;
+    modal.classList.add('modal-closing');
+    modal.addEventListener('animationend', () => {
+        modal.classList.remove('active', 'modal-closing');
+    }, { once: true });
+}
+
+let currentUserLocation = null;
+let currentRouteEvent = null;
+
+function openRouteModal(eventId) {
+    const ev = events.find(e => e.id === eventId);
+    if (!ev || !ev.location) return;
+
+    currentRouteEvent = ev;
+
+    const eventStart = ev.start_time || 'Ganztägig';
+    document.getElementById('routeEventInfo').innerHTML = `
+        <div class="route-event-card">
+            <div class="route-event-title">${escapeHtml(ev.title)}</div>
+            <div class="route-event-details">
+                <span>📅 ${ev.start_date} ${eventStart}</span>
+                <span>📍 ${escapeHtml(ev.location)}</span>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('routeModalTitle').textContent = `Route zu: ${ev.title}`;
+    document.getElementById('routeResults').innerHTML = '<div class="empty-state"><span>Warte auf Standort...</span></div>';
+
+    openModal('routeModal');
+
+    getUserLocation();
+}
+
+function getUserLocation() {
+    const statusEl = document.getElementById('locationStatus');
+
+    if (!navigator.geolocation) {
+        statusEl.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+            </svg>
+            <span style="color: var(--error)">Standortermittlung nicht unterstützt</span>
+        `;
+        return;
+    }
+
+    statusEl.innerHTML = `
+        <svg class="spinner" width="16" height="16" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" opacity="0.3"/>
+            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="2" fill="none"/>
+        </svg>
+        <span>Standort wird ermittelt...</span>
+    `;
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            currentUserLocation = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                name: 'Aktueller Standort'
+            };
+
+            statusEl.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                <span style="color: var(--success)">Standort gefunden</span>
+            `;
+
+            getRouteToEvent();
+        },
+        (error) => {
+            let errorMsg = 'Standort konnte nicht ermittelt werden';
+            if (error.code === 1) errorMsg = 'Standortzugriff verweigert';
+            if (error.code === 2) errorMsg = 'Standort nicht verfügbar';
+            if (error.code === 3) errorMsg = 'Zeitüberschreitung';
+
+            statusEl.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <span style="color: var(--warning)">${errorMsg}</span>
+                <button class="btn-secondary small" onclick="enterManualLocation()" style="margin-left: 10px">Manuell eingeben</button>
+            `;
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+}
+
+function enterManualLocation() {
+    const address = prompt('Gib deinen Startort ein (z.B. Straße, Ort):');
+    if (!address) return;
+
+    document.getElementById('locationStatus').innerHTML = `
+        <svg class="spinner" width="16" height="16" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" opacity="0.3"/>
+            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="2" fill="none"/>
+        </svg>
+        <span>Suche Adresse...</span>
+    `;
+
+    searchAndSetLocation(address);
+}
+
+async function searchAndSetLocation(query) {
+    try {
+        const response = await fetch(`/api/vbb/search?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+
+        if (data.success && data.locations && data.locations.length > 0) {
+            const loc = data.locations[0];
+            currentUserLocation = {
+                id: loc.id,
+                latitude: loc.latitude,
+                longitude: loc.longitude,
+                name: loc.name
+            };
+
+            document.getElementById('locationStatus').innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                <span style="color: var(--success)">Start: ${escapeHtml(loc.name)}</span>
+            `;
+
+            getRouteToEvent();
+        } else {
+            document.getElementById('locationStatus').innerHTML = `
+                <span style="color: var(--error)">Adresse nicht gefunden</span>
+                <button class="btn-secondary small" onclick="enterManualLocation()" style="margin-left: 10px">Erneut versuchen</button>
+            `;
+        }
+    } catch (err) {
+        console.error('Location search error:', err);
+    }
+}
+
+async function getRouteToEvent() {
+    if (!currentUserLocation || !currentRouteEvent) return;
+
+    const resultsEl = document.getElementById('routeResults');
+    resultsEl.innerHTML = `
+        <div class="loading-routes">
+            <svg class="spinner" width="24" height="24" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" opacity="0.3"/>
+                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="2" fill="none"/>
+            </svg>
+            <span>Suche Verbindungen...</span>
+        </div>
+    `;
+
+    try {
+        let eventStart = currentRouteEvent.start_date;
+        if (currentRouteEvent.start_time) {
+            eventStart += 'T' + currentRouteEvent.start_time + ':00';
+        } else {
+            eventStart += 'T09:00:00';
+        }
+
+        const response = await fetch('/api/vbb/route-to-event', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                event: {
+                    title: currentRouteEvent.title,
+                    start: eventStart,
+                    location: currentRouteEvent.location
+                },
+                current_location: currentUserLocation,
+                buffer_minutes: 15
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.routes && data.routes.length > 0) {
+            renderRouteResults(data);
+        } else {
+            resultsEl.innerHTML = `
+                <div class="empty-state">
+                    <span>${data.error || 'Keine Verbindungen gefunden'}</span>
+                </div>
+            `;
+        }
+    } catch (err) {
+        console.error('Route error:', err);
+        resultsEl.innerHTML = `
+            <div class="empty-state">
+                <span>Fehler beim Laden der Verbindungen</span>
+            </div>
+        `;
+    }
+}
+
+function renderRouteResults(data) {
+    const resultsEl = document.getElementById('routeResults');
+
+    const routesHtml = data.routes.map((route, idx) => {
+        const departureTime = route.departure ? new Date(route.departure).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+        const arrivalTime = route.arrival ? new Date(route.arrival).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+
+        const legsHtml = route.legs.map(leg => {
+            if (leg.type === 'walk') {
+                const walkInfo = leg.distance ? `${leg.distance}m` : `${leg.duration} Min.`;
+                return `<div class="route-leg walk">
+                    <span class="leg-icon">🚶</span>
+                    <span class="leg-info">${walkInfo} zu Fuß</span>
+                </div>`;
+            } else {
+                const line = leg.line || {};
+                const productEmoji = getProductEmoji(line.product);
+                const delayBadge = leg.departure?.delay > 0 ?
+                    `<span class="delay-badge">+${leg.departure.delay}</span>` : '';
+
+                return `<div class="route-leg transit">
+                    <span class="leg-icon">${productEmoji}</span>
+                    <div class="leg-details">
+                        <div class="leg-line">${escapeHtml(line.name || 'Linie')} ${delayBadge}</div>
+                        <div class="leg-stations">${escapeHtml(leg.departure?.station || '')} → ${escapeHtml(leg.arrival?.station || '')}</div>
+                        ${leg.departure?.platform ? `<div class="leg-platform">Gleis ${escapeHtml(String(leg.departure.platform))}</div>` : ''}
+                    </div>
+                </div>`;
+            }
+        }).join('<div class="leg-connector">→</div>');
+
+        const delayWarning = route.has_delay ?
+            `<div class="route-delay-warning">⚠️ Verspätung: +${route.max_delay} Min.</div>` : '';
+
+        return `
+            <div class="route-option ${idx === 0 ? 'recommended' : ''}">
+                ${idx === 0 ? '<div class="route-badge">Empfohlen</div>' : ''}
+                <div class="route-header">
+                    <div class="route-times">
+                        <span class="route-departure">${departureTime}</span>
+                        <span class="route-arrow">→</span>
+                        <span class="route-arrival">${arrivalTime}</span>
+                    </div>
+                    <div class="route-meta">
+                        <span class="route-duration">⏱️ ${route.duration} Min.</span>
+                        ${route.transfers > 0 ? `<span class="route-transfers">🔄 ${route.transfers} Umstieg${route.transfers > 1 ? 'e' : ''}</span>` : ''}
+                    </div>
+                </div>
+                ${delayWarning}
+                <div class="route-legs">${legsHtml}</div>
+            </div>
+        `;
+    }).join('');
+
+    resultsEl.innerHTML = `
+        <div class="route-destination">
+            <strong>Ziel:</strong> ${escapeHtml(data.to)}
+        </div>
+        ${routesHtml}
+    `;
+}
+
+function getProductEmoji(product) {
+    const emojis = {
+        'suburban': '🚆',  // S-Bahn
+        'subway': '🚇',    // U-Bahn
+        'tram': '🚊',
+        'bus': '🚌',
+        'ferry': '⛴️',
+        'express': '🚄',
+        'regional': '🚂'
+    };
+    return emojis[product] || '🚃';
+}
+
+function openAddCalendarAccountModal() {
+    document.getElementById('addCalendarAccountForm').reset();
+    document.getElementById('calAccountError').style.display = 'none';
+    updateCalendarProviderFields();
+    openModal('addCalendarAccountModal');
+}
+
+function updateCalendarProviderFields() {
+    const provider = document.getElementById('calAccountProvider').value;
+    const urlGroup = document.getElementById('calAccountUrlGroup');
+    const hint = document.getElementById('calAccountHint');
+
+    const hints = {
+        'samsung': 'Samsung: Verwende dein Samsung-Konto und Passwort.',
+        'icloud': 'iCloud: Verwende deine Apple-ID und ein App-spezifisches Passwort.',
+        'caldav': 'Gib die CalDAV-URL deines Kalender-Anbieters ein.'
+    };
+
+    hint.textContent = hints[provider] || '';
+    urlGroup.style.display = provider === 'caldav' ? 'block' : 'none';
+}
+
+async function addCalendarAccount(e) {
+    e.preventDefault();
+    const form = e.target;
+    const errorEl = document.getElementById('calAccountError');
+
+    const data = {
+        provider: form.provider.value,
+        name: form.name.value,
+        username: form.username.value,
+        password: form.password.value,
+        url: form.url?.value || ''
+    };
+
+    try {
+        const response = await fetch('/api/calendar/caldav/accounts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            closeModal('addCalendarAccountModal');
+            _calendarSelectorAccounts = null; // Invalidate cache
+            loadCalendarAccounts();
+            loadEvents();
+        } else {
+            errorEl.textContent = result.error || 'Verbindung fehlgeschlagen';
+            errorEl.style.display = 'block';
+        }
+    } catch (err) {
+        errorEl.textContent = 'Netzwerkfehler. Bitte versuche es erneut.';
+        errorEl.style.display = 'block';
+    }
+}
+
+async function loadCalendarAccounts() {
+    const select = document.getElementById('calendarAccountSelect');
+    const savedFilter = localStorage.getItem('nexus-calendar-filter') || 'all';
+
+    select.innerHTML = '<option value="all">Alle Kalender</option>';
+
+    const sourcesGroup = document.createElement('optgroup');
+    sourcesGroup.label = 'Quellen';
+
+    const sourceOptions = [
+        { value: 'google', label: 'Google' },
+        { value: 'iserv', label: 'IServ' },
+        { value: 'holiday', label: 'Feiertage & Ferien' },
+        { value: 'nexus', label: 'Nexus (Lokal)' },
+        { value: 'local', label: 'macOS Kalender' }
+    ];
+
+    sourceOptions.forEach(src => {
+        const option = document.createElement('option');
+        option.value = src.value;
+        option.textContent = src.label;
+        option.selected = src.value === savedFilter;
+        sourcesGroup.appendChild(option);
+    });
+    select.appendChild(sourcesGroup);
+
+    try {
+        const googleResponse = await fetch('/api/email/google/accounts');
+        if (googleResponse.ok) {
+            const googleData = await googleResponse.json();
+            if (googleData.accounts && googleData.accounts.length > 0) {
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = 'Google Konten';
+                googleData.accounts.forEach(acc => {
+                    const option = document.createElement('option');
+                    option.value = acc.email;
+                    option.textContent = acc.email;
+                    option.selected = acc.email === savedFilter;
+                    optgroup.appendChild(option);
+                });
+                select.appendChild(optgroup);
+            }
+        }
+    } catch (err) {}
+
+    try {
+        const caldavResponse = await fetch('/api/calendar/caldav/accounts');
+        if (caldavResponse.ok) {
+            const caldavData = await caldavResponse.json();
+            if (caldavData.accounts && caldavData.accounts.length > 0) {
+                const providerGroups = {};
+
+                caldavData.accounts.forEach(acc => {
+                    const provider = acc.provider || 'caldav';
+                    if (!providerGroups[provider]) {
+                        providerGroups[provider] = [];
+                    }
+                    providerGroups[provider].push(acc);
+                });
+
+                const providerLabels = {
+                    'samsung': 'Samsung',
+                    'icloud': 'iCloud',
+                    'caldav': 'CalDAV'
+                };
+
+                Object.keys(providerGroups).forEach(provider => {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = providerLabels[provider] || provider;
+                    providerGroups[provider].forEach(acc => {
+                        const option = document.createElement('option');
+                        option.value = `caldav:${acc.id}`;
+                        option.textContent = acc.name;
+                        option.selected = `caldav:${acc.id}` === savedFilter;
+                        optgroup.appendChild(option);
+                    });
+                    select.appendChild(optgroup);
+                });
+            }
+        }
+    } catch (err) {}
+
+    accountFilter = savedFilter;
+    select.value = savedFilter;
+
+    select.onchange = function() {
+        accountFilter = this.value;
+        localStorage.setItem('nexus-calendar-filter', this.value);
+        renderCalendar();
+        updateEventsForDate();
+    };
+}
+</script>
+
+<style>
+/* ========== CALENDAR SOURCE SELECTOR ========== */
+#eventCalendarSource {
+    background: var(--bg-secondary);
+    border: 1.5px solid var(--accent);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    padding: 9px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    width: 100%;
+    cursor: pointer;
+}
+#eventCalendarSource optgroup {
+    color: var(--text-muted);
+    font-weight: 700;
+    font-size: 11px;
+}
+#eventCalendarSource option {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+}
+
+/* ========== PAGE HEADER ========== */
+.cal-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--card-border);
+    position: relative;
+}
+.cal-page-header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 120px;
+    height: 2px;
+    background: var(--accent-gradient);
+    border-radius: 1px;
+}
+.cal-header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.cal-header-icon {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-gradient);
+    border-radius: var(--radius-sm);
+    color: white;
+    box-shadow: 0 4px 14px rgba(102, 126, 234, 0.3);
+}
+.cal-title {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+}
+.cal-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+/* ========== FILTER CHIPS ========== */
+.cal-filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+}
+.cal-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 18px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+.cal-filter:hover {
+    border-color: rgba(102, 126, 234, 0.3);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+.cal-filter.active {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.15));
+    border-color: rgba(102, 126, 234, 0.4);
+    color: var(--accent);
+    box-shadow: 0 2px 12px rgba(102, 126, 234, 0.15);
+}
+.cal-filter-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.cal-filter.active .cal-filter-dot {
+    box-shadow: 0 0 6px currentColor;
+}
+
+/* ========== LAYOUT ========== */
+.calendar-layout {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 20px;
+    align-items: start;
+}
+.calendar-widget {
+    padding: 24px;
+}
+.events-widget {
+    padding: 22px;
+    max-height: 650px;
+    overflow-y: auto;
+}
+.events-widget::-webkit-scrollbar {
+    width: 4px;
+}
+.events-widget::-webkit-scrollbar-track {
+    background: transparent;
+}
+.events-widget::-webkit-scrollbar-thumb {
+    background: var(--card-border);
+    border-radius: 2px;
+}
+
+/* ========== MONTH NAVIGATION ========== */
+.cal-month-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 22px;
+}
+.cal-month-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.cal-nav-btn {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--card-border);
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+}
+.cal-nav-btn:hover {
+    background: var(--accent-gradient);
+    color: white;
+    border-color: transparent;
+    transform: scale(1.1);
+    box-shadow: 0 3px 12px rgba(102, 126, 234, 0.3);
+}
+.cal-nav-btn:active {
+    transform: scale(0.92);
+}
+.cal-month-label {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-primary);
+    min-width: 160px;
+    text-align: center;
+    letter-spacing: -0.3px;
+}
+.cal-today-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+.cal-today-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-light);
+}
+
+/* ========== WEEKDAY HEADERS ========== */
+.calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 6px;
+}
+.calendar-weekdays span {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    padding: 8px 0 6px;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid transparent;
+    transition: all var(--transition-fast);
+}
+.calendar-weekdays span.weekend {
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+.calendar-weekdays span.current-day {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+/* ========== DAY CELLS ========== */
+.calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+.day-cell {
+    min-height: 82px;
+    padding: 5px;
+    background: var(--bg-tertiary);
+    border: 1.5px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+.day-cell:hover {
+    border-color: var(--accent);
+    background: var(--bg-secondary);
+    transform: scale(1.03);
+    z-index: 2;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+.day-cell.empty {
+    background: transparent;
+    border-color: transparent;
+    cursor: default;
+    min-height: 0;
+}
+.day-cell.empty:hover {
+    transform: none;
+    box-shadow: none;
+}
+.day-cell.weekend {
+    background: color-mix(in srgb, var(--bg-tertiary) 80%, transparent);
+}
+.day-cell.weekend .day-number {
+    opacity: 0.6;
+}
+
+/* Today */
+.day-cell.today {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.12), rgba(118, 75, 162, 0.08));
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 4px 20px rgba(102, 126, 234, 0.2);
+}
+.day-cell.today:hover {
+    box-shadow: 0 0 0 1px var(--accent), 0 6px 24px rgba(102, 126, 234, 0.3);
+}
+.day-cell.today .day-number {
+    background: var(--accent-gradient);
+    color: white;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    opacity: 1;
+}
+
+/* Selected */
+.day-cell.selected {
+    border-color: var(--accent);
+    background: var(--accent-light);
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.25);
+}
+.day-cell.selected:not(.today) .day-number {
+    color: var(--accent);
+    font-weight: 700;
+}
+
+.day-number {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 3px;
+    line-height: 1;
+}
+.day-events {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+}
+.event-preview {
+    font-size: 9px;
+    font-weight: 600;
+    color: white;
+    padding: 2px 5px;
+    border-radius: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+    letter-spacing: 0.1px;
+}
+.event-more {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 600;
+    padding: 1px 5px;
+}
+
+/* ========== EVENTS PANEL ========== */
+.cal-events-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--card-border);
+}
+.cal-events-date {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.3px;
+}
+.cal-events-badge {
+    padding: 4px 12px;
+    background: var(--accent-light);
+    color: var(--accent);
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Event Cards */
+.cal-event-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    border-left: 4px solid var(--accent);
+    cursor: pointer;
+    margin-bottom: 10px;
+    transition: all var(--transition-fast);
+    position: relative;
+    overflow: hidden;
+    animation: calEventSlideIn 0.3s ease both;
+}
+@keyframes calEventSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+.cal-event-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent-gradient);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+    z-index: 0;
+}
+.cal-event-card:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    border-color: transparent;
+}
+.cal-event-card:hover::before {
+    opacity: 1;
+}
+.cal-event-card:hover .cal-event-time,
+.cal-event-card:hover .cal-event-title,
+.cal-event-card:hover .cal-event-location,
+.cal-event-card:hover .cal-event-tag {
+    color: white;
+    position: relative;
+    z-index: 1;
+}
+.cal-event-card:hover .cal-event-location svg {
+    stroke: white;
+}
+.cal-event-card:hover .cal-route-btn {
+    position: relative;
+    z-index: 1;
+    background: rgba(255,255,255,0.2);
+    border-color: rgba(255,255,255,0.3);
+    color: white;
+}
+.cal-event-card:hover .cal-event-tag {
+    background: rgba(255,255,255,0.2) !important;
+}
+
+/* Category borders */
+.cal-event-card.category-school { border-left-color: #667eea; }
+.cal-event-card.category-training { border-left-color: #48bb78; }
+.cal-event-card.category-personal { border-left-color: #9f7aea; }
+.cal-event-card.category-work { border-left-color: #ed8936; }
+.cal-event-card.category-iserv { border-left-color: #3498db; }
+.cal-event-card.category-holiday { border-left-color: #e74c3c; }
+
+.cal-event-time {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 58px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+}
+.cal-event-time.all-day {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+.cal-event-body {
+    flex: 1;
+    min-width: 0;
+    position: relative;
+    z-index: 1;
+}
+.cal-event-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cal-event-location {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 3px;
+}
+.cal-event-location svg {
+    flex-shrink: 0;
+    stroke: var(--text-muted);
+    transition: stroke var(--transition-fast);
+}
+.cal-event-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+}
+.cal-route-btn {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-light);
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--accent);
+    transition: all var(--transition-fast);
+}
+.cal-route-btn:hover {
+    background: var(--accent);
+    color: white;
+    transform: scale(1.1);
+    box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
+}
+.cal-event-tag {
+    padding: 3px 10px;
+    background: color-mix(in srgb, var(--tag-color, var(--accent)) 12%, transparent);
+    color: var(--tag-color, var(--accent));
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: all var(--transition-fast);
+}
+
+/* Empty State */
+.cal-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 20px;
+    gap: 12px;
+    text-align: center;
+}
+.cal-empty-icon {
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-light);
+    border-radius: 50%;
+    color: var(--accent);
+    opacity: 0.6;
+}
+.cal-empty-state span {
+    font-size: 14px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 900px) {
+    .calendar-layout {
+        grid-template-columns: 1fr;
+    }
+    .cal-page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 14px;
+    }
+    .day-cell {
+        min-height: 60px;
+        padding: 3px;
+    }
+    .event-preview {
+        font-size: 8px;
+        padding: 1px 3px;
+    }
+}
+
+/* Route Modal Styles */
+.modal-large {
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.route-content {
+    padding: 0;
+}
+
+.route-info {
+    padding: 16px 20px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--card-border);
+}
+
+.route-event-card {
+    margin-bottom: 12px;
+}
+
+.route-event-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.route-event-details {
+    display: flex;
+    gap: 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.route-location-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.route-results {
+    padding: 16px 20px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.route-destination {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.route-option {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    margin-bottom: 12px;
+    position: relative;
+}
+
+.route-option.recommended {
+    border-color: var(--accent);
+}
+
+.route-badge {
+    position: absolute;
+    top: -10px;
+    right: 16px;
+    background: var(--accent);
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.route-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.route-times {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.route-departure, .route-arrival {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.route-arrow {
+    color: var(--text-muted);
+}
+
+.route-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.route-delay-warning {
+    background: rgba(237, 137, 54, 0.1);
+    color: #ed8936;
+    padding: 6px 10px;
+    border-radius: var(--radius-xs);
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 12px;
+}
+
+.route-legs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.route-leg {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-xs);
+    font-size: 12px;
+}
+
+.route-leg.walk {
+    background: rgba(107, 114, 128, 0.1);
+}
+
+.route-leg.transit {
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.leg-icon {
+    font-size: 16px;
+}
+
+.leg-details {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.leg-line {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.leg-stations {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.leg-platform {
+    font-size: 10px;
+    color: var(--accent);
+}
+
+.leg-connector {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.delay-badge {
+    background: #ed8936;
+    color: white;
+    font-size: 10px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    margin-left: 4px;
+}
+
+.loading-routes {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 40px;
+    color: var(--text-muted);
+}
+
+/* Spinner animation */
+.spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@media (max-width: 900px) {
+    .calendar-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Bundesland Selection Grid */
+.bundesland-wizard-content {
+    padding: 10px 0;
+}
+
+.bundesland-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin: 20px 0;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+.bundesland-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 10px;
+    background: var(--glass-bg);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    min-height: 80px;
+}
+
+.bundesland-card:hover {
+    border-color: var(--accent);
+    background: var(--accent-light);
+}
+
+.bundesland-card.selected {
+    border-color: var(--accent);
+    background: var(--accent-light);
+    box-shadow: 0 0 0 2px var(--accent);
+}
+
+.bundesland-code {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+}
+
+.bundesland-name {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.2;
+}
+
+.bundesland-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.import-progress-container {
+    width: 100%;
+    max-width: 300px;
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 10px 0;
+}
+
+.import-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), #764ba2);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.import-progress-text {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+    .bundesland-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .bundesland-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Delete event options */
+.delete-event-body {
+    padding: 16px 0;
+}
+
+.delete-event-body p {
+    margin-bottom: 20px;
+    color: var(--text-secondary);
+}
+
+.delete-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.delete-options button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    justify-content: flex-start;
+    width: 100%;
+}
+
+.delete-options button svg {
+    flex-shrink: 0;
+}
+
+/* ========== CALENDAR GRID: FIXED HEIGHT (always 6 rows × 82px) ========== */
+/* Every cell — empty or not — is exactly 82px. Using height+max-height (not just
+   min-height) so that nothing can collapse or expand the row, ever. */
+.calendar-days {
+    grid-auto-rows: 82px;
+}
+.day-cell {
+    height: 82px !important;
+    max-height: 82px !important;
+    min-height: unset !important;
+    overflow: hidden;
+}
+/* Keep empty/filler cells invisible but still full-height */
+.day-cell.empty {
+    height: 82px !important;
+    min-height: unset !important;
+}
+.day-cell.filler {
+    background: transparent !important;
+    border-color: transparent !important;
+    cursor: default !important;
+    pointer-events: none;
+}
+
+/* ========== MONTH FADE ANIMATIONS (no translateX = no layout shift ever) ========== */
+@keyframes monthFadeOut {
+    from { opacity: 1; transform: scale(1); }
+    to   { opacity: 0; transform: scale(0.97); }
+}
+@keyframes monthFadeIn {
+    from { opacity: 0; transform: scale(1.02); }
+    to   { opacity: 1; transform: scale(1); }
+}
+/* Use same keyframes for left/right — direction is conveyed by the month label */
+.calendar-days.slide-out-left,
+.calendar-days.slide-out-right  { animation: monthFadeOut 0.16s ease-in both; }
+.calendar-days.slide-in-from-right,
+.calendar-days.slide-in-from-left { animation: monthFadeIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* ========== MONTH LABEL TRANSITION ========== */
+@keyframes monthLabelOutLeft  { from { opacity:1; transform:translateX(0);    } to { opacity:0; transform:translateX(-14px); } }
+@keyframes monthLabelOutRight { from { opacity:1; transform:translateX(0);    } to { opacity:0; transform:translateX(14px);  } }
+@keyframes monthLabelInRight  { from { opacity:0; transform:translateX(14px); } to { opacity:1; transform:translateX(0);     } }
+@keyframes monthLabelInLeft   { from { opacity:0; transform:translateX(-14px);} to { opacity:1; transform:translateX(0);     } }
+.cal-month-label { transition: none; }
+.cal-month-label.month-label-changing-fwd { animation: monthLabelOutLeft  0.12s ease-in both; }
+.cal-month-label.month-label-changing-bwd { animation: monthLabelOutRight 0.12s ease-in both; }
+.cal-month-label.month-label-appear-fwd   { animation: monthLabelInRight  0.18s ease-out both; }
+.cal-month-label.month-label-appear-bwd   { animation: monthLabelInLeft   0.18s ease-out both; }
+
+/* ========== DAY CELL PULSE ON SELECT ========== */
+@keyframes dayPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.5); }
+    60%  { box-shadow: 0 0 0 8px rgba(102, 126, 234, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0); }
+}
+.day-cell.day-pulse {
+    animation: dayPulse 0.45s ease-out forwards;
+}
+
+/* ========== MODAL CLOSE ANIMATION ========== */
+@keyframes modalContentClose {
+    from { transform: scale(1);    opacity: 1; }
+    to   { transform: scale(0.88) translateY(20px); opacity: 0; }
+}
+@keyframes modalBackdropClose {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+}
+.modal.modal-closing {
+    animation: modalBackdropClose 0.24s ease-in forwards;
+    pointer-events: none;
+}
+.modal.modal-closing .modal-content {
+    animation: modalContentClose 0.24s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* ========== EVENT CARD DELETE ANIMATION ========== */
+@keyframes cardSlideOut {
+    0%   { opacity: 1; transform: translateX(0); max-height: 100px; margin-bottom: 10px; padding-top: 14px; padding-bottom: 14px; }
+    40%  { opacity: 0.4; transform: translateX(24px); }
+    100% { opacity: 0; transform: translateX(40px); max-height: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; }
+}
+.cal-event-card.card-removing {
+    animation: cardSlideOut 0.32s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+/* ========== SAVE BUTTON SPINNER ========== */
+.btn-spinner {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    border: 2px solid rgba(255,255,255,0.35);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.65s linear infinite;
+    margin-right: 7px;
+    vertical-align: middle;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ========== TOAST NOTIFICATION ========== */
+@keyframes slideUp {
+    from { opacity: 0; transform: translate(-50%, 20px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes slideDown {
+    from { opacity: 1; transform: translate(-50%, 0); }
+    to   { opacity: 0; transform: translate(-50%, 12px); }
+}
+.toast-notification {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    padding: 12px 22px;
+    border-radius: 10px;
+    font-weight: 500;
+    font-size: 14px;
+    z-index: 10000;
+    animation: slideUp 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    cursor: pointer;
+    white-space: nowrap;
+    max-width: 90vw;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+.toast-notification.toast-hiding {
+    animation: slideDown 0.22s ease-in forwards;
+}
+.toast-success { background: linear-gradient(135deg, #22c55e, #16a34a); }
+.toast-error   { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.toast-info    { background: linear-gradient(135deg, #667eea, #764ba2); }
+
+/* ========== EVENT CARD STAGGER (refined) ========== */
+.cal-event-card {
+    animation: calEventSlideIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes calEventSlideIn {
+    from { opacity: 0; transform: translateY(12px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ========== EMPTY STATE ENTRANCE ========== */
+@keyframes emptyStateIn {
+    0%   { opacity: 0; transform: scale(0.88) translateY(16px); }
+    70%  { transform: scale(1.03) translateY(-3px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.cal-empty-state {
+    animation: emptyStateIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* ========== EVENT PANEL CONTENT CROSS-FADE ========== */
+.events-content-leaving {
+    opacity: 0;
+    transform: translateY(5px) scale(0.98);
+    transition: opacity 0.13s ease-in, transform 0.13s ease-in;
+}
+.events-content-entering {
+    opacity: 0;
+    transform: translateY(-6px);
+}
+#eventsList {
+    transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+}
+
+/* ========== PANEL HEADER CROSS-FADE ========== */
+@keyframes headerFadeOut {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(-6px); }
+}
+@keyframes headerFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.panel-header-updating { animation: headerFadeOut 0.1s ease-in both; }
+.panel-header-updated  { animation: headerFadeIn  0.18s ease-out both; }
+
+/* ========== BADGE POP ========== */
+@keyframes badgePop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.25); }
+    100% { transform: scale(1); }
+}
+.badge-pop { animation: badgePop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* ========== EVENT DOT ENTRANCE IN MONTH GRID ========== */
+@keyframes dotPop {
+    0%   { opacity: 0; transform: scaleX(0.4); }
+    60%  { transform: scaleX(1.08); }
+    100% { opacity: 1; transform: scaleX(1); }
+}
+.event-preview {
+    animation: dotPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    transform-origin: left center;
+}
+</style>
+{% endblock %}
