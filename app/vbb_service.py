@@ -712,8 +712,6 @@ class VBBService:
                 response = self._api_get('/journeys', params, timeout=15)
                 data = response.json()
             except requests.RequestException:
-                # ID-based lookup failed on all APIs (IDs from one API may not
-                # work on the other).  Retry with coordinates if available.
                 has_coords = (
                     from_location.get('latitude') and from_location.get('longitude')
                     and to_location.get('latitude') and to_location.get('longitude')

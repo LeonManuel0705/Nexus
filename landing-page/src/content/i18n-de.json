@@ -200,7 +200,7 @@
     "macos_copy": "Kopieren",
     "macos_install_hint": "Oder: In Terminal einfügen — installiert automatisch.",
     "btn_windows": "ZIP herunterladen",
-    "req_windows": "Windows 10+, Python 3.9+",
+    "req_windows": "Windows 10+",
     "desc_windows": "Desktop App für Windows. Entpacken und starten.",
     "windows_hint": "Entpacken → Nexus.bat doppelklicken",
     "btn_linux": "ZIP herunterladen",

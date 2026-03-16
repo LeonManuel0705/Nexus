@@ -17,7 +17,6 @@ const NexusConnection = {
 
         this.loadCachedState();
 
-        // Fast path: if browser says offline, skip all network probes
         if (!navigator.onLine) {
             this.state.internetAvailable = false;
             this.state.iservAvailable = false;
@@ -32,7 +31,6 @@ const NexusConnection = {
 
         if (isInitialLoad || !this.state.lastCheck) {
             sessionStorage.setItem(this.SESSION_KEY, 'true');
-            // Run connectivity check in background — don't block page render
             this.checkConnectivity().then(() => {
                 window.dispatchEvent(new CustomEvent('nexus-connection-ready', {
                     detail: this.state
