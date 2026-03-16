@@ -1,0 +1,2733 @@
+{% extends "hub/base.html" %}
+{% set active_tab = 'assistant' %}
+
+{% block title %}Assistent - Nexus{% endblock %}
+
+{% block content %}
+<div class="page-container assistant-page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Nexus Assistent</h1>
+            <p class="page-subtitle" id="assistantStatus">Offline-Modus aktiv</p>
+        </div>
+        <div class="page-actions">
+            <button class="btn-secondary small" onclick="clearChat()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Chat leeren
+            </button>
+        </div>
+    </div>
+
+    <div class="chat-container glass-card">
+        <div class="chat-messages" id="chatMessages">
+            <div class="message assistant">
+                <div class="message-avatar">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                </div>
+                <div class="message-content">
+                    <p>Hallo! Ich bin dein Nexus Assistent. Ich kann dir bei Fragen zu deinem Stundenplan, Hausaufgaben, Klausuren und mehr helfen.</p>
+                    <p style="margin-top: 8px; font-size: 13px; color: var(--text-muted);">Frag mich zum Beispiel:</p>
+                    <ul class="suggestion-list">
+                        <li onclick="sendSuggestion('Was habe ich heute?')">Was habe ich heute?</li>
+                        <li onclick="sendSuggestion('Löse x² - 5x + 6 = 0')">Mathe lösen</li>
+                        <li onclick="sendSuggestion('Schreibe eine Erörterung über Klimawandel')">Essay schreiben</li>
+                        <li onclick="sendSuggestion('Fasse den Text zusammen: ...')">Zusammenfassen</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <form class="chat-input-form" onsubmit="sendMessage(event)">
+            <input type="text" id="chatInput" placeholder="Schreibe eine Nachricht..." autocomplete="off">
+            <button type="submit" class="btn-primary">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            </button>
+        </form>
+    </div>
+
+    <div class="quick-actions">
+        <button class="quick-action" onclick="sendSuggestion('Zusammenfassung des Tages')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            Tagesübersicht
+        </button>
+        <button class="quick-action" onclick="openMathHelper()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Mathe-Hilfe
+        </button>
+        <button class="quick-action" onclick="openEssayHelper()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+            Essay-Hilfe
+        </button>
+        <button class="quick-action" onclick="openSummaryHelper()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="21" y1="10" x2="7" y2="10"></line>
+                <line x1="21" y1="6" x2="3" y2="6"></line>
+                <line x1="21" y1="14" x2="3" y2="14"></line>
+                <line x1="21" y1="18" x2="7" y2="18"></line>
+            </svg>
+            Zusammenfassen
+        </button>
+    </div>
+
+    <div class="modal-overlay" id="mathModal" onclick="closeMathModal(event)">
+        <div class="modal-content large-modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2>🧮 Mathe-Hilfe (bis Klasse 12)</h2>
+                <button class="modal-close" onclick="closeMathModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="math-categories">
+                    <button class="math-cat active" data-cat="equation" onclick="selectMathCategory('equation')">Gleichungen</button>
+                    <button class="math-cat" data-cat="derivative" onclick="selectMathCategory('derivative')">Ableitung</button>
+                    <button class="math-cat" data-cat="integral" onclick="selectMathCategory('integral')">Integral</button>
+                    <button class="math-cat" data-cat="vector" onclick="selectMathCategory('vector')">Vektoren</button>
+                    <button class="math-cat" data-cat="matrix" onclick="selectMathCategory('matrix')">Matrizen</button>
+                    <button class="math-cat" data-cat="probability" onclick="selectMathCategory('probability')">Stochastik</button>
+                </div>
+
+                <div class="math-input-section">
+                    <label>Aufgabe eingeben:</label>
+                    <textarea id="mathInput" rows="3" placeholder="z.B. x² - 5x + 6 = 0 oder f(x) = 3x² + 2x - 1"></textarea>
+                    <div class="math-examples" id="mathExamples">
+                        <span class="example-label">Beispiele:</span>
+                        <button onclick="setMathExample('2x + 5 = 15')">2x + 5 = 15</button>
+                        <button onclick="setMathExample('x² - 4x + 3 = 0')">x² - 4x + 3 = 0</button>
+                        <button onclick="setMathExample('x³ - 6x² + 11x - 6 = 0')">Kubische Gl.</button>
+                    </div>
+                </div>
+
+                <button class="btn-primary full-width" onclick="solveMath()">Lösen</button>
+
+                <div class="math-result" id="mathResult" style="display: none;">
+                    <h3>Lösung:</h3>
+                    <div id="mathSolution"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="essayModal" onclick="closeEssayModal(event)">
+        <div class="modal-content large-modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2>✍️ Essay & Aufsatz Hilfe</h2>
+                <button class="modal-close" onclick="closeEssayModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="essay-type-selector">
+                    <label>Aufsatzart:</label>
+                    <select id="essayType">
+                        <option value="eroerterung">Erörterung</option>
+                        <option value="interpretation">Interpretation</option>
+                        <option value="analyse">Analyse</option>
+                        <option value="charakterisierung">Charakterisierung</option>
+                        <option value="inhaltsangabe">Inhaltsangabe</option>
+                        <option value="bericht">Bericht</option>
+                        <option value="kommentar">Kommentar</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Thema / Fragestellung:</label>
+                    <input type="text" id="essayTopic" placeholder="z.B. Sollte das Wahlalter auf 16 gesenkt werden?">
+                </div>
+
+                <div class="form-group">
+                    <label>Zusätzliche Informationen (optional):</label>
+                    <textarea id="essayInfo" rows="3" placeholder="Kontext, wichtige Aspekte, oder Textauszug für Analyse..."></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Länge:</label>
+                        <select id="essayLength">
+                            <option value="short">Kurz (~300 Wörter)</option>
+                            <option value="medium" selected>Mittel (~500 Wörter)</option>
+                            <option value="long">Lang (~800 Wörter)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Sprache:</label>
+                        <select id="essayLanguage">
+                            <option value="de" selected>Deutsch</option>
+                            <option value="en">Englisch</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button class="btn-primary full-width" onclick="generateEssay()">Essay generieren</button>
+
+                <div class="essay-result" id="essayResult" style="display: none;">
+                    <div class="result-header">
+                        <h3>Ergebnis:</h3>
+                        <button class="btn-secondary small" onclick="copyEssay()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            Kopieren
+                        </button>
+                    </div>
+                    <div id="essaySolution" class="essay-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="summaryModal" onclick="closeSummaryModal(event)">
+        <div class="modal-content large-modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2>📝 Text zusammenfassen</h2>
+                <button class="modal-close" onclick="closeSummaryModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Text eingeben:</label>
+                    <textarea id="summaryInput" rows="8" placeholder="Füge hier den Text ein, den du zusammenfassen möchtest..."></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Art der Zusammenfassung:</label>
+                        <select id="summaryType">
+                            <option value="kurz">Kurze Zusammenfassung</option>
+                            <option value="stichpunkte">Stichpunkte</option>
+                            <option value="detailliert">Detaillierte Zusammenfassung</option>
+                            <option value="lernkarten">Lernkarten (Q&A)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Fach (optional):</label>
+                        <select id="summarySubject">
+                            <option value="">Allgemein</option>
+                            <option value="deutsch">Deutsch</option>
+                            <option value="englisch">Englisch</option>
+                            <option value="geschichte">Geschichte</option>
+                            <option value="biologie">Biologie</option>
+                            <option value="physik">Physik</option>
+                            <option value="chemie">Chemie</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button class="btn-primary full-width" onclick="generateSummary()">Zusammenfassen</button>
+
+                <div class="summary-result" id="summaryResult" style="display: none;">
+                    <div class="result-header">
+                        <h3>Zusammenfassung:</h3>
+                        <button class="btn-secondary small" onclick="copySummary()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            Kopieren
+                        </button>
+                    </div>
+                    <div id="summarySolution" class="summary-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ g.csp_nonce }}">
+let chatHistory = [];
+let ollamaAvailable = false;
+let mlxAvailable = false;
+let ollamaModel = 'llama3.2:1b';
+let nexusData = {
+    tasks: [],
+    homework: [],
+    exams: [],
+    tests: [],
+    subjects: [],
+    weather: null
+};
+
+const TIMETABLE = {
+    A: {
+        1: ['Musik', 'Mathe LK', 'Deutsch', 'Physik'],
+        2: ['Geografie', 'Mathe LK', 'Seminarkurs', 'Englisch LK'],
+        3: ['Musik', 'PB', 'Geschichte', 'Physik'],
+        4: ['Psychologie', 'Geschichte', 'Englisch LK', null],
+        5: ['Deutsch', 'Informatik', 'Sport', null]
+    },
+    B: {
+        1: ['Musik', 'Mathe LK', 'Deutsch', 'Physik'],
+        2: ['Geografie', 'Mathe LK', 'Seminarkurs', 'Englisch LK'],
+        3: ['Musik', 'Mathe LK', 'Geschichte', 'Physik'],
+        4: ['Psychologie', 'Geschichte', 'Englisch LK', null],
+        5: ['Deutsch', 'Informatik', 'Sport', null]
+    }
+};
+
+const BLOCK_TIMES = ['08:00-09:30', '09:50-11:20', '11:30-13:00', '13:30-15:00'];
+
+document.addEventListener('DOMContentLoaded', async () => {
+    loadChatHistory();
+    await loadNexusData();
+    checkOllamaStatus();
+});
+
+function loadChatHistory() {
+    try {
+        const saved = localStorage.getItem('nexus-chat-history');
+        if (saved) {
+            chatHistory = JSON.parse(saved);
+            renderChatHistory();
+        }
+    } catch (e) {}
+}
+
+function saveChatHistory() {
+    try {
+        if (chatHistory.length > 50) {
+            chatHistory = chatHistory.slice(-50);
+        }
+        localStorage.setItem('nexus-chat-history', JSON.stringify(chatHistory));
+    } catch (e) {}
+}
+
+function renderChatHistory() {
+    const container = document.getElementById('chatMessages');
+    if (!chatHistory.length) return;
+
+    chatHistory.forEach(msg => {
+        addMessageToUI(msg.role, msg.content, false);
+    });
+    scrollToBottom();
+}
+
+async function loadNexusData() {
+    try {
+        const [tasksRes, homeworkRes, examsRes, testsRes, subjectsRes] = await Promise.all([
+            fetch('/api/hub/tasks').catch(() => null),
+            fetch('/api/hub/school/homework').catch(() => null),
+            fetch('/api/hub/school/exams').catch(() => null),
+            fetch('/api/hub/school/tests').catch(() => null),
+            fetch('/api/hub/school/subjects').catch(() => null)
+        ]);
+
+        if (tasksRes?.ok) nexusData.tasks = (await tasksRes.json()).tasks || [];
+        if (homeworkRes?.ok) nexusData.homework = (await homeworkRes.json()).homework || [];
+        if (examsRes?.ok) nexusData.exams = (await examsRes.json()).exams || [];
+        if (testsRes?.ok) nexusData.tests = (await testsRes.json()).tests || [];
+        if (subjectsRes?.ok) nexusData.subjects = (await subjectsRes.json()).subjects || [];
+
+        const weatherCache = localStorage.getItem('nexus-weather-cache');
+        if (weatherCache) {
+            nexusData.weather = JSON.parse(weatherCache);
+        }
+    } catch (e) {
+        console.log('Could not load Nexus data');
+    }
+}
+
+async function checkAIStatus() {
+    const statusEl = document.getElementById('assistantStatus');
+
+    try {
+        const response = await fetch('/api/hub/assistant/status', {
+            method: 'GET',
+            signal: AbortSignal.timeout(3000)
+        });
+        if (response.ok) {
+            const data = await response.json();
+            if (data.available) {
+                ollamaAvailable = true;
+                try {
+                    const modelsRes = await fetch('/api/hub/assistant/models');
+                    if (modelsRes.ok) {
+                        const modelsData = await modelsRes.json();
+                        if (modelsData.models && modelsData.models.length > 0) {
+                            const preferredModel = modelsData.models.find(m => m.name.includes('llama3.2')) || modelsData.models[0];
+                            ollamaModel = preferredModel.name;
+                        }
+                    }
+                } catch (e) {
+                    ollamaModel = 'llama3.2';
+                }
+                statusEl.textContent = `Ollama (${ollamaModel})`;
+                statusEl.style.color = 'var(--success)';
+                return;
+            }
+        }
+    } catch (e) {
+        ollamaAvailable = false;
+    }
+
+    try {
+        const mlxResponse = await fetch('/api/mlx/status', {
+            method: 'GET',
+            signal: AbortSignal.timeout(3000)
+        });
+        if (mlxResponse.ok) {
+            const data = await mlxResponse.json();
+            if (data.available) {
+                mlxAvailable = true;
+                statusEl.textContent = 'MLX Offline-KI (Qwen2.5)';
+                statusEl.style.color = 'var(--accent)';
+                return;
+            }
+        }
+    } catch (e) {
+        mlxAvailable = false;
+    }
+
+    statusEl.textContent = 'Offline-Modus (keine KI)';
+    statusEl.style.color = 'var(--text-muted)';
+}
+
+async function checkOllamaStatus() {
+    await checkAIStatus();
+}
+
+function sendSuggestion(text) {
+    document.getElementById('chatInput').value = text;
+    sendMessage(new Event('submit'));
+}
+
+async function sendMessage(e) {
+    e.preventDefault();
+    const input = document.getElementById('chatInput');
+    const message = input.value.trim();
+    if (!message) return;
+
+    input.value = '';
+    addMessageToUI('user', message);
+    chatHistory.push({ role: 'user', content: message });
+
+    const typingId = showTypingIndicator();
+
+    try {
+        let response;
+
+        if (ollamaAvailable) {
+            response = await getOllamaResponse(message);
+        } else if (mlxAvailable) {
+            response = await getMlxResponse(message);
+        } else {
+            response = getOfflineResponse(message);
+        }
+
+        removeTypingIndicator(typingId);
+        addMessageToUI('assistant', response);
+        chatHistory.push({ role: 'assistant', content: response });
+        saveChatHistory();
+    } catch (err) {
+        removeTypingIndicator(typingId);
+
+        if (mlxAvailable && !ollamaAvailable) {
+            try {
+                const mlxResponse = await getMlxResponse(message);
+                addMessageToUI('assistant', mlxResponse);
+                chatHistory.push({ role: 'assistant', content: mlxResponse });
+                saveChatHistory();
+                return;
+            } catch (mlxErr) {
+                console.log('MLX fallback also failed:', mlxErr);
+            }
+        }
+
+        const fallback = getOfflineResponse(message);
+        addMessageToUI('assistant', fallback);
+        chatHistory.push({ role: 'assistant', content: fallback });
+        saveChatHistory();
+    }
+}
+
+async function getOllamaResponse(message) {
+    const context = `
+Heutige Hausaufgaben: ${JSON.stringify(nexusData.homework.filter(h => !h.completed).slice(0, 5))}
+Anstehende Klausuren: ${JSON.stringify(nexusData.exams.slice(0, 3))}
+Offene Aufgaben: ${JSON.stringify(nexusData.tasks.filter(t => !t.completed).slice(0, 5))}`;
+
+    const response = await fetch('/api/hub/assistant/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            message: message,
+            model: ollamaModel,
+            context: context
+        }),
+        signal: AbortSignal.timeout(120000)
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Ollama error');
+    }
+    const data = await response.json();
+    return data.response;
+}
+
+async function getMlxResponse(message) {
+    const systemPrompt = `Du bist Nexus, ein hilfreicher Schulassistent für einen Schüler der 12. Klasse.
+Antworte kurz (max 3-4 Sätze) und präzise auf Deutsch.
+Aktuelle Daten:
+- Hausaufgaben: ${nexusData.homework.filter(h => !h.completed).length} offen
+- Klausuren: ${nexusData.exams.length} geplant
+- Aufgaben: ${nexusData.tasks.filter(t => !t.completed).length} offen`;
+
+    const response = await fetch('/api/mlx/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            prompt: message,
+            system: systemPrompt,
+            max_tokens: 300  // Keep responses shorter for MLX
+        }),
+        signal: AbortSignal.timeout(45000)  // MLX can be slower
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'MLX error');
+    }
+
+    const data = await response.json();
+    return data.response;
+}
+
+function getOfflineResponse(message) {
+    const msg = message.toLowerCase();
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const dayNames = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
+    if (msg.includes('heute') && (msg.includes('habe') || msg.includes('unterricht') || msg.includes('stunde'))) {
+        return getTodayScheduleResponse();
+    }
+
+    if (msg.includes('morgen') && (msg.includes('habe') || msg.includes('unterricht'))) {
+        return getTomorrowScheduleResponse();
+    }
+
+    if (msg.includes('stundenplan') || msg.includes('woche')) {
+        return getWeekScheduleResponse();
+    }
+
+    if (msg.includes('hausaufgabe') || msg.includes('homework')) {
+        return getHomeworkResponse();
+    }
+
+    if (msg.includes('klausur') || msg.includes('test') || msg.includes('prüfung')) {
+        return getExamsResponse();
+    }
+
+    if (msg.includes('aufgabe') || msg.includes('todo') || msg.includes('task')) {
+        return getTasksResponse();
+    }
+
+    if (msg.includes('wetter')) {
+        return getWeatherResponse();
+    }
+
+    if (msg.includes('training') || msg.includes('sport') || msg.includes('gym')) {
+        return getTrainingResponse();
+    }
+
+    if (msg.includes('zusammenfassung') || msg.includes('übersicht') || msg.includes('tag')) {
+        return getDaySummaryResponse();
+    }
+
+    if (msg.includes('uhrzeit') || msg.includes('wie spät')) {
+        return `Es ist ${today.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr.`;
+    }
+
+    if (msg.includes('datum') || msg.includes('welcher tag')) {
+        return `Heute ist ${dayNames[dayOfWeek]}, der ${today.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })}.`;
+    }
+
+    if (msg.includes('hallo') || msg.includes('hi') || msg.includes('hey')) {
+        const hour = today.getHours();
+        let greeting = 'Hallo';
+        if (hour < 12) greeting = 'Guten Morgen';
+        else if (hour < 18) greeting = 'Guten Tag';
+        else greeting = 'Guten Abend';
+        return `${greeting}! Wie kann ich dir helfen?`;
+    }
+
+    if (msg.includes('löse') || msg.includes('berechne') || msg.match(/x[²³]?\s*[+-]/) || msg.match(/=\s*0$/)) {
+        return handleMathInChat(message);
+    }
+
+    if (msg.includes('ableitung') || msg.includes('ableite') || (msg.includes('f(x)') && msg.includes("'"))) {
+        return handleDerivativeInChat(message);
+    }
+
+    if (msg.includes('schreibe') && (msg.includes('erörterung') || msg.includes('essay') || msg.includes('aufsatz') || msg.includes('analyse'))) {
+        const ollamaHint = ollamaAvailable
+            ? '✅ Ollama ist verbunden - du bekommst vollständige Essays generiert!'
+            : '💡 Mit Ollama bekommst du vollständige Essays generiert.';
+        return `Für Aufsätze nutze am besten den **Essay-Hilfe** Button unten!
+
+Dort kannst du:
+• Aufsatzart wählen (Erörterung, Analyse, etc.)
+• Thema eingeben
+• Länge und Sprache festlegen
+
+${ollamaHint}`;
+    }
+
+    if (msg.includes('zusammenfassung') && msg.includes('text')) {
+        return `Für Textzusammenfassungen nutze den **Zusammenfassen** Button unten!
+
+Du kannst:
+• Kurze oder detaillierte Zusammenfassungen erstellen
+• Stichpunkte generieren
+• Lernkarten (Q&A) erstellen`;
+    }
+
+    return `Ich bin dein Nexus Lern-Assistent und kann dir helfen mit:
+
+**📚 Schule:**
+• "Was habe ich heute?" - Stundenplan
+• "Welche Hausaufgaben?" - Offene Aufgaben
+• "Nächste Klausur?" - Prüfungstermine
+
+**🧮 Mathe (bis Klasse 12):**
+• "Löse x² - 5x + 6 = 0" - Gleichungen
+• Klicke auf **Mathe-Hilfe** für Ableitungen, Integrale, Vektoren, Matrizen, Stochastik
+
+**✍️ Schreiben:**
+• Klicke auf **Essay-Hilfe** für Erörterungen, Analysen, etc.
+• Klicke auf **Zusammenfassen** für Textzusammenfassungen
+
+**💪 Training:**
+• "Welches Training heute?" - Gym-Plan`;
+}
+
+function handleMathInChat(message) {
+    let eq = message.trim();
+
+    if (message.includes(':')) {
+        const afterColon = message.split(':').pop().trim();
+        if (afterColon.includes('=') && afterColon.toLowerCase().includes('x')) {
+            eq = afterColon;
+        }
+    }
+
+    if (eq === message.trim()) {
+        const xIndex = message.toLowerCase().indexOf('x');
+        const eqIndex = message.indexOf('=');
+        if (xIndex !== -1 && eqIndex !== -1 && eqIndex > xIndex) {
+            let start = xIndex;
+            for (let i = xIndex - 1; i >= 0; i--) {
+                const c = message[i];
+                if (/[\d\s+\-]/.test(c)) {
+                    start = i;
+                } else {
+                    break;
+                }
+            }
+            eq = message.substring(start).trim();
+        }
+    }
+
+    if (eq === message.trim() || eq.toLowerCase().startsWith('löse') || eq.toLowerCase().startsWith('wie')) {
+        eq = message
+            .replace(/wie\s+(berechnet|rechnet|löst)\s+man\s*/gi, '')
+            .replace(/löse\s+(die\s+)?gleichung(\s+mit\s+rechenweg)?\s*:?\s*/gi, '')
+            .replace(/berechne\s*(die\s+)?gleichung\s*:?\s*/gi, '')
+            .replace(/^(löse|berechne|rechne)\s+/gi, '')
+            .trim();
+    }
+
+    if (eq.includes('=') && eq.includes('x')) {
+        const originalEq = eq;
+        eq = eq.replace(/\s+/g, '').replace(/²/g, '^2').replace(/³/g, '^3');
+
+        const parts = eq.split('=');
+        if (parts.length !== 2) {
+            return 'Gleichung muss ein = Zeichen enthalten';
+        }
+
+        let leftExpr = parts[0] || '0';
+        let rightExpr = parts[1] || '0';
+
+        const hasX2 = eq.includes('x^2');
+        const hasX3 = eq.includes('x^3');
+
+        if (hasX2 && !hasX3) {
+            const coeffs = parseQuadraticCoefficients(leftExpr, rightExpr);
+            if (coeffs.isQuadratic && coeffs.a !== 0) {
+                const { a, b, c } = coeffs;
+                const D = b*b - 4*a*c;
+
+                let result = `**Gleichung:** ${originalEq}\n`;
+                result += `**Standardform:** ${formatCoeff(a)}x² ${formatCoeff(b, true)}x ${formatCoeff(c, true)} = 0\n`;
+                result += `**Diskriminante:** D = b² - 4ac = ${b}² - 4·${a}·${c} = **${D}**\n\n`;
+
+                if (D < 0) {
+                    const realPart = -b / (2*a);
+                    const imagPart = Math.sqrt(-D) / (2*a);
+                    result += `Da D < 0, gibt es **keine reellen Lösungen**.\n\n`;
+                    result += `**Komplexe Lösungen:**\n`;
+                    result += `• x₁ = ${realPart.toFixed(4)} + ${imagPart.toFixed(4)}i\n`;
+                    result += `• x₂ = ${realPart.toFixed(4)} - ${imagPart.toFixed(4)}i\n\n`;
+                    result += `_Komplexe Zahlen werden in der Oberstufe behandelt._`;
+                    return result;
+                } else if (D === 0) {
+                    const x = -b / (2*a);
+                    result += `Da D = 0, gibt es **eine doppelte Lösung**:\n`;
+                    result += `• x = -b/(2a) = **${x.toFixed(6)}**`;
+                    return result;
+                } else {
+                    const x1 = (-b + Math.sqrt(D)) / (2*a);
+                    const x2 = (-b - Math.sqrt(D)) / (2*a);
+                    result += `Da D > 0, gibt es **zwei reelle Lösungen**:\n`;
+                    result += `• x₁ = (-b + √D) / 2a = **${x1.toFixed(6)}**\n`;
+                    result += `• x₂ = (-b - √D) / 2a = **${x2.toFixed(6)}**`;
+                    return result;
+                }
+            }
+        }
+
+        const roots = findAllRoots(leftExpr, rightExpr, 3);
+
+        if (roots.length === 0) {
+            return `**Gleichung:** ${originalEq}\n\n**Ergebnis:** Keine reellen Lösungen gefunden.\n\n_Möglicherweise hat die Gleichung nur komplexe Lösungen._`;
+        }
+
+        let result = `**Gleichung:** ${originalEq}\n\n`;
+        result += `**Lösung${roots.length > 1 ? 'en' : ''}:**\n`;
+        roots.forEach((root, i) => {
+            const roundedRoot = Math.abs(root) < 1e-10 ? 0 : root;
+            const verify = Math.abs(evaluateExpression(leftExpr, root) - evaluateExpression(rightExpr, root));
+            result += `• x${roots.length > 1 ? '₁₂₃₄₅'[i] : ''} = **${roundedRoot.toFixed(6)}**`;
+            if (verify < 1e-6) result += ' ✓';
+            result += '\n';
+        });
+
+        return result;
+    }
+
+    return `Für Mathe-Aufgaben klicke auf **Mathe-Hilfe** unten oder schreibe eine Gleichung wie:
+
+• "Löse x² - 5x + 6 = 0"
+• "Löse 2x + 5 = 15"
+• "x² + 5 = 0" (hat komplexe Lösungen)`;
+}
+
+function formatCoeff(n, withSign = false) {
+    if (n === 0) return '';
+    if (n === 1 && !withSign) return '';
+    if (n === -1 && !withSign) return '-';
+    if (n === 1) return '+ ';
+    if (n === -1) return '- ';
+    if (withSign) return n > 0 ? `+ ${n}` : `- ${Math.abs(n)}`;
+    return n.toString();
+}
+
+function handleDerivativeInChat(message) {
+    const funcMatch = message.match(/f\(x\)\s*=\s*([^\s]+)/i);
+    if (!funcMatch) {
+        return `Schreibe die Funktion im Format: f(x) = 3x² + 2x - 1
+
+Oder nutze **Mathe-Hilfe** für mehr Optionen!`;
+    }
+
+    let func = funcMatch[1].replace(/²/g, '^2').replace(/³/g, '^3');
+    let terms = [];
+
+    func = func.replace(/-/g, '+-');
+    const parts = func.split('+').filter(p => p);
+
+    parts.forEach(term => {
+        if (!term.includes('x')) return; // constant -> 0
+
+        const powerMatch = term.match(/^(-?\d*)x\^?(\d*)$/);
+        if (powerMatch) {
+            const coef = parseFloat(powerMatch[1] || 1) || 1;
+            const exp = parseFloat(powerMatch[2] || 1) || 1;
+            const newCoef = coef * exp;
+            const newExp = exp - 1;
+
+            if (newExp === 0) terms.push(`${newCoef}`);
+            else if (newExp === 1) terms.push(`${newCoef}x`);
+            else terms.push(`${newCoef}x^${newExp}`);
+        }
+    });
+
+    const derivative = terms.join(' + ').replace(/\+ -/g, '- ') || '0';
+
+    return `**Funktion:** f(x) = ${funcMatch[1]}\n\n**Ableitung:** f'(x) = **${derivative}**`;
+}
+
+function getTodayScheduleResponse() {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+        return 'Heute ist Wochenende - kein Unterricht! 🎉';
+    }
+
+    const weekType = getWeekType();
+    const schedule = TIMETABLE[weekType][dayOfWeek];
+
+    if (!schedule) return 'Keine Stundenplan-Daten für heute.';
+
+    let response = `**Heute (${weekType}-Woche):**\n\n`;
+    schedule.forEach((subject, i) => {
+        if (subject) {
+            response += `• Block ${i + 1} (${BLOCK_TIMES[i]}): ${subject}\n`;
+        }
+    });
+
+    return response;
+}
+
+function getTomorrowScheduleResponse() {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayOfWeek = tomorrow.getDay();
+
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+        return 'Morgen ist Wochenende - kein Unterricht! 🎉';
+    }
+
+    const weekType = getWeekType(tomorrow);
+    const schedule = TIMETABLE[weekType][dayOfWeek];
+
+    if (!schedule) return 'Keine Stundenplan-Daten für morgen.';
+
+    let response = `**Morgen (${weekType}-Woche):**\n\n`;
+    schedule.forEach((subject, i) => {
+        if (subject) {
+            response += `• Block ${i + 1} (${BLOCK_TIMES[i]}): ${subject}\n`;
+        }
+    });
+
+    return response;
+}
+
+function getWeekScheduleResponse() {
+    const weekType = getWeekType();
+    const dayNames = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'];
+
+    let response = `**Wochenplan (${weekType}-Woche):**\n\n`;
+
+    for (let day = 1; day <= 5; day++) {
+        const schedule = TIMETABLE[weekType][day];
+        if (schedule) {
+            response += `**${dayNames[day]}:** ${schedule.filter(s => s).join(', ')}\n`;
+        }
+    }
+
+    return response;
+}
+
+function getHomeworkResponse() {
+    const openHomework = nexusData.homework.filter(h => !h.completed);
+
+    if (!openHomework.length) {
+        return 'Keine offenen Hausaufgaben! 🎉';
+    }
+
+    let response = `**Offene Hausaufgaben (${openHomework.length}):**\n\n`;
+    openHomework.slice(0, 5).forEach(hw => {
+        const subject = nexusData.subjects.find(s => s.id === hw.subject_id);
+        const dueDate = hw.due_date ? new Date(hw.due_date).toLocaleDateString('de-DE') : 'Kein Datum';
+        response += `• **${subject?.name || 'Unbekannt'}**: ${hw.title} (bis ${dueDate})\n`;
+    });
+
+    if (openHomework.length > 5) {
+        response += `\n...und ${openHomework.length - 5} weitere.`;
+    }
+
+    return response;
+}
+
+function getExamsResponse() {
+    const now = new Date();
+    const upcomingExams = nexusData.exams
+        .filter(e => new Date(e.date) >= now)
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    const upcomingTests = nexusData.tests
+        .filter(t => new Date(t.date) >= now)
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    if (!upcomingExams.length && !upcomingTests.length) {
+        return 'Keine anstehenden Klausuren oder Tests! 📚';
+    }
+
+    let response = '';
+
+    if (upcomingExams.length) {
+        response += `**Klausuren:**\n`;
+        upcomingExams.slice(0, 3).forEach(exam => {
+            const subject = nexusData.subjects.find(s => s.id === exam.subject_id);
+            const date = new Date(exam.date).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
+            response += `• ${date}: ${subject?.name || 'Unbekannt'} - ${exam.title}\n`;
+        });
+    }
+
+    if (upcomingTests.length) {
+        response += `\n**Tests:**\n`;
+        upcomingTests.slice(0, 3).forEach(test => {
+            const subject = nexusData.subjects.find(s => s.id === test.subject_id);
+            const date = new Date(test.date).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
+            response += `• ${date}: ${subject?.name || 'Unbekannt'} - ${test.title}\n`;
+        });
+    }
+
+    return response;
+}
+
+function getTasksResponse() {
+    const openTasks = nexusData.tasks.filter(t => !t.completed);
+
+    if (!openTasks.length) {
+        return 'Keine offenen Aufgaben! ✅';
+    }
+
+    let response = `**Offene Aufgaben (${openTasks.length}):**\n\n`;
+    openTasks.slice(0, 5).forEach(task => {
+        response += `• ${task.title}`;
+        if (task.due_date) {
+            response += ` (bis ${new Date(task.due_date).toLocaleDateString('de-DE')})`;
+        }
+        response += '\n';
+    });
+
+    return response;
+}
+
+function getWeatherResponse() {
+    if (!nexusData.weather?.data) {
+        return 'Wetterdaten nicht verfügbar. Gehe zur Startseite um das Wetter zu laden.';
+    }
+
+    const w = nexusData.weather.data;
+    return `**Wetter heute:**\n\n🌡️ Temperatur: ${w.temperature_2m_max?.[0] || '--'}°C (max) / ${w.temperature_2m_min?.[0] || '--'}°C (min)\n☔ Niederschlag: ${w.precipitation_sum?.[0] || 0}mm`;
+}
+
+function getTrainingResponse() {
+    const today = new Date().getDay();
+    const dayNames = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
+    const regularPlan = {
+        0: 'Ruhetag (Regeneration)',
+        1: 'Ruhetag (DLRG Schwimmen)',
+        2: 'Armday (Bizeps & Trizeps)',
+        3: 'Chestday (Brustmuskulatur)',
+        4: 'Backday + Schultern',
+        5: 'Legday (Beinmuskulatur)',
+        6: 'Backday (optional)'
+    };
+
+    return `**Training heute (${dayNames[today]}):**\n\n💪 ${regularPlan[today]}\n\n🏊 DLRG Schwimmen: Montag 19:15-20:15`;
+}
+
+function getDaySummaryResponse() {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+
+    let summary = `**Zusammenfassung für ${today.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}:**\n\n`;
+
+    if (dayOfWeek > 0 && dayOfWeek < 6) {
+        const weekType = getWeekType();
+        const schedule = TIMETABLE[weekType][dayOfWeek];
+        if (schedule) {
+            summary += `📚 **Unterricht:** ${schedule.filter(s => s).join(', ')}\n\n`;
+        }
+    } else {
+        summary += '📚 **Unterricht:** Wochenende!\n\n';
+    }
+
+    const openHomework = nexusData.homework.filter(h => !h.completed);
+    summary += `📝 **Hausaufgaben:** ${openHomework.length} offen\n`;
+
+    const openTasks = nexusData.tasks.filter(t => !t.completed);
+    summary += `✅ **Aufgaben:** ${openTasks.length} offen\n`;
+
+    const nextExam = nexusData.exams
+        .filter(e => new Date(e.date) >= today)
+        .sort((a, b) => new Date(a.date) - new Date(b.date))[0];
+    if (nextExam) {
+        const subject = nexusData.subjects.find(s => s.id === nextExam.subject_id);
+        const daysUntil = Math.ceil((new Date(nextExam.date) - today) / (1000 * 60 * 60 * 24));
+        summary += `\n📅 **Nächste Klausur:** ${subject?.name || 'Unbekannt'} in ${daysUntil} Tagen`;
+    }
+
+    return summary;
+}
+
+function getWeekType(date = new Date()) {
+    const refDate = new Date(2025, 11, 29);
+    const diffWeeks = Math.floor((date - refDate) / (7 * 24 * 60 * 60 * 1000));
+    return diffWeeks % 2 === 0 ? 'A' : 'B';
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function addMessageToUI(role, content, scroll = true) {
+    const container = document.getElementById('chatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${role}`;
+
+    const avatar = role === 'assistant'
+        ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`
+        : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
+
+    let formattedContent = escapeHtml(content)
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n/g, '<br>');
+
+    messageDiv.innerHTML = `
+        <div class="message-avatar">${avatar}</div>
+        <div class="message-content">${formattedContent}</div>
+    `;
+
+    container.appendChild(messageDiv);
+    if (scroll) scrollToBottom();
+}
+
+function showTypingIndicator() {
+    const container = document.getElementById('chatMessages');
+    const id = 'typing-' + Date.now();
+    const div = document.createElement('div');
+    div.id = id;
+    div.className = 'message assistant typing';
+    div.innerHTML = `
+        <div class="message-avatar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        </div>
+        <div class="message-content">
+            <div class="typing-dots"><span></span><span></span><span></span></div>
+        </div>
+    `;
+    container.appendChild(div);
+    scrollToBottom();
+    return id;
+}
+
+function removeTypingIndicator(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+}
+
+function scrollToBottom() {
+    const container = document.getElementById('chatMessages');
+    container.scrollTop = container.scrollHeight;
+}
+
+function clearChat() {
+    if (!confirm('Chat-Verlauf wirklich löschen?')) return;
+    chatHistory = [];
+    localStorage.removeItem('nexus-chat-history');
+    document.getElementById('chatMessages').innerHTML = `
+        <div class="message assistant">
+            <div class="message-avatar">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+            </div>
+            <div class="message-content">
+                <p>Chat wurde geleert. Wie kann ich dir helfen?</p>
+            </div>
+        </div>
+    `;
+}
+
+let currentMathCategory = 'equation';
+
+function openMathHelper() {
+    document.getElementById('mathModal').classList.add('active');
+}
+
+function closeMathModal(event) {
+    if (!event || event.target === event.currentTarget) {
+        document.getElementById('mathModal').classList.remove('active');
+    }
+}
+
+function selectMathCategory(cat) {
+    currentMathCategory = cat;
+    document.querySelectorAll('.math-cat').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.math-cat[data-cat="${cat}"]`).classList.add('active');
+
+    const examples = {
+        equation: [
+            { label: '2x + 5 = 15', val: '2x + 5 = 15' },
+            { label: 'x² - 4x + 3 = 0', val: 'x² - 4x + 3 = 0' },
+            { label: 'Kubische Gl.', val: 'x³ - 6x² + 11x - 6 = 0' }
+        ],
+        derivative: [
+            { label: 'f(x) = x²', val: 'f(x) = x²' },
+            { label: 'f(x) = 3x³ + 2x² - x', val: 'f(x) = 3x³ + 2x² - x' },
+            { label: 'f(x) = sin(x)', val: 'f(x) = sin(x)' }
+        ],
+        integral: [
+            { label: '∫ x² dx', val: '∫ x² dx' },
+            { label: '∫ 2x + 3 dx', val: '∫ 2x + 3 dx' },
+            { label: '∫ x² von 0 bis 2', val: '∫ x² dx von 0 bis 2' }
+        ],
+        vector: [
+            { label: 'Betrag', val: 'Betrag von (3, 4, 0)' },
+            { label: 'Skalarprodukt', val: '(1,2,3) · (4,5,6)' },
+            { label: 'Kreuzprodukt', val: '(1,0,0) × (0,1,0)' }
+        ],
+        matrix: [
+            { label: 'Determinante', val: 'det [[1,2],[3,4]]' },
+            { label: 'Multiplikation', val: '[[1,2],[3,4]] * [[5,6],[7,8]]' },
+            { label: 'Inverse', val: 'inv [[4,7],[2,6]]' }
+        ],
+        probability: [
+            { label: 'Binomial', val: 'B(10, 0.5, 3)' },
+            { label: 'Erwartungswert', val: 'E(X) für B(20, 0.3)' },
+            { label: 'Normalvert.', val: 'P(X < 1.5) für N(0, 1)' }
+        ]
+    };
+
+    const examplesDiv = document.getElementById('mathExamples');
+    const exs = examples[cat] || examples.equation;
+    examplesDiv.innerHTML = '<span class="example-label">Beispiele:</span>' +
+        exs.map(e => `<button onclick="setMathExample('${e.val}')">${e.label}</button>`).join('');
+
+    document.getElementById('mathInput').placeholder = getPlaceholderForCategory(cat);
+}
+
+function getPlaceholderForCategory(cat) {
+    const placeholders = {
+        equation: 'z.B. x² - 5x + 6 = 0',
+        derivative: 'z.B. f(x) = 3x² + 2x - 1',
+        integral: 'z.B. ∫ x² dx oder ∫ x² dx von 0 bis 2',
+        vector: 'z.B. Betrag von (3, 4, 5) oder (1,2,3) · (4,5,6)',
+        matrix: 'z.B. det [[1,2],[3,4]] oder inv [[4,7],[2,6]]',
+        probability: 'z.B. B(10, 0.5, 3) für Binomialverteilung'
+    };
+    return placeholders[cat] || placeholders.equation;
+}
+
+function setMathExample(example) {
+    document.getElementById('mathInput').value = example;
+}
+
+async function solveMath() {
+    const input = document.getElementById('mathInput').value.trim();
+    if (!input) return;
+
+    const resultEl = document.getElementById('mathResult');
+    const solutionEl = document.getElementById('mathSolution');
+
+    resultEl.style.display = 'block';
+    solutionEl.innerHTML = '<p style="color: var(--text-muted);">Löse Aufgabe...</p>';
+
+    if (ollamaAvailable) {
+        try {
+            const response = await fetch('/api/hub/assistant/math', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    problem: input,
+                    model: ollamaModel
+                }),
+                signal: AbortSignal.timeout(60000)
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.solution) {
+                    const formattedSolution = formatMathResponse(data.solution);
+                    solutionEl.innerHTML = formattedSolution;
+                    return;
+                }
+            }
+        } catch (e) {
+            console.log('AI math solving failed, falling back to local engine:', e);
+        }
+    }
+
+    let solution = '';
+
+    try {
+        switch (currentMathCategory) {
+            case 'equation':
+                solution = solveEquation(input);
+                break;
+            case 'derivative':
+                solution = solveDerivative(input);
+                break;
+            case 'integral':
+                solution = solveIntegral(input);
+                break;
+            case 'vector':
+                solution = solveVector(input);
+                break;
+            case 'matrix':
+                solution = solveMatrix(input);
+                break;
+            case 'probability':
+                solution = solveProbability(input);
+                break;
+            default:
+                solution = solveEquation(input);
+        }
+    } catch (e) {
+        solution = `<p class="error">Fehler beim Lösen: ${escapeHtml(e.message)}</p><p>Versuche die Aufgabe anders zu formulieren.</p>`;
+    }
+
+    solutionEl.innerHTML = solution;
+}
+
+function formatMathResponse(text) {
+    return escapeHtml(text)
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`(.*?)`/g, '<code>$1</code>')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>')
+        .replace(/^/, '<p>')
+        .replace(/$/, '</p>');
+}
+
+function evaluateExpression(expr, x) {
+    let normalized = expr
+        .replace(/\s+/g, '')
+        .replace(/²/g, '^2')
+        .replace(/³/g, '^3')
+        .replace(/\^/g, '**')
+        .replace(/(\d)([x])/g, '$1*$2')  // 2x -> 2*x
+        .replace(/([x])(\d)/g, '$1*$2')  // x2 -> x*2
+        .replace(/\)(\d)/g, ')*$1')       // )2 -> )*2
+        .replace(/(\d)\(/g, '$1*(')       // 2( -> 2*(
+        .replace(/\)\(/g, ')*(')          // )( -> )*(
+        .replace(/([x])\(/g, '$1*(')      // x( -> x*(
+        .replace(/\)([x])/g, ')*$1')      // )x -> )*x
+        .replace(/sin/g, 'Math.sin')
+        .replace(/cos/g, 'Math.cos')
+        .replace(/tan/g, 'Math.tan')
+        .replace(/sqrt/g, 'Math.sqrt')
+        .replace(/log/g, 'Math.log')
+        .replace(/ln/g, 'Math.log')
+        .replace(/abs/g, 'Math.abs')
+        .replace(/pi/gi, 'Math.PI')
+        .replace(/e(?![a-z])/gi, 'Math.E');
+
+    normalized = normalized.replace(/x/g, `(${x})`);
+
+    // Whitelist: only allow safe math characters after all transformations
+    const safeMath = normalized.replace(/Math\.(sin|cos|tan|abs|log|sqrt|pow|floor|ceil|round|PI|E|exp|min|max)/g, '');
+    if (!/^[\d\s+\-*/().eE,]+$/.test(safeMath)) {
+        return NaN;
+    }
+
+    try {
+        return Function('"use strict"; return (' + normalized + ')')();
+    } catch (e) {
+        return NaN;
+    }
+}
+
+function findRootNewton(leftExpr, rightExpr, initialGuess = 0, tolerance = 1e-10, maxIterations = 100) {
+    const f = (x) => evaluateExpression(leftExpr, x) - evaluateExpression(rightExpr, x);
+
+    const df = (x) => {
+        const h = 1e-8;
+        return (f(x + h) - f(x - h)) / (2 * h);
+    };
+
+    let x = initialGuess;
+    for (let i = 0; i < maxIterations; i++) {
+        const fx = f(x);
+        const dfx = df(x);
+
+        if (Math.abs(fx) < tolerance) {
+            return x;
+        }
+
+        if (Math.abs(dfx) < 1e-15) {
+            x += 0.5;
+            continue;
+        }
+
+        x = x - fx / dfx;
+
+        if (Math.abs(x) > 1e10) {
+            return NaN;
+        }
+    }
+
+    if (Math.abs(f(x)) < tolerance * 100) {
+        return x;
+    }
+    return NaN;
+}
+
+function findAllRoots(leftExpr, rightExpr, degree = 2) {
+    const roots = [];
+    const startingPoints = [-100, -50, -20, -10, -5, -2, -1, -0.5, 0, 0.5, 1, 2, 5, 10, 20, 50, 100];
+
+    for (const guess of startingPoints) {
+        const root = findRootNewton(leftExpr, rightExpr, guess);
+
+        if (!isNaN(root) && isFinite(root)) {
+            const isDuplicate = roots.some(r => Math.abs(r - root) < 1e-6);
+            if (!isDuplicate) {
+                const f = evaluateExpression(leftExpr, root) - evaluateExpression(rightExpr, root);
+                if (Math.abs(f) < 1e-6) {
+                    roots.push(root);
+                }
+            }
+        }
+
+        if (roots.length >= degree + 2) break;
+    }
+
+    return roots.sort((a, b) => a - b);
+}
+
+function parseQuadraticCoefficients(leftExpr, rightExpr) {
+    const f = (x) => evaluateExpression(leftExpr, x) - evaluateExpression(rightExpr, x);
+
+    const y0 = f(0);
+    const y1 = f(1);
+    const y_1 = f(-1);
+
+    const c = y0;
+    const a = (y1 + y_1) / 2 - c;
+    const b = (y1 - y_1) / 2;
+
+    const y2 = f(2);
+    const expected = 4 * a + 2 * b + c;
+
+    if (Math.abs(y2 - expected) < 1e-6) {
+        return { a, b, c, isQuadratic: true };
+    }
+
+    return { a: 0, b: 0, c: 0, isQuadratic: false };
+}
+
+function solveEquation(input) {
+    let eq = input.replace(/\s+/g, '').replace(/²/g, '^2').replace(/³/g, '^3');
+
+    const parts = eq.split('=');
+    if (parts.length !== 2) {
+        return '<p class="error">Gleichung muss ein = Zeichen enthalten</p>';
+    }
+
+    let leftExpr = parts[0];
+    let rightExpr = parts[1];
+
+    if (!leftExpr) leftExpr = '0';
+    if (!rightExpr) rightExpr = '0';
+
+    let steps = [`<div class="solution-step"><strong>Gleichung:</strong> ${escapeHtml(input)}</div>`];
+
+    const leftHasX = leftExpr.includes('x');
+    const rightHasX = rightExpr.includes('x');
+
+    if (!leftHasX && !rightHasX) {
+        return '<p class="error">Gleichung enthält keine Variable x</p>';
+    }
+
+    const hasX3 = eq.includes('x^3') || eq.includes('x³');
+    const hasX2 = eq.includes('x^2') || eq.includes('x²');
+
+    let degree = 1;
+    if (hasX3) degree = 3;
+    else if (hasX2) degree = 2;
+
+    steps.push(`<div class="solution-step"><strong>Umgeformt:</strong> (${escapeHtml(leftExpr)}) - (${escapeHtml(rightExpr)}) = 0</div>`);
+
+    if (degree === 2) {
+        const coeffs = parseQuadraticCoefficients(leftExpr, rightExpr);
+
+        if (coeffs.isQuadratic && coeffs.a !== 0) {
+            const { a, b, c } = coeffs;
+            const discriminant = b * b - 4 * a * c;
+
+            steps.push(`<div class="solution-step"><strong>Standardform:</strong> ${a.toFixed(4)}x² + ${b.toFixed(4)}x + ${c.toFixed(4)} = 0</div>`);
+            steps.push(`<div class="solution-step"><strong>Koeffizienten:</strong> a = ${a.toFixed(4)}, b = ${b.toFixed(4)}, c = ${c.toFixed(4)}</div>`);
+            steps.push(`<div class="solution-step"><strong>Diskriminante:</strong> D = b² - 4ac = ${discriminant.toFixed(4)}</div>`);
+
+            if (discriminant > 0) {
+                const x1 = (-b + Math.sqrt(discriminant)) / (2 * a);
+                const x2 = (-b - Math.sqrt(discriminant)) / (2 * a);
+                steps.push(`<div class="solution-step">D > 0 → Zwei reelle Lösungen</div>`);
+                steps.push(`<div class="solution-step">x₁ = (-b + √D) / 2a = ${x1.toFixed(6)}</div>`);
+                steps.push(`<div class="solution-step">x₂ = (-b - √D) / 2a = ${x2.toFixed(6)}</div>`);
+
+                const verify1 = Math.abs(evaluateExpression(leftExpr, x1) - evaluateExpression(rightExpr, x1));
+                const verify2 = Math.abs(evaluateExpression(leftExpr, x2) - evaluateExpression(rightExpr, x2));
+                steps.push(`<div class="solution-step"><em>Probe: f(x₁) = ${verify1.toExponential(2)}, f(x₂) = ${verify2.toExponential(2)}</em></div>`);
+
+                steps.push(`<div class="solution-final"><strong>x₁ ≈ ${x1.toFixed(6)}<br>x₂ ≈ ${x2.toFixed(6)}</strong></div>`);
+            } else if (Math.abs(discriminant) < 1e-10) {
+                const x = -b / (2 * a);
+                steps.push(`<div class="solution-step">D = 0 → Eine doppelte Nullstelle</div>`);
+                steps.push(`<div class="solution-final"><strong>x = ${x.toFixed(6)}</strong></div>`);
+            } else {
+                const realPart = -b / (2 * a);
+                const imagPart = Math.sqrt(-discriminant) / (2 * a);
+                steps.push(`<div class="solution-step">D < 0 → Komplexe Lösungen</div>`);
+                steps.push(`<div class="solution-final"><strong>x₁ = ${realPart.toFixed(4)} + ${imagPart.toFixed(4)}i<br>x₂ = ${realPart.toFixed(4)} - ${imagPart.toFixed(4)}i</strong></div>`);
+            }
+
+            return steps.join('');
+        }
+    }
+
+    steps.push(`<div class="solution-step"><strong>Numerische Lösung:</strong></div>`);
+
+    const roots = findAllRoots(leftExpr, rightExpr, degree);
+
+    if (roots.length === 0) {
+        steps.push(`<div class="solution-step">Keine reellen Lösungen gefunden.</div>`);
+        return steps.join('');
+    }
+
+    roots.forEach((root, i) => {
+        const roundedRoot = Math.abs(root) < 1e-10 ? 0 : root;
+        const verify = Math.abs(evaluateExpression(leftExpr, root) - evaluateExpression(rightExpr, root));
+        steps.push(`<div class="solution-step">x${roots.length > 1 ? '₁₂₃₄₅'[i] : ''} = ${roundedRoot.toFixed(6)} <em>(Probe: ${verify.toExponential(2)})</em></div>`);
+    });
+
+    if (roots.length === 1) {
+        steps.push(`<div class="solution-final"><strong>x ≈ ${roots[0].toFixed(6)}</strong></div>`);
+    } else {
+        const formatted = roots.map((r, i) => `x${'₁₂₃₄₅'[i]} ≈ ${r.toFixed(6)}`).join('<br>');
+        steps.push(`<div class="solution-final"><strong>${formatted}</strong></div>`);
+    }
+
+    return steps.join('');
+}
+
+function solveDerivative(input) {
+    const funcMatch = input.match(/f\(x\)\s*=\s*(.+)/i);
+    if (!funcMatch) {
+        return '<p>Bitte im Format f(x) = ... eingeben</p>';
+    }
+
+    let func = funcMatch[1].replace(/\s+/g, '').replace(/²/g, '^2').replace(/³/g, '^3');
+    let steps = [`<div class="solution-step"><strong>Funktion:</strong> f(x) = ${escapeHtml(funcMatch[1])}</div>`];
+    let derivative = '';
+    let terms = [];
+
+    func = func.replace(/-/g, '+-');
+    const parts = func.split('+').filter(p => p);
+
+    steps.push('<div class="solution-step"><strong>Ableitungsregeln anwenden:</strong></div>');
+
+    parts.forEach(term => {
+        term = term.trim();
+        if (!term) return;
+
+        if (!term.includes('x')) {
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → 0 (Konstante)</div>`);
+            return;
+        }
+
+        const powerMatch = term.match(/^(-?\d*\.?\d*)x\^?(\d*)$/);
+        if (powerMatch) {
+            const coef = parseFloat(powerMatch[1] || 1) || 1;
+            const exp = parseFloat(powerMatch[2] || 1) || 1;
+            const newCoef = coef * exp;
+            const newExp = exp - 1;
+
+            let derivTerm = '';
+            if (newExp === 0) derivTerm = `${newCoef}`;
+            else if (newExp === 1) derivTerm = `${newCoef}x`;
+            else derivTerm = `${newCoef}x^${newExp}`;
+
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → ${newCoef}x^${newExp} = ${derivTerm} (Potenzregel)</div>`);
+            terms.push(derivTerm);
+            return;
+        }
+
+        if (term.includes('sin')) {
+            const coefMatch = term.match(/^(-?\d*)/);
+            const coef = parseFloat(coefMatch[1] || 1) || 1;
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → ${coef}cos(x)</div>`);
+            terms.push(`${coef}cos(x)`);
+            return;
+        }
+
+        if (term.includes('cos')) {
+            const coefMatch = term.match(/^(-?\d*)/);
+            const coef = parseFloat(coefMatch[1] || 1) || 1;
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → ${-coef}sin(x)</div>`);
+            terms.push(`${-coef}sin(x)`);
+            return;
+        }
+
+        if (term.includes('e^x')) {
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → e^x</div>`);
+            terms.push('e^x');
+            return;
+        }
+
+        if (term.includes('ln')) {
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → 1/x</div>`);
+            terms.push('1/x');
+            return;
+        }
+    });
+
+    derivative = terms.join(' + ').replace(/\+ -/g, '- ');
+    steps.push(`<div class="solution-final"><strong>f'(x) = ${derivative || '0'}</strong></div>`);
+
+    return steps.join('');
+}
+
+function solveIntegral(input) {
+    let func = input.replace(/∫/g, '').replace(/dx/gi, '').replace(/\s+/g, '');
+    let bounds = null;
+
+    const boundsMatch = input.match(/von\s*(-?\d+\.?\d*)\s*bis\s*(-?\d+\.?\d*)/i);
+    if (boundsMatch) {
+        bounds = { lower: parseFloat(boundsMatch[1]), upper: parseFloat(boundsMatch[2]) };
+        func = func.replace(/von.*/i, '').trim();
+    }
+
+    func = func.replace(/²/g, '^2').replace(/³/g, '^3');
+
+    let steps = [`<div class="solution-step"><strong>Integral:</strong> ∫ ${escapeHtml(func)} dx</div>`];
+    let terms = [];
+
+    func = func.replace(/-/g, '+-');
+    const parts = func.split('+').filter(p => p);
+
+    steps.push('<div class="solution-step"><strong>Stammfunktion bilden:</strong></div>');
+
+    parts.forEach(term => {
+        term = term.trim();
+        if (!term) return;
+
+        if (!term.includes('x')) {
+            const c = parseFloat(term);
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → ${c}x</div>`);
+            terms.push(`${c}x`);
+            return;
+        }
+
+        const powerMatch = term.match(/^(-?\d*\.?\d*)x\^?(\d*)$/);
+        if (powerMatch) {
+            const coef = parseFloat(powerMatch[1] || 1) || 1;
+            const exp = parseFloat(powerMatch[2] || 1) || 1;
+            const newCoef = coef / (exp + 1);
+            const newExp = exp + 1;
+
+            const formattedCoef = Number.isInteger(newCoef) ? newCoef : newCoef.toFixed(4);
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → ${formattedCoef}x^${newExp}</div>`);
+            terms.push(`${formattedCoef}x^${newExp}`);
+            return;
+        }
+
+        if (term.includes('sin')) {
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → -cos(x)</div>`);
+            terms.push('-cos(x)');
+            return;
+        }
+
+        if (term.includes('cos')) {
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → sin(x)</div>`);
+            terms.push('sin(x)');
+            return;
+        }
+
+        if (term.includes('e^x')) {
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → e^x</div>`);
+            terms.push('e^x');
+            return;
+        }
+
+        if (term === '1/x') {
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → ln|x|</div>`);
+            terms.push('ln|x|');
+            return;
+        }
+    });
+
+    const antiderivative = terms.join(' + ').replace(/\+ -/g, '- ') + ' + C';
+    steps.push(`<div class="solution-step"><strong>Stammfunktion:</strong> F(x) = ${antiderivative}</div>`);
+
+    if (bounds) {
+        steps.push(`<div class="solution-step"><strong>Bestimmtes Integral von ${bounds.lower} bis ${bounds.upper}:</strong></div>`);
+        steps.push(`<div class="solution-step">F(${bounds.upper}) - F(${bounds.lower})</div>`);
+
+        let result = 0;
+        terms.forEach(term => {
+            const match = term.match(/(-?\d*\.?\d*)x\^(\d+)/);
+            if (match) {
+                const coef = parseFloat(match[1]) || 1;
+                const exp = parseInt(match[2]);
+                result += coef * (Math.pow(bounds.upper, exp) - Math.pow(bounds.lower, exp));
+            }
+        });
+
+        steps.push(`<div class="solution-final"><strong>= ${result.toFixed(4)}</strong></div>`);
+    } else {
+        steps.push(`<div class="solution-final"><strong>F(x) = ${antiderivative}</strong></div>`);
+    }
+
+    return steps.join('');
+}
+
+function solveVector(input) {
+    const inp = input.toLowerCase();
+
+    const parseVector = (str) => {
+        const match = str.match(/\((-?\d+\.?\d*),\s*(-?\d+\.?\d*),?\s*(-?\d+\.?\d*)?\)/);
+        if (match) {
+            return [parseFloat(match[1]), parseFloat(match[2]), parseFloat(match[3] || 0)];
+        }
+        return null;
+    };
+
+    if (inp.includes('betrag')) {
+        const vec = parseVector(input);
+        if (vec) {
+            const mag = Math.sqrt(vec[0]**2 + vec[1]**2 + vec[2]**2);
+            return `
+                <div class="solution-step"><strong>Vektor:</strong> (${vec.join(', ')})</div>
+                <div class="solution-step">|v| = √(${vec[0]}² + ${vec[1]}² + ${vec[2]}²)</div>
+                <div class="solution-step">|v| = √(${vec[0]**2} + ${vec[1]**2} + ${vec[2]**2})</div>
+                <div class="solution-step">|v| = √${vec[0]**2 + vec[1]**2 + vec[2]**2}</div>
+                <div class="solution-final"><strong>|v| = ${mag.toFixed(4)}</strong></div>
+            `;
+        }
+    }
+
+    if (inp.includes('·') || inp.includes('skalar')) {
+        const vectors = input.match(/\((-?\d+\.?\d*),\s*(-?\d+\.?\d*),?\s*(-?\d+\.?\d*)?\)/g);
+        if (vectors && vectors.length >= 2) {
+            const v1 = parseVector(vectors[0]);
+            const v2 = parseVector(vectors[1]);
+            const dot = v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2];
+            return `
+                <div class="solution-step"><strong>Vektoren:</strong> a = (${v1.join(', ')}), b = (${v2.join(', ')})</div>
+                <div class="solution-step">a · b = ${v1[0]}·${v2[0]} + ${v1[1]}·${v2[1]} + ${v1[2]}·${v2[2]}</div>
+                <div class="solution-step">a · b = ${v1[0]*v2[0]} + ${v1[1]*v2[1]} + ${v1[2]*v2[2]}</div>
+                <div class="solution-final"><strong>a · b = ${dot}</strong></div>
+            `;
+        }
+    }
+
+    if (inp.includes('×') || inp.includes('kreuz')) {
+        const vectors = input.match(/\((-?\d+\.?\d*),\s*(-?\d+\.?\d*),?\s*(-?\d+\.?\d*)?\)/g);
+        if (vectors && vectors.length >= 2) {
+            const v1 = parseVector(vectors[0]);
+            const v2 = parseVector(vectors[1]);
+            const cross = [
+                v1[1]*v2[2] - v1[2]*v2[1],
+                v1[2]*v2[0] - v1[0]*v2[2],
+                v1[0]*v2[1] - v1[1]*v2[0]
+            ];
+            return `
+                <div class="solution-step"><strong>Vektoren:</strong> a = (${v1.join(', ')}), b = (${v2.join(', ')})</div>
+                <div class="solution-step"><strong>Kreuzprodukt:</strong></div>
+                <div class="solution-step">x: ${v1[1]}·${v2[2]} - ${v1[2]}·${v2[1]} = ${cross[0]}</div>
+                <div class="solution-step">y: ${v1[2]}·${v2[0]} - ${v1[0]}·${v2[2]} = ${cross[1]}</div>
+                <div class="solution-step">z: ${v1[0]}·${v2[1]} - ${v1[1]}·${v2[0]} = ${cross[2]}</div>
+                <div class="solution-final"><strong>a × b = (${cross.join(', ')})</strong></div>
+            `;
+        }
+    }
+
+    return '<p>Vektor-Operationen: Betrag von (x,y,z), Skalarprodukt (·), Kreuzprodukt (×)</p>';
+}
+
+function solveMatrix(input) {
+    const inp = input.toLowerCase();
+
+    const parse2x2 = (str) => {
+        const match = str.match(/\[\[(-?\d+),(-?\d+)\],\[(-?\d+),(-?\d+)\]\]/);
+        if (match) {
+            return [[parseFloat(match[1]), parseFloat(match[2])], [parseFloat(match[3]), parseFloat(match[4])]];
+        }
+        return null;
+    };
+
+    if (inp.includes('det')) {
+        const matrix = parse2x2(input.replace(/\s/g, ''));
+        if (matrix) {
+            const det = matrix[0][0]*matrix[1][1] - matrix[0][1]*matrix[1][0];
+            return `
+                <div class="solution-step"><strong>Matrix:</strong></div>
+                <div class="solution-step matrix-display">| ${matrix[0][0]}  ${matrix[0][1]} |<br>| ${matrix[1][0]}  ${matrix[1][1]} |</div>
+                <div class="solution-step">det(A) = ${matrix[0][0]}·${matrix[1][1]} - ${matrix[0][1]}·${matrix[1][0]}</div>
+                <div class="solution-step">det(A) = ${matrix[0][0]*matrix[1][1]} - ${matrix[0][1]*matrix[1][0]}</div>
+                <div class="solution-final"><strong>det(A) = ${det}</strong></div>
+            `;
+        }
+    }
+
+    if (inp.includes('inv')) {
+        const matrix = parse2x2(input.replace(/\s/g, ''));
+        if (matrix) {
+            const det = matrix[0][0]*matrix[1][1] - matrix[0][1]*matrix[1][0];
+            if (det === 0) {
+                return '<p class="error">Matrix ist nicht invertierbar (det = 0)</p>';
+            }
+            const inv = [
+                [matrix[1][1]/det, -matrix[0][1]/det],
+                [-matrix[1][0]/det, matrix[0][0]/det]
+            ];
+            return `
+                <div class="solution-step"><strong>Matrix:</strong></div>
+                <div class="solution-step matrix-display">| ${matrix[0][0]}  ${matrix[0][1]} |<br>| ${matrix[1][0]}  ${matrix[1][1]} |</div>
+                <div class="solution-step">det(A) = ${det}</div>
+                <div class="solution-step"><strong>Inverse: A⁻¹ = 1/det · adj(A)</strong></div>
+                <div class="solution-final matrix-display">| ${inv[0][0].toFixed(4)}  ${inv[0][1].toFixed(4)} |<br>| ${inv[1][0].toFixed(4)}  ${inv[1][1].toFixed(4)} |</div>
+            `;
+        }
+    }
+
+    if (inp.includes('*')) {
+        const matrices = input.replace(/\s/g, '').match(/\[\[.+?\]\]/g);
+        if (matrices && matrices.length >= 2) {
+            const A = parse2x2(matrices[0]);
+            const B = parse2x2(matrices[1]);
+            if (A && B) {
+                const C = [
+                    [A[0][0]*B[0][0] + A[0][1]*B[1][0], A[0][0]*B[0][1] + A[0][1]*B[1][1]],
+                    [A[1][0]*B[0][0] + A[1][1]*B[1][0], A[1][0]*B[0][1] + A[1][1]*B[1][1]]
+                ];
+                return `
+                    <div class="solution-step"><strong>A × B:</strong></div>
+                    <div class="solution-final matrix-display">| ${C[0][0]}  ${C[0][1]} |<br>| ${C[1][0]}  ${C[1][1]} |</div>
+                `;
+            }
+        }
+    }
+
+    return '<p>Matrix-Operationen: det [[a,b],[c,d]], inv [[a,b],[c,d]], Multiplikation mit *</p>';
+}
+
+function solveProbability(input) {
+    const inp = input.toLowerCase();
+
+    const binomCoef = (n, k) => {
+        if (k > n) return 0;
+        if (k === 0 || k === n) return 1;
+        let result = 1;
+        for (let i = 0; i < k; i++) {
+            result = result * (n - i) / (i + 1);
+        }
+        return Math.round(result);
+    };
+
+    const binomMatch = inp.match(/b\((\d+),\s*([\d.]+),\s*(\d+)\)/);
+    if (binomMatch) {
+        const n = parseInt(binomMatch[1]);
+        const p = parseFloat(binomMatch[2]);
+        const k = parseInt(binomMatch[3]);
+        const q = 1 - p;
+        const binom = binomCoef(n, k);
+        const prob = binom * Math.pow(p, k) * Math.pow(q, n - k);
+
+        return `
+            <div class="solution-step"><strong>Binomialverteilung:</strong> B(${n}, ${p})</div>
+            <div class="solution-step">P(X = ${k}) = C(${n}, ${k}) · ${p}^${k} · ${q.toFixed(2)}^${n - k}</div>
+            <div class="solution-step">= ${binom} · ${Math.pow(p, k).toFixed(6)} · ${Math.pow(q, n - k).toFixed(6)}</div>
+            <div class="solution-final"><strong>P(X = ${k}) = ${prob.toFixed(6)} ≈ ${(prob * 100).toFixed(2)}%</strong></div>
+        `;
+    }
+
+    const expMatch = inp.match(/e\(x\).*b\((\d+),\s*([\d.]+)\)/);
+    if (expMatch) {
+        const n = parseInt(expMatch[1]);
+        const p = parseFloat(expMatch[2]);
+        const ex = n * p;
+        const variance = n * p * (1 - p);
+        const stddev = Math.sqrt(variance);
+
+        return `
+            <div class="solution-step"><strong>Binomialverteilung:</strong> B(${n}, ${p})</div>
+            <div class="solution-step"><strong>Erwartungswert:</strong> E(X) = n · p = ${n} · ${p}</div>
+            <div class="solution-final"><strong>E(X) = ${ex}</strong></div>
+            <div class="solution-step"><strong>Varianz:</strong> Var(X) = n · p · (1-p) = ${variance.toFixed(4)}</div>
+            <div class="solution-step"><strong>Standardabweichung:</strong> σ = ${stddev.toFixed(4)}</div>
+        `;
+    }
+
+    const normMatch = inp.match(/p\(x\s*<\s*([\d.]+)\).*n\(([\d.]+),\s*([\d.]+)\)/);
+    if (normMatch) {
+        const x = parseFloat(normMatch[1]);
+        const mu = parseFloat(normMatch[2]);
+        const sigma = parseFloat(normMatch[3]);
+        const z = (x - mu) / sigma;
+
+        const erf = (x) => {
+            const t = 1 / (1 + 0.5 * Math.abs(x));
+            const tau = t * Math.exp(-x * x - 1.26551223 + t * (1.00002368 + t * (0.37409196 +
+                t * (0.09678418 + t * (-0.18628806 + t * (0.27886807 + t * (-1.13520398 +
+                t * (1.48851587 + t * (-0.82215223 + t * 0.17087277)))))))));
+            return x >= 0 ? 1 - tau : tau - 1;
+        };
+        const phi = (z) => 0.5 * (1 + erf(z / Math.sqrt(2)));
+        const prob = phi(z);
+
+        return `
+            <div class="solution-step"><strong>Normalverteilung:</strong> N(${mu}, ${sigma})</div>
+            <div class="solution-step">z = (x - μ) / σ = (${x} - ${mu}) / ${sigma} = ${z.toFixed(4)}</div>
+            <div class="solution-step">P(X < ${x}) = Φ(${z.toFixed(4)})</div>
+            <div class="solution-final"><strong>P(X < ${x}) = ${prob.toFixed(6)} ≈ ${(prob * 100).toFixed(2)}%</strong></div>
+        `;
+    }
+
+    return `<p>Stochastik-Formeln:</p>
+        <ul>
+            <li>Binomial: B(n, p, k) - z.B. B(10, 0.5, 3)</li>
+            <li>Erwartungswert: E(X) für B(n, p)</li>
+            <li>Normalverteilung: P(X < x) für N(μ, σ)</li>
+        </ul>`;
+}
+
+function openEssayHelper() {
+    document.getElementById('essayModal').classList.add('active');
+}
+
+function closeEssayModal(event) {
+    if (!event || event.target === event.currentTarget) {
+        document.getElementById('essayModal').classList.remove('active');
+    }
+}
+
+async function generateEssay() {
+    const type = document.getElementById('essayType').value;
+    const topic = document.getElementById('essayTopic').value.trim();
+    const info = document.getElementById('essayInfo').value.trim();
+    const length = document.getElementById('essayLength').value;
+    const language = document.getElementById('essayLanguage').value;
+
+    if (!topic) {
+        alert('Bitte gib ein Thema ein');
+        return;
+    }
+
+    const typeNames = {
+        'eroerterung': 'Erörterung',
+        'interpretation': 'Interpretation',
+        'analyse': 'Analyse',
+        'charakterisierung': 'Charakterisierung',
+        'inhaltsangabe': 'Inhaltsangabe',
+        'bericht': 'Bericht',
+        'kommentar': 'Kommentar'
+    };
+
+    document.getElementById('essayResult').style.display = 'block';
+    document.getElementById('essaySolution').innerHTML = '<div class="loading">Generiere Essay...</div>';
+
+    if (ollamaAvailable) {
+        try {
+            const wordCount = length === 'short' ? 300 : length === 'long' ? 800 : 500;
+
+            const response = await fetch('/api/hub/assistant/essay', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    topic: topic + (info ? ` - ${info}` : ''),
+                    type: type,
+                    model: ollamaModel
+                }),
+                signal: AbortSignal.timeout(120000)
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.response) {
+                    document.getElementById('essaySolution').innerHTML = formatEssayOutput(data.response);
+                    return;
+                }
+            }
+        } catch (e) {
+            console.log('Essay generation error:', e);
+        }
+    }
+
+    document.getElementById('essaySolution').innerHTML = getEssayTemplate(type, escapeHtml(topic), language);
+}
+
+function getEssayTemplate(type, topic, language) {
+    const templates = {
+        'eroerterung': `
+            <h4>Erörterung: ${topic}</h4>
+
+            <p><strong>Einleitung:</strong></p>
+            <p>Das Thema "${topic}" ist in der heutigen Gesellschaft von großer Relevanz. In der folgenden Erörterung sollen die verschiedenen Aspekte dieses Themas beleuchtet und gegeneinander abgewogen werden.</p>
+
+            <p><strong>Hauptteil - Pro-Argumente:</strong></p>
+            <ul>
+                <li>Argument 1: [Hier Pro-Argument einfügen]</li>
+                <li>Argument 2: [Hier weiteres Pro-Argument einfügen]</li>
+                <li>Argument 3: [Hier drittes Pro-Argument einfügen]</li>
+            </ul>
+
+            <p><strong>Hauptteil - Contra-Argumente:</strong></p>
+            <ul>
+                <li>Argument 1: [Hier Contra-Argument einfügen]</li>
+                <li>Argument 2: [Hier weiteres Contra-Argument einfügen]</li>
+                <li>Argument 3: [Hier drittes Contra-Argument einfügen]</li>
+            </ul>
+
+            <p><strong>Schluss:</strong></p>
+            <p>Abwägend lässt sich feststellen, dass... [Eigene Position mit Begründung]</p>
+
+            <p class="tip">💡 <em>Tipp: Fülle die Platzhalter mit konkreten Argumenten und Beispielen. Für einen vollständigen Essay installiere Ollama für KI-Unterstützung.</em></p>
+        `,
+        'analyse': `
+            <h4>Analyse: ${topic}</h4>
+
+            <p><strong>Einleitung:</strong></p>
+            <p>Der vorliegende Text/Das vorliegende Werk behandelt... [Kurze Einordnung in Kontext, Autor, Entstehungszeit]</p>
+
+            <p><strong>Hauptteil - Inhaltliche Analyse:</strong></p>
+            <ul>
+                <li>Thema und Kernaussage</li>
+                <li>Aufbau und Struktur</li>
+                <li>Zentrale Motive und Symbole</li>
+            </ul>
+
+            <p><strong>Sprachliche/Stilistische Analyse:</strong></p>
+            <ul>
+                <li>Wortwahl und Sprachebene</li>
+                <li>Rhetorische Mittel (Metaphern, Vergleiche, etc.)</li>
+                <li>Satzbau und Rhythmus</li>
+            </ul>
+
+            <p><strong>Schluss:</strong></p>
+            <p>Zusammenfassend zeigt die Analyse... [Wirkung und Bedeutung]</p>
+        `,
+        'interpretation': `
+            <h4>Interpretation: ${topic}</h4>
+
+            <p><strong>Einleitung:</strong></p>
+            <p>Das Werk "${topic}" von [Autor] aus dem Jahr [Jahr] ist ein bedeutendes Beispiel für... [Gattung, Epoche einordnen]</p>
+
+            <p><strong>Inhaltsangabe:</strong></p>
+            <p>[Kurze Zusammenfassung des Inhalts im Präsens]</p>
+
+            <p><strong>Interpretation:</strong></p>
+            <ul>
+                <li>Deutung der Handlung und Figuren</li>
+                <li>Symbolik und Motive</li>
+                <li>Historischer/gesellschaftlicher Kontext</li>
+                <li>Aktualitätsbezug</li>
+            </ul>
+
+            <p><strong>Schluss:</strong></p>
+            <p>Die Interpretation zeigt, dass... [Fazit zur Bedeutung des Werks]</p>
+        `,
+        'charakterisierung': `
+            <h4>Charakterisierung: ${topic}</h4>
+
+            <p><strong>Einleitung:</strong></p>
+            <p>Die Figur [Name] stammt aus dem Werk [Werk] von [Autor]. Sie spielt eine [zentrale/wichtige] Rolle in der Handlung.</p>
+
+            <p><strong>Äußere Merkmale:</strong></p>
+            <ul>
+                <li>Alter, Aussehen</li>
+                <li>Soziale Stellung, Beruf</li>
+                <li>Familiäre Situation</li>
+            </ul>
+
+            <p><strong>Innere Merkmale:</strong></p>
+            <ul>
+                <li>Charaktereigenschaften</li>
+                <li>Verhaltensweisen</li>
+                <li>Beziehungen zu anderen Figuren</li>
+                <li>Entwicklung im Verlauf der Handlung</li>
+            </ul>
+
+            <p><strong>Schluss:</strong></p>
+            <p>Insgesamt lässt sich die Figur als... charakterisieren. Ihre Funktion im Werk ist...</p>
+        `,
+        'inhaltsangabe': `
+            <h4>Inhaltsangabe: ${topic}</h4>
+
+            <p><strong>Einleitungssatz:</strong></p>
+            <p>Das/Die [Textsorte] "[Titel]" von [Autor], erschienen [Jahr], handelt von... [Kernthema in einem Satz]</p>
+
+            <p><strong>Hauptteil:</strong></p>
+            <p>[Zusammenfassung der Handlung im Präsens, chronologisch, ohne wörtliche Rede, nur das Wesentliche]</p>
+
+            <p class="tip">💡 <em>Tipps für die Inhaltsangabe:</em></p>
+            <ul>
+                <li>Immer Präsens verwenden</li>
+                <li>Keine wörtliche Rede (indirekte Rede nutzen)</li>
+                <li>Keine eigene Meinung</li>
+                <li>Nur die wichtigsten Ereignisse</li>
+                <li>Sachlich und neutral schreiben</li>
+            </ul>
+        `,
+        'bericht': `
+            <h4>Bericht: ${topic}</h4>
+
+            <p><strong>Überschrift:</strong> [Informative Überschrift]</p>
+
+            <p><strong>Einleitung (W-Fragen):</strong></p>
+            <ul>
+                <li><strong>Was</strong> ist passiert?</li>
+                <li><strong>Wer</strong> war beteiligt?</li>
+                <li><strong>Wann</strong> ist es passiert?</li>
+                <li><strong>Wo</strong> ist es passiert?</li>
+            </ul>
+
+            <p><strong>Hauptteil:</strong></p>
+            <p>[Chronologischer Ablauf der Ereignisse im Präteritum]</p>
+            <ul>
+                <li><strong>Wie</strong> ist es passiert? (Hergang)</li>
+                <li><strong>Warum</strong> ist es passiert? (Ursachen)</li>
+            </ul>
+
+            <p><strong>Schluss:</strong></p>
+            <p>[Folgen, Konsequenzen, aktueller Stand]</p>
+        `,
+        'kommentar': `
+            <h4>Kommentar: ${topic}</h4>
+
+            <p><strong>Einleitung:</strong></p>
+            <p>[Aktueller Anlass, der zum Thema hinführt]</p>
+
+            <p><strong>These:</strong></p>
+            <p>[Klare Positionierung zum Thema]</p>
+
+            <p><strong>Argumentation:</strong></p>
+            <ul>
+                <li>Argument 1 mit Beispiel/Beleg</li>
+                <li>Argument 2 mit Beispiel/Beleg</li>
+                <li>Gegenargument und Entkräftung</li>
+            </ul>
+
+            <p><strong>Schluss:</strong></p>
+            <p>[Zusammenfassung der eigenen Position, ggf. Appell oder Ausblick]</p>
+
+            <p class="tip">💡 <em>Im Kommentar ist die eigene Meinung ausdrücklich erwünscht!</em></p>
+        `
+    };
+
+    return templates[type] || templates['eroerterung'];
+}
+
+function formatEssayOutput(text) {
+    return escapeHtml(text)
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>')
+        .replace(/^/, '<p>')
+        .replace(/$/, '</p>');
+}
+
+function copyEssay() {
+    const content = document.getElementById('essaySolution').innerText;
+    navigator.clipboard.writeText(content);
+    alert('Essay kopiert!');
+}
+
+function openSummaryHelper() {
+    document.getElementById('summaryModal').classList.add('active');
+}
+
+function closeSummaryModal(event) {
+    if (!event || event.target === event.currentTarget) {
+        document.getElementById('summaryModal').classList.remove('active');
+    }
+}
+
+async function generateSummary() {
+    const text = document.getElementById('summaryInput').value.trim();
+    const type = document.getElementById('summaryType').value;
+    const subject = document.getElementById('summarySubject').value;
+
+    if (!text) {
+        alert('Bitte gib einen Text ein');
+        return;
+    }
+
+    document.getElementById('summaryResult').style.display = 'block';
+    document.getElementById('summarySolution').innerHTML = '<div class="loading">Erstelle Zusammenfassung...</div>';
+
+    if (ollamaAvailable) {
+        try {
+            const lengthMap = {
+                'kurz': 'short',
+                'stichpunkte': 'medium',
+                'detailliert': 'long',
+                'lernkarten': 'medium'
+            };
+
+            const response = await fetch('/api/hub/assistant/summarize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: text + (subject ? `\n\n[Fach: ${subject}]` : ''),
+                    length: lengthMap[type] || 'medium',
+                    model: ollamaModel
+                }),
+                signal: AbortSignal.timeout(120000)
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.summary) {
+                    document.getElementById('summarySolution').innerHTML = formatSummaryOutput(data.summary, type);
+                    return;
+                }
+            }
+        } catch (e) {
+            console.log('Summary generation error:', e);
+        }
+    }
+
+    document.getElementById('summarySolution').innerHTML = getOfflineSummary(text, type);
+}
+
+function getOfflineSummary(text, type) {
+    const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+    const words = text.split(/\s+/);
+    const wordCount = words.length;
+
+    let result = '';
+
+    switch (type) {
+        case 'kurz':
+            const shortSummary = sentences.slice(0, Math.min(3, sentences.length)).join(' ');
+            result = `
+                <p><strong>Kurze Zusammenfassung:</strong></p>
+                <p>${escapeHtml(shortSummary)}</p>
+                <p class="stats">📊 Original: ${wordCount} Wörter → Zusammenfassung: ${shortSummary.split(/\s+/).length} Wörter</p>
+            `;
+            break;
+
+        case 'stichpunkte':
+            const bulletPoints = sentences.slice(0, Math.min(6, sentences.length));
+            result = `
+                <p><strong>Stichpunkte:</strong></p>
+                <ul>
+                    ${bulletPoints.map(s => `<li>${escapeHtml(s.trim())}</li>`).join('')}
+                </ul>
+            `;
+            break;
+
+        case 'detailliert':
+            result = `
+                <p><strong>Detaillierte Zusammenfassung:</strong></p>
+                <p><em>Hauptinhalt:</em> ${escapeHtml(sentences.slice(0, 2).join(' '))}</p>
+                <p><em>Weitere Details:</em> ${escapeHtml(sentences.slice(2, 5).join(' '))}</p>
+                ${sentences.length > 5 ? `<p><em>Zusätzliche Informationen:</em> ${escapeHtml(sentences.slice(5, 8).join(' '))}</p>` : ''}
+                <p class="stats">📊 Original: ${wordCount} Wörter, ${sentences.length} Sätze</p>
+            `;
+            break;
+
+        case 'lernkarten':
+            const cards = sentences.slice(0, 5).map((s, i) => {
+                const trimmed = s.trim();
+                return `
+                    <div class="flashcard">
+                        <div class="flashcard-q"><strong>Q${i + 1}:</strong> Was bedeutet: "${escapeHtml(trimmed.substring(0, 50))}..."?</div>
+                        <div class="flashcard-a"><strong>A:</strong> ${escapeHtml(trimmed)}</div>
+                    </div>
+                `;
+            });
+            result = `
+                <p><strong>Lernkarten:</strong></p>
+                ${cards.join('')}
+            `;
+            break;
+    }
+
+    if (!ollamaAvailable) {
+        result += `<p class="tip">💡 <em>Für bessere Zusammenfassungen installiere Ollama für lokale KI-Unterstützung.</em></p>`;
+    } else {
+        result += `<p class="tip">⚠️ <em>KI-Zusammenfassung fehlgeschlagen, hier ist eine einfache Textanalyse.</em></p>`;
+    }
+
+    return result;
+}
+
+function formatSummaryOutput(text, type) {
+    if (type === 'stichpunkte') {
+        const lines = text.split('\n').filter(l => l.trim());
+        return '<ul>' + lines.map(l => `<li>${escapeHtml(l.replace(/^[-•*]\s*/, ''))}</li>`).join('') + '</ul>';
+    }
+
+    if (type === 'lernkarten') {
+        const cards = text.split(/Q:|Frage:/gi).filter(c => c.trim());
+        return cards.map(card => {
+            const parts = card.split(/A:|Antwort:/i);
+            if (parts.length >= 2) {
+                return `
+                    <div class="flashcard">
+                        <div class="flashcard-q"><strong>Q:</strong> ${escapeHtml(parts[0].trim())}</div>
+                        <div class="flashcard-a"><strong>A:</strong> ${escapeHtml(parts[1].trim())}</div>
+                    </div>
+                `;
+            }
+            return '';
+        }).join('');
+    }
+
+    return escapeHtml(text).replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>').replace(/^/, '<p>').replace(/$/, '</p>');
+}
+
+function copySummary() {
+    const content = document.getElementById('summarySolution').innerText;
+    navigator.clipboard.writeText(content);
+    alert('Zusammenfassung kopiert!');
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeMathModal();
+        closeEssayModal();
+        closeSummaryModal();
+    }
+});
+</script>
+
+<style>
+.assistant-page {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 40px);
+    max-height: calc(100vh - 40px);
+}
+
+.chat-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.message {
+    display: flex;
+    gap: 12px;
+    max-width: 85%;
+}
+
+.message.user {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+}
+
+.message-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--glass-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--text-secondary);
+}
+
+.message.user .message-avatar {
+    background: var(--accent);
+    color: white;
+}
+
+.message-content {
+    background: var(--glass-bg);
+    padding: 12px 16px;
+    border-radius: 16px;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+.message.user .message-content {
+    background: var(--accent);
+    color: white;
+    border-radius: 16px 16px 4px 16px;
+}
+
+.message.assistant .message-content {
+    border-radius: 16px 16px 16px 4px;
+}
+
+.suggestion-list {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.suggestion-list li {
+    background: var(--hover-bg);
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.suggestion-list li:hover {
+    background: var(--accent);
+    color: white;
+}
+
+.chat-input-form {
+    display: flex;
+    gap: 12px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border-color);
+    background: var(--glass-bg);
+}
+
+.chat-input-form input {
+    flex: 1;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 24px;
+    padding: 12px 20px;
+    color: var(--text-primary);
+    font-size: 15px;
+}
+
+.chat-input-form input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.chat-input-form button {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.quick-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+}
+
+.quick-action {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: var(--glass-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.quick-action:hover {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+.quick-action svg {
+    color: var(--text-secondary);
+}
+
+.quick-action:hover svg {
+    color: white;
+}
+
+/* Typing indicator */
+.typing-dots {
+    display: flex;
+    gap: 4px;
+}
+
+.typing-dots span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    animation: typing 1.4s infinite ease-in-out both;
+}
+
+.typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+.typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes typing {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+    40% { transform: scale(1); opacity: 1; }
+}
+
+@media (max-width: 768px) {
+    .message {
+        max-width: 95%;
+    }
+
+    .quick-actions {
+        flex-direction: column;
+    }
+
+    .quick-action {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Modal styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--glass-bg);
+    border-radius: 16px;
+    max-width: 500px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+}
+
+.modal-content.large-modal {
+    max-width: 700px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+}
+
+.modal-close:hover {
+    background: var(--hover-bg);
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.btn-primary.full-width {
+    width: 100%;
+}
+
+/* Math helper styles */
+.math-categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.math-cat {
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.math-cat:hover {
+    border-color: var(--accent);
+}
+
+.math-cat.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.math-input-section {
+    margin-bottom: 16px;
+}
+
+.math-input-section label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.math-input-section textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 15px;
+    font-family: 'SF Mono', monospace;
+    resize: vertical;
+}
+
+.math-examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+    align-items: center;
+}
+
+.math-examples .example-label {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.math-examples button {
+    padding: 4px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.math-examples button:hover {
+    background: var(--hover-bg);
+}
+
+.math-result,
+.essay-result,
+.summary-result {
+    margin-top: 20px;
+    padding: 16px;
+    background: var(--bg-primary);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.math-result h3,
+.essay-result h3,
+.summary-result h3 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.solution-step {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 14px;
+}
+
+.solution-step:last-child {
+    border-bottom: none;
+}
+
+.solution-final {
+    padding: 12px;
+    background: rgba(99, 102, 241, 0.1);
+    border-radius: 8px;
+    margin-top: 12px;
+    font-size: 16px;
+}
+
+.matrix-display {
+    font-family: 'SF Mono', monospace;
+    white-space: pre;
+    text-align: center;
+}
+
+.error {
+    color: var(--danger);
+}
+
+/* Essay helper styles */
+.essay-type-selector {
+    margin-bottom: 16px;
+}
+
+.essay-type-selector select {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.result-header h3 {
+    margin: 0;
+}
+
+.essay-content,
+.summary-content {
+    line-height: 1.7;
+    font-size: 14px;
+}
+
+.essay-content h4 {
+    margin: 0 0 16px 0;
+    color: var(--accent);
+}
+
+.essay-content ul {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.essay-content li {
+    margin: 4px 0;
+}
+
+.tip {
+    padding: 12px;
+    background: rgba(245, 158, 11, 0.1);
+    border-radius: 8px;
+    margin-top: 16px;
+    font-size: 13px;
+}
+
+.stats {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 12px;
+}
+
+/* Flashcard styles */
+.flashcard {
+    background: var(--glass-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.flashcard-q {
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.flashcard-a {
+    color: var(--text-secondary);
+    font-size: 13px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border-color);
+}
+
+.loading {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-secondary);
+}
+
+@media (max-width: 600px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .math-categories {
+        justify-content: center;
+    }
+}
+</style>
+{% endblock %}
