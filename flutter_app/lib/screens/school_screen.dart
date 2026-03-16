@@ -102,7 +102,7 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
     _tabTransitionController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 250),
-      value: 1.0, // start fully visible
+      value: 1.0,
     );
     _loadAllData();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -220,7 +220,6 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
     if (newIndex == _selectedSubTab) return;
     _previousSubTab = _selectedSubTab;
 
-    // Fade out current content
     await _tabTransitionController.animateTo(0,
       duration: const Duration(milliseconds: 120),
       curve: Curves.easeIn,
@@ -229,7 +228,6 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
 
     setState(() => _selectedSubTab = newIndex);
 
-    // Fade + slide in new content
     await _tabTransitionController.animateTo(1,
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOut,
@@ -333,7 +331,6 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
                       animation: _tabTransitionController,
                       builder: (context, child) {
                         final t = _tabTransitionController.value;
-                        // Slide direction: right if going to higher tab, left if lower
                         final slideDir = _selectedSubTab >= _previousSubTab ? 1.0 : -1.0;
                         return Opacity(
                           opacity: t.clamp(0.0, 1.0),
@@ -1676,12 +1673,10 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
         ? ['$_classLevel/1', '$_classLevel/2', 'all']
         : ['Q1', 'Q2', 'Q3', 'Q4', 'all'];
 
-    // Ensure selected semester is valid for current system
     if (!semesters.contains(_selectedSemester)) {
       _selectedSemester = semesters.first;
     }
 
-    // Split grades into current system and archived
     final currentSemesters = isMarks
         ? ['$_classLevel/1', '$_classLevel/2']
         : ['Q1', 'Q2', 'Q3', 'Q4'];
@@ -1715,13 +1710,11 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
     double? sonstigeAvg;
 
     if (isMarks) {
-      // Marks mode: simple average of all mark values
       final marksWithValue = filteredGrades.where((g) => g['value'] != null).toList();
       if (marksWithValue.isNotEmpty) {
         overallAvg = marksWithValue.map((g) => (g['value'] as num).toDouble()).reduce((a, b) => a + b) / marksWithValue.length;
       }
     } else {
-      // Points mode: 1/3 Klausur + 2/3 Sonstige
       final klausurGrades = filteredGrades.where((g) => g['type'] == 'Klausur').toList();
       final sonstigeGradesList = filteredGrades.where((g) => g['type'] != 'Klausur').toList();
 
@@ -1846,7 +1839,6 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
           else
             ..._buildGradesBySubject(filteredGrades, isDark),
 
-          // Archive section for grades from the other system
           if (archivedGrades.isNotEmpty) ...[
             const SizedBox(height: 24),
             _buildArchiveSection(archivedGrades, isDark),
@@ -1863,7 +1855,6 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
         ? 'Archiv (andere Klassenstufen & Punkte)'
         : 'Archiv (Noten)';
 
-    // Group by subject
     final Map<int, List<Map<String, dynamic>>> bySubject = {};
     for (final g in archivedGrades) {
       final sid = g['subject_id'] as int;
@@ -1962,7 +1953,6 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
               child: Column(
                 mainAxisSize: MainAxisSize.min,
               children: [
-                // Subject dropdown — hide LK/GK badges in marks mode
                 DropdownButtonFormField<int?>(
                   initialValue: selectedSubjectId,
                   decoration: const InputDecoration(labelText: 'Fach'),
@@ -1991,7 +1981,6 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
                   onChanged: (v) => setDialogState(() => selectedSubjectId = v),
                 ),
                 const SizedBox(height: 16),
-                // Semester dropdown — HJ1/HJ2 for marks, Q1-Q4 for points
                 DropdownButtonFormField<String>(
                   initialValue: selectedSemester,
                   decoration: const InputDecoration(labelText: 'Halbjahr'),
@@ -2011,7 +2000,6 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
                 ),
                 const SizedBox(height: 16),
                 if (isMarks)
-                  // Marks mode: dropdown with 16 options (1+ to 6)
                   DropdownButtonFormField<double>(
                     initialValue: selectedMarkValue,
                     decoration: const InputDecoration(labelText: 'Note'),
@@ -2022,7 +2010,6 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
                     onChanged: (v) => setDialogState(() => selectedMarkValue = v),
                   )
                 else
-                  // Points mode: text field 0-15
                   TextField(
                     controller: pointsController,
                     decoration: const InputDecoration(
@@ -2115,7 +2102,6 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
       final courseType = subjectGrades.first['course_type'];
 
       if (isMarks) {
-        // Marks mode: simple average of mark values
         final marksWithValue = subjectGrades.where((g) => g['value'] != null).toList();
         if (marksWithValue.isEmpty) return const SizedBox.shrink();
         final avgMark = marksWithValue.map((g) => (g['value'] as num).toDouble()).reduce((a, b) => a + b) / marksWithValue.length;
@@ -2172,7 +2158,6 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
         );
       }
 
-      // Points mode: 1/3 Klausur + 2/3 Sonstige
       final klausuren = subjectGrades.where((g) => g['type'] == 'Klausur').toList();
       final sonstige = subjectGrades.where((g) => g['type'] != 'Klausur').toList();
 
@@ -3420,7 +3405,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard>
     {'points': 0, 'grade': '6', 'rating': 'Ungenügend', 'color': Color(0xFF991B1B)},
   ];
 
-  // Marks table for the converter in marks mode
   static const _marksTable = [
     {'label': '1+', 'value': 0.7, 'rating': 'Sehr gut', 'color': Color(0xFF10B981)},
     {'label': '1', 'value': 1.0, 'rating': 'Sehr gut', 'color': Color(0xFF10B981)},
@@ -3530,7 +3514,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard>
 
     setState(() {
       if (_isMarks) {
-        // Marks: lower is better (1.0 best, 6.0 worst)
         if (neededGrade > 6.0) {
           _targetResult = 'Du bräuchtest ${neededGrade.toStringAsFixed(1)} - leider nicht erreichbar';
         } else if (neededGrade < 0.7) {
@@ -3560,7 +3543,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard>
   }
 
   void _calculateSubjectGradeMarks() {
-    // Marks mode: simple average of all comma-separated mark values
     final text = _sonstigeGradesController.text;
     if (text.isEmpty) {
       setState(() => _subjectGradeResult = 'Bitte Noten eingeben');
@@ -3695,7 +3677,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Section 1: Converter
                   if (_isMarks) ...[
                     _buildSectionTitle('Note ⇄ Bewertung'),
                     const SizedBox(height: 12),
@@ -3792,7 +3773,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard>
 
                   const SizedBox(height: 24),
 
-                  // Section 2: "Welche Note brauche ich?"
                   _buildSectionTitle('Welche Note brauche ich?'),
                   const SizedBox(height: 12),
                   Row(
@@ -3875,7 +3855,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard>
 
                   const SizedBox(height: 24),
 
-                  // Section 3: Subject grade calculator
                   if (_isMarks) ...[
                     _buildSectionTitle('Fachnote berechnen (Durchschnitt)'),
                     const SizedBox(height: 12),
@@ -3971,7 +3950,6 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard>
 
                   const SizedBox(height: 24),
 
-                  // Section 4: Grade table
                   _buildSectionTitle(_isMarks ? 'Noten-Tabelle' : 'Punkte-Noten-Tabelle'),
                   const SizedBox(height: 12),
                   Container(

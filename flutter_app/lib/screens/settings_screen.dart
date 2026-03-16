@@ -147,7 +147,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   isDark: isDark,
                 ),
                 const Divider(height: 1),
-                // Theme switch mode selector (Manual / System / Schedule)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                   child: Row(
@@ -700,12 +699,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           trailing: TextButton(
                             onPressed: () async {
                               final ns = NotificationService();
-                              // If not initialized, try initializing first
                               if (!ns.isInitialized) {
                                 await ns.initialize();
                               }
                               if (!ns.permissionGranted) {
-                                // Re-request permissions
                                 final granted = await ns.requestPermissions();
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -727,8 +724,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 body: 'macOS-Benachrichtigungen funktionieren!',
                               );
                               if (context.mounted) {
-                                // status: 0=notDetermined,1=denied,2=authorized,3=provisional
-                                // alertStyle: 0=none,1=banner,2=alert
                                 final authStatus = status['status'] ?? -1;
                                 final alertStyle = status['alertStyle'] ?? -1;
                                 String msg;
@@ -758,7 +753,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             )),
             const SizedBox(height: 20),
 
-            // Notification settings (matching desktop)
             AnimatedListItem(
               index: 12,
               child: _buildSectionTitle(context, 'Benachrichtigungen', Icons.notifications),
@@ -2007,7 +2001,6 @@ class _NotificationSettingsCardState extends State<_NotificationSettingsCard> {
       borderRadius: 16,
       child: Column(
         children: [
-          // Master toggle
           SwitchListTile(
             secondary: Container(
               padding: const EdgeInsets.all(8),
@@ -2031,7 +2024,6 @@ class _NotificationSettingsCardState extends State<_NotificationSettingsCard> {
           if (_masterToggle) ...[
             const Divider(height: 1),
 
-            // Quiet hours
             ListTile(
               leading: Container(
                 padding: const EdgeInsets.all(8),
@@ -2067,7 +2059,6 @@ class _NotificationSettingsCardState extends State<_NotificationSettingsCard> {
               ),
             ),
 
-            // Category divider
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
               child: Align(

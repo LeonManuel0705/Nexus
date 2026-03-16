@@ -13,14 +13,12 @@ class AssistantScreen extends StatelessWidget {
     return PageFadeIn(
       child: Column(
         children: [
-          // Header
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: NexusTheme.gradientText('Assistent', fontSize: 36),
           ),
           const SizedBox(height: 4),
 
-          // "In Development" wall
           Expanded(
             child: Center(
               child: Padding(

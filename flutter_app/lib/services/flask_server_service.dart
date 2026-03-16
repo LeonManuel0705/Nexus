@@ -37,12 +37,8 @@ class FlaskServerService {
     _errorMessage = null;
     isPythonMissing = false;
 
-    // Kill any stale Flask server from a previous app session so we always
-    // serve the latest templates.
     await _killExistingServerOnPort();
 
-    // Always sync bundled backend to ~/Documents/Nexus so templates/code
-    // stay up-to-date with the installed app version.
     await _extractBundledBackend();
 
     var root = await _resolveProjectRoot();
@@ -61,7 +57,6 @@ class FlaskServerService {
       state.value = FlaskServerState.error;
       return;
     }
-    // Ensure pip dependencies are up-to-date (handles new deps after app update)
     await _syncPipDependencies(root, pythonPath);
 
     try {
@@ -151,11 +146,9 @@ class FlaskServerService {
       // Step 1: Find or install Python 3
       String? pythonPath;
 
-      // Check if python3 is already available (e.g. Xcode CLT)
       pythonPath = await _findSystemPython3();
 
       if (pythonPath == null) {
-        // Try brew install
         setupProgress.value = 'Prüfe ob Homebrew verfügbar ist...';
         final brewWhich = await Process.run('which', ['brew']);
         if (brewWhich.exitCode == 0) {
@@ -173,7 +166,6 @@ class FlaskServerService {
           }
           pythonPath = await _findSystemPython3();
         } else {
-          // No brew, check /usr/bin/python3 (Xcode CLT)
           setupProgress.value = 'Homebrew nicht gefunden.\n'
               'Prüfe Xcode Command Line Tools...';
           if (File('/usr/bin/python3').existsSync()) {
@@ -191,7 +183,6 @@ class FlaskServerService {
 
       if (kDebugMode) print('FlaskServer: Setup using Python at $pythonPath');
 
-      // Step 2: Create venv
       final venvPath = '$root/venv';
       if (!Directory(venvPath).existsSync()) {
         setupProgress.value = 'Erstelle virtuelle Umgebung...';

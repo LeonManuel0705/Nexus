@@ -44,3 +44,5 @@ certs/
 
 node_modules/
 *.pack
+
+windows-build/

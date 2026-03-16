@@ -463,7 +463,7 @@ class _NotesScreenState extends State<NotesScreen> {
                     border: Border(
                       left: BorderSide(
                         color: isActive
-                            ? const Color(0xFF6366F1) // indigo-500
+                            ? const Color(0xFF6366F1)
                             : Colors.transparent,
                         width: isActive ? 3 : 0,
                       ),

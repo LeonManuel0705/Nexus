@@ -21,11 +21,9 @@
 		<meta name="twitter:card" content="player" />
 		<meta name="twitter:image" content="https://res.cloudinary.com/du5fldub3/image/upload/c_fill,w_1200,h_630,g_north/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/screenshots/preview-image.png" />
 		
-		<!-- twitter:player removed — no embed/preview endpoint exists, and {DOMAIN_URL} placeholder would leak if meta-injector is skipped -->
 		<meta name="twitter:player:width" content="1280" />
 		<meta name="twitter:player:height" content="720" />
 		
-		<!-- Raw stream URL (MP4) -->
 		<meta name="twitter:player:stream" content="https://res.cloudinary.com/du5fldub3/video/upload/w_1200/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/videos/desktop/preview-video.mp4" />
 		<meta name="twitter:player:stream:content_type" content="video/mp4" />
     <meta property="og:image:width" content="1200" />
@@ -33,24 +31,18 @@
     <meta property="og:image:alt" content="Nexus App Interface" />
     <meta name="description" content="Nexus combines school, transit, training, and life management in one private, offline-first app. No account, no cloud, no cost." />
 
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inclusive+Sans:ital@0;1&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Radio+Canada+Big:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap" rel="stylesheet" />
 
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js" integrity="sha384-hJnF5AwidE18GSWTAGHv3ByzzvfNZ1Tcx5y1UUV3WkauuMCEzBJBMSwSt/PUPXnM" crossorigin="anonymous"></script>
 
-    <!-- Lenis Smooth Scroll -->
-    <!-- TODO: Add SRI integrity hash when upgrading Lenis version -->
     <script src="https://unpkg.com/lenis@1.1.18/dist/lenis.min.js" crossorigin="anonymous"></script>
 
-    <!-- Tailwind CSS (compiled at build time) -->
     <link rel="stylesheet" href="/tailwind.css">
 
     <style>
-      /* BASE_STYLES */
       body {
         font-family: 'Inclusive Sans', sans-serif;
         color: #1A202C;
@@ -62,7 +54,6 @@
         user-select: none;
       }
 
-      /* Allow text selection for inputs, textareas, and code blocks */
       input, textarea, pre, code, [contenteditable="true"], .selectable {
         -webkit-user-select: text;
         -moz-user-select: text;
@@ -74,7 +65,6 @@
         font-family: 'Radio Canada Big', sans-serif;
       }
 
-      /* COMPONENT_STYLES */
       .glass-panel {
         background: rgba(255, 255, 255, 0.7);
         backdrop-filter: blur(12px);
@@ -107,7 +97,6 @@
         font-weight: 600;
       }
 
-      /* ANIMATION_STYLES */
       .reveal {
         opacity: 0;
         transform: translateY(30px);
@@ -136,9 +125,6 @@
         100% { transform: translateY(0px); }
       }
 
-      /* ══════════════════════════════════════════════════════════════
-         HERO BACKGROUND - Static Full Image (No Carousel)
-         ══════════════════════════════════════════════════════════════ */
       .hero-bg-container {
         position: absolute;
         inset: 0;
@@ -146,7 +132,6 @@
         z-index: 0;
       }
 
-      /* Soft gradient backdrop to fill any empty space around the image */
       .hero-bg-backdrop {
         position: absolute;
         inset: 0;
@@ -158,7 +143,6 @@
           #faf8ff 100%);
       }
 
-      /* Blurred edge fill using the image itself */
       .hero-bg-blur-fill {
         position: absolute;
         inset: -50px;
@@ -170,7 +154,6 @@
         transform: scale(1.2);
       }
 
-      /* Main hero image - fully visible with contain, anchored to top */
       .hero-bg-image {
         position: absolute;
         inset: 0;
@@ -192,7 +175,6 @@
         50% { transform: scale(1.02) translateY(-8px); }
       }
 
-      /* Light scrim overlay for text readability */
       .hero-scrim-overlay {
         position: absolute;
         inset: 0;
@@ -216,15 +198,10 @@
         pointer-events: none;
       }
 
-      /* Hero bottom fade - DISABLED for seamless transition */
       .hero-bottom-fade {
         display: none;
       }
 
-      /* ══════════════════════════════════════════════════════════════
-         EXTENDED HERO BACKGROUND - Fixed/Parallax Effect
-         Background stays fixed while content scrolls over it
-         ══════════════════════════════════════════════════════════════ */
       .hero-extended-wrapper {
         position: relative;
         overflow: visible;
@@ -232,21 +209,18 @@
         max-width: none;
       }
 
-      /* Fixed background layer - stays in place during scroll (desktop) */
       .hero-extended-bg {
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
-        width: 100vw; /* Explicit viewport width — prevents any max-width/padding constraint */
+        width: 100vw;
         height: 100vh;
         overflow: hidden;
         z-index: 0;
         pointer-events: none;
-        /* Will be clipped by wrapper via JS */
       }
 
-      /* Mobile: Use absolute positioning (iOS Safari doesn't support fixed bg well) */
       @supports (-webkit-touch-callout: none) {
         .hero-extended-bg {
           position: absolute;
@@ -257,7 +231,6 @@
         }
       }
 
-      /* Also use media query for touch devices */
       @media (hover: none) and (pointer: coarse) {
         .hero-extended-bg {
           position: absolute;
@@ -268,7 +241,6 @@
         }
       }
 
-      /* Gradient backdrop - fills any empty space */
       .hero-extended-bg .extended-backdrop {
         position: absolute;
         inset: 0;
@@ -280,7 +252,6 @@
           #faf8ff 100%);
       }
 
-      /* Blurred edge fill - prevents harsh bars around contained image */
       .hero-extended-bg .extended-blur-fill {
         position: absolute;
         inset: -50px;
@@ -292,7 +263,6 @@
         transform: scale(1.2);
       }
 
-      /* Main hero image - contained, centered, no cropping */
       .hero-extended-bg .extended-image {
         position: absolute;
         inset: 0;
@@ -306,11 +276,9 @@
         height: 100%;
         object-fit: cover;
         object-position: center center;
-        /* Subtle float animation - no carousel/rotation */
         animation: heroImageFloat 20s ease-in-out infinite;
       }
 
-      /* Light scrim overlay for text readability */
       .hero-extended-bg .extended-scrim {
         position: absolute;
         inset: 0;
@@ -325,7 +293,6 @@
         z-index: 1;
       }
 
-      /* Gradient overlay for brand tint */
       .hero-extended-bg .extended-gradient-overlay {
         position: absolute;
         inset: 0;
@@ -336,7 +303,6 @@
         z-index: 2;
       }
 
-      /* Fade out at bottom of viewport for smooth transition */
       .hero-extended-bg .extended-bottom-fade {
         position: absolute;
         left: 0;
@@ -359,7 +325,6 @@
         z-index: 3;
       }
 
-      /* Content sections within extended wrapper - transparent bg, above fixed bg */
       .hero-extended-wrapper > section,
       .hero-extended-wrapper .hero-section,
       .hero-extended-wrapper .problem-solution-section {
@@ -368,14 +333,12 @@
         background: transparent !important;
       }
 
-      /* Hide fixed background when scrolled past the extended wrapper */
       .hero-extended-bg.is-hidden {
         opacity: 0;
         pointer-events: none;
         transition: opacity 0.3s ease;
       }
 
-      /* Subtle animated separator glow between hero and next section */
       .hero-transition-glow {
         position: relative;
         height: 2px;
@@ -410,7 +373,6 @@
         filter: blur(8px);
       }
 
-      /* Scroll-linked hero fade using CSS custom properties */
       .hero-section {
         --hero-opacity: 1;
         --hero-blur-intensity: 1;
@@ -427,7 +389,6 @@
         transition: opacity 0.1s linear;
       }
 
-      /* Hero entrance animations */
       .hero-entrance {
         opacity: 0;
         transform: translateY(40px);
@@ -447,9 +408,6 @@
         }
       }
 
-      /* ══════════════════════════════════════════════════════════════
-         SCROLL-DRIVEN SECTION TRANSITIONS
-         ══════════════════════════════════════════════════════════════ */
       .scroll-section {
         position: relative;
         transition: background-color 0.6s ease;
@@ -480,9 +438,6 @@
         background: linear-gradient(180deg, transparent 0%, rgba(240,147,251,0.02) 50%, transparent 100%);
       }
 
-      /* ══════════════════════════════════════════════════════════════
-         IMMERSIVE FEATURE PANELS
-         ══════════════════════════════════════════════════════════════ */
       .feature-panel {
         position: relative;
         overflow: hidden;
@@ -567,11 +522,6 @@
         color: white;
       }
 
-      /* ══════════════════════════════════════════════════════════════
-         DEVICE MOCKUPS - Laptop & Phone Frames
-         ══════════════════════════════════════════════════════════════ */
-
-      /* --- Laptop (MacBook-style) --- */
       .device-laptop {
         position: relative;
         width: 100%;
@@ -618,7 +568,6 @@
         border-radius: 0 0 4px 4px;
       }
 
-      /* --- Phone (iPhone-style) --- */
       .device-phone {
         position: relative;
         width: 100%;
@@ -655,7 +604,6 @@
         border-radius: 22px;
       }
 
-      /* Glow effect behind devices */
       .device-glow {
         position: relative;
       }
@@ -677,10 +625,6 @@
         .device-phone { max-width: 220px; }
       }
 
-      /* ══════════════════════════════════════════════════════════════
-         HERO VIDEO SECTION
-         ══════════════════════════════════════════════════════════════ */
-
       .hero-video-section { position: relative; width: 100%; min-height: 100vh; background: #080810; overflow: hidden; display: flex; align-items: center; justify-content: center; }
       .hero-video-wrap { position: absolute; inset: 0; z-index: 0; }
       .hero-video-wrap video { width: 100%; height: 100%; object-fit: cover; }
@@ -688,15 +632,12 @@
       .hero-video-content { position: absolute; bottom: 6rem; left: 0; right: 0; z-index: 2; text-align: center; padding: 0 1.5rem; }
       .hero-video-cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; }
 
-      /* Scroll hint below hero */
       .hero-scroll-hint { position: absolute; bottom: 2rem; left: 50%; transform: translateX(-50%); z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; color: rgba(255,255,255,0.35); font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; animation: heroBounce 2s ease-in-out infinite; }
       @keyframes heroBounce { 0%, 100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(8px); } }
 
-      /* Lenis smooth scroll */
       html.lenis, html.lenis body { height: auto; }
       html.lenis { scroll-behavior: auto; }
 
-      /* Below-fold reveal animation */
       .reveal { opacity: 0; transform: scale(0.96) translateY(40px); transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
       .reveal.visible { opacity: 1; transform: scale(1) translateY(0); }
 
@@ -706,9 +647,6 @@
       }
 
 
-      /* ══════════════════════════════════════════════════════════════
-         FAQ SMOOTH ACCORDION
-         ══════════════════════════════════════════════════════════════ */
       .faq-item {
         overflow: hidden;
       }
@@ -739,10 +677,6 @@
         overflow: hidden;
       }
 
-      /* ══════════════════════════════════════════════════════════════
-         PRIVACY SWITCHING HIGHLIGHT SECTION
-         Premium animated section with scroll-driven highlighting
-         ══════════════════════════════════════════════════════════════ */
       .privacy-highlight-section {
         position: relative;
         min-height: 100vh;
@@ -756,7 +690,6 @@
         padding: 0 1.5rem;
       }
 
-      /* Desktop: Two column layout with sticky left */
       @media (min-width: 768px) {
         .privacy-highlight-grid {
           display: grid;
@@ -770,7 +703,6 @@
           top: 8rem;
         }
 
-        /* Give each item enough scroll height for story-like slow progression (~80vh scroll per item) */
         .privacy-highlight-item {
           min-height: 80vh;
           display: flex;
@@ -783,7 +715,6 @@
         }
       }
 
-      /* Left column intro */
       .privacy-highlight-intro h2 {
         font-size: 2.5rem;
         font-weight: 700;
@@ -799,7 +730,6 @@
         max-width: 28rem;
       }
 
-      /* Animated gradient bar indicator */
       .privacy-indicator-track {
         position: absolute;
         left: 0;
@@ -823,7 +753,6 @@
         box-shadow: 0 0 20px rgba(118, 75, 162, 0.4);
       }
 
-      /* Right column items */
       .privacy-highlight-items {
         position: relative;
         padding-left: 2rem;
@@ -840,7 +769,6 @@
         border-bottom: 1px solid rgba(148, 163, 184, 0.1);
       }
 
-      /* Muted state for non-active items */
       .privacy-highlight-item.muted {
         opacity: 0.4;
       }
@@ -849,7 +777,6 @@
         opacity: 0.7;
       }
 
-      /* Item icon */
       .privacy-item-icon {
         width: 3rem;
         height: 3rem;
@@ -882,7 +809,6 @@
         color: #F093FB;
       }
 
-      /* Item title */
       .privacy-item-title {
         font-size: 1.25rem;
         font-weight: 700;
@@ -893,7 +819,6 @@
         transition: color 300ms ease;
       }
 
-      /* Gradient underline for active item */
       .privacy-item-title::after {
         content: '';
         position: absolute;
@@ -917,7 +842,6 @@
         background-clip: text;
       }
 
-      /* Item description - hidden by default, slides in when active */
       .privacy-item-desc {
         font-size: 1rem;
         color: #64748B;
@@ -937,7 +861,6 @@
         transform: translateY(0);
       }
 
-      /* Mobile: Accordion style */
       @media (max-width: 767px) {
         .privacy-highlight-section {
           padding: 4rem 0;
@@ -978,7 +901,6 @@
         }
       }
 
-      /* Subtle background glow for active item */
       .privacy-highlight-item::before {
         content: '';
         position: absolute;
@@ -997,21 +919,13 @@
         opacity: 1;
       }
 
-      /* Navbar Logic */
       #nav-logo {
         transition: opacity 0.3s ease;
       }
 
-      /* Only hide logo on home page when transparent */
       body.is-home #navbar[data-scroll-effect]:not(.scrolled) #nav-logo {
-         /* We actually want the logo visible always based on design spec "logo uploaded for Nexus website (transparent background)"
-            and "If the navbar in the design is not transparent, display the logo".
-            However, standard pattern suggests keeping it visible for brand recognition unless it clashes.
-            Given the white background design, we'll keep the logo visible always but change navbar background.
-         */
       }
 
-      /* Navbar: floating overlay on its own GPU layer */
       #navbar {
         background-color: transparent;
         will-change: transform;
@@ -1022,7 +936,6 @@
                     box-shadow 300ms ease;
       }
 
-      /* Home page: navbar slides up out of view at top */
       body.is-home #navbar:not(.scrolled) {
         transform: translate3d(0, -100%, 0);
         pointer-events: none;
@@ -1033,25 +946,21 @@
         pointer-events: auto;
       }
 
-      /* Remove top padding on main container for home page so hero is flush */
       body.is-home #app {
         padding-top: 0 !important;
       }
 
-      /* Hero content: constant padding, no transitions (navbar floats above) */
       .hero-content-wrapper {
         padding-bottom: 4rem !important;
         padding-top: calc(15vh + env(safe-area-inset-top, 0px)) !important;
       }
 
-      /* Scrolled navbar: frosted glass background */
       #navbar.scrolled {
         background-color: rgba(255, 255, 255, 0.75);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
       }
 
-      /* Soft blurred fade at bottom edge — tall gradient, no hard cutoff */
       #navbar::after {
         content: '';
         position: absolute;
@@ -1079,15 +988,11 @@
         opacity: 1;
       }
 
-      /* Mobile Menu */
       #mobile-menu {
         background: rgba(255,255,255,0.98);
         backdrop-filter: blur(16px);
       }
 
-      /* ══════════════════════════════════════════════════════════════
-         NEW ANIMATION SYSTEM (v2)
-         ══════════════════════════════════════════════════════════════ */
       .fade-up { opacity: 0; transform: translateY(60px); transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1), transform 0.8s cubic-bezier(0.22, 1, 0.36, 1); transition-delay: var(--delay, 0ms); }
       .fade-up.active { opacity: 1; transform: translateY(0); }
       .fade-in { opacity: 0; transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1); transition-delay: var(--delay, 0ms); }
@@ -1099,19 +1004,16 @@
       .blur-in { opacity: 0; filter: blur(12px); transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1), filter 0.8s cubic-bezier(0.22, 1, 0.36, 1); transition-delay: var(--delay, 0ms); }
       .blur-in.active { opacity: 1; filter: blur(0); }
 
-      /* ─── Word Reveal ─── */
       .word-reveal .word { display: inline-block; overflow: hidden; vertical-align: top; }
       .word-reveal .word-inner { display: inline-block; transform: translateY(105%); opacity: 0; transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.5s ease; }
       .word-reveal.active .word-inner { transform: translateY(0); opacity: 1; }
 
-      /* ─── Feature Cards 2×2 ─── */
       .feature-card { background: rgba(255,255,255,0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.5); border-radius: 1.5rem; padding: 2rem; position: relative; overflow: hidden; transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s ease; box-shadow: 0 4px 24px rgba(118,75,162,0.06); }
       .feature-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #667EEA, #764BA2, #F093FB); transition: height 0.3s ease; }
       .feature-card:hover { transform: translateY(-8px); box-shadow: 0 20px 60px rgba(118,75,162,0.15); }
       .feature-card:hover::before { height: 6px; }
       .feature-card-watermark { position: absolute; bottom: -20px; right: -20px; width: 140px; height: 140px; opacity: 0.06; pointer-events: none; object-fit: contain; }
 
-      /* ─── Privacy Shield Pulse ─── */
       .shield-pulse-container { position: relative; display: flex; align-items: center; justify-content: center; width: 200px; height: 200px; margin: 0 auto; }
       .shield-pulse-ring { position: absolute; width: 100%; height: 100%; border-radius: 50%; border: 2px solid rgba(118,75,162,0.3); }
       .shield-pulse-ring:nth-child(1) { animation: pulseRing 3s ease-out infinite; }
@@ -1119,21 +1021,17 @@
       .shield-pulse-ring:nth-child(3) { width: 180%; height: 180%; animation: pulseRing 3s ease-out 1.2s infinite; }
       @keyframes pulseRing { 0% { opacity: 0.6; transform: scale(0.85); } 100% { opacity: 0; transform: scale(1.15); } }
 
-      /* SVG checkmark draw */
       .check-draw { stroke-dasharray: 24; stroke-dashoffset: 24; transition: stroke-dashoffset 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
       .check-draw.drawn { stroke-dashoffset: 0; }
 
-      /* Counter cards */
       .counter-value { font-family: 'Radio Canada Big', sans-serif; font-size: 3.5rem; font-weight: 700; line-height: 1; background: linear-gradient(135deg, #667EEA 0%, #764BA2 50%, #F093FB 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
       .counter-label { font-size: 1rem; color: #64748B; margin-top: 0.5rem; }
 
-      /* ─── CTA Shimmer ─── */
       .shimmer-text { background: linear-gradient(90deg, #1A202C 0%, #764BA2 25%, #667EEA 50%, #764BA2 75%, #1A202C 100%); background-size: 200% 100%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: shimmer 4s linear infinite; }
       @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
       .cta-glow-btn { transition: transform 0.3s ease, box-shadow 0.4s ease; box-shadow: 0 4px 20px rgba(118,75,162,0.15); }
       .cta-glow-btn:hover { transform: translateY(-3px); box-shadow: 0 8px 40px rgba(118,75,162,0.3); }
 
-      /* ─── Reduced Motion ─── */
       @media (prefers-reduced-motion: reduce) {
         .fade-up, .fade-in, .scale-in, .slide-left, .blur-in,
         .reveal, .word-reveal .word-inner, .shield-pulse-ring, .shimmer-text {
@@ -1144,23 +1042,16 @@
     </style>
       <link rel="icon" href="/pwa/icons/Icon-192.png" type="image/png">
       <link rel="apple-touch-icon" href="/pwa/icons/Icon-192.png">
-  <!-- Preload hero background image (first carousel slide) -->
   <link rel="preload" as="image" href="https://res.cloudinary.com/du5fldub3/image/upload/w_1920,q_auto,f_auto/v1771960323/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/hero-background-image-modern-productivity-f22d39.png" fetchpriority="high">
   </head>
 
   <body class="is-home selection:bg-nexus-pink selection:text-white">
-    <!-- ══════════════════════════════════════════════════════════════
-         LAYOUT STRUCTURE
-         ══════════════════════════════════════════════════════════════ -->
-
-    <!-- NAVIGATION -->
     <nav
       class="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
       id="navbar"
       data-scroll-effect
     >
       <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-        <!-- Logo -->
         <a
           href="/"
           class="flex items-center gap-2 group"
@@ -1174,7 +1065,6 @@
           <span class="font-display font-bold text-2xl tracking-tight text-nexus-text group-hover:text-nexus-purple transition-colors">Nexus</span>
         </a>
 
-        <!-- Desktop Menu -->
         <div class="hidden md:flex items-center gap-8">
           <a href="/" onclick="handleNav(event, '/')" class="text-sm font-medium text-nexus-text hover:text-nexus-purple transition-colors" data-nav data-i18n="nav.home">Home</a>
           <a href="/features" onclick="handleNav(event, '/features')" class="text-sm font-medium text-nexus-text hover:text-nexus-purple transition-colors" data-nav data-i18n="nav.features">Features</a>
@@ -1184,7 +1074,6 @@
           <button onclick="setLanguage(currentLang === 'de' ? 'en' : 'de')" class="text-sm font-medium text-nexus-muted hover:text-nexus-purple transition-colors px-2 py-1 rounded border border-gray-200" id="lang-toggle">EN</button>
         </div>
 
-        <!-- Mobile Menu Trigger -->
         <button
           id="mobile-menu-btn"
           class="md:hidden p-2 text-nexus-text focus:outline-none"
@@ -1195,7 +1084,6 @@
       </div>
     </nav>
 
-    <!-- MOBILE MENU OVERLAY -->
     <div
       id="mobile-menu"
       class="fixed inset-0 z-[60] transform translate-x-full transition-transform duration-300 flex flex-col"
@@ -1217,12 +1105,9 @@
     </div>
 
     <main id="app" class="pt-20 min-h-screen">
-      <!-- Route content is appended dynamically -->
     </main>
 
-    <!-- FOOTER -->
     <footer class="bg-white border-t border-gray-100 pt-16 pb-8 overflow-hidden relative">
-      <!-- Mega Watermark -->
       <div class="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-5xl pointer-events-none opacity-[0.03] select-none">
         <img src="https://res.cloudinary.com/du5fldub3/image/upload/e_trim/v1771950089/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/logo-iter1-nobg.png" class="w-full" alt="Watermark">
       </div>
@@ -1279,9 +1164,6 @@
       </div>
     </footer>
 
-    <!-- ══════════════════════════════════════════════════════════════
-         DATA & ROUTING
-         ══════════════════════════════════════════════════════════════ -->
     <script id="content" type="application/json">{
     "company": "content/company.json",
     "assets": "content/assets.json",
@@ -1294,16 +1176,14 @@ const data = JSON.parse(document.getElementById('content').textContent);
       const app = document.getElementById('app');
       document.getElementById('year').textContent = new Date().getFullYear();
 
-      // ─── i18n ───────────────────────────────────────────────────
       const translations = { de: data.i18n_de, en: data.i18n_en };
-      let currentLang = localStorage.getItem('nexus-lang') || (navigator.language.startsWith('de') ? 'de' : 'de'); // default: German
+      let currentLang = localStorage.getItem('nexus-lang') || (navigator.language.startsWith('de') ? 'de' : 'de');
 
       function t(key) {
         const keys = key.split('.');
         let val = translations[currentLang];
         for (const k of keys) { val = val?.[k]; }
         if (val !== undefined) return val;
-        // Fallback to English
         let fallback = translations['en'];
         for (const k of keys) { fallback = fallback?.[k]; }
         return fallback || key;
@@ -1312,25 +1192,20 @@ const data = JSON.parse(document.getElementById('content').textContent);
       function setLanguage(lang) {
         currentLang = lang;
         localStorage.setItem('nexus-lang', lang);
-        // Update static nav/footer text
         updateStaticText();
-        // Re-render current page
         render(location.pathname);
       }
 
       function updateStaticText() {
-        // Nav links and all data-i18n elements
         document.querySelectorAll('[data-i18n]').forEach(el => {
           el.textContent = t(el.dataset.i18n);
         });
-        // Language toggle buttons
         const otherLang = currentLang === 'de' ? 'EN' : 'DE';
         const toggle = document.getElementById('lang-toggle');
         if (toggle) toggle.textContent = otherLang;
         document.querySelectorAll('.lang-toggle-mobile').forEach(el => { el.textContent = otherLang; });
       }
 
-      // ─── UTILS ───────────────────────────────────────────────────
       function optimizeUrl(url, width = 800) {
         if (!url || !url.includes('cloudinary.com')) return url;
         return url.replace('/upload/', `/upload/w_${width},q_auto,f_auto/`);
@@ -1341,7 +1216,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
         if (el) el.scrollIntoView({ behavior: 'smooth' });
       }
 
-      // ─── ROUTER ───────────────────────────────────────────────────
       const routes = {
         '/': { titleKey: 'nav.home', render: renderHome },
         '/features': { titleKey: 'nav.features', render: renderFeatures },
@@ -1360,7 +1234,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
         history.pushState({}, '', path);
         render(path);
         
-        // Mobile menu handling
         const mobileMenu = document.getElementById('mobile-menu');
         if (!mobileMenu.classList.contains('translate-x-full')) {
           mobileMenu.classList.add('translate-x-full');
@@ -1371,12 +1244,10 @@ const data = JSON.parse(document.getElementById('content').textContent);
         cleanupCurrentPage();
         const route = routes[path] || routes['/'];
 
-        // Update body class for specific styling
         document.body.className = path === '/' ? 'is-home' : '';
 
         document.title = path === '/' ? siteName : `${siteName} — ${t(route.titleKey)}`;
 
-        // Update active nav
         document.querySelectorAll('[data-nav]').forEach(link => {
           const isActive = link.getAttribute('href') === path;
           link.classList.toggle('nav-link-active', isActive);
@@ -1388,15 +1259,12 @@ const data = JSON.parse(document.getElementById('content').textContent);
 
         lucide?.createIcons();
         initScrollReveal();
-        // Reset navbar state for new page (scrollY will be 0 after scrollTo)
         updateNavbar();
       }
 
-      // Event listeners
       addEventListener('popstate', () => render(location.pathname));
       window.handleNav = handleNav;
 
-      // Navbar Scroll
       const nav = document.getElementById('navbar');
 
       function updateNavbar() {
@@ -1405,7 +1273,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
 
         nav.classList.toggle('scrolled', window.scrollY > 20);
 
-        // Accessibility: when visually hidden on home page, remove from focus order
         const hidden = isHome && !scrolled;
         nav.setAttribute('aria-hidden', hidden ? 'true' : 'false');
         nav.querySelectorAll('a, button').forEach(el => {
@@ -1418,12 +1285,9 @@ const data = JSON.parse(document.getElementById('content').textContent);
       }
 
       window.addEventListener('scroll', updateNavbar, { passive: true });
-      // Run on page load so initial state is correct
       updateNavbar();
 
-      // Scroll Reveal with enhanced section transitions
       function initScrollReveal() {
-        // Basic reveal observer (supports both .reveal and new animation classes)
         const revealObserver = new IntersectionObserver(
           entries => {
             entries.forEach(entry => {
@@ -1437,7 +1301,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
         document.querySelectorAll('.reveal, .fade-up, .fade-in, .scale-in, .slide-left, .blur-in, .word-reveal').forEach(el => revealObserver.observe(el));
         _homeCleanups.push(() => revealObserver.disconnect());
 
-        // Section background shift observer
         const sectionObserver = new IntersectionObserver(
           entries => {
             entries.forEach(entry => {
@@ -1452,29 +1315,13 @@ const data = JSON.parse(document.getElementById('content').textContent);
         );
         document.querySelectorAll('.scroll-section').forEach(el => sectionObserver.observe(el));
 
-        // Hero background carousel disabled - using static image
-        // initHeroCarousel();
-
-        // Extended hero background - dynamic height
         initExtendedHeroBg();
-
-        // Hero scroll transition effect
         initHeroScrollTransition();
-
-        // Day story timeline interaction
-        // initDayStory removed — scrollytelling replaces it
-
-        // FAQ smooth accordion
         initFaqAccordion();
-
-        // Privacy page switching highlight section
         initPrivacyHighlights();
-
-        // Home page specific animations (video, counters, word reveal)
         initHomeAnimations();
       }
 
-      // Privacy Page Switching Highlight Interaction
       function initPrivacyHighlights() {
         const container = document.getElementById('privacy-highlights');
         if (!container) return;
@@ -1486,7 +1333,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
         let activeIndex = 0;
         let lockout = false;
         const LOCKOUT_MS = 200;
-        // Trigger line: item activates when its top reaches 60% from viewport top (slower progression)
         const TRIGGER_RATIO = 0.60;
 
         function setActiveItem(index) {
@@ -1519,11 +1365,9 @@ const data = JSON.parse(document.getElementById('content').textContent);
             requestAnimationFrame(() => {
               rafPending = false;
               const containerRect = container.getBoundingClientRect();
-              // Only run when section is visible
               if (containerRect.bottom < 0 || containerRect.top > window.innerHeight) return;
 
               const triggerY = window.innerHeight * TRIGGER_RATIO;
-              // Walk items in reverse: last item whose top is at or above triggerY wins
               let newIndex = 0;
               items.forEach((item, i) => {
                 const top = item.getBoundingClientRect().top;
@@ -1538,7 +1382,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
           onScroll(); // Run once on init to set correct initial state
         }
 
-        // Click/tap to highlight (mobile & desktop)
         items.forEach((item, i) => {
           item.addEventListener('click', () => {
             setActiveItem(i);
@@ -1551,7 +1394,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
         setActiveItem(0);
       }
 
-      // Hero scroll-linked transition effect
       function initHeroScrollTransition() {
         const heroSection = document.getElementById('hero-section');
         const transitionGlow = document.getElementById('hero-transition-glow');
@@ -1564,21 +1406,16 @@ const data = JSON.parse(document.getElementById('content').textContent);
           const heroHeight = heroRect.height;
           const scrolled = -heroRect.top;
 
-          // Calculate progress: 0 at top, 1 when 30% past hero bottom
           const transitionStart = heroHeight * 0.6;
           const transitionEnd = heroHeight * 1.3;
           const progress = Math.max(0, Math.min(1, (scrolled - transitionStart) / (transitionEnd - transitionStart)));
 
-          // Update CSS custom properties for smooth opacity/blur fade
-          // Opacity: 1 → 0.85 as user scrolls past
           const opacity = 1 - (progress * 0.15);
-          // Blur intensity: 1 → 0.5 as user scrolls past
           const blurIntensity = 1 - (progress * 0.5);
 
           heroSection.style.setProperty('--hero-opacity', opacity);
           heroSection.style.setProperty('--hero-blur-intensity', blurIntensity);
 
-          // Show transition glow when scrolled past 70% of hero
           if (transitionGlow) {
             const glowThreshold = heroHeight * 0.7;
             transitionGlow.classList.toggle('visible', scrolled > glowThreshold);
@@ -1595,11 +1432,9 @@ const data = JSON.parse(document.getElementById('content').textContent);
         }
 
         window.addEventListener('scroll', onScroll, { passive: true });
-        // Initial call
         updateHeroTransition();
       }
 
-      // Hero background carousel - crossfade every 6-8 seconds
       function initHeroCarousel() {
         const slides = document.querySelectorAll('.hero-bg-slide');
         if (slides.length === 0) return;
@@ -1617,7 +1452,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
         setInterval(nextSlide, interval);
       }
 
-      // Extended hero background - dynamic height calculation
       function initExtendedHeroBg() {
         const wrapper = document.querySelector('.hero-extended-wrapper');
         const bg = document.querySelector('.hero-extended-bg');
@@ -1626,44 +1460,33 @@ const data = JSON.parse(document.getElementById('content').textContent);
         let resizeTimeout;
         let ticking = false;
 
-        // Detect if we're on a touch device (mobile Safari fix)
         const isTouchDevice = ('ontouchstart' in window) ||
           (navigator.maxTouchPoints > 0) ||
           window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
-        // For mobile: use absolute positioning (CSS handles this)
-        // For desktop: use fixed positioning with scroll-based visibility
 
         function updateBgVisibility() {
           if (isTouchDevice) {
-            // Mobile: absolute positioning, just update height
             bg.style.height = wrapper.offsetHeight + 'px';
             return;
           }
 
-          // Desktop: fixed background with visibility toggle
           const wrapperRect = wrapper.getBoundingClientRect();
           const wrapperBottom = wrapperRect.bottom;
           const viewportHeight = window.innerHeight;
 
-          // Hide fixed bg when wrapper is scrolled past viewport
           if (wrapperBottom <= 0) {
             bg.classList.add('is-hidden');
           } else {
             bg.classList.remove('is-hidden');
           }
 
-          // Calculate opacity based on scroll progress through wrapper
-          // Fade out as we approach the bottom of the wrapper
           const scrollProgress = Math.max(0, Math.min(1,
             1 - (wrapperBottom / viewportHeight)
           ));
 
-          // Start fading when 50% scrolled through wrapper visible area
-          // Ease out smoothly to fully transparent before is-hidden kicks in
           if (scrollProgress > 0.5) {
             const fadeProgress = (scrollProgress - 0.5) / 0.5;
-            // Use easeInQuad curve for a more natural fade-out
             const easedFade = fadeProgress * fadeProgress;
             bg.style.opacity = 1 - easedFade;
           } else {
@@ -1680,7 +1503,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
           }
         }
 
-        // Debounced resize handler
         function onResize() {
           clearTimeout(resizeTimeout);
           resizeTimeout = setTimeout(() => {
@@ -1691,10 +1513,8 @@ const data = JSON.parse(document.getElementById('content').textContent);
           }, 100);
         }
 
-        // Initial setup
         updateBgVisibility();
 
-        // Listen for scroll (desktop parallax visibility)
         window.addEventListener('scroll', onScroll, { passive: true });
 
         // Recalculate on resize
@@ -1723,7 +1543,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
         }
       }
 
-      // Privacy Page Switching Highlight Interaction
       function initPrivacyHighlights() {
         const container = document.getElementById('privacy-highlights');
         if (!container) return;
@@ -1735,7 +1554,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
         let activeIndex = 0;
         let lockout = false;
         const LOCKOUT_MS = 200;
-        // Trigger line: item activates when its top reaches 60% from viewport top (slower progression)
         const TRIGGER_RATIO = 0.60;
 
         function setActiveItem(index) {
@@ -1768,11 +1586,9 @@ const data = JSON.parse(document.getElementById('content').textContent);
             requestAnimationFrame(() => {
               rafPending = false;
               const containerRect = container.getBoundingClientRect();
-              // Only run when section is visible
               if (containerRect.bottom < 0 || containerRect.top > window.innerHeight) return;
 
               const triggerY = window.innerHeight * TRIGGER_RATIO;
-              // Walk items in reverse: last item whose top is at or above triggerY wins
               let newIndex = 0;
               items.forEach((item, i) => {
                 const top = item.getBoundingClientRect().top;
@@ -1787,7 +1603,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
           onScroll(); // Run once on init to set correct initial state
         }
 
-        // Click/tap to highlight (mobile & desktop)
         items.forEach((item, i) => {
           item.addEventListener('click', () => {
             setActiveItem(i);
@@ -1800,7 +1615,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
         setActiveItem(0);
       }
 
-      // Hero scroll-linked transition effect
       function initHeroScrollTransition() {
         const heroSection = document.getElementById('hero-section');
         const transitionGlow = document.getElementById('hero-transition-glow');
@@ -1813,21 +1627,16 @@ const data = JSON.parse(document.getElementById('content').textContent);
           const heroHeight = heroRect.height;
           const scrolled = -heroRect.top;
 
-          // Calculate progress: 0 at top, 1 when 30% past hero bottom
           const transitionStart = heroHeight * 0.6;
           const transitionEnd = heroHeight * 1.3;
           const progress = Math.max(0, Math.min(1, (scrolled - transitionStart) / (transitionEnd - transitionStart)));
 
-          // Update CSS custom properties for smooth opacity/blur fade
-          // Opacity: 1 → 0.85 as user scrolls past
           const opacity = 1 - (progress * 0.15);
-          // Blur intensity: 1 → 0.5 as user scrolls past
           const blurIntensity = 1 - (progress * 0.5);
 
           heroSection.style.setProperty('--hero-opacity', opacity);
           heroSection.style.setProperty('--hero-blur-intensity', blurIntensity);
 
-          // Show transition glow when scrolled past 70% of hero
           if (transitionGlow) {
             const glowThreshold = heroHeight * 0.7;
             transitionGlow.classList.toggle('visible', scrolled > glowThreshold);
@@ -1844,11 +1653,9 @@ const data = JSON.parse(document.getElementById('content').textContent);
         }
 
         window.addEventListener('scroll', onScroll, { passive: true });
-        // Initial call
         updateHeroTransition();
       }
 
-      // Hero background carousel - crossfade every 6-8 seconds
       function initHeroCarousel() {
         const slides = document.querySelectorAll('.hero-bg-slide');
         if (slides.length === 0) return;
@@ -1866,7 +1673,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
         setInterval(nextSlide, interval);
       }
 
-      // Extended hero background - dynamic height calculation
       function initExtendedHeroBg() {
         const wrapper = document.querySelector('.hero-extended-wrapper');
         const bg = document.querySelector('.hero-extended-bg');
@@ -1875,44 +1681,33 @@ const data = JSON.parse(document.getElementById('content').textContent);
         let resizeTimeout;
         let ticking = false;
 
-        // Detect if we're on a touch device (mobile Safari fix)
         const isTouchDevice = ('ontouchstart' in window) ||
           (navigator.maxTouchPoints > 0) ||
           window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
-        // For mobile: use absolute positioning (CSS handles this)
-        // For desktop: use fixed positioning with scroll-based visibility
 
         function updateBgVisibility() {
           if (isTouchDevice) {
-            // Mobile: absolute positioning, just update height
             bg.style.height = wrapper.offsetHeight + 'px';
             return;
           }
 
-          // Desktop: fixed background with visibility toggle
           const wrapperRect = wrapper.getBoundingClientRect();
           const wrapperBottom = wrapperRect.bottom;
           const viewportHeight = window.innerHeight;
 
-          // Hide fixed bg when wrapper is scrolled past viewport
           if (wrapperBottom <= 0) {
             bg.classList.add('is-hidden');
           } else {
             bg.classList.remove('is-hidden');
           }
 
-          // Calculate opacity based on scroll progress through wrapper
-          // Fade out as we approach the bottom of the wrapper
           const scrollProgress = Math.max(0, Math.min(1,
             1 - (wrapperBottom / viewportHeight)
           ));
 
-          // Start fading when 50% scrolled through wrapper visible area
-          // Ease out smoothly to fully transparent before is-hidden kicks in
           if (scrollProgress > 0.5) {
             const fadeProgress = (scrollProgress - 0.5) / 0.5;
-            // Use easeInQuad curve for a more natural fade-out
             const easedFade = fadeProgress * fadeProgress;
             bg.style.opacity = 1 - easedFade;
           } else {
@@ -1929,7 +1724,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
           }
         }
 
-        // Debounced resize handler
         function onResize() {
           clearTimeout(resizeTimeout);
           resizeTimeout = setTimeout(() => {
@@ -1940,10 +1734,8 @@ const data = JSON.parse(document.getElementById('content').textContent);
           }, 100);
         }
 
-        // Initial setup
         updateBgVisibility();
 
-        // Listen for scroll (desktop parallax visibility)
         window.addEventListener('scroll', onScroll, { passive: true });
 
         // Recalculate on resize
@@ -2097,9 +1889,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
 
       function renderHome() {
         app.innerHTML = `
-          <!-- ════════════════════════════════════════════════════════
-               HERO VIDEO SECTION
-               ════════════════════════════════════════════════════════ -->
           <section class="hero-video-section">
             <div class="hero-video-wrap">
               <video autoplay muted loop playsinline poster="" id="hero-video">
@@ -2123,9 +1912,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
             </div>
           </section>
 
-          <!-- ════════════════════════════════════════════════════════
-               FEATURE CARDS
-               ════════════════════════════════════════════════════════ -->
           <section id="features" class="py-20 md:py-28 bg-white reveal">
             <div class="max-w-7xl mx-auto px-6">
               <div class="text-center max-w-3xl mx-auto mb-16 fade-up">
@@ -2189,14 +1975,9 @@ const data = JSON.parse(document.getElementById('content').textContent);
             </div>
           </section>
 
-          <!-- ════════════════════════════════════════════════════════
-               SECTION 4: PRIVACY (Light Theme)
-               Animated shield + SVG checkmarks + stat counters
-               ════════════════════════════════════════════════════════ -->
           <section class="py-24 bg-white relative overflow-hidden reveal" id="privacy-counters">
             <div class="max-w-7xl mx-auto px-6">
               <div class="grid lg:grid-cols-2 gap-16 items-center mb-20">
-                <!-- Left: Animated Shield -->
                 <div class="flex justify-center fade-up">
                   <div class="shield-pulse-container">
                     <div class="shield-pulse-ring"></div>
@@ -2208,7 +1989,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
                   </div>
                 </div>
 
-                <!-- Right: Content -->
                 <div class="fade-up" style="--delay:200ms">
                   <h2 class="text-4xl md:text-5xl font-bold mb-6">${t('home.privacy_title')}</h2>
                   <p class="text-lg text-nexus-muted mb-8 leading-relaxed">${t('home.privacy_desc')}</p>
@@ -2243,7 +2023,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
                 </div>
               </div>
 
-              <!-- Counter Cards -->
               <div class="grid grid-cols-3 gap-6 max-w-2xl mx-auto fade-up" style="--delay:300ms">
                 <div class="text-center">
                   <div class="counter-value">0</div>
@@ -2261,9 +2040,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
             </div>
           </section>
 
-          <!-- ════════════════════════════════════════════════════════
-               SECTION 5: FAQ (polished)
-               ════════════════════════════════════════════════════════ -->
           <section class="py-24 bg-gray-50/50 reveal">
             <div class="max-w-3xl mx-auto px-6">
               <h2 class="text-4xl font-bold text-center mb-12 fade-up">${t('home.faq_title')}</h2>
@@ -2301,9 +2077,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
             </div>
           </section>
 
-          <!-- ════════════════════════════════════════════════════════
-               SECTION 6: CTA (Light Theme + Shimmer)
-               ════════════════════════════════════════════════════════ -->
           <section class="py-32 bg-white relative overflow-hidden reveal">
             <div class="max-w-4xl mx-auto px-6 text-center relative z-10">
               <div class="fade-up">
@@ -2314,7 +2087,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
                     <i data-lucide="download" class="w-5 h-5"></i> ${t('home.cta_download')}
                   </a>
                 </div>
-                <!-- Platform indicators -->
                 <div class="flex items-center justify-center gap-8 text-sm text-nexus-muted">
                   <span class="font-medium">${t('home.cta_platforms')}:</span>
                   <div class="flex items-center gap-6">
@@ -2333,7 +2105,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
 
       function renderFeatures() {
         app.innerHTML = `
-          <!-- HERO -->
           <section class="pt-32 pb-20 bg-gray-50">
             <div class="max-w-7xl mx-auto px-6">
               <div class="grid lg:grid-cols-2 gap-12 items-center">
@@ -2348,11 +2119,9 @@ const data = JSON.parse(document.getElementById('content').textContent);
             </div>
           </section>
 
-          <!-- FEATURES LIST -->
           <section class="py-24 bg-white">
             <div class="max-w-7xl mx-auto px-6 space-y-32">
               
-              <!-- Feature 1 -->
               <div class="grid md:grid-cols-2 gap-16 items-center">
                 <div class="order-2 md:order-1 reveal">
                    <div class="glass-panel p-8 rounded-[2rem] bg-indigo-50/50 border-indigo-100">
@@ -2366,7 +2135,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
                 </div>
               </div>
 
-              <!-- Feature 2 -->
               <div class="grid md:grid-cols-2 gap-16 items-center">
                 <div class="reveal">
                   <div class="w-12 h-12 rounded-2xl bg-pink-100 flex items-center justify-center text-nexus-pink mb-6"><i data-lucide="train" class="w-6 h-6"></i></div>
@@ -2380,7 +2148,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
                 </div>
               </div>
 
-              <!-- Feature 3 -->
               <div class="grid md:grid-cols-2 gap-16 items-center">
                 <div class="order-2 md:order-1 reveal">
                    <div class="glass-panel p-8 rounded-[2rem] bg-blue-50/50 border-blue-100">
@@ -2394,7 +2161,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
                 </div>
               </div>
 
-              <!-- Feature 4 -->
               <div class="grid md:grid-cols-2 gap-16 items-center">
                 <div class="reveal">
                   <div class="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center text-orange-500 mb-6"><i data-lucide="check-circle-2" class="w-6 h-6"></i></div>
@@ -2411,7 +2177,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
             </div>
           </section>
 
-          <!-- USE CASES -->
           <section class="py-24 bg-gray-900 text-white">
             <div class="max-w-7xl mx-auto px-6">
               <h2 class="text-4xl font-bold text-center mb-16 reveal">${t('features.usecases_title')}</h2>
@@ -2436,7 +2201,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
             </div>
           </section>
 
-          <!-- INTEGRATIONS -->
           <section class="py-24 bg-white">
             <div class="max-w-4xl mx-auto px-6 text-center">
               <h2 class="text-3xl font-bold mb-12 reveal">${t('features.integrations_title')}</h2>
@@ -2449,7 +2213,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
             </div>
           </section>
 
-          <!-- CTA -->
           <section class="py-24 bg-gradient-brand text-white text-center">
             <div class="max-w-3xl mx-auto px-6 reveal">
               <h2 class="text-4xl font-bold mb-8">${t('features.cta_title')}</h2>
@@ -2463,7 +2226,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
 
       function renderPrivacy() {
         app.innerHTML = `
-           <!-- HERO -->
            <section class="pt-32 pb-20 bg-white">
              <div class="max-w-7xl mx-auto px-6">
                <div class="grid md:grid-cols-2 gap-12 items-center">
@@ -2478,11 +2240,9 @@ const data = JSON.parse(document.getElementById('content').textContent);
              </div>
            </section>
 
-           <!-- OFFLINE ADVANTAGE - Switching Highlight Section -->
            <section class="privacy-highlight-section" id="privacy-highlights">
              <div class="privacy-highlight-container">
                <div class="privacy-highlight-grid">
-                 <!-- Left: Sticky intro -->
                  <div class="privacy-highlight-sticky">
                    <div class="privacy-highlight-intro reveal">
                      <h2 class="font-display">${t('privacy.offline_title')} <span class="text-gradient">${t('privacy.offline_title_gradient')}</span></h2>
@@ -2490,7 +2250,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
                    </div>
                  </div>
 
-                 <!-- Right: Highlight items with indicator -->
                  <div class="privacy-highlight-items reveal stagger-1">
                    <div class="privacy-indicator-track">
                      <div class="privacy-indicator-bar" id="privacy-indicator"></div>
@@ -2524,7 +2283,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
              </div>
            </section>
 
-           <!-- TRUST BADGES -->
            <section class="py-24 bg-white">
              <div class="max-w-4xl mx-auto px-6">
                <div class="flex flex-wrap justify-center gap-12 md:gap-24 opacity-70">
@@ -2544,7 +2302,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
              </div>
            </section>
 
-           <!-- CTA -->
            <section class="py-24 bg-nexus-text text-white text-center">
              <div class="max-w-3xl mx-auto px-6 reveal">
                <h2 class="text-4xl font-bold mb-8">${t('privacy.cta_title')}</h2>
@@ -2558,7 +2315,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
 
       function renderDownload() {
         app.innerHTML = `
-          <!-- HERO -->
           <section class="pt-32 pb-16 text-center">
             <div class="max-w-3xl mx-auto px-6 reveal">
               <h1 class="text-5xl font-bold mb-4 font-display">${t('download.hero_title')}</h1>
@@ -2566,10 +2322,8 @@ const data = JSON.parse(document.getElementById('content').textContent);
             </div>
           </section>
 
-          <!-- FEATURES + PLATFORMS -->
           <section class="pb-24">
             <div class="max-w-6xl mx-auto px-6">
-              <!-- Features card -->
               <div class="glass-panel bg-white p-8 md:p-12 rounded-[2.5rem] border-2 border-nexus-purple/10 relative overflow-hidden mb-16 max-w-2xl mx-auto reveal">
                 <div class="absolute top-0 right-0 bg-nexus-purple text-white px-6 py-2 rounded-bl-2xl font-bold">${t('download.plan_badge')}</div>
                 <h2 class="text-3xl font-bold mb-8">${t('download.plan_title')}</h2>
@@ -2582,12 +2336,9 @@ const data = JSON.parse(document.getElementById('content').textContent);
                 </ul>
               </div>
 
-              <!-- Platform grid -->
               <h2 class="text-3xl font-bold text-center mb-12 reveal">${t('download.platforms_title')}</h2>
-              <!-- Top row: 3 cards -->
               <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6" id="platform-grid">
 
-                <!-- Android -->
                 <div id="android" class="glass-panel bg-white p-6 rounded-2xl border border-nexus-purple/10 hover:border-nexus-purple/30 transition-all reveal">
                   <div class="flex items-center gap-3 mb-3">
                     <img src="/icons/android.png" alt="Android" class="w-10 h-10 object-contain">
@@ -2598,7 +2349,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
                   <p class="text-center text-xs text-nexus-muted mt-2">${t('download.req_android')}</p>
                 </div>
 
-                <!-- iOS / iPadOS -->
                 <div id="ios" class="glass-panel bg-white p-6 rounded-2xl border border-nexus-purple/10 hover:border-nexus-purple/30 transition-all reveal stagger-1">
                   <div class="flex items-center gap-3 mb-3">
                     <img src="/icons/iOS-Logo.png" alt="iOS" class="w-10 h-10 object-contain">
@@ -2609,7 +2359,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
                   <p class="text-center text-xs text-nexus-muted mt-2">${t('download.req_ios')}</p>
                 </div>
 
-                <!-- macOS -->
                 <div id="macos" class="glass-panel bg-white p-6 rounded-2xl border border-nexus-purple/10 hover:border-nexus-purple/30 transition-all reveal stagger-2">
                   <div class="flex items-center gap-3 mb-3">
                     <img src="/icons/macOS-logo.png" alt="macOS" class="w-10 h-10 object-contain">
@@ -2628,29 +2377,26 @@ const data = JSON.parse(document.getElementById('content').textContent);
 
               </div>
 
-              <!-- Bottom row: 2 cards centered -->
               <div class="grid sm:grid-cols-2 gap-6 max-w-[calc(66.666%+0.75rem)] mx-auto mt-6">
 
-                <!-- Windows -->
                 <div id="windows" class="glass-panel bg-white p-6 rounded-2xl border border-nexus-purple/10 hover:border-nexus-purple/30 transition-all reveal stagger-3">
                   <div class="flex items-center gap-3 mb-3">
                     <img src="/icons/Windows-logo.png" alt="Windows" class="w-10 h-10 object-contain">
                     <h3 class="font-bold text-lg">Windows</h3>
                   </div>
                   <p class="text-sm text-nexus-muted mb-4">${t('download.desc_windows')}</p>
-                  <a href="/downloads/Nexus-Windows.zip" class="block w-full py-3 rounded-xl border-2 border-nexus-text text-nexus-text font-bold text-center hover:bg-gray-50 transition-colors">${t('download.btn_windows')}</a>
+                  <a href="/downloads/Nexus-Setup.exe" class="block w-full py-3 rounded-xl border-2 border-nexus-text text-nexus-text font-bold text-center hover:bg-gray-50 transition-colors">${t('download.btn_windows')}</a>
                   <p class="text-center text-xs text-nexus-muted mb-2">${t('download.windows_hint')}</p>
                   <p class="text-center text-xs text-nexus-muted">${t('download.req_windows')}</p>
                 </div>
 
-                <!-- Linux -->
                 <div id="linux" class="glass-panel bg-white p-6 rounded-2xl border border-nexus-purple/10 hover:border-nexus-purple/30 transition-all reveal stagger-4">
                   <div class="flex items-center gap-3 mb-3">
                     <img src="/icons/Linux-logo.png" alt="Linux" class="w-10 h-10 object-contain">
                     <h3 class="font-bold text-lg">Linux</h3>
                   </div>
                   <p class="text-sm text-nexus-muted mb-4">${t('download.desc_linux')}</p>
-                  <a href="/downloads/Nexus-Linux.zip" class="block w-full py-3 rounded-xl border-2 border-nexus-text text-nexus-text font-bold text-center hover:bg-gray-50 transition-colors">${t('download.btn_linux')}</a>
+                  <a href="/downloads/Nexus.AppImage" class="block w-full py-3 rounded-xl border-2 border-nexus-text text-nexus-text font-bold text-center hover:bg-gray-50 transition-colors">${t('download.btn_linux')}</a>
                   <p class="text-center text-xs text-nexus-muted mb-2">${t('download.linux_hint')}</p>
                   <p class="text-center text-xs text-nexus-muted">${t('download.req_linux')}</p>
                 </div>
@@ -2659,7 +2405,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
             </div>
           </section>
 
-          <!-- INSTALLATION FAQ -->
           <section class="py-24 bg-gray-50">
             <div class="max-w-3xl mx-auto px-6">
               <h2 class="text-3xl font-bold text-center mb-12 reveal">${t('download.faq_title')}</h2>
@@ -2697,7 +2442,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
 
       function renderAbout() {
         app.innerHTML = `
-          <!-- HERO -->
           <section class="pt-32 pb-20 bg-white">
             <div class="max-w-7xl mx-auto px-6 text-center">
               <h1 class="text-5xl font-bold mb-6 font-display reveal">${t('about.hero_title')}</h1>
@@ -2708,7 +2452,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
             </div>
           </section>
 
-          <!-- STORY -->
           <section class="py-24 bg-gray-50">
             <div class="max-w-3xl mx-auto px-6 text-center reveal">
               <h2 class="text-3xl font-bold mb-6">${t('about.story_title')}</h2>
@@ -2718,7 +2461,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
             </div>
           </section>
 
-          <!-- VALUES -->
           <section class="py-24 bg-white">
             <div class="max-w-7xl mx-auto px-6">
               <h2 class="text-3xl font-bold text-center mb-16 reveal">${t('about.values_title')}</h2>
@@ -2742,7 +2484,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
             </div>
           </section>
 
-          <!-- CONTACT -->
           <section class="py-24 bg-nexus-purple text-white text-center">
             <div class="max-w-2xl mx-auto px-6 reveal">
               <h2 class="text-3xl font-bold mb-6">${t('about.contact_title')}</h2>

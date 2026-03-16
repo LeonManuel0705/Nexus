@@ -69,7 +69,7 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
       case 'month':
         start = DateTime(now.year, now.month, 1);
         break;
-      default: // week
+      default:
         start = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
     }
     return start.toIso8601String();
@@ -252,11 +252,11 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
   Color get _modeColor {
     switch (_currentMode) {
       case PomodoroMode.work:
-        return const Color(0xFFF43F5E); // rose-500
+        return const Color(0xFFF43F5E);
       case PomodoroMode.shortBreak:
-        return const Color(0xFF10B981); // emerald-500
+        return const Color(0xFF10B981);
       case PomodoroMode.longBreak:
-        return const Color(0xFF4F46E5); // indigo-600
+        return const Color(0xFF4F46E5);
     }
   }
 
@@ -279,7 +279,6 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
       child: ListView(
       padding: EdgeInsets.zero,
       children: [
-        // Screen header
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           child: NexusTheme.gradientText('Pomodoro', fontSize: 36),
@@ -301,7 +300,6 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
 
         const SizedBox(height: 24),
 
-        // Main timer area in GlassCard
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: GlassCard(
@@ -310,12 +308,10 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
             enableTapScale: false,
             child: Column(
               children: [
-                // Mode selector pills
                 _buildModeSelectorPills(isDark),
 
                 const SizedBox(height: 32),
 
-                // Timer display with progress fill
                 AnimatedBuilder(
                   animation: _pulseAnimation,
                   builder: (context, child) {
@@ -335,7 +331,6 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
                       borderRadius: BorderRadius.circular(32),
                       child: Stack(
                         children: [
-                          // Progress fill from bottom
                           Positioned.fill(
                             child: Align(
                               alignment: Alignment.bottomCenter,
@@ -350,7 +345,6 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
                               ),
                             ),
                           ),
-                          // Timer text
                           Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -387,7 +381,6 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
 
                 const SizedBox(height: 24),
 
-                // Session dots
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(4, (index) {
@@ -408,7 +401,6 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
 
                 const SizedBox(height: 24),
 
-                // Controls row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -418,7 +410,6 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
                       color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
                     ),
                     const SizedBox(width: 20),
-                    // Play/Pause button
                     GestureDetector(
                       onTap: _isRunning ? _pauseTimer : _startTimer,
                       child: Container(

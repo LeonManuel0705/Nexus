@@ -31,10 +31,8 @@ class NotificationService {
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  // macOS native channel (existing)
   static const _macChannel = MethodChannel('com.leon.nexus/notifications');
 
-  // flutter_local_notifications for Android/iOS/Windows/Linux
   final FlutterLocalNotificationsPlugin _flnPlugin = FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
@@ -79,7 +77,6 @@ class NotificationService {
         );
         _initialized = result ?? false;
 
-        // Request platform-specific notification permissions
         if (Platform.isAndroid) {
           final androidPlugin = _flnPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
           _permissionGranted = await androidPlugin?.requestNotificationsPermission() ?? false;

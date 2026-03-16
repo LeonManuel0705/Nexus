@@ -72,7 +72,6 @@ class _TasksScreenState extends State<TasksScreen> {
           child: CustomScrollView(
             slivers: [
 
-              // Screen header with gradient text + add button
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -103,7 +102,6 @@ class _TasksScreenState extends State<TasksScreen> {
                 ),
               ),
 
-              // Filter chips
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -228,7 +226,6 @@ class _TasksScreenState extends State<TasksScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Group header
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(
@@ -269,7 +266,6 @@ class _TasksScreenState extends State<TasksScreen> {
                 ],
               ),
             ),
-            // Task items wrapped in GlassCard
             GlassCard(
               padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 0),
               borderRadius: 20,
@@ -351,13 +347,13 @@ class _TaskListItem extends StatelessWidget {
         break;
       case 'medium':
         label = 'Mittel';
-        bgColor = const Color(0xFFFEF3C7); // amber-100
-        textColor = const Color(0xFFD97706); // amber-600
+        bgColor = const Color(0xFFFEF3C7);
+        textColor = const Color(0xFFD97706);
         break;
       default:
         label = 'Niedrig';
-        bgColor = const Color(0xFFD1FAE5); // emerald-100
-        textColor = const Color(0xFF059669); // emerald-600
+        bgColor = const Color(0xFFD1FAE5);
+        textColor = const Color(0xFF059669);
         break;
     }
 
@@ -400,13 +396,12 @@ class _TaskListItem extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
             children: [
-              // Check toggle - circle/checkCircle icon
               GestureDetector(
                 onTap: onToggle,
                 child: Icon(
                   task.completed ? Icons.check_circle : Icons.circle_outlined,
                   color: task.completed
-                      ? const Color(0xFF10B981) // emerald-500
+                      ? const Color(0xFF10B981)
                       : (isDark ? const Color(0xFF71717A) : const Color(0xFFA1A1AA)),
                   size: 26,
                 ),

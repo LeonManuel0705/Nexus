@@ -925,7 +925,6 @@
     </div>
 </div>
 
-<!-- Period Config Modal -->
 <div class="modal" id="periodConfigModal">
     <div class="modal-content" style="max-width: 520px;">
         <div class="modal-header">
@@ -933,7 +932,6 @@
             <button class="modal-close" onclick="closeModal('periodConfigModal')">&times;</button>
         </div>
         <div class="modal-body" id="periodConfigBody">
-            <!-- Filled by JS -->
         </div>
         <div class="form-actions">
             <button class="btn-secondary" onclick="showPeriodWizard()">
@@ -953,7 +951,6 @@
     </div>
 </div>
 
-<!-- Period Wizard Modal -->
 <div class="modal" id="periodWizardModal">
     <div class="modal-content" style="max-width: 560px;">
         <div class="modal-header">
@@ -1034,8 +1031,8 @@ let calendarEvents = [];
 let iservCalendarEvents = [];
 let currentCalendarDate = new Date();
 let iservConnected = false;
-let currentSemesterFilter = 'Q1'; // Current semester filter (Q1, Q2, Q3, Q4, or 'all' for combined)
-let gradeSystem = 'points'; // 'points' (Oberstufe) or 'marks' (Mittelstufe)
+let currentSemesterFilter = 'Q1';
+let gradeSystem = 'points';
 let classLevel = 10;
 
 const MARK_OPTIONS = [
@@ -1099,12 +1096,12 @@ let timetableSettings = {
 };
 
 let isEditMode = false;
-let selectedSetupOption = 'empty'; // 'template' or 'empty'
+let selectedSetupOption = 'empty';
 
 const DAY_NAMES = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 const DAY_NAMES_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
-let viewingWeek = null; // null = current week, 'A' or 'B' = forced view
+let viewingWeek = null;
 let stundenplanInterval = null;
 let timetableLoaded = false;
 
@@ -1248,7 +1245,6 @@ async function initTimetable() {
 
         updateWeekGroupVisibility();
 
-        // Handle deep-link from settings
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('openPeriodConfig') === '1') {
             isEditMode = true;
@@ -1292,7 +1288,7 @@ async function createTimetableEntry(entry) {
         });
         if (response.ok) {
             const data = await response.json();
-            await loadTimetableEntries(); // Reload all entries
+            await loadTimetableEntries();
             return data;
         }
     } catch (error) {
@@ -1310,7 +1306,7 @@ async function updateTimetableEntry(id, entry) {
         });
         if (response.ok) {
             const data = await response.json();
-            await loadTimetableEntries(); // Reload all entries
+            await loadTimetableEntries();
             return data;
         }
     } catch (error) {
@@ -1325,7 +1321,7 @@ async function deleteTimetableEntry(id) {
             method: 'DELETE'
         });
         if (response.ok) {
-            await loadTimetableEntries(); // Reload all entries
+            await loadTimetableEntries();
             return true;
         }
     } catch (error) {
@@ -1442,7 +1438,7 @@ async function saveBundeslandSelection() {
     let progress = 0;
     const progressInterval = setInterval(() => {
         progress += Math.random() * 15;
-        if (progress > 85) progress = 85; // Cap at 85% until complete
+        if (progress > 85) progress = 85;
         progressBar.style.width = progress + '%';
 
         if (progress < 30) {
@@ -1599,7 +1595,6 @@ function toggleEditMode() {
         document.body.classList.remove('edit-mode-active');
     }
 
-    // Reset week view when exiting edit mode
     if (!isEditMode) {
         viewingWeek = null;
     }
@@ -1811,8 +1806,6 @@ async function confirmClearTimetable() {
     }
 }
 
-// ===== Period Config Modal =====
-
 function openPeriodConfigModal() {
     renderPeriodConfigList();
     openModal('periodConfigModal');
@@ -1899,8 +1892,6 @@ async function savePeriodConfig() {
     }
 }
 
-// ===== Period Wizard =====
-
 let wizardStep = 1;
 let wizardTemplate = null;
 let wizardConfig = {
@@ -1923,7 +1914,6 @@ function renderWizardStep() {
     const content = document.getElementById('wizardContent');
     const actions = document.getElementById('wizardActions');
 
-    // Progress pills
     progress.innerHTML = [1, 2, 3].map(s =>
         `<span class="wizard-pill ${s === wizardStep ? 'active' : ''} ${s < wizardStep ? 'done' : ''}">${s}</span>`
     ).join('<span class="wizard-pill-line"></span>');
@@ -2068,7 +2058,6 @@ function changeWizardPeriodCount(delta) {
     const newCount = wizardConfig.periodCount + delta;
     if (newCount < 1 || newCount > 12) return;
     wizardConfig.periodCount = newCount;
-    // Adjust breaks array
     while (wizardConfig.breaks.length < newCount - 1) {
         wizardConfig.breaks.push(5);
     }
@@ -2779,7 +2768,6 @@ function toggleWeekView() {
     const displayedWeekType = getWeekType(displayedDate);
 
     if (isEditMode) {
-        // In edit mode: permanently change which week is current
         const targetWeek = displayedWeekType === 'A' ? 'B' : 'A';
         const newRef = new Date(REFERENCE_A_WEEK);
         newRef.setDate(newRef.getDate() + 7);
@@ -2793,7 +2781,6 @@ function toggleWeekView() {
         updateStundenplanDisplay();
         showToast(`Woche auf ${targetWeek}-Woche geändert`, 'success');
     } else {
-        // Normal mode: just preview the other week
         if (viewingWeek === null) {
             viewingWeek = displayedWeekType === 'A' ? 'B' : 'A';
         } else {
@@ -5468,7 +5455,6 @@ function convertMarkToRating() {
 </script>
 
 <style>
-/* Bundesland Selection Grid */
 .bundesland-wizard-content {
     padding: 10px 0;
 }
@@ -5567,7 +5553,6 @@ function convertMarkToRating() {
     }
 }
 
-/* Import from Stundenplan Banner */
 .import-from-stundenplan {
     display: flex;
     align-items: center;
@@ -5677,10 +5662,6 @@ function convertMarkToRating() {
     font-size: 11px;
 }
 
-/* ==========================================
-   COLOR PICKER STYLES
-   ========================================== */
-
 #subjectColor {
     padding: 10px 12px;
     padding-right: 36px;
@@ -5738,10 +5719,6 @@ function convertMarkToRating() {
     font-size: 13px;
     color: var(--text-secondary);
 }
-
-/* ==========================================
-   VERTRETUNGSPLAN STYLES
-   ========================================== */
 
 .vertretungsplan-container {
     padding: 16px;
@@ -5932,11 +5909,6 @@ function convertMarkToRating() {
     font-size: 13px;
 }
 
-/* ==========================================
-   STUNDENPLAN STYLES
-   ========================================== */
-
-/* Week Indicator */
 .week-indicator {
     display: flex;
     align-items: center;
@@ -5988,7 +5960,6 @@ function convertMarkToRating() {
     align-items: center;
 }
 
-/* Current Lesson Section */
 .current-lesson-section {
     margin-bottom: 24px;
 }
@@ -6078,7 +6049,6 @@ function convertMarkToRating() {
     color: var(--text-secondary);
 }
 
-/* Current Lesson Display */
 .current-lesson-display,
 .upcoming-lesson {
     display: flex;
@@ -6171,7 +6141,6 @@ function convertMarkToRating() {
     transition: width 0.5s ease;
 }
 
-/* No Lesson State */
 .no-lesson {
     display: flex;
     flex-direction: column;
@@ -6196,18 +6165,15 @@ function convertMarkToRating() {
     color: var(--accent) !important;
 }
 
-/* Schedule Section */
 .schedule-section {
     margin-bottom: 24px;
 }
 
-/* Primary schedule (Today/Next school day) - more prominent */
 .schedule-section.schedule-primary .schedule-item.glass-card {
     background: var(--card-bg);
     border-color: var(--card-border);
 }
 
-/* Secondary schedule (Day after) - slightly faded */
 .schedule-section.schedule-secondary .schedule-item.glass-card {
     opacity: 0.75;
 }
@@ -6318,7 +6284,6 @@ function convertMarkToRating() {
     font-size: 14px;
 }
 
-/* Week Overview */
 .week-overview-section {
     margin-bottom: 24px;
 }
@@ -6424,7 +6389,6 @@ function convertMarkToRating() {
     font-size: 12px;
 }
 
-/* Clickable Teacher Names */
 .clickable {
     cursor: pointer;
     transition: all 0.2s ease;
@@ -6465,7 +6429,6 @@ function convertMarkToRating() {
     color: var(--accent);
 }
 
-/* Email Compose Modal */
 .email-compose-modal {
     max-width: 550px;
 }
@@ -6530,7 +6493,6 @@ function convertMarkToRating() {
     margin-right: 6px;
 }
 
-/* Toast Notifications */
 .toast {
     position: fixed;
     bottom: 100px;
@@ -6600,7 +6562,6 @@ function convertMarkToRating() {
     to { transform: rotate(360deg); }
 }
 
-/* Responsive */
 @media (max-width: 600px) {
     .week-indicator {
         flex-wrap: wrap;
@@ -6634,7 +6595,6 @@ function convertMarkToRating() {
     }
 }
 
-/* Calendar Styles */
 .calendar-container {
     padding: 20px;
 }
@@ -6778,7 +6738,6 @@ function convertMarkToRating() {
     background: #0ea5e9;
 }
 
-/* Events List */
 .events-list {
     display: flex;
     flex-direction: column;
@@ -6884,13 +6843,11 @@ function convertMarkToRating() {
     gap: 8px;
 }
 
-/* IServ Events Section in Calendar */
 .iserv-events-section {
     border-top: 1px solid var(--border-color);
     padding-top: 24px;
 }
 
-/* Grades Styles */
 .grades-summary {
     padding: 20px;
     margin-bottom: 24px;
@@ -6916,7 +6873,6 @@ function convertMarkToRating() {
     color: var(--accent);
 }
 
-/* Grade Calculator Styles */
 .grade-calculator {
     margin-bottom: 24px;
     overflow: hidden;
@@ -7063,7 +7019,6 @@ function convertMarkToRating() {
     color: var(--text-secondary);
 }
 
-/* Klausur/Sonstige Calculator */
 .klausur-calc-section {
     margin-bottom: 24px;
     padding-top: 16px;
@@ -7243,7 +7198,6 @@ function convertMarkToRating() {
 .grade-row.poor span { background: rgba(239, 68, 68, 0.15); }
 .grade-row.fail span { background: rgba(239, 68, 68, 0.25); }
 
-/* Grade color classes */
 .grade-excellent { color: #22c55e; }
 .grade-good { color: #3b82f6; }
 .grade-satisfactory { color: #eab308; }
@@ -7252,7 +7206,6 @@ function convertMarkToRating() {
 
 .error { color: #ef4444; }
 
-/* Semester Tabs */
 .semester-tabs {
     margin-bottom: 16px;
     padding: 12px 16px;
@@ -7302,7 +7255,6 @@ function convertMarkToRating() {
     border-color: transparent;
 }
 
-/* Summary display for combined view */
 .grades-summary {
     display: flex;
     gap: 24px;
@@ -7330,7 +7282,6 @@ function convertMarkToRating() {
     color: var(--accent);
 }
 
-/* Semester badge on grade items */
 .grade-semester-badge {
     display: inline-block;
     padding: 2px 8px;
@@ -7466,7 +7417,6 @@ function convertMarkToRating() {
     color: var(--text-secondary);
 }
 
-/* Archive Section */
 .archive-section {
     margin-top: 24px;
     border-top: 1px solid var(--border);
@@ -7548,7 +7498,6 @@ function convertMarkToRating() {
     }
 }
 
-/* Period Config Modal */
 .period-config-list {
     display: flex;
     flex-direction: column;
@@ -7623,7 +7572,6 @@ function convertMarkToRating() {
     color: #ea4335;
 }
 
-/* Wizard */
 .wizard-progress {
     display: flex;
     align-items: center;

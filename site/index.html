@@ -1610,14 +1610,14 @@
       "macos_zip_hint": "Entpacken → Nexus.app in Programme ziehen → Rechtsklick → Öffnen",
       "macos_copy": "Kopieren",
       "macos_install_hint": "Oder: In Terminal einfügen — installiert automatisch.",
-      "btn_windows": "ZIP herunterladen",
+      "btn_windows": "Installer herunterladen",
       "req_windows": "Windows 10+",
-      "desc_windows": "Desktop App für Windows. Entpacken und starten.",
-      "windows_hint": "Entpacken → Nexus.bat doppelklicken",
-      "btn_linux": "ZIP herunterladen",
-      "req_linux": "64-bit, Python 3.9+",
+      "desc_windows": "Desktop App für Windows. Installieren und loslegen.",
+      "windows_hint": "Doppelklick auf Setup → Nexus erscheint im Startmenü",
+      "btn_linux": "AppImage herunterladen",
+      "req_linux": "64-bit Linux",
       "desc_linux": "Desktop App für alle Distributionen.",
-      "linux_hint": "Entpacken → chmod +x Nexus.sh → ./Nexus.sh",
+      "linux_hint": "chmod +x Nexus.AppImage → Doppelklick",
       "faq_title": "Installations-FAQ",
       "faq_q1": "Wie aktualisiere ich?",
       "faq_a1": "Die App benachrichtigt dich automatisch, wenn ein Update verfügbar ist. Du kannst es dann direkt herunterladen.",
@@ -1919,14 +1919,14 @@
       "macos_zip_hint": "Extract → Drag Nexus.app to Applications → Right-click → Open",
       "macos_copy": "Copy",
       "macos_install_hint": "Or: Paste into Terminal — auto-installs.",
-      "btn_windows": "Download ZIP",
+      "btn_windows": "Download Installer",
       "req_windows": "Windows 10+",
-      "desc_windows": "Desktop App for Windows. Extract and run.",
-      "windows_hint": "Extract → Double-click Nexus.bat",
-      "btn_linux": "Download ZIP",
-      "req_linux": "64-bit, Python 3.9+",
+      "desc_windows": "Desktop App for Windows. Install and go.",
+      "windows_hint": "Double-click Setup → Nexus appears in Start Menu",
+      "btn_linux": "Download AppImage",
+      "req_linux": "64-bit Linux",
       "desc_linux": "Desktop App for all distributions.",
-      "linux_hint": "Extract → chmod +x Nexus.sh → ./Nexus.sh",
+      "linux_hint": "chmod +x Nexus.AppImage → double-click",
       "faq_title": "Installation FAQ",
       "faq_q1": "How do I update?",
       "faq_a1": "The app automatically notifies you when an update is available. You can then download it directly.",
@@ -3378,7 +3378,7 @@ const data = JSON.parse(document.getElementById('content').textContent);
                     <h3 class="font-bold text-lg">Windows</h3>
                   </div>
                   <p class="text-sm text-nexus-muted mb-4">${t('download.desc_windows')}</p>
-                  <a href="/downloads/Nexus-Windows.zip" class="block w-full py-3 rounded-xl border-2 border-nexus-text text-nexus-text font-bold text-center hover:bg-gray-50 transition-colors">${t('download.btn_windows')}</a>
+                  <a href="/downloads/Nexus-Setup.exe" class="block w-full py-3 rounded-xl border-2 border-nexus-text text-nexus-text font-bold text-center hover:bg-gray-50 transition-colors">${t('download.btn_windows')}</a>
                   <p class="text-center text-xs text-nexus-muted mb-2">${t('download.windows_hint')}</p>
                   <p class="text-center text-xs text-nexus-muted">${t('download.req_windows')}</p>
                 </div>
@@ -3390,7 +3390,7 @@ const data = JSON.parse(document.getElementById('content').textContent);
                     <h3 class="font-bold text-lg">Linux</h3>
                   </div>
                   <p class="text-sm text-nexus-muted mb-4">${t('download.desc_linux')}</p>
-                  <a href="/downloads/Nexus-Linux.zip" class="block w-full py-3 rounded-xl border-2 border-nexus-text text-nexus-text font-bold text-center hover:bg-gray-50 transition-colors">${t('download.btn_linux')}</a>
+                  <a href="/downloads/Nexus.AppImage" class="block w-full py-3 rounded-xl border-2 border-nexus-text text-nexus-text font-bold text-center hover:bg-gray-50 transition-colors">${t('download.btn_linux')}</a>
                   <p class="text-center text-xs text-nexus-muted mb-2">${t('download.linux_hint')}</p>
                   <p class="text-center text-xs text-nexus-muted">${t('download.req_linux')}</p>
                 </div>

@@ -367,7 +367,6 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
           ),
           const SizedBox(height: 16),
 
-          // Emerald section - achievements & good
           AnimatedListItem(
             index: 1,
             child: GlassCard(
@@ -398,7 +397,6 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
           ),
           const SizedBox(height: 12),
 
-          // Rose section - improvements
           AnimatedListItem(
             index: 2,
             child: GlassCard(
@@ -416,7 +414,6 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
           ),
           const SizedBox(height: 12),
 
-          // Indigo section - focus
           AnimatedListItem(
             index: 3,
             child: GlassCard(
@@ -434,7 +431,6 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
           ),
           const SizedBox(height: 12),
 
-          // Amber section - gratitude
           AnimatedListItem(
             index: 4,
             child: GlassCard(
@@ -520,7 +516,6 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
 
           const SizedBox(height: 12),
 
-          // Amber section - highlights
           AnimatedListItem(
             index: 2,
             child: GlassCard(
@@ -538,7 +533,6 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
           ),
           const SizedBox(height: 12),
 
-          // Emerald section - progress
           AnimatedListItem(
             index: 3,
             child: GlassCard(
@@ -556,7 +550,6 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
           ),
           const SizedBox(height: 12),
 
-          // Rose section - challenges
           AnimatedListItem(
             index: 4,
             child: GlassCard(
@@ -574,7 +567,6 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
           ),
           const SizedBox(height: 12),
 
-          // Indigo section - learnings & goals
           AnimatedListItem(
             index: 5,
             child: GlassCard(
@@ -982,7 +974,6 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
             ],
           ),
           const SizedBox(height: 12),
-          // 2x2 colored quadrant cards
           Row(
             children: [
               Expanded(

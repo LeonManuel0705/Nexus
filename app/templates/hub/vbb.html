@@ -392,7 +392,6 @@
 
 {% block scripts %}
 <script nonce="{{ g.csp_nonce }}">
-// --- State ---
 let currentTab = 'route';
 let fromLocation = null;
 let toLocation = null;
@@ -447,7 +446,6 @@ let monitorSocket = null;
 let _isCheckingCoverage = false;
 let userPrefs = null;
 
-// --- Init ---
 function loadSocketIO() {
     return new Promise((resolve) => {
         if (typeof io !== 'undefined') { resolve(); return; }
@@ -459,18 +457,16 @@ function loadSocketIO() {
         function done() { if (!resolved) { resolved = true; resolve(); } }
         script.onload = done;
         script.onerror = done;
-        // Timeout: don't wait forever on slow connections
         setTimeout(done, 3000);
         document.head.appendChild(script);
     });
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Fast offline check — don't block on network probe
     if (!navigator.onLine) {
         document.getElementById('vbbContent').style.display = 'none';
         document.getElementById('vbbOfflineCard').style.display = 'flex';
-        return; // Don't init anything — page needs internet
+        return;
     }
 
     setDefaultDateTime();
@@ -489,7 +485,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadPersonalization();
 });
 
-// --- Personalization ---
 
 async function loadPersonalization() {
     try {
@@ -499,7 +494,6 @@ async function loadPersonalization() {
         if (!data.success) return;
         userPrefs = data.preferences;
 
-        // Restore last search
         if (userPrefs.feature_flags?.last_search_restore && userPrefs.last_search) {
             if (!fromLocation && !toLocation) {
                 const ls = userPrefs.last_search;
@@ -510,7 +504,6 @@ async function loadPersonalization() {
             }
         }
 
-        // Apply adaptive default sort
         if (userPrefs.feature_flags?.adaptive_sort && userPrefs.default_sort && userPrefs.default_sort !== 'recommended') {
             currentSort = userPrefs.default_sort;
             document.querySelectorAll('.sort-btn').forEach(btn => {
@@ -518,7 +511,6 @@ async function loadPersonalization() {
             });
         }
 
-        // Load suggestions
         renderPersonalizationSection();
     } catch (err) {
         console.log('Personalization not available');
@@ -530,7 +522,6 @@ function renderPersonalizationSection() {
     const section = document.getElementById('personalizationSection');
     let hasContent = false;
 
-    // Commute suggestions
     if (userPrefs.feature_flags?.commute_suggestions && userPrefs.detected_commutes?.length) {
         const hour = new Date().getHours();
         const relevant = userPrefs.detected_commutes.filter(c => {
@@ -562,7 +553,6 @@ function renderPersonalizationSection() {
         }
     }
 
-    // Frequent routes
     if (userPrefs.feature_flags?.frequent_routes && userPrefs.route_searches?.length) {
         const qualified = userPrefs.route_searches
             .filter(r => r.count >= 3)
@@ -584,15 +574,11 @@ function renderPersonalizationSection() {
     if (hasContent) section.style.display = 'block';
 }
 
-// escAttr removed in Wave 7 — use escapeHtml() instead (includes single-quote escaping)
-
 async function quickSearch(fromId, fromName, toId, toName) {
     document.getElementById('fromInput').value = fromName;
     document.getElementById('toInput').value = toName;
     setDefaultDateTime();
 
-    // Resolve full location objects (with coordinates) so the backend
-    // can fall back to coordinate-based lookup if IDs are API-specific.
     const [fromRes, toRes] = await Promise.all([
         fetch(`/api/vbb/search?q=${encodeURIComponent(fromName)}`).then(r => r.json()).catch(() => null),
         fetch(`/api/vbb/search?q=${encodeURIComponent(toName)}`).then(r => r.json()).catch(() => null),
@@ -667,7 +653,6 @@ function setDefaultDateTime() {
     document.getElementById('routeTime').value = timeStr;
 }
 
-// --- Tab Switching ---
 function switchTab(tab) {
     currentTab = tab;
     document.querySelectorAll('.filter-tab').forEach(t => {
@@ -677,7 +662,6 @@ function switchTab(tab) {
     document.getElementById('tabDepartures').style.display = tab === 'departures' ? 'block' : 'none';
 }
 
-// --- Known Locations ---
 async function loadKnownLocations() {
     try {
         const response = await fetch('/api/vbb/locations');
@@ -722,7 +706,6 @@ function useQuickLocation(key) {
     if (!loc) return;
 
     if (currentTab === 'route') {
-        // Put in "from" if empty, else in "to"
         if (!fromLocation) {
             fromLocation = loc;
             document.getElementById('fromInput').value = loc.name || LOCATION_LABELS[key];
@@ -740,7 +723,6 @@ function useQuickLocation(key) {
     }
 }
 
-// --- Autocomplete ---
 function setupAutocomplete(inputId, dropdownId, onSelect) {
     const input = document.getElementById(inputId);
     const dropdown = document.getElementById(dropdownId);
@@ -787,7 +769,6 @@ async function searchLocations(query, dropdown, onSelect) {
             return;
         }
 
-        // Smart autocomplete: sort frequently-used stations to top
         let locations = data.locations;
         if (userPrefs?.feature_flags?.smart_autocomplete && userPrefs?.station_usage) {
             const su = userPrefs.station_usage;
@@ -847,7 +828,6 @@ function renderProductDots(products) {
     return dots.length > 0 ? `<div class="ac-products">${dots.join('')}</div>` : '';
 }
 
-// --- Swap ---
 function swapFromTo() {
     const fromInput = document.getElementById('fromInput');
     const toInput = document.getElementById('toInput');
@@ -860,7 +840,6 @@ function swapFromTo() {
     toLocation = tempLoc;
 }
 
-// --- Route Search ---
 async function searchRoute() {
     if (!fromLocation || !toLocation) {
         showToast('Bitte Start und Ziel eingeben', 'error');
@@ -884,7 +863,6 @@ async function searchRoute() {
         return `${date}T${time}:00${sign}${pad(Math.floor(off/60))}:${pad(off%60)}`;
     })();
 
-    // Apply per-route sort preference or adaptive default
     const routeKey = fromLocation.id + '_' + toLocation.id;
     const routeSort = userPrefs?.route_sort_prefs?.[routeKey];
     const defaultSort = routeSort || userPrefs?.default_sort || 'recommended';
@@ -917,14 +895,12 @@ async function searchRoute() {
         if (data.success && data.routes && data.routes.length > 0) {
             journeyCache = data.routes;
 
-            // Apply non-default sort if adaptive sort changed it
             if (currentSort !== 'recommended') {
                 sortRoutes(currentSort, true);
             } else {
                 renderRouteResults(data);
             }
 
-            // Track search for personalization
             trackPersonalizationEvent('search', {
                 from: fromLocation,
                 to: toLocation,
@@ -962,7 +938,6 @@ function renderRouteResults(data) {
     countEl.textContent = `${data.routes.length} Verbindung${data.routes.length !== 1 ? 'en' : ''}`;
     sortBar.style.display = 'flex';
 
-    // Hide sort buttons that are redundant (all values identical)
     if (data.routes.length > 1) {
         const durations = data.routes.map(r => r.duration);
         const prices = data.routes.map(r => r.price).filter(p => p != null);
@@ -1001,7 +976,6 @@ function renderRouteResults(data) {
             }
         }
 
-        // Ticket coverage badge
         let ticketBadgeHtml = '';
         if (route._ticketCoverage) {
             if (route._ticketCoverage.covered) {
@@ -1044,7 +1018,6 @@ function renderRouteResults(data) {
         </div>`;
     }).join('');
 
-    // Check ticket coverage for all routes (guard prevents infinite recursion)
     if (!_isCheckingCoverage) {
         checkAllTicketCoverage();
     }
@@ -1056,7 +1029,6 @@ function sortRoutes(sortBy, skipTrack) {
         btn.classList.toggle('active', btn.dataset.sort === sortBy);
     });
 
-    // Track sort preference (skip when auto-applied to avoid feedback loop)
     if (!skipTrack) {
         trackPersonalizationEvent('sort', {
             sort_type: sortBy,
@@ -1179,7 +1151,6 @@ function showJourneyDetail(idx) {
 
     html += '</div>';
 
-    // Summary bar
     const priceDisplay = route.price ? route.price.toFixed(2).replace('.', ',') : null;
     const priceIsDB = route.price_source === 'db';
     html += `
@@ -1191,7 +1162,6 @@ function showJourneyDetail(idx) {
         ${route.tariff_zone ? `<span class="summary-zone">${escapeHtml(route.tariff_zone)}</span>` : ''}
     </div>`;
 
-    // VBB ticket section (for local routes)
     if (route.tickets && route.tickets.length > 0) {
         const categories = {};
         route.tickets.forEach(t => {
@@ -1228,7 +1198,6 @@ function showJourneyDetail(idx) {
         html += '</div>';
     }
 
-    // Build bahn.de deep-link
     const fromStation = route.legs[0]?.departure?.station || '';
     const toStation = route.legs[route.legs.length - 1]?.arrival?.station || '';
     const transitLegs = (route.legs || []).filter(l => l.type === 'transit' && l.line);
@@ -1251,7 +1220,6 @@ function showJourneyDetail(idx) {
     const transfersHint = route.transfers === 0 ? 'Direkt' : `${route.transfers} Umstieg${route.transfers > 1 ? 'e' : ''}`;
     const linesHint = lineNames.length ? lineNames.join(' \u2192 ') : '';
 
-    // Ticket coverage info
     let ticketCoverageHtml = '';
     if (route._ticketCoverage) {
         if (route._ticketCoverage.covered) {
@@ -1270,7 +1238,6 @@ function showJourneyDetail(idx) {
     }
     html += ticketCoverageHtml;
 
-    // DB Ticket offers section (for long-distance routes with ctxRecon)
     if (route.ctxRecon) {
         html += `
         <div class="db-offers-section">
@@ -1285,7 +1252,6 @@ function showJourneyDetail(idx) {
         </div>`;
     }
 
-    // Fallback buy button (always shown)
     html += `
     <div class="ticket-purchase-section">
         <a href="${bahnUrl}" target="_blank" rel="noopener" class="ticket-buy-btn">
@@ -1315,7 +1281,6 @@ function showJourneyDetail(idx) {
     document.getElementById('journeyDetailContent').innerHTML = html;
     openModal('journeyDetailModal');
 
-    // Auto-load DB ticket offers if ctxRecon is available
     if (route.ctxRecon) {
         loadDBTicketOffers(route.ctxRecon, bahnUrl, depTimeHint, arrTimeHint, linesHint, transfersHint);
     }
@@ -1338,13 +1303,11 @@ async function loadDBTicketOffers(ctxRecon, bahnUrl, depTime, arrTime, lines, tr
             return;
         }
 
-        // Group by class
         const class2 = data.offers.filter(o => o.class_key === 'KLASSE_2');
         const class1 = data.offers.filter(o => o.class_key === 'KLASSE_1');
 
         let html = '';
 
-        // 2nd class offers
         if (class2.length > 0) {
             html += '<div class="db-offers-class"><div class="db-offers-class-label">2. Klasse</div>';
             html += '<div class="db-offers-grid">';
@@ -1354,7 +1317,6 @@ async function loadDBTicketOffers(ctxRecon, bahnUrl, depTime, arrTime, lines, tr
             html += '</div></div>';
         }
 
-        // 1st class (collapsed by default)
         if (class1.length > 0) {
             html += `<button class="ticket-expand-btn" onclick="this.nextElementSibling.classList.toggle('expanded'); this.textContent = this.nextElementSibling.classList.contains('expanded') ? '1. Klasse ausblenden' : '1. Klasse anzeigen'">1. Klasse anzeigen</button>`;
             html += '<div class="db-offers-class ticket-other-categories"><div class="db-offers-class-label">1. Klasse</div>';
@@ -1374,7 +1336,7 @@ async function loadDBTicketOffers(ctxRecon, bahnUrl, depTime, arrTime, lines, tr
 
 function renderDBOffer(offer, bahnUrl, depTime, arrTime, lines, transfers) {
     const priceLabel = offer.price.toFixed(2).replace('.', ',');
-    const isCheapest = offer === (offer._cheapest); // Will be set below
+    const isCheapest = offer === (offer._cheapest);
     const seatInfo = offer.seat_reservation_price != null
         ? `<span class="db-offer-seat">+ ${offer.seat_reservation_price.toFixed(2).replace('.',',')} \u20ac Sitzplatz</span>` : '';
 
@@ -1413,7 +1375,6 @@ function renderDBOffer(offer, bahnUrl, depTime, arrTime, lines, transfers) {
     </div>`;
 }
 
-// --- Departures ---
 async function loadDepartures(stop) {
     if (!stop || !stop.id) return;
 
@@ -1474,7 +1435,6 @@ function renderDepartures(departures) {
         const remarksHtml = dep.remarks && dep.remarks.length > 0
             ? `<div class="dep-remarks">${dep.remarks.map(r => `<span class="dep-remark">${escapeHtml(r)}</span>`).join('')}</div>`
             : '';
-        // Feature + occupancy badges (structured, not raw HTML)
         let featureBadges = '';
         if (dep.features && dep.features.length > 0) {
             featureBadges = dep.features.map(f => `<span class="dep-feature">${escapeHtml(f)}</span>`).join('');
@@ -1525,7 +1485,6 @@ function toggleAutoRefresh(enabled) {
     }
 }
 
-// --- Helpers ---
 function formatTime(isoStr) {
     if (!isoStr) return '--:--';
     try {
@@ -1576,7 +1535,6 @@ function closeModal(id) {
     document.getElementById(id).classList.remove('active');
 }
 
-// --- Save Location ---
 function openSaveLocationModal(loc) {
     document.getElementById('saveLocStation').value = loc.name || '';
     document.getElementById('saveLocData').value = JSON.stringify(loc);
@@ -1585,7 +1543,6 @@ function openSaveLocationModal(loc) {
 }
 
 function openAddLocationSearch() {
-    // Focus the "Von" input to let user search, then they can bookmark from results
     const fromInput = document.getElementById(currentTab === 'route' ? 'fromInput' : 'departureStopInput');
     fromInput.focus();
     fromInput.value = '';
@@ -1635,19 +1592,16 @@ async function deleteLocation(key) {
     }
 }
 
-// --- Departure countdown refresh ---
 setInterval(() => {
     if (currentTab === 'departures') {
         document.querySelectorAll('.dep-countdown').forEach(el => {
             const parent = el.closest('.departure-item');
             const timeEl = parent?.querySelector('.dep-time');
             if (!timeEl) return;
-            // Re-render would be better, but light countdowns update is fine
         });
     }
 }, 30000);
 
-// --- Ticket Management ---
 async function loadUserTickets() {
     try {
         const res = await fetch('/api/vbb/user-tickets');
@@ -1739,7 +1693,6 @@ function selectCatalogTicket(ticket) {
     document.getElementById('ticketZone').value = ticket.zone_coverage || 'all';
     document.getElementById('ticketSearch').value = ticket.name;
     document.getElementById('ticketSearchResults').style.display = 'none';
-    // Auto-fill auto-renew for subscription tickets
     if (['month', 'year'].includes(ticket.period)) {
         document.getElementById('ticketAutoRenews').checked = true;
     }
@@ -1829,7 +1782,6 @@ async function checkAllTicketCoverage() {
                 }
             } catch (err) { /* ignore */ }
         }
-        // Re-render with coverage info
         const container = document.getElementById('routeResultsList');
         if (container.children.length > 0) {
             renderRouteResults({routes: journeyCache});

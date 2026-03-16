@@ -516,7 +516,7 @@ function isCacheFresh() {
         if (!lastSync) return false;
         const syncTime = new Date(lastSync);
         const now = new Date();
-        return (now - syncTime) < 5 * 60 * 1000; // 5 minutes
+        return (now - syncTime) < 5 * 60 * 1000;
     } catch (e) {
         return false;
     }
@@ -1024,7 +1024,7 @@ function renderGymSchedule() {
     const scheduleType = getEffectiveScheduleType();
     const entries = scheduleEntries.filter(e => e.schedule_type === scheduleType);
     const today = new Date().getDay();
-    const dayOrder = [1, 2, 3, 4, 5, 6, 0]; // Monday to Sunday
+    const dayOrder = [1, 2, 3, 4, 5, 6, 0];
 
     container.innerHTML = dayOrder.map(dayNum => {
         const entry = entries.find(e => e.day === dayNum);
@@ -1264,7 +1264,6 @@ function getSuggestedWorkout(date) {
     border-color: var(--accent);
 }
 
-/* Holiday Alert */
 .holiday-alert {
     display: flex;
     align-items: center;
@@ -1277,7 +1276,6 @@ function getSuggestedWorkout(date) {
     font-weight: 600;
 }
 
-/* Schedule Cards */
 .schedule-cards {
     display: flex;
     flex-direction: column;
@@ -1364,14 +1362,12 @@ function getSuggestedWorkout(date) {
     }
 }
 
-/* Schedule Controls */
 .schedule-controls {
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
-/* Edit Mode Controls */
 .edit-mode-controls {
     display: flex;
     justify-content: space-between;
@@ -1393,7 +1389,6 @@ function getSuggestedWorkout(date) {
     gap: 8px;
 }
 
-/* Editable Schedule Card */
 .schedule-card.editable {
     cursor: pointer;
     position: relative;
@@ -1422,7 +1417,6 @@ function getSuggestedWorkout(date) {
     font-size: 14px;
 }
 
-/* Radio Button Group for Training Type */
 .radio-button-group {
     display: flex;
     flex-wrap: wrap;
@@ -1457,14 +1451,12 @@ function getSuggestedWorkout(date) {
     border-color: var(--accent);
 }
 
-/* Active edit button */
 #editModeBtn.active {
     background: var(--accent);
     color: white;
     border-color: var(--accent);
 }
 
-/* Modal small variant */
 .modal-content.modal-small {
     max-width: 400px;
 }

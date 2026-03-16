@@ -87,7 +87,6 @@ class MoreScreen extends StatelessWidget {
           const SizedBox(height: 24),
         ],
 
-        // Settings & About
         AnimatedListItem(
           index: globalIndex++,
           child: GlassCard(

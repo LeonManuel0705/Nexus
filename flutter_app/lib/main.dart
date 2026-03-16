@@ -211,31 +211,31 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     _sidebarAnimController = AnimationController(vsync: this);
     _pageTransitionController = AnimationController(
       vsync: this,
-      value: 1, // start fully visible
+      value: 1,
     );
     _menuSlideController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
     _screens = [
-      const DashboardScreen(),   // 0
-      const TasksScreen(),       // 1
-      const CalendarScreen(),    // 2
-      const SchoolScreen(),      // 3
-      const MoreScreen(),        // 4
-      const PomodoroScreen(),    // 5
-      const TrainingScreen(),    // 6
-      const ProjectsScreen(),    // 7
-      const KnowledgeScreen(),   // 8
-      const EmailScreen(),       // 9
-      const ReviewScreen(),      // 10
-      const MousepadScreen(),    // 11
-      const AssistantScreen(),   // 12
-      const SettingsScreen(),    // 13
-      const NotesScreen(),       // 14
-      const VbbScreen(),         // 15
-      const BookmarksScreen(),   // 16
-      const IServScreen(),       // 17
+      const DashboardScreen(),
+      const TasksScreen(),
+      const CalendarScreen(),
+      const SchoolScreen(),
+      const MoreScreen(),
+      const PomodoroScreen(),
+      const TrainingScreen(),
+      const ProjectsScreen(),
+      const KnowledgeScreen(),
+      const EmailScreen(),
+      const ReviewScreen(),
+      const MousepadScreen(),
+      const AssistantScreen(),
+      const SettingsScreen(),
+      const NotesScreen(),
+      const VbbScreen(),
+      const BookmarksScreen(),
+      const IServScreen(),
     ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkFirstLaunch();
@@ -384,7 +384,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                   Expanded(child: _screens[i]),
                                 ],
                               )
-                            : _screens[i], // Phone: no app bar, screens handle own headers
+                            : _screens[i],
                   ),
               ],
             ),
@@ -395,7 +395,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   }
 
   bool _isNavigating = false;
-  int _displayIndex = 0; // the index actually shown in IndexedStack
+  int _displayIndex = 0;
 
   void _navigateToScreen(int screenIndex) async {
     if (screenIndex == _currentIndex || _isNavigating) return;
@@ -498,19 +498,15 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
           backgroundColor: Colors.transparent,
           body: Stack(
             children: [
-              // Main content - no app bar, screens handle their own headers
               SafeArea(
                 bottom: false,
                 child: _buildScreenStack(isTablet: false, isDark: isDark),
               ),
 
-              // Bottom pill nav (hidden when keyboard is open)
               if (MediaQuery.of(context).viewInsets.bottom == 0)
                 _buildBottomPillNav(isDark),
 
-              // Full-screen menu overlay
               if (_isMobileMenuOpen) ...[
-                // Backdrop
                 GestureDetector(
                   onTap: _closeMobileMenu,
                   child: AnimatedBuilder(
@@ -520,7 +516,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-                // Menu panel
                 _buildMobileMenuPanel(isDark),
               ],
             ],
@@ -563,10 +558,8 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                // Main nav items
                 for (final item in _pillNavItems)
                   _buildPillNavItem(item.index, item.icon, item.activeIcon, item.label, isDark),
-                // Menu button
                 _buildPillMenuButton(isDark),
               ],
             ),
@@ -693,7 +686,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
           ),
           child: Column(
             children: [
-              // Handle bar
               Center(
                 child: Container(
                   margin: const EdgeInsets.only(top: 12),
@@ -705,7 +697,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                   ),
                 ),
               ),
-              // Header
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                 child: Row(
@@ -744,7 +735,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                 ),
               ),
               const SizedBox(height: 8),
-              // Grid of nav items
               Expanded(
                 child: GridView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
@@ -831,7 +821,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
               ],
             ),
           ),
-          // No FAB on tablet — screens have their own add buttons
         ),
       ),
     );
@@ -864,7 +853,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
           ),
           child: Column(
             children: [
-              // Logo header
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                 child: Row(
@@ -891,7 +879,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                   ],
                 ),
               ),
-              // Nav items
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -1817,7 +1804,7 @@ class _WelcomeSetupDialogState extends State<_WelcomeSetupDialog>
     } else if (_currentStep == 1) {
       return _selectedGraduationYear != null;
     } else {
-      return true; // Demo step always allows proceeding
+      return true;
     }
   }
 
@@ -1900,9 +1887,6 @@ class _AppInitializerState extends State<_AppInitializer>
     await appProvider.initialize();
     if (!mounted) return;
 
-    // Fire IServ init in background — don't block the loading screen on network calls.
-    // IServProvider.initialize() may make HTTP requests (autoReconnect) that timeout
-    // after 10s when there's no internet, which would freeze the splash screen.
     iservProvider.initialize();
 
     if (mounted) {
@@ -2127,12 +2111,11 @@ class _TabletNavItemState extends State<_TabletNavItem> {
     final isDark = widget.isDark;
     final isActive = widget.isActive;
 
-    // Hover only changes text/icon color, not the background
     Color itemColor;
     if (isActive) {
       itemColor = isDark ? const Color(0xFF60A5FA) : const Color(0xFF1D4ED8);
     } else if (_isHovered) {
-      itemColor = Colors.red; // TEST: should turn red on hover
+      itemColor = Colors.red;
     } else {
       itemColor = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF52525B);
     }

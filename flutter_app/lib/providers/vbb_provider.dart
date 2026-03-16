@@ -49,7 +49,6 @@ class VbbProvider extends ChangeNotifier {
   String? _error;
   String? get error => _routeError ?? _error;
 
-  // Separate route error that doesn't get cleared by location search
   String? _routeError;
 
   bool get isOnline => _connectivity.isOnline.value;
@@ -68,7 +67,6 @@ class VbbProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Clear old caches that might have stale IDs
       await _service.clearOldCache();
       _knownLocations = await _service.getKnownLocations();
       _favoriteRoutes = await _service.getFavoriteRoutes();
@@ -137,7 +135,6 @@ class VbbProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Track whether a search has been performed
   bool _hasSearched = false;
   bool get hasSearched => _hasSearched;
 
@@ -306,7 +303,6 @@ class VbbProvider extends ChangeNotifier {
     }
   }
 
-  // Pending destination from calendar "Route planen"
   String? _pendingDestination;
   String? get pendingDestination => _pendingDestination;
 
@@ -320,7 +316,6 @@ class VbbProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Ticket management
   Future<void> loadTickets() async {
     _tickets = await _service.getTickets();
     notifyListeners();

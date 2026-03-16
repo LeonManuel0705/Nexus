@@ -30,11 +30,9 @@ class _CalendarScreenState extends State<CalendarScreen> with TickerProviderStat
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
-  // Month transition animation
   late AnimationController _monthTransitionController;
-  double _monthSlideDirection = 1.0; // 1.0 = forward, -1.0 = backward
+  double _monthSlideDirection = 1.0;
 
-  // Day events transition
   late AnimationController _dayEventsController;
 
   @override
@@ -893,7 +891,6 @@ class _CalendarDayState extends State<_CalendarDay> with SingleTickerProviderSta
 
   @override
   Widget build(BuildContext context) {
-    // Build proportional color segments: count events per category color
     final colorCounts = <Color, int>{};
     for (final event in widget.events) {
       final color = widget.getCategoryColor(event.category);
@@ -1382,7 +1379,6 @@ class _EventDialogState extends State<_EventDialog> {
     } else {
       final date = widget.initialDate ?? DateTime.now();
       final now = DateTime.now();
-      // If the selected date is today, use the next full hour; otherwise use 9:00
       final bool isToday = date.year == now.year && date.month == now.month && date.day == now.day;
       final int startHour = isToday ? now.hour + 1 : 9;
       _startTime = DateTime(date.year, date.month, date.day, startHour, 0);

@@ -221,7 +221,6 @@ class UpdateDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
@@ -298,7 +297,6 @@ class UpdateDialog extends StatelessWidget {
               ),
             ),
 
-            // Changelog
             if (updateInfo.changelog.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
@@ -352,7 +350,6 @@ class UpdateDialog extends StatelessWidget {
                 ),
               ),
 
-            // Divider
             Container(
               height: 1,
               margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -368,12 +365,10 @@ class UpdateDialog extends StatelessWidget {
               ),
             ),
 
-            // Buttons
             Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  // Download button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -434,7 +429,6 @@ class UpdateDialog extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // Close and Skip row
                   Row(
                     children: [
                       Expanded(
@@ -488,7 +482,6 @@ class UpdateDialog extends StatelessWidget {
               ),
             ),
 
-            // Installed version
             Container(
               padding: const EdgeInsets.only(bottom: 16),
               child: Text(
