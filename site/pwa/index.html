@@ -105,25 +105,31 @@
   </div>
 
   <script>
-    // Hide loading screen when Flutter is ready
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (var r of registrations) { r.unregister(); }
+      });
+      caches.keys().then(function(names) {
+        for (var name of names) { caches.delete(name); }
+      });
+    }
+
     window.addEventListener('flutter-first-frame', function() {
       var loading = document.getElementById('loading');
       if (loading) {
         loading.style.opacity = '0';
         loading.style.transition = 'opacity 0.3s ease';
-        setTimeout(function() {
-          loading.style.display = 'none';
-        }, 300);
+        setTimeout(function() { loading.style.display = 'none'; }, 300);
       }
-
-      // Pre-cache all assets for offline use after app loads
-      setTimeout(function() {
-        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage('downloadOffline');
-          console.log('Nexus: Caching assets for offline use...');
-        }
-      }, 2000);
     });
+
+    setTimeout(function() {
+      var loading = document.getElementById('loading');
+      if (loading && loading.style.display !== 'none') {
+        var sub = loading.querySelector('.loading-sub');
+        if (sub) sub.textContent = 'Laden dauert länger als erwartet. Bitte Seite neu laden.';
+      }
+    }, 20000);
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
