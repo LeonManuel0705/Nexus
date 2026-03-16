@@ -51,45 +51,8 @@
     <!-- TODO: Add SRI integrity hash when upgrading Lenis version -->
     <script src="https://unpkg.com/lenis@1.1.18/dist/lenis.min.js" crossorigin="anonymous"></script>
 
-    <!-- Tailwind CSS -->
-    <!-- TODO: Add SRI integrity hash when upgrading Tailwind version -->
-    <script src="https://cdn.tailwindcss.com/3.4.17" crossorigin="anonymous"></script>
-    <script>
-      if (typeof tailwind === 'undefined') { window.tailwind = { config: {} }; }
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              display: ['"Radio Canada Big"', 'sans-serif'],
-              body: ['"Inclusive Sans"', 'sans-serif'],
-            },
-            colors: {
-              nexus: {
-                purple: '#764BA2',
-                pink: '#F093FB',
-                blue: '#667EEA',
-                text: '#1A202C',
-                muted: '#64748B',
-                surface: 'rgba(255,255,255,0.7)',
-              }
-            },
-            backgroundImage: {
-              'gradient-brand': 'linear-gradient(135deg, #667EEA 0%, #764BA2 50%, #F093FB 100%)',
-              'gradient-subtle': 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
-            },
-            borderRadius: {
-              'xl': '1rem',
-              '2xl': '1.5rem', // 24px
-              '3xl': '2rem',
-            },
-            boxShadow: {
-              'glass': '0 8px 32px rgba(118, 75, 162, 0.1)',
-              'soft': '0 4px 12px rgba(0, 0, 0, 0.05)',
-            }
-          }
-        }
-      }
-    </script>
+    <!-- Tailwind CSS (compiled at build time) -->
+    <link rel="stylesheet" href="/tailwind.css">
 
     <style>
       /* BASE_STYLES */
