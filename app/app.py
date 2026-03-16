@@ -1,19 +1,164 @@
-from flask import Flask, request, jsonify, render_template, redirect, url_for
+from flask import Flask, request, jsonify, render_template, redirect, url_for, session, g
 from flask_cors import CORS
 from flask_socketio import SocketIO
+from functools import wraps
 import os
 import uuid
-from datetime import datetime
+import logging
+from datetime import datetime, timedelta
 from pathlib import Path
 import json
+import re
 import time
+import secrets
+import hmac
+import html as html_mod
 import requests
 
 from . import database as db
+from .crypto_utils import _get_secret_key, encrypt_file, decrypt_file
 
 app = Flask(__name__, static_folder='static')
-CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+
+_raw_key = _get_secret_key()
+app.secret_key = hmac.new(_raw_key.encode() if isinstance(_raw_key, str) else _raw_key, b'flask-session', 'sha256').hexdigest()
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') != 'development'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+ALLOWED_ORIGINS = os.environ.get('CORS_ORIGINS', 'http://localhost:5050').split(',')
+CORS(app, origins=ALLOWED_ORIGINS)
+socketio = SocketIO(app, cors_allowed_origins=ALLOWED_ORIGINS, async_mode='threading')
+
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    limiter = Limiter(get_remote_address, app=app, default_limits=["200 per minute"],
+                      storage_uri="memory://")
+except ImportError:
+    pass
+
+def _read_build_info():
+    try:
+        build_info_path = Path(__file__).parent.parent / 'flutter_app' / 'lib' / 'build_info.dart'
+        content = build_info_path.read_text()
+        version_name = re.search(r"versionName = '(.+?)'", content)
+        build_number = re.search(r"buildNumber = (\d+)", content)
+        if version_name and build_number:
+            return f"{version_name.group(1)} (Build {build_number.group(1)})"
+    except Exception:
+        pass
+    return "Nexus"
+
+_cached_version = None
+_cached_version_mtime = 0
+
+def _get_app_version():
+    global _cached_version, _cached_version_mtime
+    build_info_path = Path(__file__).parent.parent / 'flutter_app' / 'lib' / 'build_info.dart'
+    try:
+        mtime = build_info_path.stat().st_mtime
+        if mtime != _cached_version_mtime:
+            _cached_version = _read_build_info()
+            _cached_version_mtime = mtime
+    except OSError:
+        pass
+    return _cached_version or _read_build_info()
+
+@app.context_processor
+def inject_globals():
+    theme = db.get_user_theme()
+    css_path = os.path.join(app.static_folder, 'css', 'hub.css')
+    try:
+        cache_bust = int(os.path.getmtime(css_path))
+    except OSError:
+        cache_bust = int(time.time())
+    return {'app_version': _get_app_version(), 'user_theme': theme, 'cache_bust': cache_bust}
+
+DATA_DIR = Path(__file__).parent.parent / 'data'
+API_TOKEN_FILE = DATA_DIR / '.api_token'
+
+def _get_api_token() -> str:
+    try:
+        data = decrypt_file(API_TOKEN_FILE)
+        if data and data.get('token'):
+            return data['token']
+    except Exception:
+        pass
+    token = secrets.token_hex(32)
+    encrypt_file({'token': token}, API_TOKEN_FILE)
+    logging.info("New API token generated. Retrieve with: python -c \"from app.crypto_utils import decrypt_file; from pathlib import Path; print(decrypt_file(Path('data/.api_token'))['token'])\"")
+    return token
+
+API_TOKEN = _get_api_token()
+
+def require_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.headers.get('Authorization', '')
+        if secrets.compare_digest(auth, f'Bearer {API_TOKEN}'):
+            return f(*args, **kwargs)
+        return jsonify({'error': 'Unauthorized'}), 401
+    return decorated
+
+@app.after_request
+def set_security_headers(response):
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    nonce = getattr(g, 'csp_nonce', '')
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data: https:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'"
+    )
+    if request.is_secure:
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    if request.path.startswith('/static/'):
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+    return response
+
+def _bounded_str(value, max_len=500):
+    """Truncate string query parameters to prevent DoS via oversized inputs."""
+    return value[:max_len] if value else value
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    logging.exception("Unhandled exception")
+    return jsonify({'error': 'Internal server error'}), 500
+
+@app.before_request
+def generate_csp_nonce():
+    g.csp_nonce = secrets.token_hex(16)
+
+AUTH_EXEMPT_PATHS = {'/api/ping', '/api/iserv/ping', '/api/email/google/oauth-callback'}
+
+@app.before_request
+def check_api_auth():
+    if not request.path.startswith('/api/'):
+        if request.path.startswith('/hub'):
+            session['web_auth'] = True
+            session.permanent = True
+        return
+    if request.path in AUTH_EXEMPT_PATHS:
+        return
+    if os.environ.get('NEXUS_HOST') == '127.0.0.1' and request.remote_addr in ('127.0.0.1', '::1'):
+        return
+    auth = request.headers.get('Authorization', '')
+    if secrets.compare_digest(auth, f'Bearer {API_TOKEN}'):
+        return
+    if session.get('web_auth'):
+        return
+    return jsonify({'error': 'Unauthorized'}), 401
 
 @app.route('/')
 def landing():
@@ -90,6 +235,15 @@ def hub_email():
 def hub_pomodoro():
     return render_template('hub/pomodoro.html', active_tab='pomodoro')
 
+@app.route('/hub/bookmarks')
+def hub_bookmarks():
+    return render_template('hub/bookmarks.html', active_tab='bookmarks')
+
+@app.route('/hub/vbb')
+def hub_vbb():
+    return render_template('hub/vbb.html', active_tab='vbb')
+
+
 @app.route('/api/ping', methods=['HEAD', 'GET'])
 def ping():
 
@@ -108,7 +262,7 @@ def iserv_ping():
 @app.route('/api/hub/tasks', methods=['GET'])
 def get_hub_tasks_api():
 
-    filter_type = request.args.get('filter', 'all')
+    filter_type = _bounded_str(request.args.get('filter', 'all'))
     user_id = request.args.get('user_id')
     tasks = db.get_hub_tasks(filter_type, user_id=user_id)
     return jsonify({'success': True, 'tasks': tasks})
@@ -179,7 +333,8 @@ def delete_hub_task_api(task_id):
 @app.route('/api/hub/tasks/<int:task_id>/toggle', methods=['POST'])
 def toggle_hub_task_api(task_id):
 
-    result = db.toggle_hub_task(task_id)
+    stop_recurrence = request.args.get('stop_recurrence') == '1'
+    result = db.toggle_hub_task(task_id, stop_recurrence=stop_recurrence)
     if result.get('success'):
         task = db.get_hub_task(task_id)
         response = {'success': True, 'task': task}
@@ -213,7 +368,7 @@ def skip_hub_task_api(task_id):
 @app.route('/api/hub/reviews', methods=['GET'])
 def get_reviews():
 
-    review_type = request.args.get('type')
+    review_type = _bounded_str(request.args.get('type'))
     reviews = db.get_hub_reviews(review_type=review_type)
     return jsonify({'reviews': reviews})
 
@@ -274,7 +429,7 @@ def delete_review(review_id):
 def get_knowledge():
 
     topic = request.args.get('topic')
-    search = request.args.get('search')
+    search = _bounded_str(request.args.get('search'))
     user_id = request.args.get('user_id')
     entries = db.get_hub_knowledge(topic=topic, search=search, user_id=user_id)
     return jsonify({'entries': entries})
@@ -336,7 +491,7 @@ def delete_knowledge(entry_id):
 @app.route('/api/hub/projects', methods=['GET'])
 def get_projects():
 
-    status = request.args.get('status')
+    status = _bounded_str(request.args.get('status'))
     user_id = request.args.get('user_id')
     projects = db.get_hub_projects(status=status, user_id=user_id)
     return jsonify({'projects': projects})
@@ -401,6 +556,91 @@ def delete_project(project_id):
     db.delete_hub_project(project_id)
     return jsonify({'success': True})
 
+
+@app.route('/api/hub/bookmarks', methods=['GET'])
+def get_bookmarks():
+    category = request.args.get('category')
+    bookmarks = db.get_hub_bookmarks(category=category)
+    return jsonify({'bookmarks': bookmarks})
+
+@app.route('/api/hub/bookmarks', methods=['POST'])
+def create_bookmark():
+    data = request.get_json()
+    if not data or not data.get('title') or not data.get('url'):
+        return jsonify({'success': False, 'error': 'Title and URL required'}), 400
+    bookmark_id = db.create_hub_bookmark(
+        title=data['title'],
+        url=data['url'],
+        category=data.get('category', 'Other'),
+        favicon=data.get('favicon')
+    )
+    bookmark = db.get_hub_bookmark(bookmark_id)
+    return jsonify({'success': True, 'bookmark': bookmark})
+
+@app.route('/api/hub/bookmarks/<int:bookmark_id>', methods=['PUT'])
+def update_bookmark(bookmark_id):
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+    bookmark = db.get_hub_bookmark(bookmark_id)
+    if not bookmark:
+        return jsonify({'success': False, 'error': 'Bookmark not found'}), 404
+    db.update_hub_bookmark(bookmark_id, **{k: data[k] for k in ('title', 'url', 'category', 'favicon') if k in data})
+    updated = db.get_hub_bookmark(bookmark_id)
+    return jsonify({'success': True, 'bookmark': updated})
+
+@app.route('/api/hub/bookmarks/<int:bookmark_id>', methods=['DELETE'])
+def delete_bookmark(bookmark_id):
+    db.delete_hub_bookmark(bookmark_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/hub/drawings', methods=['GET'])
+def get_drawings():
+    drawings = db.get_hub_drawings()
+    return jsonify({'drawings': drawings})
+
+@app.route('/api/hub/drawings', methods=['POST'])
+def create_drawing():
+    data = request.get_json()
+    if not data or not data.get('name') or not data.get('image_data'):
+        return jsonify({'success': False, 'error': 'Name and image data required'}), 400
+    if len(data['image_data']) > 5 * 1024 * 1024:
+        return jsonify({'success': False, 'error': 'Image data too large (max 5MB)'}), 400
+    drawing_id = db.create_hub_drawing(
+        name=data['name'],
+        image_data=data['image_data'],
+        background_type=data.get('background_type', 'blank')
+    )
+    drawing = db.get_hub_drawing(drawing_id)
+    return jsonify({'success': True, 'drawing': drawing})
+
+@app.route('/api/hub/drawings/<int:drawing_id>', methods=['GET'])
+def get_drawing(drawing_id):
+    drawing = db.get_hub_drawing(drawing_id)
+    if not drawing:
+        return jsonify({'success': False, 'error': 'Drawing not found'}), 404
+    return jsonify({'success': True, 'drawing': drawing})
+
+@app.route('/api/hub/drawings/<int:drawing_id>', methods=['PUT'])
+def update_drawing(drawing_id):
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+    drawing = db.get_hub_drawing(drawing_id)
+    if not drawing:
+        return jsonify({'success': False, 'error': 'Drawing not found'}), 404
+    if 'image_data' in data and len(data['image_data']) > 5 * 1024 * 1024:
+        return jsonify({'success': False, 'error': 'Image data too large (max 5MB)'}), 400
+    db.update_hub_drawing(drawing_id, **{k: data[k] for k in ('name', 'image_data', 'background_type') if k in data})
+    updated = db.get_hub_drawing(drawing_id)
+    return jsonify({'success': True, 'drawing': updated})
+
+@app.route('/api/hub/drawings/<int:drawing_id>', methods=['DELETE'])
+def delete_drawing(drawing_id):
+    db.delete_hub_drawing(drawing_id)
+    return jsonify({'success': True})
+
 SCHOOL_SUBJECTS_FILE = Path(__file__).parent.parent / 'data' / 'school_subjects.json'
 SCHOOL_HOMEWORK_FILE = Path(__file__).parent.parent / 'data' / 'school_homework.json'
 SCHOOL_TESTS_FILE = Path(__file__).parent.parent / 'data' / 'school_tests.json'
@@ -409,100 +649,58 @@ SCHOOL_GRADES_FILE = Path(__file__).parent.parent / 'data' / 'school_grades.json
 SCHOOL_CALENDAR_FILE = Path(__file__).parent.parent / 'data' / 'school_calendar.json'
 
 def load_school_subjects():
-
-    if SCHOOL_SUBJECTS_FILE.exists():
-        try:
-            with open(SCHOOL_SUBJECTS_FILE, 'r') as f:
-                return json.load(f)
-        except Exception:
-            return []
-    return []
+    try:
+        return decrypt_file(SCHOOL_SUBJECTS_FILE) or []
+    except Exception:
+        return []
 
 def save_school_subjects(subjects):
-
-    SCHOOL_SUBJECTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(SCHOOL_SUBJECTS_FILE, 'w') as f:
-        json.dump(subjects, f, indent=2, ensure_ascii=False)
+    encrypt_file(subjects, SCHOOL_SUBJECTS_FILE)
 
 def load_school_homework():
-
-    if SCHOOL_HOMEWORK_FILE.exists():
-        try:
-            with open(SCHOOL_HOMEWORK_FILE, 'r') as f:
-                return json.load(f)
-        except Exception:
-            return []
-    return []
+    try:
+        return decrypt_file(SCHOOL_HOMEWORK_FILE) or []
+    except Exception:
+        return []
 
 def save_school_homework(homework):
-
-    SCHOOL_HOMEWORK_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(SCHOOL_HOMEWORK_FILE, 'w') as f:
-        json.dump(homework, f, indent=2, ensure_ascii=False)
+    encrypt_file(homework, SCHOOL_HOMEWORK_FILE)
 
 def load_school_tests():
-
-    if SCHOOL_TESTS_FILE.exists():
-        try:
-            with open(SCHOOL_TESTS_FILE, 'r') as f:
-                return json.load(f)
-        except Exception:
-            return []
-    return []
+    try:
+        return decrypt_file(SCHOOL_TESTS_FILE) or []
+    except Exception:
+        return []
 
 def save_school_tests(tests):
-
-    SCHOOL_TESTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(SCHOOL_TESTS_FILE, 'w') as f:
-        json.dump(tests, f, indent=2, ensure_ascii=False)
+    encrypt_file(tests, SCHOOL_TESTS_FILE)
 
 def load_school_exams():
-
-    if SCHOOL_EXAMS_FILE.exists():
-        try:
-            with open(SCHOOL_EXAMS_FILE, 'r') as f:
-                return json.load(f)
-        except Exception:
-            return []
-    return []
+    try:
+        return decrypt_file(SCHOOL_EXAMS_FILE) or []
+    except Exception:
+        return []
 
 def save_school_exams(exams):
-
-    SCHOOL_EXAMS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(SCHOOL_EXAMS_FILE, 'w') as f:
-        json.dump(exams, f, indent=2, ensure_ascii=False)
+    encrypt_file(exams, SCHOOL_EXAMS_FILE)
 
 def load_school_grades():
-
-    if SCHOOL_GRADES_FILE.exists():
-        try:
-            with open(SCHOOL_GRADES_FILE, 'r') as f:
-                return json.load(f)
-        except Exception:
-            return []
-    return []
+    try:
+        return decrypt_file(SCHOOL_GRADES_FILE) or []
+    except Exception:
+        return []
 
 def save_school_grades(grades):
-
-    SCHOOL_GRADES_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(SCHOOL_GRADES_FILE, 'w') as f:
-        json.dump(grades, f, indent=2, ensure_ascii=False)
+    encrypt_file(grades, SCHOOL_GRADES_FILE)
 
 def load_school_calendar():
-
-    if SCHOOL_CALENDAR_FILE.exists():
-        try:
-            with open(SCHOOL_CALENDAR_FILE, 'r') as f:
-                return json.load(f)
-        except Exception:
-            return []
-    return []
+    try:
+        return decrypt_file(SCHOOL_CALENDAR_FILE) or []
+    except Exception:
+        return []
 
 def save_school_calendar(events):
-
-    SCHOOL_CALENDAR_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(SCHOOL_CALENDAR_FILE, 'w') as f:
-        json.dump(events, f, indent=2, ensure_ascii=False)
+    encrypt_file(events, SCHOOL_CALENDAR_FILE)
 
 @app.route('/api/hub/school/subjects', methods=['GET'])
 def get_school_subjects():
@@ -575,7 +773,12 @@ def delete_school_subject(subject_id):
 def get_school_homework():
 
     homework = load_school_homework()
-    return jsonify({'homework': homework})
+    today = datetime.now().date()
+    cleaned = [h for h in homework if not h.get('due_date') or
+               (datetime.strptime(h['due_date'], '%Y-%m-%d').date() - today).days >= -1]
+    if len(cleaned) < len(homework):
+        save_school_homework(cleaned)
+    return jsonify({'homework': cleaned})
 
 @app.route('/api/hub/school/homework', methods=['POST'])
 def create_school_homework():
@@ -781,6 +984,52 @@ def delete_school_exam(exam_id):
     save_school_exams(exams)
     return jsonify({'success': True})
 
+@app.route('/api/hub/school/grade-system', methods=['GET'])
+def get_grade_system():
+    conn = db.get_connection()
+    row = conn.execute('SELECT grade_system FROM hub_timetable_settings LIMIT 1').fetchone()
+    system = row['grade_system'] if row and row['grade_system'] else 'points'
+    return jsonify({'grade_system': system})
+
+@app.route('/api/hub/school/grade-system', methods=['POST'])
+def set_grade_system():
+    data = request.get_json()
+    system = data.get('grade_system', 'points')
+    if system not in ('points', 'marks'):
+        return jsonify({'error': 'Invalid grade system'}), 400
+    conn = db.get_connection()
+    existing = conn.execute('SELECT id FROM hub_timetable_settings LIMIT 1').fetchone()
+    if existing:
+        conn.execute('UPDATE hub_timetable_settings SET grade_system = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [system, existing['id']])
+    else:
+        conn.execute('INSERT INTO hub_timetable_settings (grade_system) VALUES (?)', [system])
+    conn.commit()
+    return jsonify({'grade_system': system})
+
+@app.route('/api/hub/school/class-level', methods=['GET'])
+def get_class_level():
+    conn = db.get_connection()
+    row = conn.execute('SELECT class_level FROM hub_timetable_settings LIMIT 1').fetchone()
+    level = row['class_level'] if row and row['class_level'] else 10
+    return jsonify({'class_level': level})
+
+@app.route('/api/hub/school/class-level', methods=['POST'])
+def set_class_level():
+    data = request.get_json()
+    level = data.get('class_level')
+    if not isinstance(level, int) or level < 5 or level > 13:
+        return jsonify({'error': 'Invalid class level (5-13)'}), 400
+    system = 'marks' if level <= 10 else 'points'
+    conn = db.get_connection()
+    existing = conn.execute('SELECT id FROM hub_timetable_settings LIMIT 1').fetchone()
+    if existing:
+        conn.execute('UPDATE hub_timetable_settings SET class_level = ?, grade_system = ? WHERE id = ?',
+                   [level, system, existing['id']])
+    else:
+        conn.execute('INSERT INTO hub_timetable_settings (class_level, grade_system) VALUES (?, ?)', [level, system])
+    conn.commit()
+    return jsonify({'class_level': level, 'grade_system': system})
+
 @app.route('/api/hub/school/grades', methods=['GET'])
 def get_school_grades():
 
@@ -805,6 +1054,8 @@ def create_school_grade():
             'date': data.get('date'),
             'description': data.get('description'),
             'semester': data.get('semester', 'Q1'),
+            'grade_system': data.get('grade_system', 'points'),
+            'value': data.get('value'),
             'created_at': datetime.now().isoformat()
         }
 
@@ -812,8 +1063,8 @@ def create_school_grade():
         save_school_grades(grades)
         return jsonify({'grade': grade})
     except Exception as e:
-        print(f"Error creating grade: {e}")
-        return jsonify({'error': str(e)}), 500
+        logging.error(f"Failed to create grade: {e}")
+        return jsonify({'error': 'Failed to create grade'}), 500
 
 @app.route('/api/hub/school/grades/<grade_id>', methods=['PUT'])
 def update_school_grade(grade_id):
@@ -834,6 +1085,8 @@ def update_school_grade(grade_id):
                 grade['date'] = data.get('date', grade.get('date'))
                 grade['description'] = data.get('description', grade.get('description'))
                 grade['semester'] = data.get('semester', grade.get('semester', 'Q1'))
+                grade['grade_system'] = data.get('grade_system', grade.get('grade_system', 'points'))
+                grade['value'] = data.get('value', grade.get('value'))
                 grade['updated_at'] = datetime.now().isoformat()
                 updated_grade = grade
                 break
@@ -844,8 +1097,8 @@ def update_school_grade(grade_id):
         save_school_grades(grades)
         return jsonify({'grade': updated_grade})
     except Exception as e:
-        print(f"Error updating grade: {e}")
-        return jsonify({'error': str(e)}), 500
+        logging.error(f"Failed to update grade: {e}")
+        return jsonify({'error': 'Failed to update grade'}), 500
 
 @app.route('/api/hub/school/grades/<grade_id>', methods=['DELETE'])
 def delete_school_grade(grade_id):
@@ -865,6 +1118,8 @@ def get_school_calendar():
 def create_school_calendar_event():
 
     data = request.json
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
     events = load_school_calendar()
 
     event = {
@@ -874,21 +1129,25 @@ def create_school_calendar_event():
         'time': data.get('time'),
         'end_date': data.get('end_date'),
         'end_time': data.get('end_time'),
-        'category': data.get('category', 'school'),
+        'category': data.get('category', 'personal'),
         'description': data.get('description'),
+        'location': data.get('location'),
         'created_at': datetime.now().isoformat()
     }
 
     events.append(event)
     save_school_calendar(events)
-    return jsonify({'event': event})
+    return jsonify({'success': True, 'event': event})
 
 @app.route('/api/hub/school/calendar/<event_id>', methods=['PUT'])
 def update_school_calendar_event(event_id):
 
     data = request.json
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
     events = load_school_calendar()
 
+    updated_event = None
     for event in events:
         if event['id'] == event_id:
             event['title'] = data.get('title', event.get('title'))
@@ -898,11 +1157,15 @@ def update_school_calendar_event(event_id):
             event['end_time'] = data.get('end_time', event.get('end_time'))
             event['category'] = data.get('category', event.get('category'))
             event['description'] = data.get('description', event.get('description'))
+            event['location'] = data.get('location', event.get('location'))
             event['updated_at'] = datetime.now().isoformat()
+            updated_event = event
             break
 
+    if not updated_event:
+        return jsonify({'error': 'Event not found'}), 404
     save_school_calendar(events)
-    return jsonify({'event': event})
+    return jsonify({'event': updated_event})
 
 @app.route('/api/hub/school/calendar/<event_id>', methods=['DELETE'])
 def delete_school_calendar_event(event_id):
@@ -928,20 +1191,97 @@ def save_timetable_settings():
     if not data:
         return jsonify({'success': False, 'error': 'No data provided'}), 400
 
+    user_id = data.get('user_id')
+    existing = db.get_timetable_settings(user_id=user_id)
+
+    if existing:
+        has_ab_weeks = data.get('has_ab_weeks', existing.get('has_ab_weeks', True))
+        block_count = data.get('block_count', existing.get('block_count', 4))
+        reference_date = data.get('reference_date', existing.get('reference_date'))
+        setup_completed = data.get('setup_completed', existing.get('setup_completed', False))
+    else:
+        has_ab_weeks = data.get('has_ab_weeks', True)
+        block_count = data.get('block_count', 4)
+        reference_date = data.get('reference_date')
+        setup_completed = data.get('setup_completed', False)
+
     settings_id = db.save_timetable_settings(
-        has_ab_weeks=data.get('has_ab_weeks', True),
-        block_count=data.get('block_count', 4),
-        reference_date=data.get('reference_date'),
-        setup_completed=data.get('setup_completed', False),
-        user_id=data.get('user_id')
+        has_ab_weeks=has_ab_weeks,
+        block_count=block_count,
+        reference_date=reference_date,
+        setup_completed=setup_completed,
+        user_id=user_id
     )
     return jsonify({'success': True, 'settings_id': settings_id})
+
+@app.route('/api/hub/theme', methods=['GET'])
+def get_theme():
+    user_id = request.args.get('user_id')
+    theme = db.get_user_theme(user_id=user_id)
+    return jsonify({'success': True, 'theme': theme})
+
+@app.route('/api/hub/theme', methods=['POST'])
+def save_theme():
+    data = request.get_json()
+    if not data or 'theme' not in data:
+        return jsonify({'success': False, 'error': 'No theme provided'}), 400
+    theme = data['theme']
+    if theme not in ('dark', 'light'):
+        return jsonify({'success': False, 'error': 'Invalid theme'}), 400
+    user_id = data.get('user_id')
+    db.save_user_theme(theme=theme, user_id=user_id)
+    return jsonify({'success': True})
+
+@app.route('/hub/toggle-theme', methods=['POST'])
+def toggle_theme():
+    current = db.get_user_theme()
+    new_theme = 'light' if current == 'dark' else 'dark'
+    db.save_user_theme(theme=new_theme)
+    referrer = request.referrer
+    if referrer and referrer.startswith(request.host_url):
+        return redirect(referrer)
+    return redirect('/hub')
+
+@app.route('/api/hub/theme-preferences', methods=['GET'])
+def get_theme_preferences():
+    prefs = db.get_theme_preferences()
+    import json as _json
+    schedule = None
+    if prefs.get('theme_schedule_json'):
+        try:
+            schedule = _json.loads(prefs['theme_schedule_json'])
+        except (ValueError, TypeError):
+            pass
+    return jsonify({
+        'success': True,
+        'theme': prefs['theme'],
+        'theme_mode': prefs['theme_mode'],
+        'schedule': schedule,
+    })
+
+@app.route('/api/hub/theme-preferences', methods=['POST'])
+def save_theme_preferences():
+    import json as _json
+    data = request.get_json() or {}
+    theme_mode = data.get('theme_mode', 'manual')
+    if theme_mode not in ('manual', 'system', 'schedule'):
+        return jsonify({'success': False, 'error': 'Invalid theme_mode'}), 400
+    schedule = data.get('schedule')
+    schedule_json = None
+    if theme_mode == 'schedule' and schedule:
+        light_time = schedule.get('light_time', '')
+        dark_time = schedule.get('dark_time', '')
+        if not light_time or not dark_time:
+            return jsonify({'success': False, 'error': 'Schedule requires light_time and dark_time'}), 400
+        schedule_json = _json.dumps({'light_time': light_time, 'dark_time': dark_time})
+    db.save_theme_preferences(theme_mode=theme_mode, theme_schedule_json=schedule_json)
+    return jsonify({'success': True})
 
 @app.route('/api/hub/school/timetable/entries', methods=['GET'])
 def get_timetable_entries():
 
     day = request.args.get('day', type=int)
-    week = request.args.get('week')
+    week = _bounded_str(request.args.get('week'))
     user_id = request.args.get('user_id')
     entries = db.get_timetable_entries(day=day, week=week, user_id=user_id)
     return jsonify({'success': True, 'entries': entries})
@@ -1085,21 +1425,66 @@ def get_default_timetable_template():
 
     return jsonify({'success': True, 'template': DEFAULT_TIMETABLE_TEMPLATE})
 
+@app.route('/api/hub/school/timetable/periods', methods=['GET'])
+def get_timetable_periods():
+    periods = db.get_timetable_periods()
+    return jsonify({'periods': periods})
+
+@app.route('/api/hub/school/timetable/periods/replace-all', methods=['POST'])
+def replace_all_timetable_periods():
+    data = request.get_json()
+    if not data or 'periods' not in data:
+        return jsonify({'error': 'No periods provided'}), 400
+
+    periods = data['periods']
+    if not isinstance(periods, list) or len(periods) == 0 or len(periods) > 12:
+        return jsonify({'error': 'Periods must be a list of 1-12 items'}), 400
+
+    import re
+    time_pattern = re.compile(r'^\d{2}:\d{2}$')
+    validated = []
+    for p in periods:
+        pn = p.get('period_number')
+        st = p.get('start_time', '')
+        et = p.get('end_time', '')
+        if not isinstance(pn, int) or pn < 1 or pn > 12:
+            return jsonify({'error': f'Invalid period_number: {pn}'}), 400
+        if not time_pattern.match(st) or not time_pattern.match(et):
+            return jsonify({'error': f'Invalid time format for period {pn}'}), 400
+        validated.append({'period_number': pn, 'start_time': st, 'end_time': et})
+
+    db.replace_all_timetable_periods(validated)
+
+    # Update block_count in timetable settings
+    conn = db.get_connection()
+    existing = conn.execute('SELECT id FROM hub_timetable_settings LIMIT 1').fetchone()
+    if existing:
+        conn.execute('UPDATE hub_timetable_settings SET block_count = ? WHERE id = ?',
+                     [len(validated), existing['id']])
+    else:
+        conn.execute('INSERT INTO hub_timetable_settings (block_count) VALUES (?)', [len(validated)])
+    conn.commit()
+    conn.close()
+
+    return jsonify({'success': True, 'periods': validated})
+
+@app.route('/api/hub/school/timetable/periods/<int:period_number>', methods=['DELETE'])
+def delete_timetable_period(period_number):
+    deleted = db.delete_timetable_period(period_number)
+    if not deleted:
+        return jsonify({'error': 'Period not found'}), 404
+    return jsonify({'success': True})
+
 QUICK_NOTES_FILE = Path(__file__).parent.parent / 'data' / 'quick_notes.json'
 
 def load_quick_notes():
-    if QUICK_NOTES_FILE.exists():
-        try:
-            with open(QUICK_NOTES_FILE, 'r') as f:
-                return json.load(f)
-        except Exception:
-            return []
-    return []
+    try:
+        return decrypt_file(QUICK_NOTES_FILE) or []
+    except Exception:
+        return []
 
 def save_quick_notes(notes):
-    QUICK_NOTES_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(QUICK_NOTES_FILE, 'w') as f:
-        json.dump(notes, f, indent=2, ensure_ascii=False)
+    encrypt_file(notes, QUICK_NOTES_FILE)
 
 @app.route('/api/hub/quick-notes', methods=['GET'])
 def get_quick_notes():
@@ -1109,6 +1494,8 @@ def get_quick_notes():
 @app.route('/api/hub/quick-notes', methods=['POST'])
 def create_quick_note():
     data = request.json
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
     notes = load_quick_notes()
 
     note = {
@@ -1401,7 +1788,7 @@ def check_holiday_mode():
                 source = 'school_calendar'
                 break
     except Exception as e:
-        print(f"School calendar check failed: {e}")
+        logging.warning("School calendar check failed")
 
     if not is_holiday:
         try:
@@ -1423,7 +1810,7 @@ def check_holiday_mode():
                             source = 'google_calendar'
                             break
         except Exception as e:
-            print(f"Google Calendar check failed: {e}")
+            logging.warning("Google Calendar check failed")
 
     return jsonify({
         'is_holiday': is_holiday,
@@ -1620,7 +2007,8 @@ def get_email_messages_route(email):
         if not iserv_service.is_connected():
 
             iserv_service.connect()
-        result = iserv_service.get_emails(limit=request.args.get('limit', 20, type=int))
+        limit = min(max(request.args.get('limit', 20, type=int), 1), 200)
+        result = iserv_service.get_emails(limit=limit)
         if result.get('success'):
 
             emails = result.get('emails', [])
@@ -1640,11 +2028,11 @@ def get_email_messages_route(email):
 
     google_accounts = [a['email'] for a in get_google_accounts()]
     if email in google_accounts:
-        limit = request.args.get('limit', 20, type=int)
+        limit = min(max(request.args.get('limit', 20, type=int), 1), 200)
         result = fetch_gmail_messages(email, limit)
     else:
         folder = request.args.get('folder', 'INBOX')
-        limit = request.args.get('limit', 20, type=int)
+        limit = min(max(request.args.get('limit', 20, type=int), 1), 200)
         result = fetch_emails(email, folder, limit)
 
     if result['success']:
@@ -1724,6 +2112,8 @@ def start_google_auth():
 
     from .google_oauth import start_oauth_flow
     result = start_oauth_flow()
+    if result.get('success'):
+        session['oauth_state'] = result.get('state')
     return jsonify(result)
 
 @app.route('/api/email/google/callback', methods=['POST'])
@@ -1733,6 +2123,10 @@ def complete_google_auth():
     data = request.get_json()
     if not data or not data.get('code'):
         return jsonify({'success': False, 'error': 'Authorization code required'}), 400
+    state = data.get('state', '')
+    expected_state = session.pop('oauth_state', '') or ''
+    if not state or not expected_state or not secrets.compare_digest(state, expected_state):
+        return jsonify({'success': False, 'error': 'Invalid state parameter'}), 403
     result = complete_oauth_flow(data['code'])
     return jsonify(result)
 
@@ -1743,51 +2137,66 @@ def google_oauth_redirect_callback():
 
     code = request.args.get('code')
     error = request.args.get('error')
+    state = request.args.get('state')
+    expected_state = session.pop('oauth_state', None)
+
+    nonce = g.csp_nonce
+
+    if not state or not expected_state or not secrets.compare_digest(state, expected_state):
+        return f'''
+        <html><body style="font-family: -apple-system, sans-serif; text-align: center; padding: 50px;">
+            <h2 style="color: #d93025;">Invalid Request</h2>
+            <p>OAuth state validation failed. Please try signing in again.</p>
+            <script nonce="{nonce}">setTimeout(() => window.close(), 3000);</script>
+        </body></html>
+        '''
 
     if error:
+        safe_error = html_mod.escape(error)
         return f'''
         <html><body style="font-family: -apple-system, sans-serif; text-align: center; padding: 50px;">
             <h2 style="color: #d93025;">Authorization Failed</h2>
-            <p>Error: {error}</p>
+            <p>Error: {safe_error}</p>
             <p>You can close this window and try again.</p>
-            <script>setTimeout(() => window.close(), 3000);</script>
+            <script nonce="{nonce}">setTimeout(() => window.close(), 3000);</script>
         </body></html>
         '''
 
     if not code:
-        return '''
+        return f'''
         <html><body style="font-family: -apple-system, sans-serif; text-align: center; padding: 50px;">
             <h2 style="color: #d93025;">No Authorization Code</h2>
             <p>No authorization code received from Google.</p>
-            <script>setTimeout(() => window.close(), 3000);</script>
+            <script nonce="{nonce}">setTimeout(() => window.close(), 3000);</script>
         </body></html>
         '''
 
     result = complete_oauth_flow(code)
 
     if result.get('success'):
-        email = result.get('email', 'your account')
+        safe_email = html_mod.escape(result.get('email', 'your account'))
+        js_email = safe_email.replace('\\', '\\\\').replace("'", "\\'")
         return f'''
         <html><body style="font-family: -apple-system, sans-serif; text-align: center; padding: 50px;">
             <h2 style="color: #34a853;">Successfully Connected!</h2>
-            <p>Connected: <strong>{email}</strong></p>
+            <p>Connected: <strong>{safe_email}</strong></p>
             <p>You can close this window and return to Nexus.</p>
-            <script>
+            <script nonce="{nonce}">
                 if (window.opener) {{
-                    window.opener.postMessage({{ type: 'google-oauth-success', email: '{email}' }}, '*');
+                    window.opener.postMessage({{ type: 'google-oauth-success', email: '{js_email}' }}, window.location.origin);
                 }}
                 setTimeout(() => window.close(), 2000);
             </script>
         </body></html>
         '''
     else:
-        error_msg = result.get('error', 'Unknown error')
+        safe_error_msg = html_mod.escape(result.get('error', 'Unknown error'))
         return f'''
         <html><body style="font-family: -apple-system, sans-serif; text-align: center; padding: 50px;">
             <h2 style="color: #d93025;">Connection Failed</h2>
-            <p>{error_msg}</p>
+            <p>{safe_error_msg}</p>
             <p>Please close this window and try again.</p>
-            <script>setTimeout(() => window.close(), 5000);</script>
+            <script nonce="{nonce}">setTimeout(() => window.close(), 5000);</script>
         </body></html>
         '''
 
@@ -1812,7 +2221,7 @@ def get_calendar_events():
 
     start_date = request.args.get('start')
     end_date = request.args.get('end')
-    days = request.args.get('days', 14, type=int)
+    days = min(max(request.args.get('days', 14, type=int), 1), 365)
     account = request.args.get('account')
 
     tokens = load_tokens()
@@ -1837,7 +2246,7 @@ def get_calendar_events():
 def get_macos_calendar():
 
     from .calendar_service import get_macos_calendar_events
-    days = request.args.get('days', 14, type=int)
+    days = min(max(request.args.get('days', 14, type=int), 1), 365)
     result = get_macos_calendar_events(days)
     return jsonify(result)
 
@@ -1973,6 +2382,7 @@ def get_caldav_events_route():
     start_date = request.args.get('start')
     end_date = request.args.get('end')
     days = request.args.get('days', 30, type=int)
+    days = min(max(days, 1), 365)
 
     result = fetch_caldav_events(
         account_id=account_id,
@@ -2085,7 +2495,11 @@ def iserv_emails():
     from .iserv_service import get_iserv_service
     service = get_iserv_service()
     folder = request.args.get('folder', 'INBOX')
-    limit = int(request.args.get('limit', 20))
+    try:
+        limit = int(request.args.get('limit', 20))
+    except (ValueError, TypeError):
+        limit = 20
+    limit = min(max(limit, 1), 200)
     result = service.get_emails(folder=folder, limit=limit)
     if result.get('success'):
         return jsonify(result)
@@ -2136,8 +2550,11 @@ def iserv_create_event():
     data = request.get_json() or {}
     service = get_iserv_service()
 
-    start = datetime.fromisoformat(data.get('start'))
-    end = datetime.fromisoformat(data.get('end')) if data.get('end') else None
+    try:
+        start = datetime.fromisoformat(data.get('start'))
+        end = datetime.fromisoformat(data.get('end')) if data.get('end') else None
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'error': 'Invalid date format'}), 400
 
     result = service.create_event(
         title=data.get('title'),
@@ -2177,6 +2594,10 @@ def iserv_files():
     from .iserv_service import get_iserv_service
     service = get_iserv_service()
     path = request.args.get('path', '/')
+    import posixpath
+    path = posixpath.normpath(path)
+    if '..' in path:
+        return jsonify({'success': False, 'error': 'Ungültiger Pfad'}), 400
     result = service.list_files(path=path)
     if result.get('success'):
         return jsonify(result)
@@ -2187,7 +2608,7 @@ def iserv_search_users():
 
     from .iserv_service import get_iserv_service
     service = get_iserv_service()
-    query = request.args.get('q', '')
+    query = _bounded_str(request.args.get('q', ''))
     result = service.search_users(query=query)
     if result.get('success'):
         return jsonify(result)
@@ -2198,7 +2619,7 @@ def iserv_get_vertretungsplan():
 
     from .iserv_service import get_iserv_service
     service = get_iserv_service()
-    display_id = request.args.get('display_id', 3, type=int)
+    display_id = min(max(request.args.get('display_id', 3, type=int), 1), 100)
     refresh = request.args.get('refresh', 'false').lower() == 'true'
 
     if refresh and service.is_connected():
@@ -2218,8 +2639,8 @@ def iserv_analyze_vertretungsplan():
     import io
 
     service = get_iserv_service()
-    display_id = request.args.get('display_id', 3, type=int)
-    grade_filter = request.args.get('grade', '11')
+    display_id = min(max(request.args.get('display_id', 3, type=int), 1), 100)
+    grade_filter = _bounded_str(request.args.get('grade', '11'), 10)
 
     result = service.get_vertretungsplan(display_id=display_id)
 
@@ -2264,7 +2685,7 @@ def vbb_search_location():
 
     from .vbb_service import get_vbb_service
     service = get_vbb_service()
-    query = request.args.get('q', '')
+    query = _bounded_str(request.args.get('q', ''))
     if not query:
         return jsonify({'success': False, 'error': 'Suchbegriff fehlt'}), 400
     result = service.search_location(query)
@@ -2280,7 +2701,7 @@ def vbb_nearby_stops():
     try:
         lat = float(request.args.get('lat', 0))
         lng = float(request.args.get('lng', 0))
-        radius = int(request.args.get('radius', 1000))
+        radius = min(max(int(request.args.get('radius', 1000)), 100), 50000)
     except ValueError:
         return jsonify({'success': False, 'error': 'Ungültige Koordinaten'}), 400
 
@@ -2327,10 +2748,30 @@ def vbb_get_route():
         to_location=to_location,
         arrival_time=arrival_time,
         departure_time=departure_time,
-        num_results=data.get('results', 5)
+        num_results=min(max(int(data.get('results', 6)), 1), 20)
     )
 
     if result.get('success'):
+        try:
+            from .vbb_personalization import get_personalization
+            pers = get_personalization()
+            weights = pers.get_recommendation_weights()
+            result['routes'] = service.score_routes(result['routes'], personalized_weights=weights)
+            result['personalization'] = {
+                'default_sort': pers.get_default_sort(),
+            }
+        except Exception:
+            pass
+
+        sort_by = data.get('sort', 'recommended')
+        routes = result['routes']
+        if sort_by == 'fastest':
+            routes.sort(key=lambda r: r.get('duration', 9999))
+        elif sort_by == 'cheapest':
+            routes.sort(key=lambda r: r.get('price') or 9999)
+        elif sort_by == 'fewest_transfers':
+            routes.sort(key=lambda r: r.get('transfers', 99))
+        result['routes'] = routes
         return jsonify(result)
     return jsonify(result), 400
 
@@ -2364,10 +2805,16 @@ def vbb_route_to_event():
 
 @app.route('/api/vbb/departures/<stop_id>', methods=['GET'])
 def vbb_departures(stop_id):
+    import re
+    if not re.match(r'^[a-zA-Z0-9_:-]+$', stop_id):
+        return jsonify({'success': False, 'error': 'Ungültige Haltestellen-ID'}), 400
 
     from .vbb_service import get_vbb_service
     service = get_vbb_service()
-    duration = int(request.args.get('duration', 30))
+    try:
+        duration = min(max(int(request.args.get('duration', 30)), 1), 120)
+    except (ValueError, TypeError):
+        duration = 30
     result = service.get_departures(stop_id, duration)
     if result.get('success'):
         return jsonify(result)
@@ -2396,20 +2843,349 @@ def vbb_save_location():
     result = service.save_known_location(name, location)
     return jsonify(result)
 
+@app.route('/api/vbb/locations', methods=['DELETE'])
+def vbb_delete_location():
+
+    from .vbb_service import get_vbb_service
+    service = get_vbb_service()
+    data = request.get_json() or {}
+    name = data.get('name')
+    if not name:
+        return jsonify({'success': False, 'error': 'Name erforderlich'}), 400
+    result = service.delete_known_location(name)
+    return jsonify(result)
+
+
+@app.route('/api/vbb/user-tickets', methods=['GET'])
+def vbb_get_user_tickets():
+    from .database import get_user_tickets
+    tickets = get_user_tickets()
+    return jsonify({'success': True, 'tickets': tickets})
+
+@app.route('/api/vbb/user-tickets', methods=['POST'])
+def vbb_create_user_ticket():
+    from .database import create_user_ticket
+    data = request.get_json() or {}
+    required = ['ticket_type', 'ticket_name', 'zone_coverage']
+    if not all(data.get(k) for k in required):
+        return jsonify({'success': False, 'error': 'Ticket-Typ, Name und Tarifzone erforderlich'}), 400
+    ticket_id = create_user_ticket(
+        ticket_type=data['ticket_type'],
+        ticket_name=data['ticket_name'],
+        zone_coverage=data['zone_coverage'],
+        valid_from=data.get('valid_from'),
+        valid_until=data.get('valid_until'),
+        auto_renews=data.get('auto_renews', False)
+    )
+    return jsonify({'success': True, 'id': ticket_id})
+
+@app.route('/api/vbb/user-tickets/<int:ticket_id>', methods=['PUT'])
+def vbb_update_user_ticket(ticket_id):
+    from .database import update_user_ticket
+    data = request.get_json() or {}
+    key_map = {'name': 'ticket_name', 'type': 'ticket_type', 'zones': 'zone_coverage', 'auto_renews': 'auto_renews'}
+    allowed = {}
+    for k, v in data.items():
+        db_key = key_map.get(k, k)
+        if db_key in ('ticket_name', 'ticket_type', 'zone_coverage', 'valid_from', 'valid_until', 'auto_renews', 'is_active'):
+            allowed[db_key] = v
+    update_user_ticket(ticket_id, **allowed)
+    return jsonify({'success': True})
+
+@app.route('/api/vbb/user-tickets/<int:ticket_id>', methods=['DELETE'])
+def vbb_delete_user_ticket(ticket_id):
+    from .database import delete_user_ticket
+    delete_user_ticket(ticket_id)
+    return jsonify({'success': True})
+
+@app.route('/api/vbb/check-ticket', methods=['POST'])
+def vbb_check_ticket_coverage():
+    from .vbb_service import get_vbb_service
+    from .database import get_user_tickets
+    service = get_vbb_service()
+    data = request.get_json() or {}
+    route = data.get('route')
+    if not route:
+        return jsonify({'success': False, 'error': 'Route erforderlich'}), 400
+    tickets = get_user_tickets()
+    result = service.check_ticket_coverage(route, tickets, data.get('travel_date'))
+    return jsonify({'success': True, **result})
+
+@app.route('/api/vbb/ticket-catalog', methods=['GET'])
+def vbb_ticket_catalog():
+    from .vbb_service import search_ticket_catalog, get_user_age, TICKET_CATEGORY_LABELS
+    from .database import get_birthday_setting, get_timetable_settings
+    query = _bounded_str(request.args.get('q', ''))
+    age = request.args.get('age', type=int)
+    if age is None:
+        birthday = get_birthday_setting()
+        settings = get_timetable_settings()
+        graduation_date = settings.get('reference_date') if settings else None
+        age = get_user_age(birthday, graduation_date)
+    results = search_ticket_catalog(query, age)
+    return jsonify({'success': True, 'tickets': results, 'category_labels': TICKET_CATEGORY_LABELS, 'user_age': age})
+
+@app.route('/api/hub/birthday', methods=['GET'])
+def get_birthday():
+    from .database import get_birthday_setting
+    birthday = get_birthday_setting()
+    return jsonify({'success': True, 'birthday': birthday})
+
+@app.route('/api/hub/birthday', methods=['POST'])
+def save_birthday():
+    from .database import save_birthday_setting
+    data = request.get_json() or {}
+    birthday = data.get('birthday', '')
+    if birthday:
+        try:
+            from datetime import datetime
+            datetime.strptime(birthday, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'success': False, 'error': 'Ungültiges Datumsformat'}), 400
+    save_birthday_setting(birthday if birthday else None)
+    return jsonify({'success': True, 'birthday': birthday})
+
+@app.route('/api/hub/location', methods=['GET'])
+def get_location():
+    from .database import get_location_setting
+    location_json = get_location_setting()
+    if location_json:
+        import json as _json
+        try:
+            return jsonify({'success': True, 'location': _json.loads(location_json)})
+        except (ValueError, TypeError):
+            pass
+    return jsonify({'success': True, 'location': None})
+
+@app.route('/api/hub/location', methods=['POST'])
+def save_location_api():
+    from .database import save_location_setting
+    import json as _json
+    data = request.get_json() or {}
+    location = data.get('location')
+    if not location or not isinstance(location, dict):
+        return jsonify({'success': False, 'error': 'No location provided'}), 400
+    city = location.get('city', '')
+    lat = location.get('lat')
+    lon = location.get('lon')
+    if not city or lat is None or lon is None:
+        return jsonify({'success': False, 'error': 'Missing city, lat, or lon'}), 400
+    save_location_setting(_json.dumps({'city': city, 'lat': lat, 'lon': lon}))
+    return jsonify({'success': True})
+
+
+@app.route('/api/vbb/ticket-offers', methods=['POST'])
+def vbb_ticket_offers():
+    from .vbb_service import get_vbb_service
+    service = get_vbb_service()
+
+    data = request.get_json() or {}
+    ctx_recon = data.get('ctxRecon')
+    if not ctx_recon:
+        return jsonify({'success': False, 'error': 'ctxRecon erforderlich'}), 400
+
+    result = service.get_ticket_offers(ctx_recon)
+    return jsonify(result)
+
+
+@app.route('/api/vbb/monitor', methods=['POST'])
+def vbb_start_monitoring():
+    from .database import create_monitored_route
+    data = request.get_json() or {}
+    route = data.get('route')
+    if not route:
+        return jsonify({'success': False, 'error': 'Route erforderlich'}), 400
+
+    from_name = ''
+    to_name = ''
+    legs = route.get('legs', [])
+    if legs:
+        from_name = legs[0].get('departure', {}).get('station', '')
+        to_name = legs[-1].get('arrival', {}).get('station', '')
+
+    route_id = create_monitored_route(
+        route_data=json.dumps(route),
+        from_name=from_name,
+        to_name=to_name,
+        departure_time=route.get('departure', '')
+    )
+
+    if _start_route_monitor(route_id) is False:
+        return jsonify({'success': False, 'error': 'Maximale Anzahl aktiver Monitore erreicht'}), 429
+
+    return jsonify({'success': True, 'id': route_id, 'from': from_name, 'to': to_name})
+
+@app.route('/api/vbb/monitor/<int:route_id>', methods=['GET'])
+def vbb_get_monitor_status(route_id):
+    from .database import get_monitored_routes
+    routes = get_monitored_routes()
+    route = next((r for r in routes if r['id'] == route_id), None)
+    if not route:
+        return jsonify({'success': False, 'error': 'Nicht gefunden'}), 404
+    if route.get('current_delays'):
+        route['current_delays'] = json.loads(route['current_delays'])
+    if route.get('route_data'):
+        route['route_data'] = json.loads(route['route_data'])
+    return jsonify({'success': True, 'monitor': route})
+
+@app.route('/api/vbb/monitor/<int:route_id>', methods=['DELETE'])
+def vbb_stop_monitoring(route_id):
+    from .database import update_monitored_route
+    update_monitored_route(route_id, status='cancelled')
+    return jsonify({'success': True})
+
+@app.route('/api/vbb/monitor/<int:route_id>/check', methods=['GET'])
+def vbb_force_check(route_id):
+    from .database import get_monitored_routes
+    routes = get_monitored_routes()
+    route = next((r for r in routes if r['id'] == route_id), None)
+    if not route:
+        return jsonify({'success': False, 'error': 'Nicht gefunden'}), 404
+    result = _check_monitored_route(route_id)
+    return jsonify(result)
+
+
+@app.route('/api/vbb/preferences', methods=['GET'])
+def vbb_get_preferences():
+    from .vbb_personalization import get_personalization
+    pers = get_personalization()
+    return jsonify({'success': True, 'preferences': pers.get_preferences()})
+
+@app.route('/api/vbb/preferences/track', methods=['POST'])
+def vbb_track_event():
+    from .vbb_personalization import get_personalization
+    data = request.get_json() or {}
+    event = data.get('event')
+    pers = get_personalization()
+
+    if event == 'sort':
+        pers.track_sort(
+            data.get('sort_type', 'recommended'),
+            from_id=data.get('from_id'),
+            to_id=data.get('to_id'),
+        )
+    elif event == 'search':
+        pers.track_search(
+            data.get('from', {}),
+            data.get('to', {}),
+            data.get('departure'),
+        )
+
+    return jsonify({'success': True})
+
+@app.route('/api/vbb/preferences/flags', methods=['PUT'])
+def vbb_update_flags():
+    from .vbb_personalization import get_personalization
+    data = request.get_json() or {}
+    get_personalization().update_flags(data.get('flags', {}))
+    return jsonify({'success': True})
+
+@app.route('/api/vbb/preferences/reset', methods=['POST'])
+def vbb_reset_preferences():
+    from .vbb_personalization import get_personalization
+    get_personalization().reset()
+    return jsonify({'success': True})
+
+_active_monitors = {}
+_MAX_MONITORS = 20
+
+def _start_route_monitor(route_id):
+    """Start background monitoring for a route."""
+    if len(_active_monitors) >= _MAX_MONITORS:
+        logging.warning(f"Monitor cap reached ({_MAX_MONITORS}), rejecting monitor for route {route_id}")
+        return False
+
+    def monitor_loop():
+        from .database import get_monitored_routes, update_monitored_route
+        from .vbb_service import get_vbb_service
+        import time as _time
+
+        service = get_vbb_service()
+
+        while True:
+            try:
+                routes = get_monitored_routes()
+                route = next((r for r in routes if r['id'] == route_id), None)
+                if not route or route['status'] != 'active':
+                    break
+
+                dep_time_str = route.get('departure_time', '')
+                if dep_time_str:
+                    try:
+                        dep_time = datetime.fromisoformat(dep_time_str.replace('Z', '+00:00'))
+                        if datetime.now(dep_time.tzinfo) > dep_time + timedelta(minutes=30):
+                            update_monitored_route(route_id, status='completed')
+                            break
+                    except (ValueError, TypeError):
+                        pass
+
+                route_data = json.loads(route['route_data'])
+                check_result = service.check_route_connections(route_data)
+
+                update_monitored_route(
+                    route_id,
+                    last_check=datetime.now().isoformat(),
+                    current_delays=json.dumps(check_result)
+                )
+
+                if check_result.get('has_issues'):
+                    for issue in check_result.get('issues', []):
+                        event_type = 'vbb_connection_missed' if issue['type'] == 'missed' else 'vbb_delay_alert'
+                        socketio.emit(event_type, {
+                            'monitorId': route_id,
+                            'type': issue['type'],
+                            'line': issue.get('line', ''),
+                            'station': issue.get('station', ''),
+                            'delay': issue.get('delay', 0),
+                            'message': issue.get('message', ''),
+                            'from': route.get('from_name', ''),
+                            'to': route.get('to_name', '')
+                        })
+
+            except Exception as e:
+                logging.error(f"Route monitor error for {route_id}: {e}")
+
+            _time.sleep(60)
+
+        _active_monitors.pop(route_id, None)
+
+    _active_monitors[route_id] = True
+    socketio.start_background_task(monitor_loop)
+
+def _check_monitored_route(route_id):
+    """Force-check a monitored route."""
+    from .database import get_monitored_routes, update_monitored_route
+    from .vbb_service import get_vbb_service
+
+    routes = get_monitored_routes()
+    route = next((r for r in routes if r['id'] == route_id), None)
+    if not route:
+        return {'success': False, 'error': 'Nicht gefunden'}
+
+    service = get_vbb_service()
+    route_data = json.loads(route['route_data'])
+    check_result = service.check_route_connections(route_data)
+
+    update_monitored_route(
+        route_id,
+        last_check=datetime.now().isoformat(),
+        current_delays=json.dumps(check_result)
+    )
+
+    return {'success': True, **check_result}
+
 SYNCED_CALENDAR_FILE = Path(__file__).parent.parent / 'data' / 'synced_calendar.json'
 
 @app.route('/api/calendar/local', methods=['GET'])
 def get_local_calendar_events():
 
-    if not SYNCED_CALENDAR_FILE.exists():
-        return jsonify({
-            'success': False,
-            'error': 'Kalender nicht synchronisiert. Führe calendar_sync.py aus.'
-        }), 404
-
     try:
-        with open(SYNCED_CALENDAR_FILE, 'r') as f:
-            data = json.load(f)
+        data = decrypt_file(SYNCED_CALENDAR_FILE)
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'Kalender nicht synchronisiert. Führe calendar_sync.py aus.'
+            }), 404
 
         return jsonify({
             'success': True,
@@ -2418,7 +3194,8 @@ def get_local_calendar_events():
             'events': data.get('events', [])
         })
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logging.error(f"Failed to read local calendar data: {e}")
+        return jsonify({'success': False, 'error': 'Failed to load calendar data'}), 500
 
 @app.route('/api/calendar/local/sync', methods=['POST'])
 def trigger_local_calendar_sync():
@@ -2441,12 +3218,14 @@ def trigger_local_calendar_sync():
         if result.returncode == 0:
             return jsonify({'success': True, 'message': 'Synchronisation abgeschlossen'})
         else:
-            return jsonify({'success': False, 'error': result.stderr or 'Sync fehlgeschlagen'}), 500
+            logging.error(f"Calendar sync failed: {result.stderr}")
+            return jsonify({'success': False, 'error': 'Synchronisation fehlgeschlagen'}), 500
 
     except subprocess.TimeoutExpired:
         return jsonify({'success': False, 'error': 'Timeout bei der Synchronisation'}), 500
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logging.error(f"Failed to sync local calendar: {e}")
+        return jsonify({'success': False, 'error': 'Failed to sync calendar'}), 500
 
 @app.route('/api/calendar/local/status', methods=['GET'])
 def get_local_calendar_status():
@@ -2474,11 +3253,10 @@ def get_local_calendar_status():
         last_sync = None
         event_count = 0
 
-        if SYNCED_CALENDAR_FILE.exists():
-            with open(SYNCED_CALENDAR_FILE, 'r') as f:
-                data = json.load(f)
-                last_sync = data.get('last_sync')
-                event_count = data.get('event_count', 0)
+        data = decrypt_file(SYNCED_CALENDAR_FILE)
+        if data:
+            last_sync = data.get('last_sync')
+            event_count = data.get('event_count', 0)
 
         return jsonify({
             'success': True,
@@ -2489,7 +3267,8 @@ def get_local_calendar_status():
         })
 
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logging.error(f"Failed to get calendar sync status: {e}")
+        return jsonify({'success': False, 'error': 'Failed to retrieve calendar status'}), 500
 
 WEATHER_CACHE_FILE = Path(__file__).parent.parent / 'data' / 'weather_cache.json'
 
@@ -2498,15 +3277,29 @@ def get_weather():
 
     import requests
 
-    lat = request.args.get('lat', '52.52')
-    lon = request.args.get('lon', '13.41')
-    city = request.args.get('city', 'Berlin')
+    city = _bounded_str(request.args.get('city', 'Berlin'), 100)
+
+    try:
+        lat = float(request.args.get('lat', '52.52'))
+        lon = float(request.args.get('lon', '13.41'))
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'error': 'Ungültige Koordinaten'}), 400
+
+    if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+        return jsonify({'success': False, 'error': 'Koordinaten außerhalb des gültigen Bereichs'}), 400
 
     try:
 
         response = requests.get(
-            f'https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto',
-            timeout=10
+            'https://api.open-meteo.com/v1/forecast',
+            params={
+                'latitude': lat,
+                'longitude': lon,
+                'current': 'temperature_2m,weather_code,wind_speed_10m',
+                'daily': 'temperature_2m_max,temperature_2m_min,weather_code',
+                'timezone': 'auto'
+            },
+            timeout=3
         )
 
         if response.ok:
@@ -2519,9 +3312,7 @@ def get_weather():
                 'fetched_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
 
-            WEATHER_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-            with open(WEATHER_CACHE_FILE, 'w') as f:
-                json.dump(weather_data, f)
+            encrypt_file(weather_data, WEATHER_CACHE_FILE)
 
             return jsonify({
                 'success': True,
@@ -2535,20 +3326,21 @@ def get_weather():
 
         if WEATHER_CACHE_FILE.exists():
             try:
-                with open(WEATHER_CACHE_FILE, 'r') as f:
-                    cached_data = json.load(f)
-                return jsonify({
-                    'success': True,
-                    'from_cache': True,
-                    'cached_at': cached_data.get('timestamp'),
-                    **cached_data
-                })
+                cached_data = decrypt_file(WEATHER_CACHE_FILE)
+                if cached_data:
+                    return jsonify({
+                        'success': True,
+                        'from_cache': True,
+                        'cached_at': cached_data.get('timestamp'),
+                        **cached_data
+                    })
             except:
                 pass
 
+        logging.error(f"Weather API error: {e}")
         return jsonify({
             'success': False,
-            'error': str(e),
+            'error': 'Wetterdaten konnten nicht abgerufen werden',
             'offline': True
         }), 503
 
@@ -2607,9 +3399,9 @@ def save_bundesland():
 
             try:
                 feiertage_url = f'https://feiertage-api.de/api/?jahr={year}&nur_land={bundesland}'
-                print(f"Fetching Feiertage from: {feiertage_url}")
+                logging.debug("Fetching Feiertage")
                 response = requests.get(feiertage_url, timeout=10)
-                print(f"Feiertage response status: {response.status_code}")
+                logging.debug("Feiertage response received")
                 if response.status_code == 200:
                     feiertage_data = response.json()
                     holidays = []
@@ -2621,39 +3413,65 @@ def save_bundesland():
                             'year': year
                         })
                     imported_count += db.import_holidays(holidays, bundesland)
-                    print(f"Imported {len(holidays)} Feiertage for {year}")
+                    logging.debug("Imported Feiertage for %d", year)
                 else:
                     errors.append(f'Feiertage {year}: HTTP {response.status_code}')
             except Exception as e:
-                print(f"Feiertage error for {year}: {e}")
-                errors.append(f'Feiertage {year}: {str(e)}')
+                logging.error(f"Feiertage error for {year}: {e}")
+                errors.append(f'Feiertage {year}: Import fehlgeschlagen')
 
+            schulferien_success = False
             try:
-                ferien_url = f'https://ferien-api.de/api/v1/holidays/{bundesland}/{year}'
-                print(f"Fetching Schulferien from: {ferien_url}")
-                response = requests.get(ferien_url, timeout=10)
-                print(f"Schulferien response status: {response.status_code}")
+                schulferien_url = f'https://schulferien-api.de/api/v1/{year}/{bundesland}/'
+                logging.debug("Fetching Schulferien from primary API")
+                response = requests.get(schulferien_url, timeout=10)
+                logging.debug("Primary Schulferien response received")
                 if response.status_code == 200:
                     ferien_data = response.json()
                     holidays = []
                     for ferien in ferien_data:
+
+                        name = ferien.get('name_cp') or ferien.get('name', '')
                         holidays.append({
                             'date': ferien['start'][:10],
                             'end_date': ferien['end'][:10],
-                            'name': ferien['name'],
+                            'name': name,
                             'type': 'schulferien',
                             'year': year
                         })
                     imported_count += db.import_holidays(holidays, bundesland)
-                    print(f"Imported {len(holidays)} Schulferien for {year}")
-                else:
-                    errors.append(f'Schulferien {year}: HTTP {response.status_code}')
+                    logging.debug("Imported Schulferien for %d from primary API", year)
+                    schulferien_success = True
             except Exception as e:
-                print(f"Schulferien error for {year}: {e}")
-                errors.append(f'Schulferien {year}: {str(e)}')
+                logging.warning("Primary Schulferien API error for %d", year)
+
+            if not schulferien_success:
+                try:
+                    ferien_url = f'https://ferien-api.de/api/v1/holidays/{bundesland}/{year}'
+                    logging.debug("Fetching Schulferien from fallback API")
+                    response = requests.get(ferien_url, timeout=10)
+                    logging.debug("Fallback Schulferien response received")
+                    if response.status_code == 200:
+                        ferien_data = response.json()
+                        holidays = []
+                        for ferien in ferien_data:
+                            holidays.append({
+                                'date': ferien['start'][:10],
+                                'end_date': ferien['end'][:10],
+                                'name': ferien['name'],
+                                'type': 'schulferien',
+                                'year': year
+                            })
+                        imported_count += db.import_holidays(holidays, bundesland)
+                        logging.debug("Imported Schulferien for %d from fallback API", year)
+                    else:
+                        errors.append(f'Schulferien {year}: HTTP {response.status_code}')
+                except Exception as e:
+                    logging.error(f"Fallback Schulferien error for {year}: {e}")
+                    errors.append(f'Schulferien {year}: Import fehlgeschlagen')
 
         db.save_bundesland_setting(bundesland, holidays_imported_until=years_to_import[-1])
-        print(f"Saved Bundesland setting: {bundesland}, imported {imported_count} holidays")
+        logging.debug("Saved Bundesland setting, imported %d holidays", imported_count)
 
         return jsonify({
             'success': True,
@@ -2664,10 +3482,8 @@ def save_bundesland():
             'errors': errors if errors else None
         })
     except Exception as e:
-        print(f"Error in save_bundesland: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logging.error(f"Failed to import holidays for Bundesland: {e}")
+        return jsonify({'success': False, 'error': 'Failed to import holidays'}), 500
 
 @app.route('/api/hub/holidays', methods=['GET'])
 def get_hub_holidays():
@@ -2730,7 +3546,8 @@ def get_calendar_holidays():
             'holidays': formatted_holidays
         })
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logging.error(f"Failed to retrieve holidays: {e}")
+        return jsonify({'success': False, 'error': 'Failed to retrieve holidays'}), 500
 
 @app.route('/api/pomodoro/session', methods=['POST'])
 def save_pomodoro_session():
@@ -2756,14 +3573,14 @@ def get_pomodoro_stats():
 @app.route('/api/pomodoro/sessions', methods=['GET'])
 def get_pomodoro_sessions():
 
-    limit = request.args.get('limit', 50, type=int)
+    limit = min(max(request.args.get('limit', 50, type=int), 1), 200)
     sessions = db.get_pomodoro_sessions(limit=limit)
     return jsonify({'sessions': sessions})
 
 @app.route('/api/deadlines', methods=['GET'])
 def get_all_deadlines():
 
-    days = request.args.get('days', 14, type=int)
+    days = min(max(request.args.get('days', 14, type=int), 1), 365)
     deadlines = []
     today = datetime.now().date()
 
@@ -2844,16 +3661,18 @@ if __name__ == '__main__':
         except:
             return None
 
+    host = os.environ.get('NEXUS_HOST', '127.0.0.1')
+    port = int(os.environ.get('NEXUS_PORT', 5050))
     local_ip = get_local_ip()
 
-    print("\n" + "=" * 50)
-    print("  Nexus Hub - Personal Dashboard")
-    print("=" * 50)
-    print(f"\n  Desktop:  http://localhost:5050")
-    if local_ip:
-        print(f"  Mobile:   http://{local_ip}:5050")
-    print("\n  Tipp: Auf dem Handy die Mobile-URL eingeben")
-    print("        und 'Zum Home-Bildschirm' hinzufugen!")
-    print("=" * 50 + "\n")
+    logging.info("Nexus Hub - Personal Dashboard")
+    logging.info("Desktop: http://localhost:%d", port)
+    if host == '0.0.0.0' and local_ip:
+        logging.info("Mobile: http://%s:%d", local_ip, port)
+    logging.info("Tipp: Auf dem Handy die Mobile-URL eingeben und 'Zum Home-Bildschirm' hinzufugen!")
 
-    socketio.run(app, host='0.0.0.0', port=5050, debug=False, allow_unsafe_werkzeug=True)
+    masked = '...' + API_TOKEN[-8:] if len(API_TOKEN) > 8 else '***'
+    logging.info("API Token: %s", masked)
+    logging.info("(Full token in data/.api_token — use as 'Authorization: Bearer <token>' header)")
+
+    socketio.run(app, host=host, port=port, debug=False, allow_unsafe_werkzeug=os.environ.get('FLASK_ENV') == 'development')

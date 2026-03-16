@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:cookie_jar/cookie_jar.dart';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/iserv.dart';
 import 'database_service.dart' if (dart.library.html) 'database_service_web.dart';
@@ -22,17 +23,28 @@ class IServService {
   String? _currentUsername;
   bool _isWebViewSession = false;
 
-  /// Returns true if connected via traditional login (with Dio) or WebView session
+  final StringBuffer _apiLog = StringBuffer();
+  String get apiLog => kDebugMode ? _apiLog.toString() : '';
+  void clearApiLog() => _apiLog.clear();
+  void _log(String msg) {
+    if (kDebugMode) {
+      print('IServService: $msg');
+      _apiLog.writeln('${DateTime.now().toString().substring(11, 19)} $msg');
+      if (_apiLog.length > 8000) {
+        final s = _apiLog.toString();
+        _apiLog.clear();
+        _apiLog.write(s.substring(s.length - 6000));
+      }
+    }
+  }
+
   bool get isConnected => (_sessionToken != null && _dio != null) ||
                           (_isWebViewSession && _baseUrl != null);
 
-  /// Get the current IServ base URL (e.g., https://ehgwerder.de)
   String? get iservUrl => _baseUrl;
 
-  /// Returns true if we have an active Dio session ready for requests
   bool get hasDioSession => _dio != null && _cookieJar != null;
 
-  /// Check if we have actual cookies in the jar (async check)
   Future<bool> hasValidCookies() async {
     if (_dio == null || _cookieJar == null || _baseUrl == null) return false;
     try {
@@ -43,15 +55,14 @@ class IServService {
     }
   }
 
-  /// Initialize Dio with cookie manager for proper session handling
   Dio _createDio(String baseUrl) {
     final cookieJar = CookieJar();
     _cookieJar = cookieJar;
 
     final dio = Dio(BaseOptions(
       baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 30),
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
       followRedirects: false,
       validateStatus: (status) => status != null && status < 500,
       headers: {
@@ -62,8 +73,54 @@ class IServService {
     ));
 
     dio.interceptors.add(CookieManager(cookieJar));
-
     return dio;
+  }
+
+  Future<bool> autoReconnect() async {
+    if (isConnected && _dio != null) return true;
+
+    try {
+      final db = await _db.database;
+      final credentials = await db.query('iserv_credentials', limit: 1);
+
+      if (credentials.isNotEmpty) {
+        final cred = IServCredentials.fromMap(credentials.first);
+        _baseUrl = cred.iservUrl;
+        _currentUsername = cred.username;
+
+        final secureCredentials = await _encryption.getIServCredentials(cred.credentialKey);
+        final storedPassword = secureCredentials?['password'] ?? '';
+
+        if (storedPassword.isNotEmpty) {
+          final result = await connect(
+            username: cred.username,
+            password: storedPassword,
+            iservUrl: cred.iservUrl,
+          );
+          return result['success'] == true;
+        } else {
+          _isWebViewSession = false;
+          if (kDebugMode) print('IServ: autoReconnect - no password stored (WebView session), cannot re-authenticate');
+          return false;
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) print('IServ: Auto-reconnect failed: $e');
+    }
+
+    return false;
+  }
+
+  Future<IServCredentials?> getSavedCredentials() async {
+    try {
+      final db = await _db.database;
+      final credentials = await db.query('iserv_credentials', limit: 1);
+
+      if (credentials.isNotEmpty) {
+        return IServCredentials.fromMap(credentials.first);
+      }
+    } catch (_) {}
+    return null;
   }
 
   Future<Map<String, dynamic>> connect({
@@ -75,272 +132,156 @@ class IServService {
       String normalizedUrl = iservUrl
           .replaceAll(RegExp(r'^https?://'), '')
           .replaceAll(RegExp(r'/+$'), '');
+      final testUri = Uri.tryParse('https://$normalizedUrl');
+      if (testUri == null || testUri.host.isEmpty || testUri.userInfo.isNotEmpty) {
+        return {'success': false, 'error': 'Ungültige IServ-URL'};
+      }
       _baseUrl = 'https://$normalizedUrl';
 
       final dio = _createDio(_baseUrl!);
 
-      String? csrfToken;
-
-      try {
-        final loginPageResponse = await dio.get('/iserv/login');
-
-        final pageContent = loginPageResponse.data?.toString() ?? '';
-
-        final csrfPatterns = [
-          RegExp(r'name="_csrf_token"\s+value="([^"]+)"'),
-          RegExp(r'name="_csrf_token"\s*value="([^"]+)"'),
-          RegExp(r'value="([^"]+)"\s+name="_csrf_token"'),
-          RegExp(r'_csrf_token["\s]*[:=]["\s]*"?([^"&\s<>]+)'),
-          RegExp(r'"_csrf_token":"([^"]+)"'),
-        ];
-
-        for (final pattern in csrfPatterns) {
-          final match = pattern.firstMatch(pageContent);
-          if (match != null) {
-            csrfToken = match.group(1);
-            break;
-          }
-        }
-      } catch (e) {
-        return {'success': false, 'error': 'Server nicht erreichbar: ${e.toString()}'};
-      }
-
-      final loginData = {
+      final loginData = <String, dynamic>{
         '_username': username,
         '_password': password,
       };
-      if (csrfToken != null) {
-        loginData['_csrf_token'] = csrfToken;
+      String postUrl = '/iserv/login_check';
+
+      try {
+        final loginPageResponse = await dio.get(
+          '/iserv/login',
+          options: Options(
+            followRedirects: true,
+            maxRedirects: 5,
+          ),
+        );
+        final html = loginPageResponse.data?.toString() ?? '';
+        if (kDebugMode) print('IServ: Login page status: ${loginPageResponse.statusCode}, length: ${html.length}');
+
+        final formAction = RegExp(r'<form[^>]*action="([^"]*)"', dotAll: true).firstMatch(html);
+        if (formAction != null) {
+          final action = formAction.group(1)!;
+          if (action.isNotEmpty) {
+            postUrl = action.startsWith('/') ? action : '/iserv/$action';
+            if (kDebugMode) print('IServ: Found form action: $postUrl');
+          }
+        }
+
+        final hiddenInputs = RegExp(
+          r'<input[^>]*type=["\x27]hidden["\x27][^>]*/?>',
+          dotAll: true,
+          caseSensitive: false,
+        ).allMatches(html);
+
+        for (final input in hiddenInputs) {
+          final inputHtml = input.group(0)!;
+          final nameMatch = RegExp(r'name=["\x27]([^"\x27]+)["\x27]').firstMatch(inputHtml);
+          final valueMatch = RegExp(r'value=["\x27]([^"\x27]*)["\x27]').firstMatch(inputHtml);
+          if (nameMatch != null) {
+            final name = nameMatch.group(1)!;
+            final value = valueMatch?.group(1) ?? '';
+            loginData[name] = value;
+            if (kDebugMode) print('IServ: Found hidden field: $name (${value.length} chars)');
+          }
+        }
+
+        final hiddenInputsAlt = RegExp(
+          r'<input[^>]*name=["\x27]([^"\x27]+)["\x27][^>]*type=["\x27]hidden["\x27][^>]*value=["\x27]([^"\x27]*)["\x27][^>]*/?>',
+          dotAll: true,
+          caseSensitive: false,
+        ).allMatches(html);
+
+        for (final input in hiddenInputsAlt) {
+          final name = input.group(1)!;
+          final value = input.group(2) ?? '';
+          if (!loginData.containsKey(name)) {
+            loginData[name] = value;
+            if (kDebugMode) print('IServ: Found hidden field (alt): $name (${value.length} chars)');
+          }
+        }
+
+        if (loginData.length <= 2) {
+          if (kDebugMode) print('IServ: WARNING - No hidden form fields found!');
+          final lowerHtml = html.toLowerCase();
+          if (lowerHtml.contains('_username') || lowerHtml.contains('username')) {
+            if (kDebugMode) print('IServ: Page contains username field');
+          }
+          if (lowerHtml.contains('password')) {
+            if (kDebugMode) print('IServ: Page contains password field');
+          }
+          if (kDebugMode) print('IServ: Page start: ${html.substring(0, html.length > 1000 ? 1000 : html.length)}');
+        }
+      } catch (e) {
+        if (kDebugMode) print('IServ: Could not fetch login page: $e');
       }
 
+      if (kDebugMode) print('IServ: Posting login with ${loginData.length} fields to $postUrl');
+
       final response = await dio.post(
-        '/iserv/login_check',
+        postUrl,
         data: loginData,
         options: Options(
           contentType: Headers.formUrlEncodedContentType,
-          headers: {
-            'Origin': _baseUrl,
-            'Referer': '$_baseUrl/iserv/login',
-          },
+          followRedirects: false,
+          validateStatus: (status) => status != null && status < 500,
         ),
       );
 
-      String? finalLocation = response.headers.value('location');
-      int redirectCount = 0;
-      const maxRedirects = 10;
-      bool loginSuccess = false;
+      if (kDebugMode) print('IServ: Login response status: ${response.statusCode}');
+      if (kDebugMode) print('IServ: Login response location: ${response.headers.value('location')}');
 
-      while (finalLocation != null && redirectCount < maxRedirects) {
-        redirectCount++;
+      if (response.statusCode == 302 || response.statusCode == 200) {
+        final location = response.headers.value('location') ?? '';
+        if (!location.contains('login') && !location.contains('error')) {
+          _dio = dio;
+          _currentUsername = username;
+          _sessionToken = 'session_active';
 
-        String redirectUrl = finalLocation;
-        if (!redirectUrl.startsWith('http')) {
-          redirectUrl = redirectUrl.startsWith('/')
-              ? '$_baseUrl$redirectUrl'
-              : '$_baseUrl/$redirectUrl';
-        }
+          final credentialKey = await _encryption.storeIServCredentials(
+            username: username,
+            password: password,
+            iservUrl: _baseUrl!,
+          );
 
-        try {
-          final redirectResponse = await dio.get(redirectUrl);
+          final db = await _db.database;
+          await db.insert(
+            'iserv_credentials',
+            IServCredentials(
+              username: username,
+              iservUrl: _baseUrl!,
+              credentialKey: credentialKey,
+              createdAt: DateTime.now(),
+            ).toMap(),
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
 
-          finalLocation = redirectResponse.headers.value('location');
-
-          if (redirectResponse.statusCode == 200) {
-            final body = redirectResponse.data?.toString() ?? '';
-
-            if (body.contains('login_check') && body.contains('_username') && body.contains('_password')) {
-              return {'success': false, 'error': 'Benutzername oder Passwort falsch'};
-            }
-
-            if (body.contains('Abmelden') ||
-                body.contains('logout') ||
-                body.contains('iserv-nav') ||
-                body.contains('Mein IServ') ||
-                (body.contains('/iserv/') && !body.contains('login_check'))) {
-              loginSuccess = true;
-              break;
-            }
-          }
-        } catch (e) {
+          return {'success': true};
         }
       }
 
-      bool verificationPassed = false;
-      try {
-        final verifyResponse = await dio.get(
-          '/iserv/',
-          options: Options(followRedirects: true),
-        );
-
-        final verifyBody = verifyResponse.data?.toString() ?? '';
-
-        if (verifyBody.contains('login_check') &&
-            verifyBody.contains('_username') &&
-            verifyBody.contains('_password') &&
-            !verifyBody.contains('Abmelden')) {
-          return {'success': false, 'error': 'Anmeldung fehlgeschlagen. Bitte Zugangsdaten prüfen.'};
-        }
-
-        verificationPassed = verifyBody.contains('Abmelden') ||
-                             verifyBody.contains('logout') ||
-                             verifyBody.contains('iserv-menu') ||
-                             verifyBody.contains('iserv-nav') ||
-                             verifyBody.contains('IServ-Dashboard') ||
-                             verifyBody.contains('class="dashboard"') ||
-                             verifyBody.contains('Mein IServ') ||
-                             verifyBody.contains('data-module') ||
-                             verifyBody.contains('class="nav"') ||
-                             loginSuccess ||
-                             (verifyBody.contains('/iserv/') && !verifyBody.contains('login_check'));
-
-        if (!verificationPassed && !loginSuccess) {
-          return {'success': false, 'error': 'Konnte Anmeldung nicht verifizieren. Bitte Zugangsdaten prüfen.'};
-        }
-      } catch (e) {
-        if (!loginSuccess) {
-          return {'success': false, 'error': 'Anmeldung konnte nicht verifiziert werden: ${e.toString()}'};
-        }
-      }
-
-      List<dynamic> allCookies = [];
-      final pathsToCheck = ['/', '/iserv/', '/iserv/login', ''];
-
-      for (final path in pathsToCheck) {
-        try {
-          final uri = Uri.parse('$_baseUrl$path');
-          final cookies = await _cookieJar?.loadForRequest(uri);
-          if (cookies != null && cookies.isNotEmpty) {
-            allCookies.addAll(cookies);
-          }
-        } catch (_) {}
-      }
-
-      final uniqueCookies = <String, dynamic>{};
-      for (final cookie in allCookies) {
-        uniqueCookies[cookie.name] = cookie;
-      }
-
-      if (uniqueCookies.isEmpty && !loginSuccess && !verificationPassed) {
-        return {'success': false, 'error': 'Keine Session-Cookies erhalten. Bitte erneut versuchen.'};
-      }
-
-      _sessionToken = uniqueCookies.isNotEmpty
-          ? uniqueCookies.values.map((c) => '${c.name}=${c.value}').join('; ')
-          : 'session_active';
-      _currentUsername = username;
-      _dio = dio;
-      _isWebViewSession = false;
-
-      final credentialKey = await _encryption.storeIServCredentials(
-        username: username,
-        password: password,
-        iservUrl: _baseUrl!,
-      );
-
-      final db = await _db.database;
-      await db.insert(
-        'iserv_credentials',
-        IServCredentials(
-          username: username,
-          iservUrl: _baseUrl!,
-          credentialKey: credentialKey,
-          createdAt: DateTime.now(),
-        ).toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-
-      return {'success': true, 'username': username};
-    } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionTimeout) {
-        return {'success': false, 'error': 'Verbindung zum Server fehlgeschlagen. Bitte Netzwerk prüfen.'};
-      }
-      if (e.type == DioExceptionType.receiveTimeout) {
-        return {'success': false, 'error': 'Server antwortet nicht. Bitte später erneut versuchen.'};
-      }
-      if (e.type == DioExceptionType.connectionError) {
-        return {'success': false, 'error': 'Keine Internetverbindung oder Server nicht erreichbar.'};
-      }
-      return {'success': false, 'error': 'Verbindungsfehler: ${e.message ?? 'Unbekannter Fehler'}'};
+      return {'success': false, 'error': 'Anmeldung fehlgeschlagen'};
     } catch (e) {
-      return {'success': false, 'error': 'Fehler: ${e.toString()}'};
+      return {'success': false, 'error': 'Verbindungsfehler. Bitte überprüfe deine Internetverbindung.'};
     }
   }
 
   Future<void> disconnect() async {
+    _dio = null;
+    _cookieJar = null;
     _sessionToken = null;
     _baseUrl = null;
     _currentUsername = null;
-    _dio = null;
-    _cookieJar = null;
     _isWebViewSession = false;
 
-    final db = await _db.database;
-    await db.delete('iserv_credentials');
+    try {
+      final db = await _db.database;
+      await db.delete('iserv_credentials');
+    } catch (_) {}
   }
 
-  Future<IServCredentials?> getSavedCredentials() async {
-    final db = await _db.database;
-    final results = await db.query('iserv_credentials', limit: 1);
-    if (results.isEmpty) return null;
-    return IServCredentials.fromMap(results.first);
-  }
-
-  Future<bool> autoReconnect() async {
-    final credentials = await getSavedCredentials();
-    if (credentials == null) return false;
-
-    final savedCreds = await _encryption.getIServCredentials(credentials.credentialKey);
-    if (savedCreds == null) return false;
-
-    final password = savedCreds['password'] ?? '';
-
-    if (password.isEmpty) {
-      final iservUrl = savedCreds['iserv_url'];
-      if (iservUrl != null && iservUrl.isNotEmpty) {
-        String normalizedUrl = iservUrl
-            .replaceAll(RegExp(r'^https?://'), '')
-            .replaceAll(RegExp(r'/+$'), '');
-        _baseUrl = 'https://$normalizedUrl';
-        _currentUsername = savedCreds['username'];
-        _isWebViewSession = true;
-        _sessionToken = 'webview_session_restored';
-        print('IServ: Restored WebView session for $_baseUrl (user: $_currentUsername)');
-        return true;
-      }
-      return false;
-    }
-
-    final result = await connect(
-      username: savedCreds['username']!,
-      password: password,
-      iservUrl: savedCreds['iserv_url']!,
-    );
-
-    return result['success'] == true;
-  }
-
-  /// Refresh Dio instance with cookies from WebView's CookieManager
-  /// Call this before making API requests in a WebView session
   Future<bool> refreshWithWebViewCookies(List<dynamic> cookies) async {
-    if (_baseUrl == null) return false;
+    if (_baseUrl == null || _cookieJar == null) return false;
 
     try {
-      final cookieJar = CookieJar();
-      _cookieJar = cookieJar;
-
-      final dio = Dio(BaseOptions(
-        baseUrl: _baseUrl!,
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
-        },
-      ));
-
-      dio.interceptors.add(CookieManager(cookieJar));
-
       final uri = Uri.parse(_baseUrl!);
       final cookieList = <Cookie>[];
 
@@ -358,7 +299,7 @@ class IServService {
           }
 
           if (name != null && name.isNotEmpty) {
-            final cookie = Cookie(name, value ?? '');
+            final cookie = Cookie(name, value);
             cookie.domain = uri.host;
             cookie.path = '/';
             cookieList.add(cookie);
@@ -366,22 +307,20 @@ class IServService {
         } catch (_) {}
       }
 
-      print('IServ: Refreshing Dio with ${cookieList.length} cookies from WebView');
+      if (kDebugMode) print('IServ: Refreshing Dio with ${cookieList.length} cookies from WebView');
 
       if (cookieList.isNotEmpty) {
-        await cookieJar.saveFromResponse(uri, cookieList);
-        _dio = dio;
+        await _cookieJar!.saveFromResponse(uri, cookieList);
         return true;
       }
 
       return false;
     } catch (e) {
-      print('IServ: Failed to refresh cookies: $e');
+      if (kDebugMode) print('IServ: Failed to refresh cookies: $e');
       return false;
     }
   }
 
-  /// Connect using cookies obtained from WebView login
   Future<Map<String, dynamic>> connectWithWebViewCookies({
     required String iservUrl,
     required List<dynamic> cookies,
@@ -398,8 +337,8 @@ class IServService {
 
       final dio = Dio(BaseOptions(
         baseUrl: _baseUrl!,
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
         headers: {
           'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -409,7 +348,6 @@ class IServService {
 
       dio.interceptors.add(CookieManager(cookieJar));
 
-      final uri = Uri.parse(_baseUrl!);
       final cookieList = <Cookie>[];
 
       for (final c in cookies) {
@@ -432,7 +370,7 @@ class IServService {
           }
 
           if (name != null && name.isNotEmpty) {
-            final cookie = Cookie(name, value ?? '');
+            final cookie = Cookie(name, value);
             if (domain != null) cookie.domain = domain;
             if (path != null) cookie.path = path;
             try {
@@ -448,24 +386,24 @@ class IServService {
       }
 
       final baseUri = Uri.parse(_baseUrl!);
-      final cookieDomain = baseUri.host; // e.g., "ehgwerder.de"
+      final cookieDomain = baseUri.host;
 
       for (final cookie in cookieList) {
         cookie.domain = cookieDomain;
         cookie.path = '/';
       }
 
-      print('IServ: Saving ${cookieList.length} cookies for domain: $cookieDomain');
+      if (kDebugMode) print('IServ: Saving ${cookieList.length} cookies for domain: $cookieDomain');
       for (final c in cookieList) {
         final valuePreview = c.value.length > 10 ? '${c.value.substring(0, 10)}...' : c.value;
-        print('  Cookie: ${c.name}=$valuePreview domain=${c.domain} path=${c.path}');
+        if (kDebugMode) print('  Cookie: ${c.name}=$valuePreview domain=${c.domain} path=${c.path}');
       }
 
       try {
         await cookieJar.saveFromResponse(baseUri, cookieList);
-        print('IServ: Cookies saved successfully to jar');
+        if (kDebugMode) print('IServ: Cookies saved successfully to jar');
       } catch (e) {
-        print('IServ: Failed to save cookies: $e');
+        if (kDebugMode) print('IServ: Failed to save cookies: $e');
       }
 
       bool isLoggedIn = false;
@@ -484,7 +422,7 @@ class IServService {
                      (verifyBody.contains('/iserv/') && !verifyBody.contains('login_check') && !verifyBody.contains('_username'));
       } catch (e) {
         if (cookieList.isEmpty) {
-          return {'success': false, 'error': 'Verbindungsfehler: ${e.toString()}'};
+          return {'success': false, 'error': 'Verbindungsfehler. Bitte überprüfe deine Internetverbindung.'};
         }
       }
 
@@ -492,8 +430,8 @@ class IServService {
         try {
           final retryDio = Dio(BaseOptions(
             baseUrl: _baseUrl!,
-            connectTimeout: const Duration(seconds: 30),
-            receiveTimeout: const Duration(seconds: 30),
+            connectTimeout: const Duration(seconds: 10),
+            receiveTimeout: const Duration(seconds: 10),
             followRedirects: true,
             headers: {
               'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
@@ -510,16 +448,14 @@ class IServService {
         } catch (_) {}
       }
 
-      _sessionToken = cookieList.isNotEmpty
-          ? cookieList.map((c) => '${c.name}=${c.value}').join('; ')
-          : 'webview_session_active';
+      _sessionToken = 'webview_session_active';
       _currentUsername = username ?? 'IServ-Nutzer';
       _dio = dio;
       _isWebViewSession = true;
 
       final credentialKey = await _encryption.storeIServCredentials(
         username: _currentUsername!,
-        password: '', // No password stored for WebView login
+        password: '',
         iservUrl: _baseUrl!,
       );
 
@@ -537,38 +473,49 @@ class IServService {
 
       return {'success': true, 'username': _currentUsername};
     } catch (e) {
-      return {'success': false, 'error': 'Fehler: ${e.toString()}'};
+      return {'success': false, 'error': 'Ein Fehler ist aufgetreten. Bitte versuche es erneut.'};
     }
   }
 
   Future<List<IServNotification>> getNotifications() async {
-    if (!isConnected || _dio == null) return [];
+    if (!isConnected || _dio == null) return getCachedNotifications();
 
     try {
       final response = await _dio!.get(
         '/iserv/messenger/api/messages',
+        options: Options(
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          responseType: ResponseType.json,
+        ),
       );
 
-      if (response.statusCode != 200) return [];
+      if (response.statusCode != 200) return getCachedNotifications();
 
       final data = response.data;
+
+      if (data is! List) {
+        if (kDebugMode) print('IServ: Notifications response is not a List, returning cached');
+        return getCachedNotifications();
+      }
+
       final List<IServNotification> notifications = [];
       final now = DateTime.now();
 
-      if (data is List) {
-        for (final item in data) {
-          notifications.add(IServNotification(
-            id: item['id']?.toString() ?? '',
-            title: item['title'] ?? item['subject'] ?? '',
-            message: item['message'] ?? item['body'] ?? '',
-            type: item['type'],
-            read: item['read'] == true,
-            timestamp: item['date'] != null
-                ? DateTime.parse(item['date'])
-                : now,
-            cachedAt: now,
-          ));
-        }
+      for (final item in data) {
+        notifications.add(IServNotification(
+          id: item['id']?.toString() ?? '',
+          title: item['title'] ?? item['subject'] ?? '',
+          message: item['message'] ?? item['body'] ?? '',
+          type: item['type'],
+          read: item['read'] == true,
+          timestamp: item['date'] != null
+              ? DateTime.parse(item['date'])
+              : now,
+          cachedAt: now,
+        ));
       }
 
       await _cacheNotifications(notifications);
@@ -581,34 +528,45 @@ class IServService {
   }
 
   Future<List<IServExercise>> getExercises() async {
-    if (!isConnected || _dio == null) return [];
+    if (!isConnected || _dio == null) return getCachedExercises();
 
     try {
       final response = await _dio!.get(
         '/iserv/exercise/api/exercises',
+        options: Options(
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          responseType: ResponseType.json,
+        ),
       );
 
-      if (response.statusCode != 200) return [];
+      if (response.statusCode != 200) return getCachedExercises();
 
       final data = response.data;
+
+      if (data is! Map || data['data'] is! List) {
+        if (kDebugMode) print('IServ: Exercises response is not valid, returning cached');
+        return getCachedExercises();
+      }
+
       final List<IServExercise> exercises = [];
       final now = DateTime.now();
 
-      if (data is Map && data['data'] is List) {
-        for (final item in data['data']) {
-          exercises.add(IServExercise(
-            id: item['id']?.toString() ?? '',
-            title: item['title'] ?? '',
-            description: item['description'],
-            course: item['course']?['name'] ?? item['course'],
-            teacher: item['teacher']?['name'] ?? item['teacher'],
-            dueDate: item['endDate'] != null
-                ? DateTime.parse(item['endDate'])
-                : null,
-            status: item['status'] ?? 'open',
-            cachedAt: now,
-          ));
-        }
+      for (final item in data['data']) {
+        exercises.add(IServExercise(
+          id: item['id']?.toString() ?? '',
+          title: item['title'] ?? '',
+          description: item['description'],
+          course: item['course']?['name'] ?? item['course'],
+          teacher: item['teacher']?['name'] ?? item['teacher'],
+          dueDate: item['endDate'] != null
+              ? DateTime.parse(item['endDate'])
+              : null,
+          status: item['status'] ?? 'open',
+          cachedAt: now,
+        ));
       }
 
       await _cacheExercises(exercises);
@@ -620,57 +578,278 @@ class IServService {
     }
   }
 
-  Future<List<IServEvent>> getEvents() async {
-    if (!isConnected || _dio == null) return [];
+  Future<List<IServEvent>> getEvents({int? userGrade}) async {
+    _log('getEvents: isConnected=$isConnected, hasDio=${_dio != null}, baseUrl=$_baseUrl, webView=$_isWebViewSession');
+    if (!isConnected || _dio == null) {
+      _log('getEvents: NOT connected → returning cached');
+      return getCachedEvents();
+    }
 
     try {
       final now = DateTime.now();
-      final start = now.subtract(const Duration(days: 7));
-      final end = now.add(const Duration(days: 30));
+      final start = now.subtract(const Duration(days: 30));
+      final end = now.add(const Duration(days: 90));
 
-      final response = await _dio!.get(
-        '/iserv/calendar/api/events',
-        queryParameters: {
-          'start': start.toIso8601String(),
-          'end': end.toIso8601String(),
-        },
+
+      _log('getEvents: fetching event sources...');
+      final sourcesResponse = await _dio!.get(
+        '/iserv/calendar/api/eventsources',
+        options: Options(
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          responseType: ResponseType.json,
+          validateStatus: (status) => status != null && status < 500,
+        ),
       );
 
-      if (response.statusCode != 200) return [];
+      _log('getEvents: eventsources status=${sourcesResponse.statusCode}, type=${sourcesResponse.headers.value("content-type")}');
+
+      if (sourcesResponse.statusCode != 200) {
+        _log('getEvents: eventsources non-200 → cached');
+        return getCachedEvents();
+      }
+
+      final sourcesData = sourcesResponse.data;
+      List? sourcesList;
+      if (sourcesData is List) {
+        sourcesList = sourcesData;
+      } else if (sourcesData is Map) {
+        sourcesList = sourcesData.values.toList();
+      }
+
+      if (sourcesList == null || sourcesList.isEmpty) {
+        _log('getEvents: no event sources found. Data: ${sourcesData.toString().substring(0, (sourcesData.toString().length).clamp(0, 300))}');
+        return getCachedEvents();
+      }
+
+      _log('getEvents: found ${sourcesList.length} event sources');
+
+      final calendarIds = <String>[];
+      final pluginIds = <String>[];
+      for (final source in sourcesList) {
+        if (source is! Map) continue;
+        final id = source['id']?.toString() ?? '';
+        final type = source['type']?.toString() ?? '';
+        _log('  source: id=$id, type=$type');
+        if (type == 'cal' && id.isNotEmpty) {
+          calendarIds.add(id);
+        } else if (type == 'plugin' && id.isNotEmpty) {
+          pluginIds.add(id);
+        }
+      }
+
+      _log('getEvents: ${calendarIds.length} calendars, ${pluginIds.length} plugins');
+
+      final List<IServEvent> allEvents = [];
+      final startStr = start.toIso8601String();
+      final endStr = end.toIso8601String();
+
+      if (calendarIds.isNotEmpty) {
+        _log('getEvents: trying multi-feed for ${calendarIds.length} calendars...');
+        final multiFeedEvents = await _fetchFromFeed(
+          '/iserv/calendar/feed/calendar-multi',
+          {'start': startStr, 'end': endStr, 'calendars[]': calendarIds},
+          now,
+        );
+
+        if (multiFeedEvents != null) {
+          allEvents.addAll(multiFeedEvents);
+          _log('getEvents: multi-feed → ${multiFeedEvents.length} events');
+        } else {
+          _log('getEvents: multi-feed failed, trying individual feeds...');
+          for (final calId in calendarIds) {
+            final events = await _fetchFromFeed(
+              '/iserv/calendar/feed/calendar',
+              {'start': startStr, 'end': endStr, 'calendar': calId},
+              now,
+            );
+            if (events != null) {
+              allEvents.addAll(events);
+              _log('  calendar $calId → ${events.length} events');
+            }
+          }
+        }
+      }
+
+      if (pluginIds.isNotEmpty) {
+        for (final pluginId in pluginIds) {
+          final events = await _fetchFromFeed(
+            '/iserv/calendar/feed/plugin',
+            {'start': startStr, 'end': endStr, 'plugin': pluginId},
+            now,
+          );
+          if (events != null) {
+            allEvents.addAll(events);
+            _log('  plugin $pluginId → ${events.length} events');
+          }
+        }
+      }
+
+      _log('getEvents: total ${allEvents.length} events (raw)');
+
+      final seen = <String>{};
+      allEvents.removeWhere((e) {
+        final key = '${e.title}|${e.startTime?.toIso8601String()}';
+        if (seen.contains(key)) return true;
+        seen.add(key);
+        return false;
+      });
+      _log('getEvents: ${allEvents.length} after dedup');
+
+      if (userGrade != null) {
+        final before = allEvents.length;
+        final explicitGrade = RegExp(
+          r'(?:JGST\.?\s*|Klasse\s+|Kl\.?\s*)(\d+)',
+          caseSensitive: false,
+        );
+        final classSection = RegExp(r'\b(\d{1,2})[A-Za-z]\b');
+
+        allEvents.removeWhere((e) {
+          final text = '${e.title} ${e.description ?? ''}';
+
+          final explicitMatch = explicitGrade.firstMatch(text);
+          if (explicitMatch != null) {
+            final eventGrade = int.tryParse(explicitMatch.group(1)!);
+            return eventGrade != null && eventGrade != userGrade;
+          }
+
+          final sectionMatch = classSection.firstMatch(text);
+          if (sectionMatch != null) {
+            final eventGrade = int.tryParse(sectionMatch.group(1)!);
+            if (eventGrade != null && eventGrade >= 5 && eventGrade <= 13 && eventGrade != userGrade) {
+              return true;
+            }
+          }
+
+          return false;
+        });
+        _log('getEvents: ${allEvents.length} after grade filter (was $before, grade=$userGrade)');
+      }
+
+      if (allEvents.isNotEmpty) {
+        await _cacheEvents(allEvents);
+      }
+
+      return allEvents;
+    } catch (e) {
+      _log('getEvents: EXCEPTION: $e');
+      return getCachedEvents();
+    }
+  }
+
+  Future<List<IServEvent>?> _fetchFromFeed(
+    String endpoint, Map<String, dynamic> params, DateTime now,
+  ) async {
+    try {
+      final response = await _dio!.get(
+        endpoint,
+        queryParameters: params,
+        options: Options(
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          responseType: ResponseType.json,
+          validateStatus: (status) => status != null && status < 500,
+        ),
+      );
+
+      _log('  feed $endpoint → status=${response.statusCode}');
+
+      if (response.statusCode != 200) return null;
 
       final data = response.data;
       final List<IServEvent> events = [];
 
       if (data is List) {
         for (final item in data) {
-          events.add(IServEvent(
-            id: item['id']?.toString() ?? '',
-            title: item['title'] ?? '',
-            startTime: item['start'] != null
-                ? DateTime.parse(item['start'])
-                : null,
-            endTime: item['end'] != null
-                ? DateTime.parse(item['end'])
-                : null,
-            location: item['location'],
-            description: item['description'],
-            calendar: item['calendar'],
-            allDay: item['allDay'] == true,
-            cachedAt: now,
-          ));
+          final e = _parseIServEvent(item, now);
+          if (e != null) events.add(e);
+        }
+      } else if (data is Map) {
+        for (final entry in data.entries) {
+          final key = entry.key.toString();
+          final value = entry.value;
+          if (value is List) {
+            for (final item in value) {
+              final e = _parseIServEvent(item, now);
+              if (e != null) events.add(e);
+            }
+          } else if (value is Map && value.containsKey('error')) {
+            _log('  feed source $key: error=${value['error']}');
+          }
         }
       }
 
-      await _cacheEvents(events);
-
-      return events;
+      return events.isEmpty && data is! List && data is! Map ? null : events;
     } catch (e) {
-
-      return getCachedEvents();
+      _log('  feed $endpoint → EXCEPTION: $e');
+      return null;
     }
   }
 
+  IServEvent? _parseIServEvent(dynamic item, DateTime now) {
+    if (item is! Map) return null;
+    final title = item['title'] ?? item['summary'] ?? item['subject'] ?? '';
+    final startRaw = item['start'];
+    final endRaw = item['end'];
+    final startTime = _parseEventDateTime(startRaw);
+    var endTime = _parseEventDateTime(endRaw);
+
+    bool allDay = item['allDay'] == true || item['allday'] == true;
+    if (!allDay && startRaw is String && !startRaw.contains('T')) {
+      allDay = true;
+    }
+
+    if (allDay && endTime != null && startTime != null) {
+      endTime = endTime.subtract(const Duration(days: 1));
+      if (endTime.isBefore(startTime)) {
+        endTime = startTime;
+      }
+    }
+
+    if (_apiLog.length < 4000) {
+      _log('  event: "$title" raw=$startRaw→$endRaw parsed=$startTime→$endTime allDay=$allDay');
+    }
+    return IServEvent(
+      id: item['id']?.toString() ?? item['uid']?.toString() ?? '',
+      title: title,
+      startTime: startTime,
+      endTime: endTime,
+      location: item['location'],
+      description: item['description'],
+      calendar: item['calendar'] ?? item['calendarId'] ?? item['calendarName'],
+      allDay: allDay,
+      cachedAt: now,
+    );
+  }
+
+  DateTime? _parseEventDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is String) {
+      final dt = DateTime.tryParse(value);
+      if (dt == null) return null;
+      return dt.isUtc ? dt.toLocal() : dt;
+    }
+    if (value is Map) {
+      final dateStr = value['dateTime'] ?? value['date'] ?? value['start'];
+      if (dateStr is String) {
+        final dt = DateTime.tryParse(dateStr);
+        if (dt == null) return null;
+        return dt.isUtc ? dt.toLocal() : dt;
+      }
+    }
+    return null;
+  }
+
+  final String _discoveryLog = '';
+  String get discoveryLog => kDebugMode ? _discoveryLog : '';
+
   Future<void> _cacheNotifications(List<IServNotification> notifications) async {
+    if (notifications.isEmpty) return;
+
     final db = await _db.database;
     final batch = db.batch();
 
@@ -684,6 +863,8 @@ class IServService {
   }
 
   Future<void> _cacheExercises(List<IServExercise> exercises) async {
+    if (exercises.isEmpty) return;
+
     final db = await _db.database;
     final batch = db.batch();
 
@@ -697,13 +878,16 @@ class IServService {
   }
 
   Future<void> _cacheEvents(List<IServEvent> events) async {
+    if (events.isEmpty) return;
+
     final db = await _db.database;
     final batch = db.batch();
 
     batch.delete('iserv_events');
 
     for (final event in events) {
-      batch.insert('iserv_events', event.toMap());
+      batch.insert('iserv_events', event.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace);
     }
 
     await batch.commit(noResult: true);
@@ -740,9 +924,6 @@ class IServService {
     ]);
   }
 
-  /// Fetch Vertretungsplan using authenticated IServ session (like macOS version)
-  /// Downloads PDF/image files from infodisplay
-  /// Returns: {success: bool, files: List<Map>?, isFromCache: bool, error: String?}
   Future<Map<String, dynamic>> fetchVertretungsplan({int displayId = 3}) async {
     if (_dio == null || _baseUrl == null) {
       final reconnected = await autoReconnect();
@@ -758,12 +939,12 @@ class IServService {
 
       if (_cookieJar != null) {
         final cookies = await _cookieJar!.loadForRequest(Uri.parse(showUrl));
-        print('IServ Vertretungsplan: Found ${cookies.length} cookies for $showUrl');
+        if (kDebugMode) print('IServ Vertretungsplan: Found ${cookies.length} cookies for $showUrl');
         for (final c in cookies) {
-          print('  Cookie: ${c.name} domain=${c.domain} path=${c.path}');
+          if (kDebugMode) print('  Cookie: ${c.name} domain=${c.domain} path=${c.path}');
         }
       } else {
-        print('IServ Vertretungsplan: WARNING - No cookie jar available!');
+        if (kDebugMode) print('IServ Vertretungsplan: WARNING - No cookie jar available!');
       }
 
       final htmlResponse = await _dio!.get(
@@ -831,7 +1012,7 @@ class IServService {
             urlsToTry.add('$_baseUrl/iserv/infodisplay/file/$displayId/$i');
           }
 
-          print('IServ Vertretungsplan: Found ${urlsToTry.length} infodisplay URLs to try');
+          if (kDebugMode) print('IServ Vertretungsplan: Found ${urlsToTry.length} infodisplay URLs to try');
 
           for (final url in urlsToTry) {
             if (files.length >= 6) break;
@@ -900,7 +1081,6 @@ class IServService {
     }
   }
 
-  /// Resolve relative URLs to absolute URLs
   String _resolveUrl(String url) {
     if (url.startsWith('http://') || url.startsWith('https://')) {
       return url;

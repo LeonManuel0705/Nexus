@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../models/drawing.dart';
@@ -190,11 +189,15 @@ class DrawingProvider extends ChangeNotifier {
       updatedAt: now,
     );
 
-    await _db.insertDrawing(drawing);
-    _drawings.insert(0, drawing);
-    notifyListeners();
-
-    return drawing;
+    try {
+      await _db.insertDrawing(drawing);
+      _drawings.insert(0, drawing);
+      notifyListeners();
+      return drawing;
+    } catch (e) {
+      debugPrint('Error saving drawing: $e');
+      return null;
+    }
   }
 
   Future<void> updateDrawing(String id, Uint8List imageData) async {
@@ -207,15 +210,23 @@ class DrawingProvider extends ChangeNotifier {
       updatedAt: DateTime.now(),
     );
 
-    await _db.updateDrawing(updated);
-    _drawings[index] = updated;
-    notifyListeners();
+    try {
+      await _db.updateDrawing(updated);
+      _drawings[index] = updated;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error updating drawing: $e');
+    }
   }
 
   Future<void> deleteDrawing(String id) async {
-    await _db.deleteDrawing(id);
-    _drawings.removeWhere((d) => d.id == id);
-    notifyListeners();
+    try {
+      await _db.deleteDrawing(id);
+      _drawings.removeWhere((d) => d.id == id);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error deleting drawing: $e');
+    }
   }
 
   Future<void> loadDrawingForEdit(Drawing drawing) async {

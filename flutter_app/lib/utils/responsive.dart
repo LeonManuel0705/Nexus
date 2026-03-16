@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
 
-/// Responsive breakpoints for different device sizes
 class ResponsiveBreakpoints {
   static const double phone = 600;
   static const double tablet = 900;
   static const double desktop = 1200;
+  static const double sidebar = 768;
 }
 
-/// Device type enum
 enum DeviceType { phone, tablet, desktop }
 
-/// Helper class for responsive design
 class Responsive {
-  /// Get the device type based on screen width
+
   static DeviceType getDeviceType(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     if (width < ResponsiveBreakpoints.phone) {
@@ -24,28 +22,23 @@ class Responsive {
     }
   }
 
-  /// Check if device is a phone
   static bool isPhone(BuildContext context) {
     return MediaQuery.of(context).size.width < ResponsiveBreakpoints.phone;
   }
 
-  /// Check if device is a tablet
   static bool isTablet(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     return width >= ResponsiveBreakpoints.phone && width < ResponsiveBreakpoints.desktop;
   }
 
-  /// Check if device is desktop-sized
   static bool isDesktop(BuildContext context) {
     return MediaQuery.of(context).size.width >= ResponsiveBreakpoints.desktop;
   }
 
-  /// Check if device should use tablet/desktop layout (not phone)
   static bool useTabletLayout(BuildContext context) {
-    return MediaQuery.of(context).size.width >= ResponsiveBreakpoints.phone;
+    return MediaQuery.of(context).size.width >= ResponsiveBreakpoints.sidebar;
   }
 
-  /// Get sidebar width for tablet/desktop
   static double getSidebarWidth(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     if (width >= ResponsiveBreakpoints.desktop) {
@@ -57,7 +50,6 @@ class Responsive {
     }
   }
 
-  /// Get number of grid columns based on screen width
   static int getGridColumns(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     if (width >= ResponsiveBreakpoints.desktop) {
@@ -70,7 +62,6 @@ class Responsive {
     return 1;
   }
 
-  /// Get content padding based on device type
   static EdgeInsets getContentPadding(BuildContext context) {
     final deviceType = getDeviceType(context);
     switch (deviceType) {
@@ -84,7 +75,6 @@ class Responsive {
   }
 }
 
-/// Widget that builds different layouts for phone/tablet
 class ResponsiveBuilder extends StatelessWidget {
   final Widget phone;
   final Widget? tablet;

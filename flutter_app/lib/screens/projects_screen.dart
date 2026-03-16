@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/database_service.dart' if (dart.library.html) '../services/database_service_web.dart';
 import '../theme.dart';
+import '../widgets/animated_list_item.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/page_fade_in.dart';
 
 class ProjectsScreen extends StatefulWidget {
   const ProjectsScreen({super.key});
@@ -49,7 +52,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> with SingleTickerProvid
       final maps = await _db.getProjectsList();
       _allProjects = maps.map((m) => Project.fromMap(m)).toList();
     } catch (e) {
-      _error = 'Fehler beim Laden: $e';
+      _error = 'Fehler beim Laden der Projekte.';
     } finally {
       setState(() => _isLoading = false);
     }
@@ -97,50 +100,55 @@ class _ProjectsScreenState extends State<ProjectsScreen> with SingleTickerProvid
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Stack(
-      children: [
-        Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: _buildHeader(isDark),
-            ),
+    return PageFadeIn(
+      child: Stack(
+        children: [
+          Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: _buildHeader(isDark),
+              ),
 
-            _buildFilterTabs(isDark),
+              _buildFilterTabs(isDark),
 
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                      ? Center(child: Text(_error!, style: TextStyle(color: NexusTheme.danger)))
-                      : RefreshIndicator(
-                          onRefresh: _loadProjects,
-                          child: _filteredProjects.isEmpty
-                              ? _buildEmptyState(isDark)
-                              : ListView.builder(
-                                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                                  itemCount: _filteredProjects.length,
-                                  itemBuilder: (context, index) => _buildProjectCard(
-                                    _filteredProjects[index],
-                                    isDark,
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _error != null
+                        ? Center(child: Text(_error!, style: const TextStyle(color: NexusTheme.danger)))
+                        : RefreshIndicator(
+                            onRefresh: _loadProjects,
+                            child: _filteredProjects.isEmpty
+                                ? _buildEmptyState(isDark)
+                                : ListView.builder(
+                                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                                    itemCount: _filteredProjects.length,
+                                    itemBuilder: (context, index) => AnimatedListItem(
+                                      index: index,
+                                      child: _buildProjectCard(
+                                        _filteredProjects[index],
+                                        isDark,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                        ),
-            ),
-          ],
-        ),
-
-        Positioned(
-          right: 16,
-          bottom: 16,
-          child: FloatingActionButton(
-            heroTag: 'fab_projects',
-            onPressed: () => _showProjectEditor(null),
-            backgroundColor: NexusTheme.projectsColor,
-            child: const Icon(Icons.add, color: Colors.white),
+                          ),
+              ),
+            ],
           ),
-        ),
-      ],
+
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: FloatingActionButton(
+              heroTag: 'fab_projects',
+              onPressed: () => _showProjectEditor(null),
+              backgroundColor: NexusTheme.projectsColor,
+              child: const Icon(Icons.add, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -151,22 +159,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> with SingleTickerProvid
         ? 0
         : (_allProjects.fold<int>(0, (sum, p) => sum + p.progress) / _allProjects.length).round();
 
-    return Container(
+    return GlassCard(
+      borderRadius: 20,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            NexusTheme.projectsColor.withOpacity(isDark ? 0.3 : 0.15),
-            NexusTheme.projectsColor.withOpacity(isDark ? 0.1 : 0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: NexusTheme.projectsColor.withOpacity(0.3),
-        ),
-      ),
       child: Column(
         children: [
           Row(
@@ -174,24 +169,17 @@ class _ProjectsScreenState extends State<ProjectsScreen> with SingleTickerProvid
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: NexusTheme.projectsColor.withOpacity(0.2),
+                  color: NexusTheme.projectsColor.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.folder, color: NexusTheme.projectsColor, size: 28),
+                child: const Icon(Icons.folder, color: NexusTheme.projectsColor, size: 28),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Projekte',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : NexusTheme.lightText,
-                      ),
-                    ),
+                    NexusTheme.gradientText('Projekte', fontSize: 36),
                     Text(
                       'Verwalte deine Projekte und Ziele',
                       style: TextStyle(
@@ -224,7 +212,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> with SingleTickerProvid
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
-          color: color.withOpacity(isDark ? 0.15 : 0.1),
+          color: color.withValues(alpha: isDark ? 0.15 : 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -251,38 +239,65 @@ class _ProjectsScreenState extends State<ProjectsScreen> with SingleTickerProvid
   }
 
   Widget _buildFilterTabs(bool isDark) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: TabBar(
-        controller: _tabController,
-        indicator: BoxDecoration(
-          gradient: const LinearGradient(colors: NexusTheme.primaryGradient),
-          borderRadius: BorderRadius.circular(10),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: GlassCard(
+        borderRadius: 9999,
+        padding: const EdgeInsets.all(4),
+        hasShadow: false,
+        enableTapScale: false,
+        child: Row(
+          children: _statusFilters.asMap().entries.map((entry) {
+            final index = entry.key;
+            final filter = entry.value;
+            final isSelected = _tabController.index == index;
+            final count = _countByStatus(filter.$1);
+
+            return Expanded(
+              flex: isSelected ? 3 : 1,
+              child: GestureDetector(
+                onTap: () => _tabController.animateTo(index),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isSelected ? 12 : 8,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFF4F46E5) : null,
+                    borderRadius: BorderRadius.circular(9999),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        filter.$3,
+                        size: 18,
+                        color: isSelected
+                            ? Colors.white
+                            : (isDark ? Colors.white54 : Colors.black54),
+                      ),
+                      if (isSelected) ...[
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            '${filter.$2} ($count)',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
         ),
-        indicatorSize: TabBarIndicatorSize.tab,
-        indicatorPadding: const EdgeInsets.all(4),
-        dividerColor: Colors.transparent,
-        labelColor: Colors.white,
-        unselectedLabelColor: isDark ? Colors.white54 : Colors.black54,
-        labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
-        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 12),
-        tabs: _statusFilters.map((f) {
-          final count = _countByStatus(f.$1);
-          return Tab(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(f.$3, size: 16),
-                const SizedBox(width: 4),
-                Text('${f.$2} ($count)'),
-              ],
-            ),
-          );
-        }).toList(),
       ),
     );
   }
@@ -327,186 +342,187 @@ class _ProjectsScreenState extends State<ProjectsScreen> with SingleTickerProvid
             ? NexusTheme.projectsColor
             : NexusTheme.warning;
 
-    return GestureDetector(
+    // Gradient colors for the progress bar
+    final progressGradient = project.progress >= 100
+        ? [NexusTheme.success, NexusTheme.success.withValues(alpha: 0.7)]
+        : project.progress >= 50
+            ? [NexusTheme.projectsColor, const Color(0xFF7C3AED)]
+            : [NexusTheme.warning, NexusTheme.warning.withValues(alpha: 0.7)];
+
+    return GlassCard(
+      margin: const EdgeInsets.only(bottom: 12),
+      borderRadius: 16,
+      padding: const EdgeInsets.all(16),
       onTap: () => _showProjectEditor(project),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              statusColor.withOpacity(isDark ? 0.15 : 0.08),
-              statusColor.withOpacity(isDark ? 0.05 : 0.02),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.folder, color: statusColor),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      project.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        color: isDark ? Colors.white : NexusTheme.lightText,
+                      ),
+                    ),
+                    if (project.goal != null && project.goal!.isNotEmpty)
+                      Text(
+                        project.goal!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? Colors.white60 : Colors.black54,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(_getStatusIcon(project.status), size: 14, color: statusColor),
+                    const SizedBox(width: 4),
+                    Text(
+                      _getStatusLabel(project.status),
+                      style: TextStyle(
+                        color: statusColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: statusColor.withOpacity(0.2),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: statusColor.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 16),
+          Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(Icons.folder, color: statusColor),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          project.name,
+                          'Fortschritt',
                           style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                            color: isDark ? Colors.white : NexusTheme.lightText,
+                            fontSize: 12,
+                            color: isDark ? Colors.white54 : Colors.black54,
                           ),
                         ),
-                        if (project.goal != null && project.goal!.isNotEmpty)
-                          Text(
-                            project.goal!,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: isDark ? Colors.white60 : Colors.black54,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(_getStatusIcon(project.status), size: 14, color: statusColor),
-                        const SizedBox(width: 4),
                         Text(
-                          _getStatusLabel(project.status),
+                          '${project.progress}%',
                           style: TextStyle(
-                            color: statusColor,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 11,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: progressColor,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: SizedBox(
+                        height: 8,
+                        child: Stack(
                           children: [
-                            Text(
-                              'Fortschritt',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isDark ? Colors.white54 : Colors.black54,
+                            Container(
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.1)
+                                    : Colors.black.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
                               ),
                             ),
-                            Text(
-                              '${project.progress}%',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: progressColor,
+                            FractionallySizedBox(
+                              widthFactor: (project.progress / 100).clamp(0.0, 1.0),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(colors: progressGradient),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: project.progress / 100,
-                            backgroundColor: isDark
-                                ? Colors.white.withOpacity(0.1)
-                                : Colors.black.withOpacity(0.1),
-                            valueColor: AlwaysStoppedAnimation(progressColor),
-                            minHeight: 8,
-                          ),
-                        ),
-                      ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (project.nextStep != null && project.nextStep!.isNotEmpty || project.deadline != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (project.nextStep != null && project.nextStep!.isNotEmpty) ...[
+                  const Icon(Icons.arrow_forward, size: 14, color: NexusTheme.primaryColor),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      project.nextStep!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: NexusTheme.primaryColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
-              ),
-              if (project.nextStep != null && project.nextStep!.isNotEmpty || project.deadline != null) ...[
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    if (project.nextStep != null && project.nextStep!.isNotEmpty) ...[
-                      Icon(Icons.arrow_forward, size: 14, color: NexusTheme.primaryColor),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          project.nextStep!,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: NexusTheme.primaryColor,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                    if (project.deadline != null) ...[
-                      const SizedBox(width: 8),
-                      Icon(
-                        Icons.event,
-                        size: 14,
-                        color: project.deadline!.isBefore(DateTime.now())
-                            ? NexusTheme.danger
-                            : (isDark ? Colors.white54 : Colors.black54),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        DateFormat('d. MMM', 'de_DE').format(project.deadline!),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: project.deadline!.isBefore(DateTime.now())
-                              ? NexusTheme.danger
-                              : (isDark ? Colors.white54 : Colors.black54),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+                if (project.deadline != null) ...[
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.event,
+                    size: 14,
+                    color: project.deadline!.isBefore(DateTime.now())
+                        ? NexusTheme.danger
+                        : (isDark ? Colors.white54 : Colors.black54),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    DateFormat('d. MMM', 'de_DE').format(project.deadline!),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: project.deadline!.isBefore(DateTime.now())
+                          ? NexusTheme.danger
+                          : (isDark ? Colors.white54 : Colors.black54),
+                    ),
+                  ),
+                ],
               ],
-            ],
-          ),
-        ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -607,7 +623,7 @@ class _ProjectEditorScreenState extends State<_ProjectEditorScreen> {
         actions: [
           if (isEditing && widget.onDelete != null)
             IconButton(
-              icon: Icon(Icons.delete_outline, color: NexusTheme.danger),
+              icon: const Icon(Icons.delete_outline, color: NexusTheme.danger),
               onPressed: _confirmDelete,
             ),
           Padding(
@@ -666,7 +682,7 @@ class _ProjectEditorScreenState extends State<_ProjectEditorScreen> {
                         margin: const EdgeInsets.only(right: 12),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
-                          color: isSelected ? opt.$4.withOpacity(0.2) : (isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1)),
+                          color: isSelected ? opt.$4.withValues(alpha: 0.2) : (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.withValues(alpha: 0.1)),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: isSelected ? opt.$4 : Colors.transparent,
@@ -711,7 +727,7 @@ class _ProjectEditorScreenState extends State<_ProjectEditorScreen> {
                           : _progress >= 50
                               ? NexusTheme.projectsColor
                               : NexusTheme.warning,
-                      overlayColor: NexusTheme.projectsColor.withOpacity(0.2),
+                      overlayColor: NexusTheme.projectsColor.withValues(alpha: 0.2),
                       trackHeight: 8,
                     ),
                     child: Slider(
@@ -732,8 +748,8 @@ class _ProjectEditorScreenState extends State<_ProjectEditorScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? NexusTheme.projectsColor.withOpacity(0.2)
-                                : (isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1)),
+                                ? NexusTheme.projectsColor.withValues(alpha: 0.2)
+                                : (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.withValues(alpha: 0.1)),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
                               color: isSelected ? NexusTheme.projectsColor : Colors.transparent,
@@ -762,7 +778,7 @@ class _ProjectEditorScreenState extends State<_ProjectEditorScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1),
+                    color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -785,7 +801,7 @@ class _ProjectEditorScreenState extends State<_ProjectEditorScreen> {
                       const Spacer(),
                       if (_deadline != null)
                         IconButton(
-                          icon: Icon(Icons.clear, color: NexusTheme.danger),
+                          icon: const Icon(Icons.clear, color: NexusTheme.danger),
                           onPressed: () => setState(() => _deadline = null),
                         ),
                     ],
@@ -847,7 +863,7 @@ class _ProjectEditorScreenState extends State<_ProjectEditorScreen> {
     return InputDecoration(
       hintText: hint,
       filled: true,
-      fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1),
+      fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.withValues(alpha: 0.1),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
@@ -860,7 +876,7 @@ class _ProjectEditorScreenState extends State<_ProjectEditorScreen> {
     final picked = await showDatePicker(
       context: context,
       initialDate: _deadline ?? DateTime.now().add(const Duration(days: 7)),
-      firstDate: DateTime.now(),
+      firstDate: DateTime(2020),
       lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
     );
     if (picked != null) {
@@ -895,9 +911,10 @@ class _ProjectEditorScreenState extends State<_ProjectEditorScreen> {
       await widget.onSave(project);
       if (mounted) Navigator.pop(context);
     } catch (e) {
+      debugPrint('Error saving project: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Fehler: $e'), backgroundColor: NexusTheme.danger),
+          const SnackBar(content: Text('Ein Fehler ist aufgetreten. Bitte versuche es erneut.'), backgroundColor: NexusTheme.danger),
         );
       }
     } finally {
@@ -920,7 +937,7 @@ class _ProjectEditorScreenState extends State<_ProjectEditorScreen> {
             onPressed: () async {
               Navigator.pop(context);
               await widget.onDelete?.call();
-              if (mounted) Navigator.pop(context);
+              if (context.mounted) Navigator.pop(context);
             },
             style: FilledButton.styleFrom(backgroundColor: NexusTheme.danger),
             child: const Text('Löschen'),

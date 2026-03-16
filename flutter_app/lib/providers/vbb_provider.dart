@@ -13,6 +13,9 @@ class VbbProvider extends ChangeNotifier {
   List<VbbFavoriteRoute> _favoriteRoutes = [];
   List<VbbFavoriteRoute> get favoriteRoutes => _favoriteRoutes;
 
+  List<VbbTicket> _tickets = [];
+  List<VbbTicket> get tickets => _tickets;
+
   List<VbbLocation> _searchResults = [];
   List<VbbLocation> get searchResults => _searchResults;
 
@@ -44,7 +47,10 @@ class VbbProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
 
   String? _error;
-  String? get error => _error;
+  String? get error => _routeError ?? _error;
+
+  // Separate route error that doesn't get cleared by location search
+  String? _routeError;
 
   bool get isOnline => _connectivity.isOnline.value;
 
@@ -62,8 +68,11 @@ class VbbProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Clear old caches that might have stale IDs
+      await _service.clearOldCache();
       _knownLocations = await _service.getKnownLocations();
       _favoriteRoutes = await _service.getFavoriteRoutes();
+      _tickets = await _service.getTickets();
     } catch (e) {
       _error = 'Fehler beim Laden der Daten';
     } finally {
@@ -91,7 +100,9 @@ class VbbProvider extends ChangeNotifier {
       _searchResults = await _service.searchLocations(query);
       _error = null;
     } catch (e) {
-      _error = 'Suche fehlgeschlagen';
+      _searchResults = [];
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      _error = msg;
     } finally {
       _isSearching = false;
       notifyListeners();
@@ -106,12 +117,14 @@ class VbbProvider extends ChangeNotifier {
   void setFromLocation(VbbLocation? location) {
     _fromLocation = location;
     _journeys = [];
+    _hasSearched = false;
     notifyListeners();
   }
 
   void setToLocation(VbbLocation? location) {
     _toLocation = location;
     _journeys = [];
+    _hasSearched = false;
     notifyListeners();
   }
 
@@ -120,8 +133,13 @@ class VbbProvider extends ChangeNotifier {
     _fromLocation = _toLocation;
     _toLocation = temp;
     _journeys = [];
+    _hasSearched = false;
     notifyListeners();
   }
+
+  // Track whether a search has been performed
+  bool _hasSearched = false;
+  bool get hasSearched => _hasSearched;
 
   Future<void> searchRoutes({DateTime? departure}) async {
     if (_fromLocation == null || _toLocation == null) {
@@ -131,7 +149,9 @@ class VbbProvider extends ChangeNotifier {
     }
 
     _isLoadingRoutes = true;
+    _routeError = null;
     _error = null;
+    _hasSearched = true;
     notifyListeners();
 
     try {
@@ -141,11 +161,14 @@ class VbbProvider extends ChangeNotifier {
         departure: departure,
       );
 
-      if (_journeys.isEmpty && !isOnline) {
-        _error = 'Keine Verbindung. Bitte prüfe deine Internetverbindung.';
+      if (_journeys.isEmpty) {
+        _routeError = 'Keine Verbindungen für diese Strecke gefunden';
       }
     } catch (e) {
-      _error = 'Routensuche fehlgeschlagen';
+      _journeys = [];
+      final raw = e.toString();
+      final msg = raw.replaceFirst('Exception: ', '');
+      _routeError = msg;
     } finally {
       _isLoadingRoutes = false;
       notifyListeners();
@@ -154,6 +177,7 @@ class VbbProvider extends ChangeNotifier {
 
   void clearRoutes() {
     _journeys = [];
+    _routeError = null;
     notifyListeners();
   }
 
@@ -172,12 +196,10 @@ class VbbProvider extends ChangeNotifier {
 
     try {
       _departures = await _service.getDepartures(_selectedStation!.id);
-
-      if (_departures.isEmpty && !isOnline) {
-        _error = 'Keine Verbindung. Bitte prüfe deine Internetverbindung.';
-      }
     } catch (e) {
-      _error = 'Abfahrten konnten nicht geladen werden';
+      _departures = [];
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      _error = msg;
     } finally {
       _isLoadingDepartures = false;
       notifyListeners();
@@ -284,8 +306,60 @@ class VbbProvider extends ChangeNotifier {
     }
   }
 
+  // Pending destination from calendar "Route planen"
+  String? _pendingDestination;
+  String? get pendingDestination => _pendingDestination;
+
+  void setPendingDestination(String destination) {
+    _pendingDestination = destination;
+    notifyListeners();
+  }
+
+  void clearPendingDestination() {
+    _pendingDestination = null;
+    notifyListeners();
+  }
+
+  // Ticket management
+  Future<void> loadTickets() async {
+    _tickets = await _service.getTickets();
+    notifyListeners();
+  }
+
+  Future<void> addTicket({
+    required String ticketType,
+    required String ticketName,
+    required String zoneCoverage,
+    DateTime? validFrom,
+    DateTime? validUntil,
+    bool autoRenews = false,
+  }) async {
+    try {
+      final ticket = await _service.addTicket(
+        ticketType: ticketType,
+        ticketName: ticketName,
+        zoneCoverage: zoneCoverage,
+        validFrom: validFrom,
+        validUntil: validUntil,
+        autoRenews: autoRenews,
+      );
+      _tickets.insert(0, ticket);
+      notifyListeners();
+    } catch (e) {
+      _error = 'Fehler beim Speichern des Tickets';
+      notifyListeners();
+    }
+  }
+
+  Future<void> removeTicket(String id) async {
+    await _service.removeTicket(id);
+    _tickets.removeWhere((t) => t.id == id);
+    notifyListeners();
+  }
+
   void clearError() {
     _error = null;
+    _routeError = null;
     notifyListeners();
   }
 }

@@ -107,34 +107,33 @@ class EmailProvider extends ChangeNotifier {
     }
   }
 
-  void selectAccount(EmailAccount account) {
+  Future<void> selectAccount(EmailAccount account) async {
     _selectedAccount = account;
     _selectedFolder = null;
     _emails = [];
     _selectedEmail = null;
     notifyListeners();
-    loadFolders().then((_) {
-      if (_folders.isNotEmpty) {
-        _selectedFolder = inboxFolder ?? _folders.first;
-        loadEmails();
-      }
-    });
+    await loadFolders();
+    if (_folders.isNotEmpty) {
+      _selectedFolder = inboxFolder ?? _folders.first;
+      await loadEmails();
+    }
   }
 
-  void selectFolder(EmailFolder folder) {
+  Future<void> selectFolder(EmailFolder folder) async {
     _selectedFolder = folder;
     _emails = [];
     _selectedEmail = null;
     notifyListeners();
-    loadEmails();
+    await loadEmails();
   }
 
-  void selectEmail(Email email) {
+  Future<void> selectEmail(Email email) async {
     _selectedEmail = email;
     notifyListeners();
 
     if (!email.isRead) {
-      markAsRead(email.id);
+      await markAsRead(email.id);
     }
   }
 
@@ -184,7 +183,8 @@ class EmailProvider extends ChangeNotifier {
 
       return true;
     } catch (e) {
-      _error = 'Fehler beim Hinzufügen des Kontos: $e';
+      debugPrint('Error adding account: $e');
+      _error = 'Fehler beim Hinzufügen des Kontos. Bitte versuche es erneut.';
       return false;
     } finally {
       _isLoading = false;
@@ -223,7 +223,8 @@ class EmailProvider extends ChangeNotifier {
       await loadFolders();
       await loadEmails();
     } catch (e) {
-      _error = 'Sync fehlgeschlagen: $e';
+      debugPrint('Email sync error: $e');
+      _error = 'E-Mail-Sync fehlgeschlagen. Bitte versuche es erneut.';
     } finally {
       _isSyncing = false;
       notifyListeners();
@@ -312,7 +313,8 @@ class EmailProvider extends ChangeNotifier {
     try {
       return await _service.sendEmail(draft);
     } catch (e) {
-      _error = 'Fehler beim Senden: $e';
+      debugPrint('Error sending email: $e');
+      _error = 'Fehler beim Senden. Bitte versuche es erneut.';
       notifyListeners();
       return false;
     }

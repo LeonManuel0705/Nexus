@@ -3,31 +3,46 @@ const NexusConnection = {
     state: {
         internetAvailable: null,
         iservAvailable: null,
-        isSchoolNetwork: false,
         lastCheck: null,
         checkInProgress: false
     },
 
-    SCHOOL_WIFI_NAME: 'WERDER-EHG',
     CACHE_KEY: 'nexus_connection_state',
     SESSION_KEY: 'nexus_session_started',
     CACHE_DURATION: 60000,
     PING_TIMEOUT: 500,
+    INTERNET_TIMEOUT: 1500,
 
     async init() {
 
         this.loadCachedState();
 
+        // Fast path: if browser says offline, skip all network probes
+        if (!navigator.onLine) {
+            this.state.internetAvailable = false;
+            this.state.iservAvailable = false;
+            this.saveState();
+            window.dispatchEvent(new CustomEvent('nexus-connection-ready', {
+                detail: this.state
+            }));
+            return this.state;
+        }
+
         const isInitialLoad = !sessionStorage.getItem(this.SESSION_KEY);
 
         if (isInitialLoad || !this.state.lastCheck) {
             sessionStorage.setItem(this.SESSION_KEY, 'true');
-            await this.checkConnectivity();
+            // Run connectivity check in background — don't block page render
+            this.checkConnectivity().then(() => {
+                window.dispatchEvent(new CustomEvent('nexus-connection-ready', {
+                    detail: this.state
+                }));
+            });
+        } else {
+            window.dispatchEvent(new CustomEvent('nexus-connection-ready', {
+                detail: this.state
+            }));
         }
-
-        window.dispatchEvent(new CustomEvent('nexus-connection-ready', {
-            detail: this.state
-        }));
 
         return this.state;
     },
@@ -63,6 +78,12 @@ const NexusConnection = {
         this.state.checkInProgress = true;
 
         try {
+            if (!navigator.onLine) {
+                this.state.internetAvailable = false;
+                this.state.iservAvailable = false;
+                this.saveState();
+                return this.state;
+            }
 
             const [internet, iserv] = await Promise.allSettled([
                 this.checkInternet(),
@@ -71,8 +92,6 @@ const NexusConnection = {
 
             this.state.internetAvailable = internet.status === 'fulfilled' && internet.value;
             this.state.iservAvailable = iserv.status === 'fulfilled' && iserv.value;
-
-            this.state.isSchoolNetwork = this.state.iservAvailable && !this.state.internetAvailable;
 
             this.saveState();
         } catch (e) {
@@ -86,16 +105,17 @@ const NexusConnection = {
 
     async checkInternet() {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), this.PING_TIMEOUT);
+        const timeoutId = setTimeout(() => controller.abort(), this.INTERNET_TIMEOUT);
 
         try {
-            const response = await fetch('/api/ping', {
+            await fetch('https://connectivitycheck.gstatic.com/generate_204', {
                 method: 'HEAD',
+                mode: 'no-cors',
                 signal: controller.signal,
                 cache: 'no-store'
             });
             clearTimeout(timeoutId);
-            return response.ok;
+            return true;
         } catch {
             clearTimeout(timeoutId);
             return false;
@@ -121,19 +141,16 @@ const NexusConnection = {
     },
 
     shouldCallExternalAPI() {
-        return this.state.internetAvailable === true && !this.state.isSchoolNetwork;
+        return this.state.internetAvailable === true;
     },
 
     shouldCallIServ() {
         return this.state.iservAvailable === true;
     },
 
-    isOnSchoolNetwork() {
-        return this.state.isSchoolNetwork;
-    },
-
     isOffline() {
-        return !this.state.internetAvailable && !this.state.iservAvailable;
+        if (navigator.onLine) return false;
+        return true;
     },
 
     async refresh() {
@@ -144,8 +161,6 @@ const NexusConnection = {
     getStatusText() {
         if (this.isOffline()) {
             return 'Offline';
-        } else if (this.state.isSchoolNetwork) {
-            return 'Schulnetzwerk (nur IServ)';
         } else if (this.state.internetAvailable) {
             return 'Online';
         }

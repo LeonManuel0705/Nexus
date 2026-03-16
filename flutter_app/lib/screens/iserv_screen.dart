@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../providers/iserv_provider.dart';
 import '../models/iserv.dart';
 import '../theme.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/iserv_webview_login.dart';
 
 class IServScreen extends StatefulWidget {
   const IServScreen({super.key});
@@ -34,161 +36,226 @@ class _IServScreenState extends State<IServScreen> with SingleTickerProviderStat
     final urlController = TextEditingController();
     final usernameController = TextEditingController();
     final passwordController = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showDialog(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setState) {
-          bool isLoading = false;
-          String? errorMessage;
-
-          return AlertDialog(
-            backgroundColor: NexusTheme.darkCard,
-            title: const Text('Mit IServ verbinden'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Gib deine IServ-Zugangsdaten ein.',
-                    style: TextStyle(fontSize: 14),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: urlController,
-                    decoration: const InputDecoration(
-                      labelText: 'IServ URL',
-                      hintText: 'z.B. gymnasium.iserv.de',
-                      prefixIcon: Icon(Icons.public),
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.url,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Benutzername',
-                      prefixIcon: Icon(Icons.person),
-                      border: OutlineInputBorder(),
-                    ),
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: passwordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Passwort',
-                      prefixIcon: Icon(Icons.lock),
-                      border: OutlineInputBorder(),
-                    ),
-                    obscureText: true,
-                    textInputAction: TextInputAction.done,
-                  ),
-                ],
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDark ? NexusTheme.darkCard : null,
+        title: const Text('Mit IServ verbinden'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Gib deine IServ-URL und Anmeldedaten ein, oder nutze den WebView-Login.',
+                style: TextStyle(fontSize: 14),
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Abbrechen'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: urlController,
+                decoration: const InputDecoration(
+                  labelText: 'IServ URL',
+                  hintText: 'z.B. gymnasium.iserv.de',
+                  prefixIcon: Icon(Icons.public),
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.url,
+                textInputAction: TextInputAction.next,
               ),
-              StatefulBuilder(
-                builder: (context, setButtonState) {
-                  bool buttonLoading = false;
-
-                  return ElevatedButton(
-                    onPressed: buttonLoading
-                        ? null
-                        : () async {
-                            final url = urlController.text.trim();
-                            final username = usernameController.text.trim();
-                            final password = passwordController.text;
-
-                            if (url.isEmpty || username.isEmpty || password.isEmpty) {
-                              ScaffoldMessenger.of(this.context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Bitte alle Felder ausfüllen'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                              return;
-                            }
-
-                            setButtonState(() => buttonLoading = true);
-
-                            final provider = this.context.read<IServProvider>();
-                            final result = await provider.connect(
-                              username: username,
-                              password: password,
-                              iservUrl: url,
-                            );
-
-                            if (!mounted) return;
-
-                            if (result['success'] == true) {
-                              Navigator.pop(dialogContext);
-                              ScaffoldMessenger.of(this.context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Erfolgreich mit IServ verbunden'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                            } else {
-                              setButtonState(() => buttonLoading = false);
-                              ScaffoldMessenger.of(this.context).showSnackBar(
-                                SnackBar(
-                                  content: Text(result['error'] ?? 'Anmeldung fehlgeschlagen'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                            }
-                          },
-                    child: buttonLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Text('Anmelden'),
-                  );
-                },
+              const SizedBox(height: 12),
+              TextField(
+                controller: usernameController,
+                decoration: const InputDecoration(
+                  labelText: 'Benutzername',
+                  prefixIcon: Icon(Icons.person),
+                  border: OutlineInputBorder(),
+                ),
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passwordController,
+                decoration: const InputDecoration(
+                  labelText: 'Passwort',
+                  prefixIcon: Icon(Icons.lock),
+                  border: OutlineInputBorder(),
+                ),
+                obscureText: true,
+                autocorrect: false,
+                enableSuggestions: false,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _directLogin(
+                  dialogContext,
+                  urlController.text.trim(),
+                  usernameController.text.trim(),
+                  passwordController.text,
+                ),
               ),
             ],
-          );
-        },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Abbrechen'),
+          ),
+          TextButton(
+            onPressed: () => _directLogin(
+              dialogContext,
+              urlController.text.trim(),
+              usernameController.text.trim(),
+              passwordController.text,
+            ),
+            child: const Text('Direkt anmelden'),
+          ),
+          ElevatedButton(
+            onPressed: () => _startWebViewLogin(dialogContext, urlController.text.trim()),
+            child: const Text('WebView Login'),
+          ),
+        ],
+      ),
+    ).then((_) {
+      urlController.dispose();
+      usernameController.dispose();
+      passwordController.dispose();
+    });
+  }
+
+  Future<void> _directLogin(BuildContext dialogContext, String url, String username, String password) async {
+    if (url.isEmpty || username.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bitte alle Felder ausfüllen'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    Navigator.pop(dialogContext);
+
+    final provider = context.read<IServProvider>();
+    final result = await provider.connect(
+      username: username,
+      password: password,
+      iservUrl: url,
+    );
+
+    if (!mounted) return;
+
+    if (result['success'] == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erfolgreich mit IServ verbunden'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['error'] ?? 'Anmeldung fehlgeschlagen'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _startWebViewLogin(BuildContext dialogContext, String url) {
+    if (url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bitte IServ-URL eingeben'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    Navigator.pop(dialogContext);
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => IServWebViewLogin(
+          iservUrl: url,
+          onLoginSuccess: (cookies, username) async {
+            Navigator.of(context).pop();
+
+            final provider = context.read<IServProvider>();
+            final result = await provider.connectWithWebViewCookies(
+              iservUrl: url,
+              cookies: cookies,
+              username: username,
+            );
+
+            if (!context.mounted) return;
+
+            if (result['success'] == true) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Erfolgreich mit IServ verbunden'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(result['error'] ?? 'Anmeldung fehlgeschlagen'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          },
+          onCancel: () {
+            Navigator.of(context).pop();
+          },
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: NexusTheme.darkBackground,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('IServ'),
-        backgroundColor: NexusTheme.darkSurface,
+        title: NexusTheme.gradientText('IServ', fontSize: 36),
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         actions: [
           Consumer<IServProvider>(
             builder: (context, provider, child) {
               if (!provider.isConnected) return const SizedBox();
-              return IconButton(
-                icon: provider.isSyncing
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.refresh),
-                onPressed: provider.isSyncing ? null : () => provider.syncData(),
-                tooltip: 'Aktualisieren',
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: provider.isSyncing
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
+                    onPressed: provider.isSyncing ? null : () => provider.syncData(),
+                    tooltip: 'Aktualisieren',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.logout, color: NexusTheme.error),
+                    onPressed: () => _showDisconnectDialog(provider),
+                    tooltip: 'Trennen',
+                  ),
+                ],
               );
             },
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
+          labelColor: NexusTheme.primaryColor,
+          unselectedLabelColor: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+          indicatorColor: NexusTheme.primaryColor,
           tabs: const [
             Tab(text: 'Nachrichten'),
             Tab(text: 'Aufgaben'),
@@ -209,20 +276,19 @@ class _IServScreenState extends State<IServScreen> with SingleTickerProviderStat
 
           return Column(
             children: [
-
               if (provider.error != null)
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  color: NexusTheme.error.withOpacity(0.1),
+                  color: NexusTheme.error.withValues(alpha: 0.1),
                   child: Row(
                     children: [
-                      Icon(Icons.error_outline, color: NexusTheme.error, size: 20),
+                      const Icon(Icons.error_outline, color: NexusTheme.error, size: 20),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           provider.error!,
-                          style: TextStyle(color: NexusTheme.error, fontSize: 13),
+                          style: const TextStyle(color: NexusTheme.error, fontSize: 13),
                         ),
                       ),
                       TextButton(
@@ -250,19 +316,11 @@ class _IServScreenState extends State<IServScreen> with SingleTickerProviderStat
       ),
       floatingActionButton: Consumer<IServProvider>(
         builder: (context, provider, child) {
-          if (provider.isConnected) {
-            return FloatingActionButton.extended(
-              heroTag: 'fab_iserv_disconnect',
-              onPressed: () => _showDisconnectDialog(provider),
-              backgroundColor: NexusTheme.error,
-              icon: const Icon(Icons.logout),
-              label: const Text('Trennen'),
-            );
-          }
+          if (provider.isConnected) return const SizedBox();
           return FloatingActionButton.extended(
             heroTag: 'fab_iserv_connect',
             onPressed: _showLoginDialog,
-            backgroundColor: NexusTheme.primary,
+            backgroundColor: NexusTheme.primaryColor,
             icon: const Icon(Icons.login),
             label: const Text('Verbinden'),
           );
@@ -275,7 +333,6 @@ class _IServScreenState extends State<IServScreen> with SingleTickerProviderStat
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: NexusTheme.darkCard,
         title: const Text('Von IServ trennen?'),
         content: const Text('Deine Anmeldedaten werden gelöscht.'),
         actions: [
@@ -306,49 +363,63 @@ class _NotConnectedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: NexusTheme.primary.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.school_outlined,
-                size: 64,
-                color: NexusTheme.primary,
+    return CustomScrollView(
+      slivers: [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(32, 32, 32, 120),
+            child: Center(
+              child: GlassCard(
+                borderRadius: 16,
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: NexusTheme.primary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.school_outlined,
+                        size: 48,
+                        color: NexusTheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Mit IServ verbinden',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Builder(builder: (context) {
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      return Text(
+                        'Verbinde dich mit deinem IServ-Konto um Nachrichten, Aufgaben und Termine zu sehen.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: onConnect,
+                      icon: const Icon(Icons.login),
+                      label: const Text('Anmelden'),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'Mit IServ verbinden',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Verbinde dich mit deinem IServ-Konto um Nachrichten, Aufgaben und Termine zu sehen.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
-              ),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: onConnect,
-              icon: const Icon(Icons.login),
-              label: const Text('Anmelden'),
-            ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -361,7 +432,7 @@ class _NotificationsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (notifications.isEmpty) {
-      return _EmptyTabView(
+      return const _EmptyTabView(
         icon: Icons.notifications_outlined,
         message: 'Keine Nachrichten',
       );
@@ -372,48 +443,53 @@ class _NotificationsTab extends StatelessWidget {
       itemCount: notifications.length,
       itemBuilder: (context, index) {
         final notification = notifications[index];
-        return Card(
-          color: NexusTheme.darkCard,
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            leading: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: notification.read
-                    ? NexusTheme.darkSurface
-                    : NexusTheme.primary.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: GlassCard(
+            borderRadius: 16,
+            padding: EdgeInsets.zero,
+            child: ListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: notification.read
+                      ? (Theme.of(context).brightness == Brightness.dark ? NexusTheme.darkSurface : const Color(0xFFF4F4F5))
+                      : NexusTheme.primary.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  notification.read
+                      ? Icons.mail_outlined
+                      : Icons.mail,
+                  color: notification.read
+                      ? (Theme.of(context).brightness == Brightness.dark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted)
+                      : NexusTheme.primary,
+                ),
               ),
-              child: Icon(
-                notification.read
-                    ? Icons.mail_outlined
-                    : Icons.mail,
-                color: notification.read
-                    ? Colors.white54
-                    : NexusTheme.primary,
+              title: Text(
+                notification.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: notification.read
+                      ? FontWeight.normal
+                      : FontWeight.bold,
+                ),
               ),
-            ),
-            title: Text(
-              notification.title,
-              style: TextStyle(
-                fontWeight: notification.read
-                    ? FontWeight.normal
-                    : FontWeight.bold,
-              ),
-            ),
-            subtitle: notification.message != null
-                ? Text(
-                    notification.message!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  )
-                : null,
-            trailing: Text(
-              _formatDate(notification.timestamp),
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.white54,
+              subtitle: notification.message != null
+                  ? Text(
+                      notification.message!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    )
+                  : null,
+              trailing: Text(
+                _formatDate(notification.timestamp),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).brightness == Brightness.dark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                ),
               ),
             ),
           ),
@@ -446,7 +522,7 @@ class _ExercisesTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (exercises.isEmpty) {
-      return _EmptyTabView(
+      return const _EmptyTabView(
         icon: Icons.assignment_outlined,
         message: 'Keine Aufgaben',
       );
@@ -471,14 +547,17 @@ class _ExercisesTab extends StatelessWidget {
         ],
         if (completedExercises.isNotEmpty) ...[
           const SizedBox(height: 24),
-          Text(
-            'Erledigt (${completedExercises.length})',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: Colors.white.withOpacity(0.5),
-            ),
-          ),
+          Builder(builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            return Text(
+              'Erledigt (${completedExercises.length})',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+              ),
+            );
+          }),
           const SizedBox(height: 12),
           ...completedExercises.map((e) => _ExerciseCard(exercise: e)),
         ],
@@ -494,10 +573,10 @@ class _ExerciseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: NexusTheme.darkCard,
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GlassCard(
+        borderRadius: 16,
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -511,10 +590,10 @@ class _ExerciseCard extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: NexusTheme.error.withOpacity(0.2),
+                      color: NexusTheme.error.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: Text(
+                    child: const Text(
                       'Überfällig',
                       style: TextStyle(
                         fontSize: 11,
@@ -531,12 +610,12 @@ class _ExerciseCard extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: NexusTheme.primary.withOpacity(0.2),
+                      color: NexusTheme.primary.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       exercise.course!,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 11,
                         color: NexusTheme.primary,
                       ),
@@ -558,7 +637,7 @@ class _ExerciseCard extends StatelessWidget {
               Text(
                 exercise.description!,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Theme.of(context).brightness == Brightness.dark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
                   fontSize: 14,
                 ),
                 maxLines: 2,
@@ -574,7 +653,7 @@ class _ExerciseCard extends StatelessWidget {
                     size: 16,
                     color: exercise.isOverdue
                         ? NexusTheme.error
-                        : Colors.white54,
+                        : (Theme.of(context).brightness == Brightness.dark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted),
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -583,7 +662,7 @@ class _ExerciseCard extends StatelessWidget {
                       fontSize: 13,
                       color: exercise.isOverdue
                           ? NexusTheme.error
-                          : Colors.white54,
+                          : (Theme.of(context).brightness == Brightness.dark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted),
                     ),
                   ),
                 ],
@@ -608,7 +687,7 @@ class _EventsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (events.isEmpty) {
-      return _EmptyTabView(
+      return const _EmptyTabView(
         icon: Icons.event_outlined,
         message: 'Keine Termine',
       );
@@ -619,59 +698,64 @@ class _EventsTab extends StatelessWidget {
       itemCount: events.length,
       itemBuilder: (context, index) {
         final event = events[index];
-        return Card(
-          color: NexusTheme.darkCard,
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            leading: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: NexusTheme.primary.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (event.startTime != null) ...[
-                    Text(
-                      '${event.startTime!.day}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: NexusTheme.primary,
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: GlassCard(
+            borderRadius: 16,
+            padding: EdgeInsets.zero,
+            child: ListTile(
+              leading: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: NexusTheme.primary.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (event.startTime != null) ...[
+                      Text(
+                        '${event.startTime!.day}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: NexusTheme.primary,
+                        ),
                       ),
-                    ),
-                    Text(
-                      _monthAbbr(event.startTime!.month),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: NexusTheme.primary,
+                      Text(
+                        _monthAbbr(event.startTime!.month),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: NexusTheme.primary,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
+                ),
+              ),
+              title: Text(event.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (event.startTime != null)
+                    Text(
+                      event.allDay
+                          ? 'Ganztägig'
+                          : '${event.startTime!.hour}:${event.startTime!.minute.toString().padLeft(2, '0')} Uhr',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  if (event.location != null)
+                    Text(
+                      event.location!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).brightness == Brightness.dark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                      ),
+                    ),
                 ],
               ),
-            ),
-            title: Text(event.title),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (event.startTime != null)
-                  Text(
-                    event.allDay
-                        ? 'Ganztägig'
-                        : '${event.startTime!.hour}:${event.startTime!.minute.toString().padLeft(2, '0')} Uhr',
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                if (event.location != null)
-                  Text(
-                    event.location!,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.white.withOpacity(0.5),
-                    ),
-                  ),
-              ],
             ),
           ),
         );
@@ -696,23 +780,28 @@ class _EmptyTabView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 64,
-            color: Colors.white.withOpacity(0.2),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            message,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.5),
+      child: GlassCard(
+        borderRadius: 16,
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 64,
+              color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.2),
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            Text(
+              message,
+              style: TextStyle(
+                color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -725,15 +814,13 @@ class _VertretungsplanTab extends StatefulWidget {
   State<_VertretungsplanTab> createState() => _VertretungsplanTabState();
 }
 
-class _VertretungsplanTabState extends State<_VertretungsplanTab>
-    with SingleTickerProviderStateMixin {
-  late TabController _innerTabController;
-  InAppWebViewController? _webViewController;
+class _VertretungsplanTabState extends State<_VertretungsplanTab> {
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
 
   @override
   void initState() {
     super.initState();
-    _innerTabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadVertretungsplan();
     });
@@ -741,7 +828,7 @@ class _VertretungsplanTabState extends State<_VertretungsplanTab>
 
   @override
   void dispose() {
-    _innerTabController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -769,37 +856,48 @@ class _VertretungsplanTabState extends State<_VertretungsplanTab>
   Widget build(BuildContext context) {
     return Consumer<IServProvider>(
       builder: (context, provider, child) {
-        if (provider.isVertretungsplanLoading && provider.vertretungsplanHtml == null) {
+        if (provider.isVertretungsplanLoading && provider.vertretungsplanFiles.isEmpty) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        if (provider.vertretungsplanError != null && provider.vertretungsplanHtml == null) {
+        if (provider.vertretungsplanError != null && provider.vertretungsplanFiles.isEmpty) {
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 64,
-                    color: NexusTheme.error.withOpacity(0.5),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    provider.vertretungsplanError!,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white.withOpacity(0.7)),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: _loadVertretungsplan,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Erneut versuchen'),
-                  ),
-                ],
+              child: GlassCard(
+                borderRadius: 16,
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: NexusTheme.error.withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      provider.vertretungsplanError!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: _loadVertretungsplan,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Erneut versuchen'),
+                    ),
+                  ],
+                ),
               ),
             ),
+          );
+        }
+
+        if (provider.vertretungsplanFiles.isEmpty) {
+          return const _EmptyTabView(
+            icon: Icons.calendar_today_outlined,
+            message: 'Kein Vertretungsplan verfügbar',
           );
         }
 
@@ -809,7 +907,7 @@ class _VertretungsplanTabState extends State<_VertretungsplanTab>
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                color: Colors.orange.withOpacity(0.15),
+                color: Colors.orange.withValues(alpha: 0.15),
                 child: Row(
                   children: [
                     const Icon(Icons.offline_bolt, color: Colors.orange, size: 20),
@@ -834,23 +932,76 @@ class _VertretungsplanTabState extends State<_VertretungsplanTab>
                 ),
               ),
 
-            Container(
-              color: NexusTheme.darkSurface,
-              child: TabBar(
-                controller: _innerTabController,
-                tabs: const [
-                  Tab(text: 'Infobildschirm'),
-                  Tab(text: 'Info'),
-                ],
+            if (provider.vertretungsplanFiles.length > 1)
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                color: NexusTheme.darkSurface,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      onPressed: _currentPage > 0
+                          ? () {
+                              _pageController.previousPage(
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                              );
+                            }
+                          : null,
+                      icon: const Icon(Icons.chevron_left),
+                    ),
+                    Text(
+                      'Seite ${_currentPage + 1} von ${provider.vertretungsplanFiles.length}',
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    IconButton(
+                      onPressed: _currentPage < provider.vertretungsplanFiles.length - 1
+                          ? () {
+                              _pageController.nextPage(
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                              );
+                            }
+                          : null,
+                      icon: const Icon(Icons.chevron_right),
+                    ),
+                  ],
+                ),
+              ),
+
+            Expanded(
+              child: PageView.builder(
+                controller: _pageController,
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentPage = index;
+                  });
+                },
+                itemCount: provider.vertretungsplanFiles.length,
+                itemBuilder: (context, index) {
+                  final file = provider.vertretungsplanFiles[index];
+                  return _buildImageContent(file);
+                },
               ),
             ),
 
-            Expanded(
-              child: TabBarView(
-                controller: _innerTabController,
+            Container(
+              padding: const EdgeInsets.all(12),
+              color: NexusTheme.darkSurface,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _buildWebViewContent(provider.vertretungsplanHtml),
-                  _buildInfoContent(provider.vertretungsplanHtml),
+                  IconButton(
+                    onPressed: provider.isVertretungsplanLoading ? null : _loadVertretungsplan,
+                    icon: provider.isVertretungsplanLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
+                    tooltip: 'Aktualisieren',
+                  ),
                 ],
               ),
             ),
@@ -860,181 +1011,40 @@ class _VertretungsplanTabState extends State<_VertretungsplanTab>
     );
   }
 
-  Widget _buildWebViewContent(String? html) {
-    if (html == null || html.isEmpty) {
-      return _EmptyTabView(
-        icon: Icons.web,
-        message: 'Keine Daten verfügbar',
+  Widget _buildImageContent(Map<String, dynamic> file) {
+    final data = file['data'] as String?;
+
+    if (data == null || data.isEmpty) {
+      return const _EmptyTabView(
+        icon: Icons.image_not_supported_outlined,
+        message: 'Bild konnte nicht geladen werden',
       );
     }
 
-    return InAppWebView(
-      initialData: InAppWebViewInitialData(
-        data: html,
-        baseUrl: WebUri('https://ehgwerder.de'),
-      ),
-      initialSettings: InAppWebViewSettings(
-        javaScriptEnabled: true,
-        supportZoom: true,
-        builtInZoomControls: true,
-        displayZoomControls: false,
-        transparentBackground: true,
-      ),
-      onWebViewCreated: (controller) {
-        _webViewController = controller;
-      },
-    );
-  }
+    try {
+      final bytes = base64Decode(data);
 
-  Widget _buildInfoContent(String? html) {
-    if (html == null || html.isEmpty) {
-      return _EmptyTabView(
-        icon: Icons.info_outline,
-        message: 'Keine Informationen verfügbar',
+      return InteractiveViewer(
+        minScale: 0.5,
+        maxScale: 4.0,
+        child: Center(
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return const _EmptyTabView(
+                icon: Icons.broken_image_outlined,
+                message: 'Bild konnte nicht angezeigt werden',
+              );
+            },
+          ),
+        ),
+      );
+    } catch (e) {
+      return const _EmptyTabView(
+        icon: Icons.error_outline,
+        message: 'Fehler beim Dekodieren des Bildes',
       );
     }
-
-    final infoSections = <Map<String, String>>[];
-
-    final titleMatch = RegExp(r'<title>([^<]+)</title>', caseSensitive: false).firstMatch(html);
-    final title = titleMatch?.group(1)?.trim() ?? 'Vertretungsplan';
-
-    final dateMatch = RegExp(r'(\d{1,2}\.\d{1,2}\.\d{4})', caseSensitive: false).firstMatch(html);
-    final date = dateMatch?.group(1);
-
-    final infoPatterns = [
-      RegExp(r'<div[^>]*class="[^"]*info[^"]*"[^>]*>(.*?)</div>', caseSensitive: false, dotAll: true),
-      RegExp(r'<p[^>]*class="[^"]*message[^"]*"[^>]*>(.*?)</p>', caseSensitive: false, dotAll: true),
-      RegExp(r'<span[^>]*class="[^"]*notice[^"]*"[^>]*>(.*?)</span>', caseSensitive: false, dotAll: true),
-    ];
-
-    for (final pattern in infoPatterns) {
-      final matches = pattern.allMatches(html);
-      for (final match in matches) {
-        final content = match.group(1)?.replaceAll(RegExp(r'<[^>]+>'), '').trim();
-        if (content != null && content.isNotEmpty) {
-          infoSections.add({'type': 'info', 'content': content});
-        }
-      }
-    }
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Card(
-          color: NexusTheme.darkCard,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: NexusTheme.primary.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.school, color: NexusTheme.primary),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          if (date != null)
-                            Text(
-                              date,
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.6),
-                                fontSize: 14,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        if (infoSections.isEmpty)
-          Card(
-            color: NexusTheme.darkCard,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: Colors.white.withOpacity(0.5),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Keine zusätzlichen Informationen',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          )
-        else
-          ...infoSections.map((section) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Card(
-              color: NexusTheme.darkCard,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  section['content'] ?? '',
-                  style: const TextStyle(fontSize: 14),
-                ),
-              ),
-            ),
-          )),
-
-        const SizedBox(height: 24),
-
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: NexusTheme.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: NexusTheme.primary.withOpacity(0.3),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.lightbulb_outline, color: NexusTheme.primary, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Wechsel zu "Infobildschirm" für die vollständige Ansicht',
-                  style: TextStyle(
-                    color: NexusTheme.primary,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
   }
 }

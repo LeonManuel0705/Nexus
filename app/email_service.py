@@ -2,6 +2,8 @@ import os
 import json
 import base64
 import imaplib
+import logging
+import socket
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -10,11 +12,14 @@ from email.header import decode_header
 from typing import Dict, List, Optional
 from datetime import datetime
 import re
+from pathlib import Path
+
+from .crypto_utils import encrypt_file, decrypt_file
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
-EMAIL_CONFIG_PATH = os.path.join(DATA_DIR, "email_config.json")
+EMAIL_CONFIG_PATH = Path(DATA_DIR) / "email_config.json"
 
 PROVIDER_SETTINGS = {
     "gmail": {
@@ -40,11 +45,44 @@ PROVIDER_SETTINGS = {
     }
 }
 
+def _validate_email_host(hostname: str) -> str:
+    """Validate an email hostname to prevent SSRF. Returns error message or None if valid."""
+    import ipaddress as _ipaddress
+    if not hostname:
+        return "Invalid hostname"
+    blocked_hosts = {'localhost', '127.0.0.1', '0.0.0.0', '169.254.169.254', '[::1]', '::1'}
+    if hostname in blocked_hosts:
+        return "Connection to localhost or metadata endpoints is not allowed"
+    try:
+        addr = _ipaddress.ip_address(hostname)
+        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+            return "Connection to internal addresses is not allowed"
+    except ValueError:
+        pass
+    try:
+        resolved = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for family, _type, _proto, _canonname, sockaddr in resolved:
+            ip_str = sockaddr[0]
+            try:
+                addr = _ipaddress.ip_address(ip_str)
+                if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+                    return "Connection to internal addresses is not allowed"
+            except ValueError:
+                pass
+    except socket.gaierror:
+        return "Cannot resolve hostname"
+    return None
+
 def get_iserv_settings(email: str) -> Dict:
 
     domain = email.split('@')[1] if '@' in email else None
     if not domain:
         return None
+
+    host_error = _validate_email_host(domain)
+    if host_error:
+        return None
+
     return {
         "imap_host": domain,
         "imap_port": 993,
@@ -60,21 +98,29 @@ def get_provider_settings(provider: str, email: str) -> Optional[Dict]:
     return PROVIDER_SETTINGS.get(provider)
 
 def load_email_config() -> Dict:
-    if not os.path.exists(EMAIL_CONFIG_PATH):
-        return {"accounts": []}
     try:
-        with open(EMAIL_CONFIG_PATH, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (json.JSONDecodeError, IOError):
+        data = decrypt_file(EMAIL_CONFIG_PATH)
+        if data:
+            if not data.get("_migrated_v2"):
+                for account in data.get("accounts", []):
+                    pw = account.get("password", "")
+                    if pw:
+                        try:
+                            account["password"] = base64.b64decode(pw).decode()
+                        except Exception:
+                            pass
+                data["_migrated_v2"] = True
+                save_email_config(data)
+            return data
+        return {"accounts": []}
+    except Exception:
         return {"accounts": []}
 
 def save_email_config(config: Dict) -> bool:
-    os.makedirs(os.path.dirname(EMAIL_CONFIG_PATH), exist_ok=True)
     try:
-        with open(EMAIL_CONFIG_PATH, 'w', encoding='utf-8') as f:
-            json.dump(config, f, ensure_ascii=False, indent=2)
+        encrypt_file(config, EMAIL_CONFIG_PATH)
         return True
-    except IOError:
+    except Exception:
         return False
 
 def add_email_account(email: str, password: str, provider: str) -> Dict:
@@ -98,19 +144,21 @@ def add_email_account(email: str, password: str, provider: str) -> Dict:
             if provider == "gmail":
                 return {"success": False, "error": "Authentication failed. For Gmail, you need to use an App Password. Go to Google Account > Security > 2-Step Verification > App Passwords."}
             return {"success": False, "error": "Authentication failed. Check your email and password."}
-        return {"success": False, "error": f"Connection failed: {error_msg}"}
+        logging.error(f"Email IMAP error: {error_msg}")
+        return {"success": False, "error": "Connection failed"}
     except Exception as e:
-        return {"success": False, "error": f"Connection error: {str(e)}"}
+        logging.error(f"Email connection error: {e}")
+        return {"success": False, "error": "Connection failed"}
 
     config = load_email_config()
     existing = next((a for a in config["accounts"] if a["email"] == email), None)
     if existing:
-        existing["password"] = base64.b64encode(password.encode()).decode()
+        existing["password"] = password
         existing["provider"] = provider
     else:
         config["accounts"].append({
             "email": email,
-            "password": base64.b64encode(password.encode()).decode(),
+            "password": password,
             "provider": provider,
             "added_at": datetime.now().isoformat()
         })
@@ -186,6 +234,14 @@ def get_email_body(msg) -> str:
 
     return body[:5000]
 
+def _validate_folder(folder: str) -> str:
+    """Validate IMAP folder name to prevent injection."""
+    if not folder or not re.match(r'^[a-zA-Z0-9_./\-\s\[\]äöüÄÖÜß]+$', folder):
+        raise ValueError('Invalid folder name')
+    if len(folder) > 200:
+        raise ValueError('Folder name too long')
+    return folder
+
 def fetch_emails(email: str, folder: str = "INBOX", limit: int = 20) -> Dict:
     config = load_email_config()
     account = next((a for a in config["accounts"] if a["email"] == email), None)
@@ -198,14 +254,15 @@ def fetch_emails(email: str, folder: str = "INBOX", limit: int = 20) -> Dict:
         return {"success": False, "error": "Unknown provider"}
 
     try:
-        password = base64.b64decode(account["password"]).decode()
+        password = account["password"]
         imap = imaplib.IMAP4_SSL(settings["imap_host"], settings["imap_port"])
         imap.login(email, password)
 
+        _validate_folder(folder)
         status, _ = imap.select(folder, readonly=True)
         if status != "OK":
             imap.logout()
-            return {"success": False, "error": f"Could not select folder {folder}"}
+            return {"success": False, "error": "Ordner konnte nicht ausgewählt werden"}
 
         status, messages = imap.search(None, "ALL")
         if status != "OK":
@@ -254,11 +311,16 @@ def fetch_emails(email: str, folder: str = "INBOX", limit: int = 20) -> Dict:
         return {"success": True, "emails": emails}
 
     except imaplib.IMAP4.error as e:
-        return {"success": False, "error": f"IMAP error: {str(e)}"}
+        logging.error(f"IMAP error fetching emails: {e}")
+        return {"success": False, "error": "Failed to fetch emails"}
     except Exception as e:
-        return {"success": False, "error": f"Error: {str(e)}"}
+        logging.error(f"Error fetching emails: {e}")
+        return {"success": False, "error": "An error occurred"}
 
 def get_email_detail(email_addr: str, msg_id: str, folder: str = "INBOX") -> Dict:
+    if not re.match(r'^[0-9]+$', str(msg_id)):
+        return {"success": False, "error": "Invalid message ID"}
+
     config = load_email_config()
     account = next((a for a in config["accounts"] if a["email"] == email_addr), None)
     if not account:
@@ -270,9 +332,10 @@ def get_email_detail(email_addr: str, msg_id: str, folder: str = "INBOX") -> Dic
         return {"success": False, "error": "Unknown provider"}
 
     try:
-        password = base64.b64decode(account["password"]).decode()
+        password = account["password"]
         imap = imaplib.IMAP4_SSL(settings["imap_host"], settings["imap_port"])
         imap.login(email_addr, password)
+        _validate_folder(folder)
         imap.select(folder)
 
         status, msg_data = imap.fetch(msg_id.encode(), "(RFC822)")
@@ -314,7 +377,12 @@ def get_email_detail(email_addr: str, msg_id: str, folder: str = "INBOX") -> Dic
         }
 
     except Exception as e:
-        return {"success": False, "error": f"Error: {str(e)}"}
+        logging.error(f"Error fetching email detail: {e}")
+        return {"success": False, "error": "An error occurred"}
+
+def _sanitize_header(value: str) -> str:
+    """Strip CRLF characters to prevent email header injection."""
+    return value.replace('\r', '').replace('\n', '')
 
 def send_email(from_email: str, to_email: str, subject: str, body: str, reply_to_id: Optional[str] = None) -> Dict:
     config = load_email_config()
@@ -328,7 +396,11 @@ def send_email(from_email: str, to_email: str, subject: str, body: str, reply_to
         return {"success": False, "error": "Unknown provider"}
 
     try:
-        password = base64.b64decode(account["password"]).decode()
+        password = account["password"]
+
+        to_email = _sanitize_header(to_email)
+        subject = _sanitize_header(subject)
+        from_email = _sanitize_header(from_email)
 
         msg = MIMEMultipart()
         msg['From'] = from_email
@@ -350,9 +422,13 @@ def send_email(from_email: str, to_email: str, subject: str, body: str, reply_to
             return {"success": False, "error": "Authentication failed. For Gmail, use an App Password."}
         return {"success": False, "error": "Authentication failed. Check your credentials."}
     except Exception as e:
-        return {"success": False, "error": f"Failed to send: {str(e)}"}
+        logging.error(f"Error sending email: {e}")
+        return {"success": False, "error": "Failed to send email"}
 
 def delete_email(email: str, msg_id: str, folder: str = "INBOX") -> Dict:
+    if not re.match(r'^[0-9]+$', str(msg_id)):
+        return {"success": False, "error": "Invalid message ID"}
+
     config = load_email_config()
     account = next((a for a in config["accounts"] if a["email"] == email), None)
     if not account:
@@ -364,9 +440,10 @@ def delete_email(email: str, msg_id: str, folder: str = "INBOX") -> Dict:
         return {"success": False, "error": "Unknown provider"}
 
     try:
-        password = base64.b64decode(account["password"]).decode()
+        password = account["password"]
         imap = imaplib.IMAP4_SSL(settings["imap_host"], settings["imap_port"])
         imap.login(email, password)
+        _validate_folder(folder)
         imap.select(folder)
 
         trash_folders = ['[Gmail]/Trash', 'Trash', 'Deleted', 'Deleted Items']
@@ -389,7 +466,8 @@ def delete_email(email: str, msg_id: str, folder: str = "INBOX") -> Dict:
         return {"success": True, "message": "Email deleted successfully"}
 
     except Exception as e:
-        return {"success": False, "error": f"Error: {str(e)}"}
+        logging.error(f"Error deleting email: {e}")
+        return {"success": False, "error": "An error occurred"}
 
 def get_folders(email: str) -> Dict:
     config = load_email_config()
@@ -403,7 +481,7 @@ def get_folders(email: str) -> Dict:
         return {"success": False, "error": "Unknown provider"}
 
     try:
-        password = base64.b64decode(account["password"]).decode()
+        password = account["password"]
         imap = imaplib.IMAP4_SSL(settings["imap_host"], settings["imap_port"])
         imap.login(email, password)
 
@@ -424,4 +502,5 @@ def get_folders(email: str) -> Dict:
         return {"success": True, "folders": folder_list}
 
     except Exception as e:
-        return {"success": False, "error": f"Error: {str(e)}"}
+        logging.error(f"Error fetching folders: {e}")
+        return {"success": False, "error": "An error occurred"}

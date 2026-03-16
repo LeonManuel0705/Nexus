@@ -250,7 +250,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ g.csp_nonce }}">
 let chatHistory = [];
 let ollamaAvailable = false;
 let mlxAvailable = false;
@@ -981,6 +981,11 @@ function getWeekType(date = new Date()) {
     return diffWeeks % 2 === 0 ? 'A' : 'B';
 }
 
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function addMessageToUI(role, content, scroll = true) {
     const container = document.getElementById('chatMessages');
     const messageDiv = document.createElement('div');
@@ -990,7 +995,7 @@ function addMessageToUI(role, content, scroll = true) {
         ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`
         : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
 
-    let formattedContent = content
+    let formattedContent = escapeHtml(content)
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\n/g, '<br>');
 
@@ -1185,14 +1190,14 @@ async function solveMath() {
                 solution = solveEquation(input);
         }
     } catch (e) {
-        solution = `<p class="error">Fehler beim Lösen: ${e.message}</p><p>Versuche die Aufgabe anders zu formulieren.</p>`;
+        solution = `<p class="error">Fehler beim Lösen: ${escapeHtml(e.message)}</p><p>Versuche die Aufgabe anders zu formulieren.</p>`;
     }
 
     solutionEl.innerHTML = solution;
 }
 
 function formatMathResponse(text) {
-    return text
+    return escapeHtml(text)
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
         .replace(/`(.*?)`/g, '<code>$1</code>')
@@ -1226,6 +1231,12 @@ function evaluateExpression(expr, x) {
         .replace(/e(?![a-z])/gi, 'Math.E');
 
     normalized = normalized.replace(/x/g, `(${x})`);
+
+    // Whitelist: only allow safe math characters after all transformations
+    const safeMath = normalized.replace(/Math\.(sin|cos|tan|abs|log|sqrt|pow|floor|ceil|round|PI|E|exp|min|max)/g, '');
+    if (!/^[\d\s+\-*/().eE,]+$/.test(safeMath)) {
+        return NaN;
+    }
 
     try {
         return Function('"use strict"; return (' + normalized + ')')();
@@ -1327,7 +1338,7 @@ function solveEquation(input) {
     if (!leftExpr) leftExpr = '0';
     if (!rightExpr) rightExpr = '0';
 
-    let steps = [`<div class="solution-step"><strong>Gleichung:</strong> ${input}</div>`];
+    let steps = [`<div class="solution-step"><strong>Gleichung:</strong> ${escapeHtml(input)}</div>`];
 
     const leftHasX = leftExpr.includes('x');
     const rightHasX = rightExpr.includes('x');
@@ -1343,7 +1354,7 @@ function solveEquation(input) {
     if (hasX3) degree = 3;
     else if (hasX2) degree = 2;
 
-    steps.push(`<div class="solution-step"><strong>Umgeformt:</strong> (${leftExpr}) - (${rightExpr}) = 0</div>`);
+    steps.push(`<div class="solution-step"><strong>Umgeformt:</strong> (${escapeHtml(leftExpr)}) - (${escapeHtml(rightExpr)}) = 0</div>`);
 
     if (degree === 2) {
         const coeffs = parseQuadraticCoefficients(leftExpr, rightExpr);
@@ -1415,7 +1426,7 @@ function solveDerivative(input) {
     }
 
     let func = funcMatch[1].replace(/\s+/g, '').replace(/²/g, '^2').replace(/³/g, '^3');
-    let steps = [`<div class="solution-step"><strong>Funktion:</strong> f(x) = ${funcMatch[1]}</div>`];
+    let steps = [`<div class="solution-step"><strong>Funktion:</strong> f(x) = ${escapeHtml(funcMatch[1])}</div>`];
     let derivative = '';
     let terms = [];
 
@@ -1429,7 +1440,7 @@ function solveDerivative(input) {
         if (!term) return;
 
         if (!term.includes('x')) {
-            steps.push(`<div class="solution-step">• ${term} → 0 (Konstante)</div>`);
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → 0 (Konstante)</div>`);
             return;
         }
 
@@ -1445,7 +1456,7 @@ function solveDerivative(input) {
             else if (newExp === 1) derivTerm = `${newCoef}x`;
             else derivTerm = `${newCoef}x^${newExp}`;
 
-            steps.push(`<div class="solution-step">• ${term} → ${newCoef}x^${newExp} = ${derivTerm} (Potenzregel)</div>`);
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → ${newCoef}x^${newExp} = ${derivTerm} (Potenzregel)</div>`);
             terms.push(derivTerm);
             return;
         }
@@ -1453,7 +1464,7 @@ function solveDerivative(input) {
         if (term.includes('sin')) {
             const coefMatch = term.match(/^(-?\d*)/);
             const coef = parseFloat(coefMatch[1] || 1) || 1;
-            steps.push(`<div class="solution-step">• ${term} → ${coef}cos(x)</div>`);
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → ${coef}cos(x)</div>`);
             terms.push(`${coef}cos(x)`);
             return;
         }
@@ -1461,19 +1472,19 @@ function solveDerivative(input) {
         if (term.includes('cos')) {
             const coefMatch = term.match(/^(-?\d*)/);
             const coef = parseFloat(coefMatch[1] || 1) || 1;
-            steps.push(`<div class="solution-step">• ${term} → ${-coef}sin(x)</div>`);
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → ${-coef}sin(x)</div>`);
             terms.push(`${-coef}sin(x)`);
             return;
         }
 
         if (term.includes('e^x')) {
-            steps.push(`<div class="solution-step">• ${term} → e^x</div>`);
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → e^x</div>`);
             terms.push('e^x');
             return;
         }
 
         if (term.includes('ln')) {
-            steps.push(`<div class="solution-step">• ${term} → 1/x</div>`);
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → 1/x</div>`);
             terms.push('1/x');
             return;
         }
@@ -1497,7 +1508,7 @@ function solveIntegral(input) {
 
     func = func.replace(/²/g, '^2').replace(/³/g, '^3');
 
-    let steps = [`<div class="solution-step"><strong>Integral:</strong> ∫ ${func} dx</div>`];
+    let steps = [`<div class="solution-step"><strong>Integral:</strong> ∫ ${escapeHtml(func)} dx</div>`];
     let terms = [];
 
     func = func.replace(/-/g, '+-');
@@ -1511,7 +1522,7 @@ function solveIntegral(input) {
 
         if (!term.includes('x')) {
             const c = parseFloat(term);
-            steps.push(`<div class="solution-step">• ${term} → ${c}x</div>`);
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → ${c}x</div>`);
             terms.push(`${c}x`);
             return;
         }
@@ -1524,31 +1535,31 @@ function solveIntegral(input) {
             const newExp = exp + 1;
 
             const formattedCoef = Number.isInteger(newCoef) ? newCoef : newCoef.toFixed(4);
-            steps.push(`<div class="solution-step">• ${term} → ${formattedCoef}x^${newExp}</div>`);
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → ${formattedCoef}x^${newExp}</div>`);
             terms.push(`${formattedCoef}x^${newExp}`);
             return;
         }
 
         if (term.includes('sin')) {
-            steps.push(`<div class="solution-step">• ${term} → -cos(x)</div>`);
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → -cos(x)</div>`);
             terms.push('-cos(x)');
             return;
         }
 
         if (term.includes('cos')) {
-            steps.push(`<div class="solution-step">• ${term} → sin(x)</div>`);
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → sin(x)</div>`);
             terms.push('sin(x)');
             return;
         }
 
         if (term.includes('e^x')) {
-            steps.push(`<div class="solution-step">• ${term} → e^x</div>`);
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → e^x</div>`);
             terms.push('e^x');
             return;
         }
 
         if (term === '1/x') {
-            steps.push(`<div class="solution-step">• ${term} → ln|x|</div>`);
+            steps.push(`<div class="solution-step">• ${escapeHtml(term)} → ln|x|</div>`);
             terms.push('ln|x|');
             return;
         }
@@ -1852,7 +1863,7 @@ async function generateEssay() {
         }
     }
 
-    document.getElementById('essaySolution').innerHTML = getEssayTemplate(type, topic, language);
+    document.getElementById('essaySolution').innerHTML = getEssayTemplate(type, escapeHtml(topic), language);
 }
 
 function getEssayTemplate(type, topic, language) {
@@ -2017,7 +2028,7 @@ function getEssayTemplate(type, topic, language) {
 }
 
 function formatEssayOutput(text) {
-    return text
+    return escapeHtml(text)
         .replace(/\n\n/g, '</p><p>')
         .replace(/\n/g, '<br>')
         .replace(/^/, '<p>')
@@ -2100,7 +2111,7 @@ function getOfflineSummary(text, type) {
             const shortSummary = sentences.slice(0, Math.min(3, sentences.length)).join(' ');
             result = `
                 <p><strong>Kurze Zusammenfassung:</strong></p>
-                <p>${shortSummary}</p>
+                <p>${escapeHtml(shortSummary)}</p>
                 <p class="stats">📊 Original: ${wordCount} Wörter → Zusammenfassung: ${shortSummary.split(/\s+/).length} Wörter</p>
             `;
             break;
@@ -2110,7 +2121,7 @@ function getOfflineSummary(text, type) {
             result = `
                 <p><strong>Stichpunkte:</strong></p>
                 <ul>
-                    ${bulletPoints.map(s => `<li>${s.trim()}</li>`).join('')}
+                    ${bulletPoints.map(s => `<li>${escapeHtml(s.trim())}</li>`).join('')}
                 </ul>
             `;
             break;
@@ -2118,9 +2129,9 @@ function getOfflineSummary(text, type) {
         case 'detailliert':
             result = `
                 <p><strong>Detaillierte Zusammenfassung:</strong></p>
-                <p><em>Hauptinhalt:</em> ${sentences.slice(0, 2).join(' ')}</p>
-                <p><em>Weitere Details:</em> ${sentences.slice(2, 5).join(' ')}</p>
-                ${sentences.length > 5 ? `<p><em>Zusätzliche Informationen:</em> ${sentences.slice(5, 8).join(' ')}</p>` : ''}
+                <p><em>Hauptinhalt:</em> ${escapeHtml(sentences.slice(0, 2).join(' '))}</p>
+                <p><em>Weitere Details:</em> ${escapeHtml(sentences.slice(2, 5).join(' '))}</p>
+                ${sentences.length > 5 ? `<p><em>Zusätzliche Informationen:</em> ${escapeHtml(sentences.slice(5, 8).join(' '))}</p>` : ''}
                 <p class="stats">📊 Original: ${wordCount} Wörter, ${sentences.length} Sätze</p>
             `;
             break;
@@ -2130,8 +2141,8 @@ function getOfflineSummary(text, type) {
                 const trimmed = s.trim();
                 return `
                     <div class="flashcard">
-                        <div class="flashcard-q"><strong>Q${i + 1}:</strong> Was bedeutet: "${trimmed.substring(0, 50)}..."?</div>
-                        <div class="flashcard-a"><strong>A:</strong> ${trimmed}</div>
+                        <div class="flashcard-q"><strong>Q${i + 1}:</strong> Was bedeutet: "${escapeHtml(trimmed.substring(0, 50))}..."?</div>
+                        <div class="flashcard-a"><strong>A:</strong> ${escapeHtml(trimmed)}</div>
                     </div>
                 `;
             });
@@ -2154,7 +2165,7 @@ function getOfflineSummary(text, type) {
 function formatSummaryOutput(text, type) {
     if (type === 'stichpunkte') {
         const lines = text.split('\n').filter(l => l.trim());
-        return '<ul>' + lines.map(l => `<li>${l.replace(/^[-•*]\s*/, '')}</li>`).join('') + '</ul>';
+        return '<ul>' + lines.map(l => `<li>${escapeHtml(l.replace(/^[-•*]\s*/, ''))}</li>`).join('') + '</ul>';
     }
 
     if (type === 'lernkarten') {
@@ -2164,8 +2175,8 @@ function formatSummaryOutput(text, type) {
             if (parts.length >= 2) {
                 return `
                     <div class="flashcard">
-                        <div class="flashcard-q"><strong>Q:</strong> ${parts[0].trim()}</div>
-                        <div class="flashcard-a"><strong>A:</strong> ${parts[1].trim()}</div>
+                        <div class="flashcard-q"><strong>Q:</strong> ${escapeHtml(parts[0].trim())}</div>
+                        <div class="flashcard-a"><strong>A:</strong> ${escapeHtml(parts[1].trim())}</div>
                     </div>
                 `;
             }
@@ -2173,7 +2184,7 @@ function formatSummaryOutput(text, type) {
         }).join('');
     }
 
-    return text.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>').replace(/^/, '<p>').replace(/$/, '</p>');
+    return escapeHtml(text).replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>').replace(/^/, '<p>').replace(/$/, '</p>');
 }
 
 function copySummary() {

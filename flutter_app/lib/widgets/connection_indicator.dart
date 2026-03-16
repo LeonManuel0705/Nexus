@@ -124,7 +124,7 @@ class _ConnectionBanner extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: (isOffline ? NexusTheme.warning : NexusTheme.success)
-                .withOpacity(0.3),
+                .withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -156,6 +156,98 @@ class _ConnectionBanner extends StatelessWidget {
   }
 }
 
+class OfflineOverlay extends StatelessWidget {
+  final String featureName;
+  final Widget child;
+
+  const OfflineOverlay({
+    super.key,
+    required this.featureName,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: ConnectivityService().isOnline,
+      builder: (context, isOnline, _) {
+        if (isOnline) return child;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Stack(
+          children: [
+            child,
+            Positioned.fill(
+              child: Container(
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.7)
+                    : Colors.white.withValues(alpha: 0.8),
+                child: Center(
+                  child: Container(
+                    margin: const EdgeInsets.all(32),
+                    padding: const EdgeInsets.all(32),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? NexusTheme.darkSurface
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: isDark
+                            ? NexusTheme.darkBorder
+                            : NexusTheme.lightBorder,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.2),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: NexusTheme.warning.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.wifi_off,
+                            size: 48,
+                            color: NexusTheme.warning,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Offline',
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '$featureName benötigt eine Internetverbindung.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Bitte stelle eine Verbindung her, um fortzufahren.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class ConnectionStatusChip extends StatelessWidget {
   const ConnectionStatusChip({super.key});
 
@@ -169,13 +261,13 @@ class ConnectionStatusChip extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: NexusTheme.warning.withOpacity(0.2),
+            color: NexusTheme.warning.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: NexusTheme.warning.withOpacity(0.5),
+              color: NexusTheme.warning.withValues(alpha: 0.5),
             ),
           ),
-          child: Row(
+          child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
@@ -183,7 +275,7 @@ class ConnectionStatusChip extends StatelessWidget {
                 size: 14,
                 color: NexusTheme.warning,
               ),
-              const SizedBox(width: 4),
+              SizedBox(width: 4),
               Text(
                 'Offline',
                 style: TextStyle(
@@ -219,14 +311,14 @@ class SyncStatusIndicator extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: NexusTheme.info.withOpacity(0.15),
+        color: NexusTheme.info.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (isSyncing)
-            SizedBox(
+            const SizedBox(
               width: 14,
               height: 14,
               child: CircularProgressIndicator(
@@ -235,7 +327,7 @@ class SyncStatusIndicator extends StatelessWidget {
               ),
             )
           else
-            Icon(
+            const Icon(
               Icons.cloud_upload_outlined,
               size: 16,
               color: NexusTheme.info,
@@ -245,7 +337,7 @@ class SyncStatusIndicator extends StatelessWidget {
             isSyncing
                 ? 'Syncing...'
                 : '$pendingCount pending',
-            style: TextStyle(
+            style: const TextStyle(
               color: NexusTheme.info,
               fontSize: 12,
               fontWeight: FontWeight.w500,

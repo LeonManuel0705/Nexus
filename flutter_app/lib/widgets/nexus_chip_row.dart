@@ -48,7 +48,7 @@ class NexusChipRow extends StatelessWidget {
         label: Text(label),
         selected: isSelected,
         onSelected: (_) => onSelected(label),
-        selectedColor: NexusTheme.primary.withOpacity(0.2),
+        selectedColor: NexusTheme.primary.withValues(alpha: 0.2),
         checkmarkColor: NexusTheme.primary,
         labelStyle: TextStyle(
           color: isSelected ? NexusTheme.primary : null,
@@ -118,7 +118,7 @@ class NexusFilterChips extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: isSelected ? color : Colors.grey.withOpacity(0.2),
+                  color: isSelected ? color : Colors.grey.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -143,7 +143,7 @@ class NexusFilterChips extends StatelessWidget {
           }
           onChanged(newSelected);
         },
-        selectedColor: color.withOpacity(0.2),
+        selectedColor: color.withValues(alpha: 0.2),
         checkmarkColor: color,
         labelStyle: TextStyle(
           color: isSelected ? color : null,

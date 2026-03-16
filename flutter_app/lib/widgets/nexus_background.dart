@@ -1,10 +1,16 @@
-import 'dart:ui';
+import 'dart:math' as math;
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 
 class NexusBackground extends StatefulWidget {
   final Widget child;
+  final bool keepCenterClear;
 
-  const NexusBackground({super.key, required this.child});
+  const NexusBackground({
+    super.key,
+    required this.child,
+    this.keepCenterClear = false,
+  });
 
   @override
   State<NexusBackground> createState() => _NexusBackgroundState();
@@ -15,13 +21,18 @@ class _NexusBackgroundState extends State<NexusBackground>
   late AnimationController _controller1;
   late AnimationController _controller2;
   late AnimationController _controller3;
+  late AnimationController _dotGridController;
 
-  static const Color _accent1 = Color(0xFF667EEA);
-  static const Color _accent2 = Color(0xFF764BA2);
-  static const Color _accent3 = Color(0xFFF093FB);
+  // TSX design colors: blue, purple, emerald
+  static const Color _blue = Color(0xFF3B82F6);
+  static const Color _blueLight = Color(0xFF60A5FA);
+  static const Color _purple = Color(0xFF9333EA);
+  static const Color _purpleLight = Color(0xFFC084FC);
+  static const Color _emerald = Color(0xFF10B981);
+  static const Color _emeraldLight = Color(0xFF34D399);
 
-  static const Color _darkBg = Color(0xFF0F0F1A);
-  static const Color _lightBg = Color(0xFFFAFBFC);
+  static const Color _darkBg = Color(0xFF09090B); // zinc-950
+  static const Color _lightBg = Color(0xFFFAFAFA); // zinc-50
 
   @override
   void initState() {
@@ -33,18 +44,21 @@ class _NexusBackgroundState extends State<NexusBackground>
     )..repeat();
 
     _controller2 = AnimationController(
-      duration: const Duration(seconds: 20),
+      duration: const Duration(seconds: 25),
       vsync: this,
-    );
-    _controller2.value = 0.35;
-    _controller2.repeat();
+    )..repeat();
 
     _controller3 = AnimationController(
-      duration: const Duration(seconds: 20),
+      duration: const Duration(seconds: 22),
       vsync: this,
+    )..repeat();
+
+    // Dot grid: paint once, no animation (massive perf win — no 1000s of dots per frame)
+    _dotGridController = AnimationController(
+      duration: const Duration(seconds: 15),
+      vsync: this,
+      value: 0, // static
     );
-    _controller3.value = 0.70;
-    _controller3.repeat();
   }
 
   @override
@@ -52,83 +66,102 @@ class _NexusBackgroundState extends State<NexusBackground>
     _controller1.dispose();
     _controller2.dispose();
     _controller3.dispose();
+    _dotGridController.dispose();
     super.dispose();
-  }
-
-  Offset _getTranslation(double t) {
-    if (t < 0.25) {
-      final progress = t / 0.25;
-      return Offset(30 * progress, -30 * progress);
-    } else if (t < 0.5) {
-      final progress = (t - 0.25) / 0.25;
-      return Offset(30 - 50 * progress, -30 + 50 * progress);
-    } else if (t < 0.75) {
-      final progress = (t - 0.5) / 0.25;
-      return Offset(-20 - 10 * progress, 20 - 40 * progress);
-    } else {
-      final progress = (t - 0.75) / 0.25;
-      return Offset(-30 + 30 * progress, -20 + 20 * progress);
-    }
-  }
-
-  double _getScale(double t) {
-    if (t < 0.25) {
-      return 1.0 + 0.05 * (t / 0.25);
-    } else if (t < 0.5) {
-      return 1.05 - 0.10 * ((t - 0.25) / 0.25);
-    } else if (t < 0.75) {
-      return 0.95 + 0.07 * ((t - 0.5) / 0.25);
-    } else {
-      return 1.02 - 0.02 * ((t - 0.75) / 0.25);
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final orbOpacity = isDark ? 0.25 : 0.4;
+    final orbOpacity = isDark ? 0.20 : 0.40;
 
     return Stack(
       children: [
+        // Base background
         Container(color: isDark ? _darkBg : _lightBg),
 
-        AnimatedBuilder(
+        // Animated orbs (isolated repaint boundary)
+        RepaintBoundary(
+          child: AnimatedBuilder(
           animation: Listenable.merge([_controller1, _controller2, _controller3]),
           builder: (context, child) {
+            final clear = widget.keepCenterClear;
             return CustomPaint(
               painter: _OrbsPainter(
                 orbs: [
+                  // Blue orb - top left
                   _OrbData(
-                    size: 600,
-                    baseOffset: const Offset(100, -200),
+                    size: clear ? 500 : 650,
+                    anchorTopRight: false,
+                    anchorBottomLeft: false,
+                    anchorBottomRight: false,
+                    anchorCenter: false,
+                    baseOffset: const Offset(0, 0),
+                    colors: [_blueLight, _blue],
+                    t: _controller1.value,
+                    phaseOffset: 0,
+                    motionScale: clear ? 0.4 : 1.0,
+                    sizeRatio: 0.4,
+                  ),
+                  // Purple orb - top right
+                  _OrbData(
+                    size: clear ? 550 : 700,
                     anchorTopRight: true,
-                    colors: [_accent1, _accent2],
-                    translation: _getTranslation(_controller1.value),
-                    scale: _getScale(_controller1.value),
+                    baseOffset: const Offset(80, -180),
+                    colors: [_purpleLight, _purple],
+                    t: _controller2.value,
+                    phaseOffset: math.pi / 2,
+                    motionScale: clear ? 0.4 : 1.0,
+                    sizeRatio: 0.5,
                   ),
+                  // Emerald orb - bottom center
                   _OrbData(
-                    size: 500,
-                    baseOffset: const Offset(-100, 150),
-                    anchorBottomLeft: true,
-                    colors: [_accent2, _accent3],
-                    translation: _getTranslation(_controller2.value),
-                    scale: _getScale(_controller2.value),
-                  ),
-                  _OrbData(
-                    size: 400,
-                    baseOffset: Offset.zero,
-                    anchorCenter: true,
-                    colors: [_accent3, _accent1],
-                    translation: _getTranslation(_controller3.value),
-                    scale: _getScale(_controller3.value),
+                    size: clear ? 400 : 550,
+                    anchorCenter: !clear,
+                    anchorBottomLeft: clear,
+                    baseOffset: clear ? const Offset(60, 100) : const Offset(0, 200),
+                    colors: [_emeraldLight, _emerald],
+                    t: _controller3.value,
+                    phaseOffset: math.pi,
+                    motionScale: clear ? 0.4 : 1.0,
+                    sizeRatio: 0.6,
                   ),
                 ],
                 opacity: orbOpacity,
-                blurSigma: 40,
               ),
               size: Size.infinite,
             );
           },
+          ),
+        ),
+
+        // Dot grid overlay (static, no animation)
+        AnimatedBuilder(
+          animation: _dotGridController,
+          builder: (context, child) {
+            return CustomPaint(
+              painter: _DotGridPainter(
+                t: _dotGridController.value,
+                isDark: isDark,
+              ),
+              size: Size.infinite,
+            );
+          },
+        ),
+
+        // Vignette overlay
+        Container(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment.center,
+              radius: 1.4,
+              colors: [
+                Colors.transparent,
+                (isDark ? _darkBg : _lightBg).withValues(alpha: 0.8),
+              ],
+              stops: const [0.3, 1.0],
+            ),
+          ),
         ),
 
         widget.child,
@@ -142,74 +175,97 @@ class _OrbData {
   final Offset baseOffset;
   final bool anchorTopRight;
   final bool anchorBottomLeft;
+  final bool anchorBottomRight;
   final bool anchorCenter;
   final List<Color> colors;
-  final Offset translation;
-  final double scale;
+  final double t;
+  final double phaseOffset;
+  final double motionScale;
+  final double sizeRatio;
 
   _OrbData({
     required this.size,
     required this.baseOffset,
     this.anchorTopRight = false,
     this.anchorBottomLeft = false,
+    this.anchorBottomRight = false,
     this.anchorCenter = false,
     required this.colors,
-    required this.translation,
-    required this.scale,
+    required this.t,
+    required this.phaseOffset,
+    this.motionScale = 1.0,
+    this.sizeRatio = 0.4,
   });
 }
 
 class _OrbsPainter extends CustomPainter {
   final List<_OrbData> orbs;
   final double opacity;
-  final double blurSigma;
 
   _OrbsPainter({
     required this.orbs,
     required this.opacity,
-    required this.blurSigma,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     for (final orb in orbs) {
-      final scaledSize = orb.size * orb.scale;
+      final angle = orb.t * 2 * math.pi;
+      final m = orb.motionScale;
+
+      final dx = (math.sin(angle + orb.phaseOffset) * 60 +
+          math.sin(angle * 0.7 + orb.phaseOffset) * 30) * m;
+      final dy = (math.cos(angle * 1.3 + orb.phaseOffset) * 40 +
+          math.cos(angle * 0.5 + orb.phaseOffset) * 20) * m;
+      final scale = 1.0 + math.sin(angle * 0.8 + orb.phaseOffset) * 0.15;
+
+      final scaledSize = orb.size * scale;
       final radius = scaledSize / 2;
 
       Offset center;
       if (orb.anchorTopRight) {
         center = Offset(
-          size.width + orb.baseOffset.dx + orb.translation.dx,
-          orb.baseOffset.dy + radius + orb.translation.dy,
+          size.width + orb.baseOffset.dx + dx,
+          orb.baseOffset.dy + radius + dy,
         );
       } else if (orb.anchorBottomLeft) {
         center = Offset(
-          orb.baseOffset.dx + radius + orb.translation.dx,
-          size.height + orb.baseOffset.dy + orb.translation.dy,
+          orb.baseOffset.dx + radius + dx,
+          size.height + orb.baseOffset.dy + dy,
+        );
+      } else if (orb.anchorBottomRight) {
+        center = Offset(
+          size.width + orb.baseOffset.dx + dx,
+          size.height + orb.baseOffset.dy + dy,
         );
       } else if (orb.anchorCenter) {
         center = Offset(
-          size.width / 2 + orb.translation.dx,
-          size.height / 2 + orb.translation.dy,
+          size.width / 2 + dx,
+          size.height / 2 + dy,
         );
       } else {
-        center = orb.baseOffset + orb.translation;
+        // Top-left default
+        center = Offset(
+          size.width * orb.sizeRatio * 0.3 + orb.baseOffset.dx + dx,
+          size.height * orb.sizeRatio * 0.3 + orb.baseOffset.dy + dy,
+        );
       }
 
       final gradient = RadialGradient(
         colors: [
-          orb.colors[0].withOpacity(opacity),
-          orb.colors[1].withOpacity(opacity * 0.6),
-          orb.colors[1].withOpacity(0),
+          orb.colors[0].withValues(alpha: opacity),
+          orb.colors[0].withValues(alpha: opacity * 0.7),
+          orb.colors[1].withValues(alpha: opacity * 0.3),
+          orb.colors[1].withValues(alpha: 0),
         ],
-        stops: const [0.0, 0.5, 1.0],
+        stops: const [0.0, 0.3, 0.6, 1.0],
       );
 
       final paint = Paint()
         ..shader = gradient.createShader(
           Rect.fromCircle(center: center, radius: radius),
         )
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, blurSigma);
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, Platform.isAndroid ? 20 : 50);
 
       canvas.drawCircle(center, radius, paint);
     }
@@ -217,18 +273,38 @@ class _OrbsPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_OrbsPainter oldDelegate) {
-    return oldDelegate.opacity != opacity ||
-        oldDelegate.blurSigma != blurSigma ||
-        !_orbsEqual(oldDelegate.orbs, orbs);
+    // Only repaint when orb positions changed noticeably (reduce GPU work)
+    for (int i = 0; i < orbs.length; i++) {
+      if ((orbs[i].t - oldDelegate.orbs[i].t).abs() > 0.005) return true;
+    }
+    return false;
   }
+}
 
-  bool _orbsEqual(List<_OrbData> a, List<_OrbData> b) {
-    if (a.length != b.length) return false;
-    for (int i = 0; i < a.length; i++) {
-      if (a[i].translation != b[i].translation || a[i].scale != b[i].scale) {
-        return false;
+class _DotGridPainter extends CustomPainter {
+  final double t;
+  final bool isDark;
+
+  _DotGridPainter({required this.t, required this.isDark});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const spacing = 32.0;
+    final offsetX = -t * spacing;
+    final offsetY = -t * spacing;
+
+    final paint = Paint()
+      ..color = (isDark ? Colors.white : Colors.black).withValues(alpha: isDark ? 0.04 : 0.06)
+      ..style = PaintingStyle.fill;
+
+    for (double x = offsetX; x < size.width + spacing; x += spacing) {
+      for (double y = offsetY; y < size.height + spacing; y += spacing) {
+        canvas.drawCircle(Offset(x, y), 0.8, paint);
       }
     }
-    return true;
   }
+
+  @override
+  bool shouldRepaint(_DotGridPainter oldDelegate) =>
+      oldDelegate.t != t || oldDelegate.isDark != isDark;
 }

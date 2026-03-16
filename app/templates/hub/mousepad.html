@@ -33,6 +33,13 @@
                 </svg>
                 Speichern
             </button>
+            <button class="btn-secondary" onclick="newDrawing()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Neu
+            </button>
         </div>
     </div>
 
@@ -104,6 +111,7 @@
     <div class="saved-drawings glass-card">
         <div class="section-header">
             <h3>Gespeicherte Zeichnungen</h3>
+            <span class="drawing-name-display" id="currentDrawingName"></span>
         </div>
         <div class="drawings-grid" id="savedDrawings">
             <div class="empty-state">
@@ -253,10 +261,32 @@
     margin-bottom: 16px;
 }
 
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
 .section-header h3 {
     font-size: 16px;
     font-weight: 600;
     color: var(--text-primary);
+}
+
+.drawing-name-display {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.drawing-card .drawing-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.9);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
 }
 
 .drawings-grid {
@@ -332,6 +362,21 @@
     background: rgba(255,255,255,0.3);
 }
 
+.drawing-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: var(--text-muted);
+    opacity: 0.4;
+}
+
+.drawing-card.active-drawing {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
 .empty-state {
     grid-column: 1 / -1;
     text-align: center;
@@ -352,8 +397,29 @@
 </style>
 {% endblock %}
 
+{% block modals %}
+<div class="modal" id="saveDrawingModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Zeichnung speichern</h3>
+            <button class="modal-close" onclick="closeModal('saveDrawingModal')">&times;</button>
+        </div>
+        <form onsubmit="confirmSave(event)">
+            <div class="form-group">
+                <label for="drawingName">Name</label>
+                <input type="text" id="drawingName" placeholder="Name der Zeichnung" required>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal('saveDrawingModal')">Abbrechen</button>
+                <button type="submit" class="btn-primary">Speichern</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
 {% block scripts %}
-<script>
+<script nonce="{{ g.csp_nonce }}">
 let canvas, ctx;
 let isDrawing = false;
 let currentTool = 'pen';
@@ -364,6 +430,8 @@ let lastY = 0;
 let strokes = [];
 let currentStroke = [];
 let backgroundType = 'blank';
+let currentDrawingId = null;
+let currentDrawingName = '';
 
 document.addEventListener('DOMContentLoaded', () => {
     initCanvas();
@@ -610,103 +678,206 @@ function undoStroke() {
     }
 }
 
-function saveDrawing() {
-    if (strokes.length === 0) {
-        alert('Nichts zum Speichern vorhanden');
-        return;
-    }
-
-    const dataUrl = canvas.toDataURL('image/png');
-    const drawings = JSON.parse(localStorage.getItem('nexus_drawings') || '[]');
-
-    drawings.unshift({
-        id: Date.now(),
-        image: dataUrl,
-        strokes: strokes,
-        background: backgroundType,
-        date: new Date().toISOString()
-    });
-
-    if (drawings.length > 20) {
-        drawings.pop();
-    }
-
-    localStorage.setItem('nexus_drawings', JSON.stringify(drawings));
-    loadSavedDrawings();
-
+function newDrawing() {
+    if (strokes.length > 0 && !confirm('Aktuelle Zeichnung verwerfen?')) return;
     strokes = [];
+    currentDrawingId = null;
+    currentDrawingName = '';
+    updateDrawingNameDisplay();
+    backgroundType = 'blank';
+    document.getElementById('backgroundType').value = 'blank';
     drawBackground();
     document.getElementById('canvasHint').classList.remove('hidden');
 }
 
-function loadSavedDrawings() {
-    const drawings = JSON.parse(localStorage.getItem('nexus_drawings') || '[]');
-    const container = document.getElementById('savedDrawings');
-
-    if (drawings.length === 0) {
-        container.innerHTML = '<div class="empty-state"><span>Noch keine Zeichnungen gespeichert</span></div>';
+function saveDrawing() {
+    if (strokes.length === 0 && !currentDrawingId) {
+        alert('Nichts zum Speichern vorhanden');
         return;
     }
 
-    container.innerHTML = drawings.map(drawing => `
-        <div class="drawing-card" onclick="loadDrawing(${drawing.id})">
-            <img src="${drawing.image}" alt="Zeichnung">
-            <div class="drawing-actions">
-                <span class="drawing-date">${new Date(drawing.date).toLocaleDateString('de-DE')}</span>
-                <div class="drawing-btns">
-                    <button onclick="event.stopPropagation(); downloadDrawing(${drawing.id})" title="Download">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="7 10 12 15 17 10"></polyline>
-                            <line x1="12" y1="15" x2="12" y2="3"></line>
-                        </svg>
-                    </button>
-                    <button onclick="event.stopPropagation(); deleteDrawing(${drawing.id})" title="Löschen">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        </svg>
-                    </button>
+    if (currentDrawingId) {
+        doSave(currentDrawingName);
+    } else {
+        document.getElementById('drawingName').value = '';
+        openModal('saveDrawingModal');
+    }
+}
+
+async function confirmSave(e) {
+    e.preventDefault();
+    const name = document.getElementById('drawingName').value.trim();
+    if (!name) return;
+    closeModal('saveDrawingModal');
+    await doSave(name);
+}
+
+async function doSave(name) {
+    const imageData = canvas.toDataURL('image/png');
+    const payload = {
+        name: name,
+        image_data: imageData,
+        background_type: backgroundType
+    };
+
+    try {
+        let res;
+        if (currentDrawingId) {
+            res = await fetch(buildApiUrl(`/api/hub/drawings/${currentDrawingId}`), {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+        } else {
+            res = await fetch(buildApiUrl('/api/hub/drawings'), {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+        }
+
+        if (res.ok) {
+            const data = await res.json();
+            if (data.drawing) {
+                currentDrawingId = data.drawing.id;
+                currentDrawingName = data.drawing.name;
+                updateDrawingNameDisplay();
+            }
+            loadSavedDrawings();
+        }
+    } catch (err) {
+        console.error('Error saving drawing:', err);
+    }
+}
+
+function updateDrawingNameDisplay() {
+    const el = document.getElementById('currentDrawingName');
+    el.textContent = currentDrawingName ? `Aktuell: ${currentDrawingName}` : '';
+}
+
+async function loadSavedDrawings() {
+    const container = document.getElementById('savedDrawings');
+    try {
+        const res = await fetch(buildApiUrl('/api/hub/drawings'));
+        if (!res.ok) return;
+        const data = await res.json();
+        const drawings = data.drawings || [];
+
+        if (drawings.length === 0) {
+            container.innerHTML = '<div class="empty-state"><span>Noch keine Zeichnungen gespeichert</span></div>';
+            return;
+        }
+
+        container.innerHTML = drawings.map(d => {
+            const date = new Date(d.updated_at || d.created_at).toLocaleDateString('de-DE');
+            const isActive = d.id === currentDrawingId;
+            return `
+            <div class="drawing-card${isActive ? ' active-drawing' : ''}" onclick="loadDrawing(${d.id})">
+                ${d.image_data ? `<img src="${d.image_data}" alt="${escapeHtml(d.name)}">` : `<div class="drawing-placeholder">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+                        <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+                    </svg>
+                </div>`}
+                <div class="drawing-actions" style="opacity: 1; background: linear-gradient(transparent, rgba(0,0,0,0.8));">
+                    <div>
+                        <span class="drawing-name">${escapeHtml(d.name)}</span>
+                        <br><span class="drawing-date">${date}</span>
+                    </div>
+                    <div class="drawing-btns">
+                        <button onclick="event.stopPropagation(); downloadDrawing(${d.id})" title="Download">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                        </button>
+                        <button onclick="event.stopPropagation(); deleteDrawing(${d.id})" title="Löschen">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-            </div>
-        </div>
-    `).join('');
-}
-
-function loadDrawing(id) {
-    const drawings = JSON.parse(localStorage.getItem('nexus_drawings') || '[]');
-    const drawing = drawings.find(d => d.id === id);
-
-    if (drawing) {
-        strokes = drawing.strokes || [];
-        backgroundType = drawing.background || 'blank';
-        document.getElementById('backgroundType').value = backgroundType;
-
-        drawBackground();
-        redrawStrokes();
-        document.getElementById('canvasHint').classList.add('hidden');
+            </div>`;
+        }).join('');
+    } catch (err) {
+        console.log('Drawings API not available');
     }
 }
 
-function downloadDrawing(id) {
-    const drawings = JSON.parse(localStorage.getItem('nexus_drawings') || '[]');
-    const drawing = drawings.find(d => d.id === id);
+async function loadDrawing(id) {
+    try {
+        const res = await fetch(buildApiUrl(`/api/hub/drawings/${id}`));
+        if (!res.ok) return;
+        const data = await res.json();
+        const drawing = data.drawing;
 
-    if (drawing) {
-        const link = document.createElement('a');
-        link.download = `nexus-drawing-${new Date(drawing.date).toISOString().slice(0,10)}.png`;
-        link.href = drawing.image;
-        link.click();
+        if (drawing) {
+            currentDrawingId = drawing.id;
+            currentDrawingName = drawing.name;
+            updateDrawingNameDisplay();
+            backgroundType = drawing.background_type || 'blank';
+            document.getElementById('backgroundType').value = backgroundType;
+
+            drawBackground();
+
+            const img = new Image();
+            img.onload = () => {
+                const dpr = window.devicePixelRatio || 1;
+                ctx.drawImage(img, 0, 0, canvas.width / dpr, canvas.height / dpr);
+            };
+            img.src = drawing.image_data;
+
+            strokes = [];
+            document.getElementById('canvasHint').classList.add('hidden');
+            loadSavedDrawings();
+        }
+    } catch (err) {
+        console.error('Error loading drawing:', err);
     }
 }
 
-function deleteDrawing(id) {
+async function downloadDrawing(id) {
+    try {
+        const res = await fetch(buildApiUrl(`/api/hub/drawings/${id}`));
+        if (!res.ok) return;
+        const data = await res.json();
+        const drawing = data.drawing;
+
+        if (drawing) {
+            const link = document.createElement('a');
+            link.download = `nexus-${drawing.name.replace(/[^a-zA-Z0-9]/g, '-')}.png`;
+            link.href = drawing.image_data;
+            link.click();
+        }
+    } catch (err) {
+        console.error('Error downloading drawing:', err);
+    }
+}
+
+async function deleteDrawing(id) {
     if (!confirm('Zeichnung wirklich löschen?')) return;
-
-    let drawings = JSON.parse(localStorage.getItem('nexus_drawings') || '[]');
-    drawings = drawings.filter(d => d.id !== id);
-    localStorage.setItem('nexus_drawings', JSON.stringify(drawings));
-    loadSavedDrawings();
+    try {
+        await fetch(buildApiUrl(`/api/hub/drawings/${id}`), { method: 'DELETE' });
+        if (currentDrawingId === id) {
+            currentDrawingId = null;
+            currentDrawingName = '';
+            updateDrawingNameDisplay();
+        }
+        loadSavedDrawings();
+    } catch (err) {
+        console.error('Error deleting drawing:', err);
+    }
 }
+
+function escapeHtml(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 </script>
 {% endblock %}

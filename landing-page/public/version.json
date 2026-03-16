@@ -1,13 +1,22 @@
 {
-  "version": "0.2",
-  "versionName": "0.2 Closed Beta",
-  "releaseDate": "2025-01-19",
+  "version": "0.3",
+  "versionName": "0.3 Closed Beta",
+  "releaseDate": "2026-03-16",
   "minSupportedVersion": "0.1",
   "updateUrl": "https://nexus-lifehub.netlify.app/download",
+  "platformUrls": {
+    "android": "https://nexus-lifehub.netlify.app/download#android",
+    "macos": "https://nexus-lifehub.netlify.app/download#macos",
+    "windows": "https://nexus-lifehub.netlify.app/download#windows",
+    "linux": "https://nexus-lifehub.netlify.app/download#linux",
+    "ios": "https://nexus-lifehub.netlify.app/download#ios",
+    "web": "https://nexus-lifehub.netlify.app/download#web"
+  },
   "changelog": [
-    "Neues Landing Page Design",
-    "Orientierungs-basiertes Responsive Design",
-    "Roadmap mit AI-Assistent in Phase 4",
-    "Performance-Verbesserungen"
+    "Flutter App mit nativem Design",
+    "VBB Transit mit Ticketmanagement und Sparpreisen",
+    "Personalisierte Routensuche",
+    "Sicherheitsverbesserungen und Verschlüsselung",
+    "Performance-Optimierungen"
   ]
 }

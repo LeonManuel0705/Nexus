@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 class OfflineAIService {
   static final OfflineAIService _instance = OfflineAIService._internal();
   factory OfflineAIService() => _instance;
@@ -122,7 +120,7 @@ Bitte formuliere deine Frage entsprechend.''';
 
     return '''**Lösung der Gleichung**
 
-Gegeben: ${a == 1 ? '' : a}x ${operator} ${match.group(3)} = $c
+Gegeben: ${a == 1 ? '' : a}x $operator ${match.group(3)} = $c
 
 **Lösungsweg:**
 1. ${a}x = $c ${operator == '+' ? '-' : '+'} ${match.group(3)}

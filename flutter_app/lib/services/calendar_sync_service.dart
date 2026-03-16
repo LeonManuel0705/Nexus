@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'database_service.dart' if (dart.library.html) 'database_service_web.dart';
@@ -48,7 +49,13 @@ class CalendarSyncService {
         final newAccessToken = await _refreshAccessToken(refreshToken);
         if (newAccessToken != null) {
           _accessToken = newAccessToken;
+        } else {
+          _accessToken = null;
+          return null;
         }
+      } else {
+        _accessToken = null;
+        return null;
       }
     }
 
@@ -56,7 +63,10 @@ class CalendarSyncService {
   }
 
   Future<String?> _refreshAccessToken(String refreshToken) async {
-
+    // Token refresh requires server-side client_secret.
+    // Return null to signal re-authentication is needed.
+    _accessToken = null;
+    _tokenExpiry = null;
     return null;
   }
 
@@ -116,8 +126,7 @@ class CalendarSyncService {
 
         return calendars;
       }
-    } catch (e) {
-
+    } catch (_) {
     }
 
     return await _db.getGoogleCalendars();
@@ -148,7 +157,7 @@ class CalendarSyncService {
         params['timeMax'] = DateTime.now().add(const Duration(days: 365)).toUtc().toIso8601String();
       }
 
-      final uri = Uri.parse('$_calendarApiBase/calendars/$calendarId/events')
+      final uri = Uri.parse('$_calendarApiBase/calendars/${Uri.encodeComponent(calendarId)}/events')
           .replace(queryParameters: params);
 
       final response = await http.get(
@@ -203,7 +212,8 @@ class CalendarSyncService {
         return syncCalendar(calendarId, syncToken: null);
       }
     } catch (e) {
-      return SyncResult(success: false, error: 'Sync fehlgeschlagen: $e');
+      debugPrint('Calendar sync error: $e');
+      return SyncResult(success: false, error: 'Kalender-Sync fehlgeschlagen');
     }
 
     return SyncResult(success: false, error: 'Unbekannter Fehler');
@@ -244,13 +254,17 @@ class CalendarSyncService {
 
     await _db.insertGoogleEvent(event);
 
-    if (!_connectivity.isOnline.value) {
+    final queuePayload = {
+      ...event.toApiMap(),
+      'calendar_id': calendarId,
+    };
 
+    if (!_connectivity.isOnline.value) {
       await _offlineQueue.enqueue(
         operationType: OperationType.create,
         entityType: EntityType.googleEvent,
         entityId: event.id,
-        payload: event.toApiMap(),
+        payload: queuePayload,
       );
       return event;
     }
@@ -261,14 +275,14 @@ class CalendarSyncService {
         operationType: OperationType.create,
         entityType: EntityType.googleEvent,
         entityId: event.id,
-        payload: event.toApiMap(),
+        payload: queuePayload,
       );
       return event;
     }
 
     try {
       final response = await http.post(
-        Uri.parse('$_calendarApiBase/calendars/$calendarId/events'),
+        Uri.parse('$_calendarApiBase/calendars/${Uri.encodeComponent(calendarId)}/events'),
         headers: {
           'Authorization': 'Bearer $accessToken',
           'Content-Type': 'application/json',
@@ -283,12 +297,11 @@ class CalendarSyncService {
         return syncedEvent;
       }
     } catch (e) {
-
       await _offlineQueue.enqueue(
         operationType: OperationType.create,
         entityType: EntityType.googleEvent,
         entityId: event.id,
-        payload: event.toApiMap(),
+        payload: queuePayload,
       );
     }
 
@@ -298,12 +311,17 @@ class CalendarSyncService {
   Future<bool> updateEvent(GoogleEvent event) async {
     await _db.updateGoogleEvent(event.copyWith(isSynced: false));
 
+    final queuePayload = {
+      ...event.toApiMap(),
+      'calendar_id': event.calendarId,
+    };
+
     if (!_connectivity.isOnline.value) {
       await _offlineQueue.enqueue(
         operationType: OperationType.update,
         entityType: EntityType.googleEvent,
         entityId: event.id,
-        payload: event.toApiMap(),
+        payload: queuePayload,
       );
       return true;
     }
@@ -314,14 +332,14 @@ class CalendarSyncService {
         operationType: OperationType.update,
         entityType: EntityType.googleEvent,
         entityId: event.id,
-        payload: event.toApiMap(),
+        payload: queuePayload,
       );
       return true;
     }
 
     try {
       final response = await http.put(
-        Uri.parse('$_calendarApiBase/calendars/${event.calendarId}/events/${event.id}'),
+        Uri.parse('$_calendarApiBase/calendars/${Uri.encodeComponent(event.calendarId)}/events/${Uri.encodeComponent(event.id)}'),
         headers: {
           'Authorization': 'Bearer $accessToken',
           'Content-Type': 'application/json',
@@ -338,7 +356,7 @@ class CalendarSyncService {
         operationType: OperationType.update,
         entityType: EntityType.googleEvent,
         entityId: event.id,
-        payload: event.toApiMap(),
+        payload: queuePayload,
       );
     }
 
@@ -371,7 +389,7 @@ class CalendarSyncService {
 
     try {
       final response = await http.delete(
-        Uri.parse('$_calendarApiBase/calendars/$calendarId/events/$eventId'),
+        Uri.parse('$_calendarApiBase/calendars/${Uri.encodeComponent(calendarId)}/events/${Uri.encodeComponent(eventId)}'),
         headers: {'Authorization': 'Bearer $accessToken'},
       );
 
@@ -404,6 +422,9 @@ class CalendarSyncService {
   Future<void> processOfflineQueue() async {
     if (!_connectivity.isOnline.value) return;
 
+    final accessToken = await _getValidAccessToken();
+    if (accessToken == null) return;
+
     final operations = await _offlineQueue.getPendingOperations();
     final eventOps = operations.where((op) => op.entityType == EntityType.googleEvent);
 
@@ -412,15 +433,66 @@ class CalendarSyncService {
 
       switch (op.operationType) {
         case OperationType.create:
+          if (op.payload != null && op.entityId != null) {
+            final calendarId = op.payload!['calendar_id'] as String? ?? 'primary';
+            try {
+              final response = await http.post(
+                Uri.parse('$_calendarApiBase/calendars/${Uri.encodeComponent(calendarId)}/events'),
+                headers: {
+                  'Authorization': 'Bearer $accessToken',
+                  'Content-Type': 'application/json',
+                },
+                body: jsonEncode(op.payload),
+              );
 
+              if (response.statusCode == 200) {
+                final data = jsonDecode(response.body) as Map<String, dynamic>;
+                final syncedEvent = GoogleEvent.fromApiResponse(data, calendarId).copyWith(isSynced: true);
+                await _db.deleteGoogleEvent(op.entityId!);
+                await _db.insertGoogleEvent(syncedEvent);
+                success = true;
+              }
+            } catch (e) {
+            }
+          }
           break;
+
         case OperationType.update:
+          if (op.payload != null && op.entityId != null) {
+            final calendarId = op.payload!['calendar_id'] as String? ?? 'primary';
+            try {
+              final response = await http.put(
+                Uri.parse('$_calendarApiBase/calendars/${Uri.encodeComponent(calendarId)}/events/${Uri.encodeComponent(op.entityId!)}'),
+                headers: {
+                  'Authorization': 'Bearer $accessToken',
+                  'Content-Type': 'application/json',
+                },
+                body: jsonEncode(op.payload),
+              );
 
+              if (response.statusCode == 200) {
+                final existingEvent = await _db.getGoogleEvent(op.entityId!);
+                if (existingEvent != null) {
+                  await _db.updateGoogleEvent(existingEvent.copyWith(isSynced: true));
+                }
+                success = true;
+              }
+            } catch (e) {
+            }
+          }
           break;
+
         case OperationType.delete:
           final calendarId = op.payload?['calendar_id'] as String?;
           if (calendarId != null && op.entityId != null) {
-            success = await deleteEvent(op.entityId!, calendarId);
+            try {
+              final response = await http.delete(
+                Uri.parse('$_calendarApiBase/calendars/${Uri.encodeComponent(calendarId)}/events/${Uri.encodeComponent(op.entityId!)}'),
+                headers: {'Authorization': 'Bearer $accessToken'},
+              );
+              success = response.statusCode == 204 || response.statusCode == 200 || response.statusCode == 410;
+            } catch (e) {
+            }
           }
           break;
       }
@@ -428,6 +500,90 @@ class CalendarSyncService {
       if (success && op.id != null) {
         await _db.markOperationCompleted(op.id!);
       }
+    }
+  }
+
+  Future<void> initialize() async {
+    _offlineQueue.registerProcessor(EntityType.googleEvent, _processGoogleEventOperation);
+
+    _connectivity.onConnected(() async {
+      await Future.delayed(const Duration(seconds: 2));
+      await processOfflineQueue();
+      await syncAllCalendars();
+    });
+  }
+
+  Future<bool> _processGoogleEventOperation(PendingOperation op) async {
+    final accessToken = await _getValidAccessToken();
+    if (accessToken == null) return false;
+
+    switch (op.operationType) {
+      case OperationType.create:
+        if (op.payload != null && op.entityId != null) {
+          final calendarId = op.payload!['calendar_id'] as String? ?? 'primary';
+          try {
+            final response = await http.post(
+              Uri.parse('$_calendarApiBase/calendars/${Uri.encodeComponent(calendarId)}/events'),
+              headers: {
+                'Authorization': 'Bearer $accessToken',
+                'Content-Type': 'application/json',
+              },
+              body: jsonEncode(op.payload),
+            );
+
+            if (response.statusCode == 200) {
+              final data = jsonDecode(response.body) as Map<String, dynamic>;
+              final syncedEvent = GoogleEvent.fromApiResponse(data, calendarId).copyWith(isSynced: true);
+              await _db.deleteGoogleEvent(op.entityId!);
+              await _db.insertGoogleEvent(syncedEvent);
+              return true;
+            }
+          } catch (e) {
+            return false;
+          }
+        }
+        return false;
+
+      case OperationType.update:
+        if (op.payload != null && op.entityId != null) {
+          final calendarId = op.payload!['calendar_id'] as String? ?? 'primary';
+          try {
+            final response = await http.put(
+              Uri.parse('$_calendarApiBase/calendars/${Uri.encodeComponent(calendarId)}/events/${Uri.encodeComponent(op.entityId!)}'),
+              headers: {
+                'Authorization': 'Bearer $accessToken',
+                'Content-Type': 'application/json',
+              },
+              body: jsonEncode(op.payload),
+            );
+
+            if (response.statusCode == 200) {
+              final existingEvent = await _db.getGoogleEvent(op.entityId!);
+              if (existingEvent != null) {
+                await _db.updateGoogleEvent(existingEvent.copyWith(isSynced: true));
+              }
+              return true;
+            }
+          } catch (e) {
+            return false;
+          }
+        }
+        return false;
+
+      case OperationType.delete:
+        final calendarId = op.payload?['calendar_id'] as String?;
+        if (calendarId != null && op.entityId != null) {
+          try {
+            final response = await http.delete(
+              Uri.parse('$_calendarApiBase/calendars/${Uri.encodeComponent(calendarId)}/events/${Uri.encodeComponent(op.entityId!)}'),
+              headers: {'Authorization': 'Bearer $accessToken'},
+            );
+            return response.statusCode == 204 || response.statusCode == 200 || response.statusCode == 410;
+          } catch (e) {
+            return false;
+          }
+        }
+        return false;
     }
   }
 }

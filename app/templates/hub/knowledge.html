@@ -107,7 +107,15 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<style>
+@keyframes itemFadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.knowledge-entry.animate-in { animation: itemFadeInUp 0.25s ease-out both; }
+.topic-card.animate-in { animation: itemFadeInUp 0.2s ease-out both; }
+</style>
+<script nonce="{{ g.csp_nonce }}">
 let entries = [];
 let topics = [];
 let currentTopic = 'all';
@@ -160,12 +168,37 @@ function renderTopics() {
             </div>
         `;
     }).join('');
+
+    let delay = 0;
+    container.querySelectorAll('.topic-card').forEach(el => {
+        el.classList.add('animate-in');
+        el.style.animationDelay = `${delay}ms`;
+        delay += 30;
+    });
 }
 
 function selectTopic(topic) {
+    const oldTopic = currentTopic;
     currentTopic = topic;
     renderTopics();
-    renderEntries();
+
+    const container = document.getElementById('entriesList');
+    const topicIds = defaultTopics.map(t => t.id);
+    const direction = topicIds.indexOf(topic) > topicIds.indexOf(oldTopic) ? 1 : -1;
+
+    container.style.transition = 'opacity 0.15s ease, transform 0.15s ease';
+    container.style.opacity = '0';
+    container.style.transform = `translateX(${direction * -20}px)`;
+
+    setTimeout(() => {
+        renderEntries();
+        container.style.transition = 'none';
+        container.style.transform = `translateX(${direction * 20}px)`;
+        void container.offsetHeight;
+        container.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
+        container.style.opacity = '1';
+        container.style.transform = 'translateX(0)';
+    }, 150);
 }
 
 function renderEntries() {
@@ -202,16 +235,23 @@ function renderEntries() {
         const preview = e.content ? e.content.substring(0, 100) + (e.content.length > 100 ? '...' : '') : '';
         const topic = defaultTopics.find(t => t.id === e.topic);
         return `
-            <div class="knowledge-entry" onclick="viewEntry('${e.id}')">
+            <div class="knowledge-entry" onclick="viewEntry('${escapeHtml(e.id)}')">
                 <div class="entry-header">
-                    <span class="entry-title">${e.title}</span>
-                    <span class="tag">${topic?.name || e.topic}</span>
+                    <span class="entry-title">${escapeHtml(e.title)}</span>
+                    <span class="tag">${escapeHtml(topic?.name || e.topic)}</span>
                 </div>
-                <div class="entry-preview">${preview}</div>
-                ${e.tags ? `<div class="entry-tags">${e.tags.split(',').map(t => `<span class="tag">${t.trim()}</span>`).join('')}</div>` : ''}
+                <div class="entry-preview">${escapeHtml(preview)}</div>
+                ${e.tags ? `<div class="entry-tags">${e.tags.split(',').map(t => `<span class="tag">${escapeHtml(t.trim())}</span>`).join('')}</div>` : ''}
             </div>
         `;
     }).join('');
+
+    let delay = 0;
+    container.querySelectorAll('.knowledge-entry').forEach(el => {
+        el.classList.add('animate-in');
+        el.style.animationDelay = `${delay}ms`;
+        delay += 40;
+    });
 }
 
 function searchEntries() {
@@ -226,9 +266,9 @@ function viewEntry(id) {
     const topic = defaultTopics.find(t => t.id === e.topic);
     document.getElementById('viewEntryTitle').textContent = e.title;
     document.getElementById('viewEntryContent').innerHTML = `
-        <div class="entry-topic"><span class="tag">${topic?.icon || ''} ${topic?.name || e.topic}</span></div>
-        <div class="entry-body">${e.content ? e.content.replace(/\n/g, '<br>') : '<em>Kein Inhalt</em>'}</div>
-        ${e.tags ? `<div class="entry-tags" style="margin-top: 16px;">${e.tags.split(',').map(t => `<span class="tag">${t.trim()}</span>`).join('')}</div>` : ''}
+        <div class="entry-topic"><span class="tag">${escapeHtml((topic?.icon || '') + ' ' + (topic?.name || e.topic))}</span></div>
+        <div class="entry-body">${e.content ? escapeHtml(e.content).replace(/\n/g, '<br>') : '<em>Kein Inhalt</em>'}</div>
+        ${e.tags ? `<div class="entry-tags" style="margin-top: 16px;">${e.tags.split(',').map(t => `<span class="tag">${escapeHtml(t.trim())}</span>`).join('')}</div>` : ''}
         <div class="entry-meta" style="margin-top: 16px; font-size: 12px; color: var(--text-muted);">
             ${e.created_at ? `Erstellt: ${new Date(e.created_at).toLocaleDateString('de-DE')}` : ''}
         </div>

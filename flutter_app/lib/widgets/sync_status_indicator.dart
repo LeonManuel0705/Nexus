@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../services/connectivity_service.dart';
 import '../theme.dart';
 
@@ -85,8 +84,8 @@ class SyncStatusIndicator extends StatelessWidget {
 
   Widget _buildSyncingIndicator(BuildContext context) {
     if (compact) {
-      return Padding(
-        padding: const EdgeInsets.all(12),
+      return const Padding(
+        padding: EdgeInsets.all(12),
         child: SizedBox(
           width: 20,
           height: 20,
@@ -190,7 +189,7 @@ class SyncStatusIndicator extends StatelessWidget {
                     Text(
                       sublabel,
                       style: TextStyle(
-                        color: color.withOpacity(0.7),
+                        color: color.withValues(alpha: 0.7),
                         fontSize: 11,
                       ),
                     ),

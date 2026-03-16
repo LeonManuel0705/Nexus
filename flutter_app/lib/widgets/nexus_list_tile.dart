@@ -1,5 +1,7 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../theme.dart';
+import '../utils/platform_utils.dart';
 
 class NexusListTile extends StatelessWidget {
   final Widget? leading;
@@ -17,6 +19,7 @@ class NexusListTile extends StatelessWidget {
   final String? swipeRightLabel;
   final bool isSelected;
   final EdgeInsetsGeometry? contentPadding;
+  final bool useGlass;
 
   const NexusListTile({
     super.key,
@@ -35,21 +38,29 @@ class NexusListTile extends StatelessWidget {
     this.swipeRightLabel,
     this.isSelected = false,
     this.contentPadding,
+    this.useGlass = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    Widget listTile = Container(
+    final tileContainer = Container(
       decoration: BoxDecoration(
         color: isSelected
-            ? NexusTheme.primary.withOpacity(0.1)
-            : (isDark ? NexusTheme.darkCard : NexusTheme.lightCard),
+            ? NexusTheme.primary.withValues(alpha: isDark ? 0.2 : 0.15)
+            : (isDark
+                ? Colors.white.withValues(alpha: shouldUseBlur ? 0.08 : 0.14)
+                : Colors.white.withValues(alpha: shouldUseBlur ? 0.65 : 0.80)),
         borderRadius: BorderRadius.circular(12),
-        border: isSelected
-            ? Border.all(color: NexusTheme.primary.withOpacity(0.3))
-            : null,
+        border: Border.all(
+          color: isSelected
+              ? NexusTheme.primary.withValues(alpha: 0.4)
+              : (isDark
+                  ? Colors.white.withValues(alpha: 0.12)
+                  : Colors.white.withValues(alpha: 0.8)),
+          width: isSelected ? 1.5 : 1,
+        ),
       ),
       child: ListTile(
         leading: leading,
@@ -67,6 +78,16 @@ class NexusListTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
         ),
       ),
+    );
+
+    Widget listTile = ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: shouldUseBlur
+          ? BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+              child: tileContainer,
+            )
+          : tileContainer,
     );
 
     if (onSwipeLeft != null || onSwipeRight != null) {
@@ -116,7 +137,7 @@ class NexusListTile extends StatelessWidget {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(12),
       ),
       alignment: alignment,
@@ -163,11 +184,17 @@ class NexusCheckboxTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+    final checkboxContainer = Container(
       decoration: BoxDecoration(
-        color: isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
+        color: isDark
+            ? Colors.white.withValues(alpha: shouldUseBlur ? 0.08 : 0.14)
+            : Colors.white.withValues(alpha: shouldUseBlur ? 0.65 : 0.80),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.12)
+              : Colors.white.withValues(alpha: 0.8),
+        ),
       ),
       child: CheckboxListTile(
         title: Text(
@@ -190,6 +217,19 @@ class NexusCheckboxTile extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
+      ),
+    );
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: shouldUseBlur
+            ? BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                child: checkboxContainer,
+              )
+            : checkboxContainer,
       ),
     );
   }

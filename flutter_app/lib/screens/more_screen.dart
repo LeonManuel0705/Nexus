@@ -1,453 +1,271 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import '../build_info.dart';
+import '../main.dart';
 import '../theme.dart';
-import 'training_screen.dart';
-import 'pomodoro_screen.dart';
-import 'projects_screen.dart';
-import 'knowledge_screen.dart';
-import 'email_screen.dart';
-import 'review_screen.dart';
-import 'settings_screen.dart';
-import 'mousepad_screen.dart';
-import 'bookmarks_screen.dart';
-import 'notes_screen.dart';
-import 'assistant_screen.dart';
-import 'iserv_screen.dart';
-import 'vbb_screen.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/animated_list_item.dart';
 
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key});
 
+  static const _sections = [
+    (
+      title: 'Alltag',
+      items: [
+        (index: 1, icon: Icons.task_alt_outlined, label: 'Aufgaben', color: Color(0xFF6366F1)),
+        (index: 5, icon: Icons.timer_outlined, label: 'Pomodoro', color: Color(0xFFF97316)),
+        (index: 2, icon: Icons.calendar_today_outlined, label: 'Kalender', color: Color(0xFF6366F1)),
+        (index: 15, icon: Icons.train_outlined, label: 'Fahrplan', color: Color(0xFFEF4444)),
+      ],
+    ),
+    (
+      title: 'Bereiche',
+      items: [
+        (index: 3, icon: Icons.school_outlined, label: 'Schule', color: Color(0xFF3B82F6)),
+        (index: 6, icon: Icons.fitness_center_outlined, label: 'Training', color: Color(0xFFEC4899)),
+        (index: 7, icon: Icons.folder_outlined, label: 'Projekte', color: Color(0xFF8B5CF6)),
+        (index: 8, icon: Icons.lightbulb_outlined, label: 'Wissen', color: Color(0xFF06B6D4)),
+        (index: 16, icon: Icons.bookmark_outline, label: 'Lesezeichen', color: Color(0xFFFACC15)),
+      ],
+    ),
+    (
+      title: 'Tools',
+      items: [
+        (index: 9, icon: Icons.email_outlined, label: 'E-Mail', color: Color(0xFFEF4444)),
+        (index: 10, icon: Icons.show_chart_outlined, label: 'Review', color: Color(0xFF10B981)),
+        (index: 11, icon: Icons.draw_outlined, label: 'Zeichnen', color: Color(0xFF8B5CF6)),
+        (index: 12, icon: Icons.smart_toy_outlined, label: 'Assistent', color: Color(0xFF6366F1)),
+        (index: 14, icon: Icons.note_outlined, label: 'Notizen', color: Color(0xFFFACC15)),
+        (index: 17, icon: Icons.dns_outlined, label: 'IServ', color: Color(0xFF3B82F6)),
+      ],
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    int globalIndex = 0;
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
       children: [
-        Text(
-          'Mehr',
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
-        const SizedBox(height: 8),
+        NexusTheme.gradientText('Mehr', fontSize: 36),
+        const SizedBox(height: 4),
         Text(
           'Alle Funktionen auf einen Blick',
-          style: Theme.of(context).textTheme.bodyMedium,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+          ),
         ),
         const SizedBox(height: 24),
 
-        Text(
-          'Produktivität',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
+        for (final section in _sections) ...[
+          Text(
+            section.title.toUpperCase(),
+            style: NexusTheme.sectionLabel(isDark),
           ),
-        ),
-        const SizedBox(height: 12),
-
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.3,
-          children: [
-            _buildFeatureCard(
-              context,
-              icon: Icons.timer,
-              label: 'Pomodoro',
-              description: 'Fokus-Timer',
-              color: NexusTheme.pomodoroColor,
-              onTap: () => _navigateTo(context, const PomodoroScreen(), 'Pomodoro'),
-            ),
-            _buildFeatureCard(
-              context,
-              icon: Icons.folder_special,
-              label: 'Projekte',
-              description: 'Projektmanagement',
-              color: NexusTheme.projectsColor,
-              onTap: () => _navigateTo(context, const ProjectsScreen(), 'Projekte'),
-            ),
-            _buildFeatureCard(
-              context,
-              icon: Icons.auto_stories,
-              label: 'Wissen',
-              description: 'Wissensbasis',
-              color: NexusTheme.knowledgeColor,
-              onTap: () => _navigateTo(context, const KnowledgeScreen(), 'Wissen'),
-            ),
-            _buildFeatureCard(
-              context,
-              icon: Icons.rate_review,
-              label: 'Review',
-              description: 'Tages-Reflexion',
-              color: NexusTheme.reviewColor,
-              onTap: () => _navigateTo(context, const ReviewScreen(), 'Review'),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 24),
-
-        Text(
-          'Tools',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.3,
-          children: [
-            _buildFeatureCard(
-              context,
-              icon: Icons.draw,
-              label: 'Zeichnen',
-              description: 'Mousepad',
-              color: const Color(0xFF8B5CF6),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const MousepadScreen()),
-              ),
-            ),
-            _buildFeatureCard(
-              context,
-              icon: Icons.bookmark,
-              label: 'Lesezeichen',
-              description: 'Links speichern',
-              color: const Color(0xFFF59E0B),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const BookmarksScreen()),
-              ),
-            ),
-            _buildFeatureCard(
-              context,
-              icon: Icons.sticky_note_2,
-              label: 'Notizen',
-              description: 'Schnelle Notizen',
-              color: const Color(0xFF10B981),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const NotesScreen()),
-              ),
-            ),
-            _buildFeatureCard(
-              context,
-              icon: Icons.smart_toy,
-              label: 'Assistent',
-              description: 'KI-Hilfe offline',
-              color: const Color(0xFF3B82F6),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AssistantScreen()),
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 24),
-
-        Text(
-          'Schule & Bildung',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        _buildLargeFeatureCard(
-          context,
-          icon: Icons.school,
-          label: 'IServ',
-          description: 'Schulplattform & Aufgaben',
-          color: const Color(0xFF059669),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const IServScreen()),
-          ),
-        ),
-
-        const SizedBox(height: 24),
-
-        Text(
-          'Transport',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        _buildLargeFeatureCard(
-          context,
-          icon: Icons.directions_transit,
-          label: 'VBB Fahrinfo',
-          description: 'Öffentlicher Nahverkehr Berlin',
-          color: const Color(0xFFDC2626),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const VbbScreen()),
-          ),
-        ),
-
-        const SizedBox(height: 24),
-
-        Text(
-          'Fitness & Gesundheit',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        _buildLargeFeatureCard(
-          context,
-          icon: Icons.fitness_center,
-          label: 'Training',
-          description: 'Workouts & Trainingsplan',
-          color: NexusTheme.trainingColor,
-          onTap: () => _navigateTo(context, const TrainingScreen(), 'Training'),
-        ),
-
-        const SizedBox(height: 24),
-
-        Text(
-          'Kommunikation',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        _buildLargeFeatureCard(
-          context,
-          icon: Icons.email,
-          label: 'E-Mail',
-          description: 'Schnellzugriff auf E-Mail-Konten',
-          color: NexusTheme.emailColor,
-          onTap: () => _navigateTo(context, const EmailScreen(), 'E-Mail'),
-        ),
-
-        const SizedBox(height: 24),
-
-        Text(
-          'Einstellungen',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        Card(
-          child: Column(
+          const SizedBox(height: 12),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 2.2,
             children: [
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: NexusTheme.primaryColor.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(Icons.settings, color: NexusTheme.primaryColor),
+              for (final item in section.items)
+                AnimatedListItem(
+                  index: globalIndex++,
+                  child: _buildModuleCard(context, isDark, item.index, item.icon, item.label, item.color),
                 ),
-                title: const Text('Einstellungen'),
-                subtitle: const Text('App-Konfiguration'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _navigateTo(context, const SettingsScreen(), 'Einstellungen'),
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: NexusTheme.info.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(Icons.info_outline, color: NexusTheme.info),
-                ),
-                title: const Text('Über Nexus'),
-                subtitle: const Text('Version 0.1 closed beta'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => _showAboutDialog(context),
-              ),
             ],
           ),
-        ),
+          const SizedBox(height: 24),
+        ],
 
-        const SizedBox(height: 100),
+        // Settings & About
+        AnimatedListItem(
+          index: globalIndex++,
+          child: GlassCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                _buildSettingsRow(
+                  context, isDark,
+                  icon: Icons.settings_outlined,
+                  label: 'Einstellungen',
+                  color: const Color(0xFF71717A),
+                  onTap: () => MainScreen.navigateTo(13),
+                ),
+                Divider(
+                  height: 1,
+                  color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
+                ),
+                _buildSettingsRow(
+                  context, isDark,
+                  icon: Icons.info_outline,
+                  label: 'Über Nexus',
+                  subtitle: '${BuildInfo.versionName} (Build ${BuildInfo.buildNumber})',
+                  color: NexusTheme.primaryColor,
+                  onTap: () => _showAboutDialog(context),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildFeatureCard(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required String description,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              Text(
-                description,
-                style: Theme.of(context).textTheme.bodySmall,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLargeFeatureCard(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required String description,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(icon, color: color, size: 32),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      description,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.chevron_right,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? NexusTheme.darkTextMuted
-                    : NexusTheme.lightTextMuted,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _navigateTo(BuildContext context, Widget screen, String title) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          appBar: AppBar(
-            title: Text(title),
-          ),
-          body: SafeArea(child: screen),
-        ),
-      ),
-    );
-  }
-
-  void _showAboutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: NexusTheme.primaryGradient,
-                ),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.hub, color: Colors.white, size: 24),
+  Widget _buildModuleCard(BuildContext context, bool isDark, int index, IconData icon, String label, Color color) {
+    return GlassCard(
+      onTap: () => MainScreen.navigateTo(index),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: isDark ? 0.2 : 0.1),
+              borderRadius: BorderRadius.circular(10),
             ),
-            const SizedBox(width: 12),
-            const Text('Nexus'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Your Personal Productivity Hub'),
-            const SizedBox(height: 16),
-            _buildInfoRow('Version', '0.1 closed beta'),
-            _buildInfoRow('Entwickler', 'Leon Manuel Töpper'),
-            _buildInfoRow('Plattform', 'Flutter'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Schließen'),
+            child: Icon(icon, size: 20, color: color),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : const Color(0xFF18181B),
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+  Widget _buildSettingsRow(BuildContext context, bool isDark, {
+    required IconData icon,
+    required String label,
+    String? subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: isDark ? 0.2 : 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : const Color(0xFF18181B),
+                  )),
+                  if (subtitle != null)
+                    Text(subtitle, style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                    )),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 20, color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAboutDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF18181B).withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: NexusTheme.primaryGradient),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.hub, color: Colors.white, size: 32),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Nexus', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF18181B))),
+                  const SizedBox(height: 4),
+                  Text('Dein persönlicher Produktivitäts-Hub', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: NexusTheme.lightTextMuted)),
+                  const SizedBox(height: 20),
+                  _buildInfoChip('Version', '${BuildInfo.versionName} (${BuildInfo.buildNumber})', isDark),
+                  const SizedBox(height: 8),
+                  _buildInfoChip('Entwickler', 'Leon Manuel Töpper', isDark),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Schließen', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoChip(String label, String value, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
-          Text(value),
+          Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted)),
+          Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? Colors.white : const Color(0xFF18181B))),
         ],
       ),
     );

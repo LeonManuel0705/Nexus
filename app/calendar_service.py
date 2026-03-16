@@ -1,9 +1,14 @@
 import subprocess
 import json
+import logging
 import os
+import shutil
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
+from pathlib import Path
 import re
+
+from .crypto_utils import encrypt_file, decrypt_file
 
 try:
     import EventKit
@@ -18,22 +23,73 @@ try:
 except ImportError:
     CALDAV_AVAILABLE = False
 
-CALDAV_ACCOUNTS_FILE = os.path.join(os.path.dirname(__file__), '..', 'caldav_accounts.json')
+import socket
+from urllib.parse import urlparse
+
+CALDAV_ACCOUNTS_FILE = Path(__file__).parent.parent / 'data' / 'caldav_accounts.json'
+CALDAV_TIMEOUT = 15
+
+def _validate_caldav_url(url: str) -> Optional[str]:
+    """Validate CalDAV URL to prevent SSRF. Returns error message or None if valid."""
+    import ipaddress as _ipaddress
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return "Invalid URL"
+    if parsed.scheme not in ('http', 'https'):
+        return "Only http:// and https:// URLs are allowed"
+    hostname = parsed.hostname or ''
+    if not hostname:
+        return "Invalid URL: no hostname"
+    blocked_hosts = {'localhost', '127.0.0.1', '0.0.0.0', '169.254.169.254', '[::1]', '::1'}
+    if hostname in blocked_hosts:
+        return "Connection to localhost or metadata endpoints is not allowed"
+    try:
+        addr = _ipaddress.ip_address(hostname)
+        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+            return "Connection to internal addresses is not allowed"
+    except ValueError:
+        pass
+    try:
+        resolved = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for family, _type, _proto, _canonname, sockaddr in resolved:
+            ip_str = sockaddr[0]
+            try:
+                addr = _ipaddress.ip_address(ip_str)
+                if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+                    return "Connection to internal addresses is not allowed"
+            except ValueError:
+                pass
+    except socket.gaierror:
+        return "Cannot resolve hostname"
+    return None
+
+_OLD_CALDAV_FILE = Path(__file__).parent.parent / 'caldav_accounts.json'
+if _OLD_CALDAV_FILE.exists() and not CALDAV_ACCOUNTS_FILE.exists():
+    CALDAV_ACCOUNTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(_OLD_CALDAV_FILE), str(CALDAV_ACCOUNTS_FILE))
+
+def _escape_ical_value(value: str) -> str:
+    """Escape special characters in iCalendar property values per RFC 5545."""
+    if not value:
+        return ''
+    value = str(value)
+    value = value.replace('\\', '\\\\')
+    value = value.replace('\r\n', '\\n')
+    value = value.replace('\n', '\\n')
+    value = value.replace('\r', '\\n')
+    value = value.replace(';', '\\;')
+    value = value.replace(',', '\\,')
+    return value
 
 def load_caldav_accounts() -> List[Dict]:
-
     try:
-        if os.path.exists(CALDAV_ACCOUNTS_FILE):
-            with open(CALDAV_ACCOUNTS_FILE, 'r') as f:
-                return json.load(f)
-    except:
-        pass
-    return []
+        return decrypt_file(CALDAV_ACCOUNTS_FILE) or []
+    except Exception:
+        return []
 
 def save_caldav_accounts(accounts: List[Dict]):
-
-    with open(CALDAV_ACCOUNTS_FILE, 'w') as f:
-        json.dump(accounts, f)
+    encrypt_file(accounts, CALDAV_ACCOUNTS_FILE)
 
 def add_caldav_account(name: str, url: str, username: str, password: str, provider: str = 'caldav') -> Dict:
 
@@ -56,8 +112,12 @@ def add_caldav_account(name: str, url: str, username: str, password: str, provid
     if not url:
         return {"success": False, "error": "CalDAV URL is required"}
 
+    url_error = _validate_caldav_url(url)
+    if url_error:
+        return {"success": False, "error": url_error}
+
     try:
-        client = caldav.DAVClient(url=url, username=username, password=password)
+        client = caldav.DAVClient(url=url, username=username, password=password, timeout=CALDAV_TIMEOUT)
         principal = client.principal()
         calendars = principal.calendars()
 
@@ -85,7 +145,8 @@ def add_caldav_account(name: str, url: str, username: str, password: str, provid
             }
         }
     except Exception as e:
-        return {"success": False, "error": f"Failed to connect: {str(e)}"}
+        logging.error(f"CalDAV connect error: {e}")
+        return {"success": False, "error": "Failed to connect to calendar"}
 
 def remove_caldav_account(account_id: str) -> Dict:
 
@@ -139,7 +200,8 @@ def fetch_caldav_events(account_id: str = None, days_ahead: int = 30,
             client = caldav.DAVClient(
                 url=account['url'],
                 username=account['username'],
-                password=account['password']
+                password=account['password'],
+                timeout=CALDAV_TIMEOUT
             )
             principal = client.principal()
             calendars = principal.calendars()
@@ -230,11 +292,21 @@ def create_caldav_event(account_id: str, calendar_url: str, title: str,
     if not account:
         return {"success": False, "error": "Account not found"}
 
+    url_error = _validate_caldav_url(calendar_url)
+    if url_error:
+        return {"success": False, "error": url_error}
+
+    account_host = urlparse(account['url']).hostname
+    calendar_host = urlparse(calendar_url).hostname
+    if not account_host or not calendar_host or account_host.lower() != calendar_host.lower():
+        return {"success": False, "error": "Calendar URL does not match account server"}
+
     try:
         client = caldav.DAVClient(
             url=account['url'],
             username=account['username'],
-            password=account['password']
+            password=account['password'],
+            timeout=CALDAV_TIMEOUT
         )
 
         cal = caldav.Calendar(client=client, url=calendar_url)
@@ -264,9 +336,9 @@ UID:{uid}
 DTSTAMP:{datetime.now().strftime('%Y%m%dT%H%M%SZ')}
 DTSTART:{dtstart_str}
 DTEND:{dtend_str}
-SUMMARY:{title}
-DESCRIPTION:{description}
-LOCATION:{location}
+SUMMARY:{_escape_ical_value(title)}
+DESCRIPTION:{_escape_ical_value(description)}
+LOCATION:{_escape_ical_value(location)}
 END:VEVENT
 END:VCALENDAR"""
 
@@ -274,7 +346,8 @@ END:VCALENDAR"""
 
         return {"success": True, "event_id": uid}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logging.error(f"CalDAV create event error: {e}")
+        return {"success": False, "error": "Calendar error"}
 
 def get_macos_calendar_events_eventkit(days_ahead: int = 14) -> Dict:
 
@@ -375,10 +448,11 @@ def get_macos_calendar_events_eventkit(days_ahead: int = 14) -> Dict:
         }
 
     except Exception as e:
+        logging.error(f"EventKit error: {e}")
         return {
             "success": False,
             "error": "eventkit_error",
-            "message": f"EventKit error: {str(e)}",
+            "message": "Calendar error",
             "events": []
         }
 
@@ -439,10 +513,11 @@ def get_macos_calendar_events_icalbuddy(days_ahead: int = 14) -> Dict:
             "events": []
         }
     except Exception as e:
+        logging.error(f"icalBuddy error: {e}")
         return {
             "success": False,
             "error": "unknown",
-            "message": str(e),
+            "message": "Calendar error",
             "events": []
         }
 
@@ -530,7 +605,8 @@ def get_calendars() -> Dict:
         return {"success": True, "calendars": calendars}
 
     except Exception as e:
-        return {"success": False, "calendars": [], "error": str(e)}
+        logging.error(f"Calendar list error: {e}")
+        return {"success": False, "calendars": [], "error": "Calendar error"}
 
 def merge_events(macos_events: List[Dict], local_events: List[Dict]) -> List[Dict]:
 

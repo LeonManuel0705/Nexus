@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
@@ -105,7 +106,15 @@ class EncryptionService {
 
   Future<Map<String, dynamic>?> getGoogleTokens(String email) async {
     final tokenKey = 'google_token_${_hashString(email)}';
-    final tokens = await getCredential(tokenKey);
+    var tokens = await getCredential(tokenKey);
+    if (tokens == null) {
+      final legacyKey = 'google_token_${_legacyHashString(email)}';
+      tokens = await getCredential(legacyKey);
+      if (tokens != null) {
+        await storeCredential(tokenKey, tokens);
+        await deleteCredential(legacyKey);
+      }
+    }
     if (tokens == null) return null;
     return jsonDecode(tokens) as Map<String, dynamic>;
   }
@@ -123,10 +132,18 @@ class EncryptionService {
   String _hashString(String input) {
     final bytes = utf8.encode(input.toLowerCase());
     final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
+  String _legacyHashString(String input) {
+    final bytes = utf8.encode(input.toLowerCase());
+    final digest = sha256.convert(bytes);
     return digest.toString().substring(0, 16);
   }
 
   Future<Map<String, String>> getAllKeys() async {
+    assert(kDebugMode, 'getAllKeys() must not be called in release builds');
+    if (!kDebugMode) return {};
     return await _secureStorage.readAll();
   }
 }

@@ -1,9 +1,12 @@
 import os
 import json
 import logging
+import socket
 import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
+
+from .crypto_utils import encrypt_file, decrypt_file
 
 class IServWarningFilter(logging.Filter):
     def filter(self, record):
@@ -19,6 +22,34 @@ from IServAPI import IServAPI
 
 CREDENTIALS_FILE = Path(__file__).parent.parent / 'data' / 'iserv_credentials.json'
 
+def _validate_hostname_ssrf(hostname: str) -> str:
+    """Validate a hostname to prevent SSRF. Returns error message or None if valid."""
+    import ipaddress as _ipaddress
+    if not hostname:
+        return "Invalid hostname"
+    blocked_hosts = {'localhost', '127.0.0.1', '0.0.0.0', '169.254.169.254', '[::1]', '::1'}
+    if hostname in blocked_hosts:
+        return "Connection to localhost or metadata endpoints is not allowed"
+    try:
+        addr = _ipaddress.ip_address(hostname)
+        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+            return "Connection to internal addresses is not allowed"
+    except ValueError:
+        pass
+    try:
+        resolved = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for family, _type, _proto, _canonname, sockaddr in resolved:
+            ip_str = sockaddr[0]
+            try:
+                addr = _ipaddress.ip_address(ip_str)
+                if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+                    return "Connection to internal addresses is not allowed"
+            except ValueError:
+                pass
+    except socket.gaierror:
+        return "Cannot resolve hostname"
+    return None
+
 class IServService:
 
     def __init__(self):
@@ -26,26 +57,36 @@ class IServService:
         self.connected = False
         self.user_info = None
         self.iserv_url = None
+        self._try_auto_connect()
+
+    def _try_auto_connect(self):
+        creds = self.load_credentials()
+        if creds:
+            try:
+                result = self.connect(
+                    username=creds.get('username'),
+                    password=creds.get('password'),
+                    iserv_url=creds.get('iserv_url')
+                )
+                if result.get('success'):
+                    logging.info('IServ auto-connected from saved credentials')
+            except Exception as e:
+                logging.debug(f'IServ auto-connect failed: {e}')
 
     def load_credentials(self):
 
-        if CREDENTIALS_FILE.exists():
-            try:
-                with open(CREDENTIALS_FILE, 'r') as f:
-                    return json.load(f)
-            except Exception:
-                return None
-        return None
+        try:
+            return decrypt_file(CREDENTIALS_FILE)
+        except Exception:
+            return None
 
     def save_credentials(self, username: str, password: str, iserv_url: str):
 
-        CREDENTIALS_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(CREDENTIALS_FILE, 'w') as f:
-            json.dump({
-                'username': username,
-                'password': password,
-                'iserv_url': iserv_url
-            }, f)
+        encrypt_file({
+            'username': username,
+            'password': password,
+            'iserv_url': iserv_url
+        }, CREDENTIALS_FILE)
 
     def delete_credentials(self):
 
@@ -67,6 +108,11 @@ class IServService:
 
         try:
             iserv_url = iserv_url.replace('https://', '').replace('http://', '').strip('/')
+
+            hostname = iserv_url.split('/')[0].split(':')[0]
+            ssrf_error = _validate_hostname_ssrf(hostname)
+            if ssrf_error:
+                return {'success': False, 'error': ssrf_error}
 
             self.api = IServAPI(
                 username=username,
@@ -110,7 +156,7 @@ class IServService:
             elif 'ssl' in error_str or 'certificate' in error_str:
                 return {'success': False, 'error': 'SSL-Zertifikatfehler'}
             else:
-                return {'success': False, 'error': f'Verbindungsfehler: {str(e)}'}
+                return {'success': False, 'error': 'IServ-Verbindung fehlgeschlagen'}
 
     def disconnect(self):
 
@@ -143,7 +189,8 @@ class IServService:
             notifications = self.api.get_notifications()
             return {'success': True, 'notifications': notifications}
         except Exception as e:
-            return {'success': False, 'error': str(e)}
+            logging.error(f"IServ notifications error: {e}")
+            return {'success': False, 'error': 'Fehler beim Abrufen der Benachrichtigungen'}
 
     def get_badges(self):
 
@@ -154,7 +201,8 @@ class IServService:
             badges = self.api.get_badges()
             return {'success': True, 'badges': badges}
         except Exception as e:
-            return {'success': False, 'error': str(e)}
+            logging.error(f"IServ badges error: {e}")
+            return {'success': False, 'error': 'Fehler beim Abrufen der Badges'}
 
     def mark_notification_read(self, notification_id: str):
 
@@ -165,7 +213,8 @@ class IServService:
             self.api.read_notification(notification_id)
             return {'success': True}
         except Exception as e:
-            return {'success': False, 'error': str(e)}
+            logging.error(f"IServ mark notification error: {e}")
+            return {'success': False, 'error': 'Fehler beim Aktualisieren der Benachrichtigung'}
 
     def get_emails(self, folder: str = 'INBOX', limit: int = 20):
 
@@ -176,7 +225,8 @@ class IServService:
             emails = self.api.get_emails(path=folder, length=limit)
             return {'success': True, 'emails': emails}
         except Exception as e:
-            return {'success': False, 'error': str(e)}
+            logging.error(f"IServ emails error: {e}")
+            return {'success': False, 'error': 'Fehler beim Abrufen der E-Mails'}
 
     def get_mail_folders(self):
 
@@ -187,7 +237,8 @@ class IServService:
             folders = self.api.get_mail_folders()
             return {'success': True, 'folders': folders}
         except Exception as e:
-            return {'success': False, 'error': str(e)}
+            logging.error(f"IServ mail folders error: {e}")
+            return {'success': False, 'error': 'Fehler beim Abrufen der Ordner'}
 
     def get_email_detail(self, msg_id: str, folder: str = 'INBOX'):
 
@@ -214,7 +265,8 @@ class IServService:
                 }
             return {'success': False, 'error': 'E-Mail nicht gefunden'}
         except Exception as e:
-            return {'success': False, 'error': str(e)}
+            logging.error(f"IServ email detail error: {e}")
+            return {'success': False, 'error': 'Fehler beim Abrufen der E-Mail'}
 
     def send_email(self, to: str, subject: str, body: str, attachments: list = None):
 
@@ -230,7 +282,8 @@ class IServService:
             )
             return {'success': True}
         except Exception as e:
-            return {'success': False, 'error': str(e)}
+            logging.error(f"IServ send email error: {e}")
+            return {'success': False, 'error': 'Fehler beim Senden der E-Mail'}
 
     def get_upcoming_events(self, days: int = 60):
 
@@ -255,7 +308,8 @@ class IServService:
                     all_events.append(events)
                 logging.info(f"IServ get_events returned {len(events) if isinstance(events, list) else 1} events")
         except Exception as e:
-            errors.append(f"get_events: {str(e)}")
+            logging.error(f"IServ get_events error: {e}")
+            errors.append("get_events: Abruf fehlgeschlagen")
 
         try:
             events = self.api.get_upcoming_events()
@@ -266,7 +320,8 @@ class IServService:
                     all_events.append(events)
                 logging.info(f"IServ get_upcoming_events returned {len(events) if isinstance(events, list) else 1} events")
         except Exception as e:
-            errors.append(f"get_upcoming_events: {str(e)}")
+            logging.error(f"IServ get_upcoming_events error: {e}")
+            errors.append("get_upcoming_events: Abruf fehlgeschlagen")
 
         try:
             if hasattr(self.api, 'get_calendar'):
@@ -277,7 +332,8 @@ class IServService:
                     else:
                         all_events.append(calendar)
         except Exception as e:
-            errors.append(f"get_calendar: {str(e)}")
+            logging.error(f"IServ get_calendar error: {e}")
+            errors.append("get_calendar: Abruf fehlgeschlagen")
 
         seen = set()
         unique_events = []
@@ -338,7 +394,8 @@ class IServService:
             events = self.api.get_events(start=start_str, end=end_str)
             return {'success': True, 'events': events if events else []}
         except Exception as e:
-            return {'success': False, 'error': str(e)}
+            logging.error(f"IServ events in range error: {e}")
+            return {'success': False, 'error': 'Fehler beim Abrufen der Termine'}
 
     def create_event(self, title: str, start: datetime, end: datetime = None,
                      description: str = '', location: str = ''):
@@ -356,7 +413,8 @@ class IServService:
             )
             return {'success': True}
         except Exception as e:
-            return {'success': False, 'error': str(e)}
+            logging.error(f"IServ create event error: {e}")
+            return {'success': False, 'error': 'Fehler beim Erstellen des Termins'}
 
     def get_exercises(self):
 
@@ -473,7 +531,8 @@ class IServService:
             storage = self.api.get_disk_space()
             return {'success': True, 'storage': storage}
         except Exception as e:
-            return {'success': False, 'error': str(e)}
+            logging.error(f"IServ storage error: {e}")
+            return {'success': False, 'error': 'Fehler beim Abrufen der Speicherinformationen'}
 
     def list_files(self, path: str = '/'):
 
@@ -487,7 +546,8 @@ class IServService:
             files = webdav_client.list(path)
             return {'success': True, 'files': files, 'path': path}
         except Exception as e:
-            return {'success': False, 'error': str(e)}
+            logging.error(f"IServ list files error: {e}")
+            return {'success': False, 'error': 'Fehler beim Abrufen der Dateien'}
 
     def get_file_info(self, path: str):
 
@@ -499,7 +559,8 @@ class IServService:
             info = webdav_client.info(path)
             return {'success': True, 'info': info}
         except Exception as e:
-            return {'success': False, 'error': str(e)}
+            logging.error(f"IServ file info error: {e}")
+            return {'success': False, 'error': 'Fehler beim Abrufen der Dateiinformationen'}
 
     def download_file(self, remote_path: str, local_path: str):
 
@@ -511,7 +572,8 @@ class IServService:
             webdav_client.download(remote_path, local_path)
             return {'success': True, 'local_path': local_path}
         except Exception as e:
-            return {'success': False, 'error': str(e)}
+            logging.error(f"IServ download file error: {e}")
+            return {'success': False, 'error': 'Fehler beim Herunterladen der Datei'}
 
     def search_users(self, query: str):
 
@@ -522,7 +584,8 @@ class IServService:
             users = self.api.search_users(query)
             return {'success': True, 'users': users}
         except Exception as e:
-            return {'success': False, 'error': str(e)}
+            logging.error(f"IServ search users error: {e}")
+            return {'success': False, 'error': 'Fehler bei der Benutzersuche'}
 
     VERTRETUNGSPLAN_CACHE_DIR = Path(__file__).parent.parent / 'data' / 'vertretungsplan_cache'
 
@@ -789,8 +852,6 @@ class IServService:
             return {
                 'success': False,
                 'error': 'Keine PDFs gefunden',
-                'html_preview': response.text[:3000],
-                'searched_urls': unique_links,
                 'media_elements': all_media[:20],
                 'page_title': soup.title.string if soup.title else 'No title'
             }
@@ -803,8 +864,14 @@ class IServService:
 
         try:
             for pdf in pdfs:
-                filename = pdf.get('filename', f'page_{pdf.get("page", 1)}.pdf')
+                import re as _re
+                raw_name = pdf.get('filename', f'page_{pdf.get("page", 1)}.pdf')
+                filename = _re.sub(r'[^a-zA-Z0-9._-]', '_', raw_name)[:100]
+                if not filename.endswith('.pdf'):
+                    filename += '.pdf'
                 file_path = cache_dir / filename
+                if not file_path.resolve().parent == cache_dir.resolve():
+                    continue
 
                 pdf_data = base64.b64decode(pdf['data'])
                 with open(file_path, 'wb') as f:
@@ -822,8 +889,7 @@ class IServService:
                     for pdf in pdfs
                 ]
             }
-            with open(meta_file, 'w') as f:
-                json.dump(meta, f)
+            encrypt_file(meta, meta_file)
 
             logging.info(f"Cached {len(pdfs)} Vertretungsplan files")
         except Exception as e:
@@ -841,12 +907,13 @@ class IServService:
             }
 
         try:
-            with open(meta_file, 'r') as f:
-                meta = json.load(f)
+            meta = decrypt_file(meta_file)
 
             pdfs = []
             for file_info in meta.get('files', []):
                 file_path = cache_dir / file_info['filename']
+                if not file_path.resolve().parent == cache_dir.resolve():
+                    continue
                 if file_path.exists():
                     with open(file_path, 'rb') as f:
                         pdf_data = f.read()
@@ -874,9 +941,10 @@ class IServService:
             }
 
         except Exception as e:
+            logging.error(f"IServ Vertretungsplan cache error: {e}")
             return {
                 'success': False,
-                'error': f'Cache-Fehler: {str(e)}',
+                'error': 'Cache-Fehler',
                 'offline': True
             }
 
@@ -917,7 +985,8 @@ class IServService:
                 return {'success': False, 'error': 'Kein Bild gefunden'}
 
         except Exception as e:
-            return {'success': False, 'error': str(e)}
+            logging.error(f"IServ Vertretungsplan image error: {e}")
+            return {'success': False, 'error': 'Fehler beim Abrufen des Vertretungsplans'}
 
 iserv_service = IServService()
 

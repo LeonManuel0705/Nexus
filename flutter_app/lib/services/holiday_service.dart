@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/event.dart';
 import 'database_service.dart' if (dart.library.html) 'database_service_web.dart';
@@ -32,64 +32,65 @@ class HolidayService {
     'Thüringen': 'TH',
   };
 
-  /// Get the user's selected Bundesland
   Future<String?> getUserBundesland() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('user_bundesland');
   }
 
-  /// Get the user's graduation year
   Future<int?> getGraduationYear() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt('graduation_year');
   }
 
-  /// Get the Bundesland code for API calls
   String? getBundeslandCode(String bundesland) {
     return bundeslandCodes[bundesland];
   }
 
-  /// Fetch and import all holidays for the user's Bundesland until graduation year
   Future<List<Event>> importHolidays({int? year, bool force = false}) async {
-    print('HolidayService: Starting holiday import (force: $force)');
+    if (kDebugMode) print('HolidayService: Starting holiday import (force: $force)');
 
     final bundesland = await getUserBundesland();
     if (bundesland == null) {
-      print('HolidayService: No Bundesland selected');
+      if (kDebugMode) print('HolidayService: No Bundesland selected');
       return [];
     }
 
     final code = getBundeslandCode(bundesland);
     if (code == null) {
-      print('HolidayService: Unknown Bundesland code for: $bundesland');
+      if (kDebugMode) print('HolidayService: Unknown Bundesland code for: $bundesland');
       return [];
     }
 
     final graduationYear = await getGraduationYear() ?? (DateTime.now().year + 3);
-    print('HolidayService: Importing holidays for $bundesland ($code) until graduation year $graduationYear');
+
+    final graduationCutoff = DateTime(graduationYear, 9, 1);
+    if (kDebugMode) print('HolidayService: Importing holidays for $bundesland ($code) until graduation year $graduationYear (cutoff: $graduationCutoff)');
 
     final currentYear = DateTime.now().year;
     final events = <Event>[];
 
     for (int targetYear = currentYear; targetYear <= graduationYear; targetYear++) {
-      print('HolidayService: Fetching holidays for year $targetYear...');
+      if (kDebugMode) print('HolidayService: Fetching holidays for year $targetYear...');
 
       final publicHolidays = await _fetchPublicHolidays(code, targetYear);
       events.addAll(publicHolidays);
-      print('HolidayService: Got ${publicHolidays.length} public holidays for $targetYear');
+      if (kDebugMode) print('HolidayService: Got ${publicHolidays.length} public holidays for $targetYear');
 
       if (targetYear == currentYear) {
         final prevYearSchoolHolidays = await _fetchSchoolHolidays(code, targetYear - 1);
         events.addAll(prevYearSchoolHolidays);
-        print('HolidayService: Got ${prevYearSchoolHolidays.length} school holidays for ${targetYear - 1} (may span into $targetYear)');
+        if (kDebugMode) print('HolidayService: Got ${prevYearSchoolHolidays.length} school holidays for ${targetYear - 1} (may span into $targetYear)');
       }
 
       final schoolHolidays = await _fetchSchoolHolidays(code, targetYear);
       events.addAll(schoolHolidays);
-      print('HolidayService: Got ${schoolHolidays.length} school holidays for $targetYear');
+      if (kDebugMode) print('HolidayService: Got ${schoolHolidays.length} school holidays for $targetYear');
     }
 
-    final savedCount = await _saveHolidaysToDatabase(events);
+    final filteredEvents = events.where((e) => e.startTime.isBefore(graduationCutoff)).toList();
+    if (kDebugMode) print('HolidayService: Filtered from ${events.length} to ${filteredEvents.length} events (removed post-graduation holidays)');
+
+    final savedCount = await _saveHolidaysToDatabase(filteredEvents);
 
     if (!kIsWeb) {
       final db = await _db.database;
@@ -98,22 +99,21 @@ class HolidayService {
         ['holiday', 'vacation']
       );
       final dbCount = verifyResult.first['c'] as int? ?? 0;
-      print('HolidayService: Import complete - fetched: ${events.length}, newly saved: $savedCount, total in DB: $dbCount');
+      if (kDebugMode) print('HolidayService: Import complete - fetched: ${events.length}, newly saved: $savedCount, total in DB: $dbCount');
 
       if (savedCount == 0 && events.isNotEmpty && dbCount == 0) {
-        print('HolidayService: WARNING - No holidays saved to database! Check for errors above.');
+        if (kDebugMode) print('HolidayService: WARNING - No holidays saved to database! Check for errors above.');
       }
     } else {
-      print('HolidayService: Fetched ${events.length} holiday events (web platform - not persisted)');
+      if (kDebugMode) print('HolidayService: Fetched ${events.length} holiday events (web platform - not persisted)');
     }
 
     return events;
   }
 
-  /// Fetch public holidays from feiertage-api.de
   Future<List<Event>> _fetchPublicHolidays(String bundeslandCode, int year) async {
     try {
-      print('HolidayService: Fetching public holidays for $bundeslandCode/$year');
+      if (kDebugMode) print('HolidayService: Fetching public holidays for $bundeslandCode/$year');
 
       final response = await _dio.get(
         'https://feiertage-api.de/api/',
@@ -128,7 +128,7 @@ class HolidayService {
       );
 
       if (response.statusCode != 200 || response.data == null) {
-        print('HolidayService: Public holidays API failed - status: ${response.statusCode}');
+        if (kDebugMode) print('HolidayService: Public holidays API failed - status: ${response.statusCode}');
         return _fetchPublicHolidaysNager(bundeslandCode, year);
       }
 
@@ -138,7 +138,7 @@ class HolidayService {
       } else if (response.data is String) {
         data = jsonDecode(response.data as String) as Map<String, dynamic>;
       } else {
-        print('HolidayService: Unexpected response type for public holidays');
+        if (kDebugMode) print('HolidayService: Unexpected response type for public holidays');
         return _fetchPublicHolidaysNager(bundeslandCode, year);
       }
 
@@ -163,21 +163,20 @@ class HolidayService {
           endTime: DateTime(date.year, date.month, date.day, 23, 59),
           allDay: true,
           category: 'holiday',
-          color: '#EF4444', // Red color for holidays
+          color: '#EF4444',
           createdAt: now,
           updatedAt: now,
         ));
       }
 
-      print('HolidayService: Got ${events.length} public holidays');
+      if (kDebugMode) print('HolidayService: Got ${events.length} public holidays');
       return events;
     } catch (e) {
-      print('HolidayService: Error fetching public holidays: $e - trying fallback');
+      if (kDebugMode) print('HolidayService: Error fetching public holidays: $e - trying fallback');
       return _fetchPublicHolidaysNager(bundeslandCode, year);
     }
   }
 
-  /// Fallback: Fetch public holidays from date.nager.at
   Future<List<Event>> _fetchPublicHolidaysNager(String bundeslandCode, int year) async {
     try {
       final response = await _dio.get(
@@ -232,22 +231,32 @@ class HolidayService {
     }
   }
 
-  /// Fetch school holidays from ferien-api.de
   Future<List<Event>> _fetchSchoolHolidays(String bundeslandCode, int year) async {
+
+    final events = await _fetchSchoolHolidaysFromSchulferienApi(bundeslandCode, year);
+    if (events.isNotEmpty) {
+      return events;
+    }
+
+    if (kDebugMode) print('HolidayService: Primary API returned no data, trying fallback...');
+    return _fetchSchoolHolidaysFromFerienApi(bundeslandCode, year);
+  }
+
+  Future<List<Event>> _fetchSchoolHolidaysFromSchulferienApi(String bundeslandCode, int year) async {
     try {
-      print('HolidayService: Fetching school holidays for $bundeslandCode/$year');
+      if (kDebugMode) print('HolidayService: Fetching school holidays from schulferien-api.de for $bundeslandCode/$year');
 
       final response = await _dio.get(
-        'https://ferien-api.de/api/v1/holidays/$bundeslandCode/$year',
+        'https://schulferien-api.de/api/v1/$year/$bundeslandCode/',
         options: Options(
           receiveTimeout: const Duration(seconds: 15),
           sendTimeout: const Duration(seconds: 10),
-          responseType: ResponseType.json, // Ensure JSON parsing
+          responseType: ResponseType.json,
         ),
       );
 
       if (response.statusCode != 200 || response.data == null) {
-        print('HolidayService: Failed to fetch school holidays - status: ${response.statusCode}');
+        if (kDebugMode) print('HolidayService: schulferien-api.de failed - status: ${response.statusCode}');
         return [];
       }
 
@@ -257,11 +266,88 @@ class HolidayService {
       } else if (response.data is String) {
         data = jsonDecode(response.data as String) as List<dynamic>;
       } else {
-        print('HolidayService: Unexpected response type: ${response.data.runtimeType}');
+        if (kDebugMode) print('HolidayService: Unexpected response type: ${response.data.runtimeType}');
         return [];
       }
 
-      print('HolidayService: Got ${data.length} school holidays');
+      if (kDebugMode) print('HolidayService: Got ${data.length} school holidays from schulferien-api.de');
+
+      final events = <Event>[];
+      final now = DateTime.now();
+
+      for (final holiday in data) {
+        try {
+
+          final name = (holiday['name_cp'] ?? holiday['name']) as String?;
+          final startStr = holiday['start'] as String?;
+          final endStr = holiday['end'] as String?;
+
+          if (name == null || startStr == null || endStr == null) {
+            if (kDebugMode) print('HolidayService: Skipping holiday with missing data');
+            continue;
+          }
+
+          final start = DateTime.parse(startStr);
+          final end = DateTime.parse(endStr);
+          final id = 'vacation_${bundeslandCode}_${startStr}_${name.hashCode}';
+
+          events.add(Event(
+            id: id,
+            title: name,
+            description: 'Schulferien',
+            startTime: DateTime(start.year, start.month, start.day, 0, 0),
+            endTime: DateTime(end.year, end.month, end.day, 23, 59),
+            allDay: true,
+            category: 'vacation',
+            color: '#22C55E',
+            createdAt: now,
+            updatedAt: now,
+          ));
+
+          if (kDebugMode) print('HolidayService: Added vacation: $name ($startStr - $endStr)');
+        } catch (e) {
+          if (kDebugMode) print('HolidayService: Error parsing holiday entry: $e');
+          continue;
+        }
+      }
+
+      if (kDebugMode) print('HolidayService: Successfully created ${events.length} vacation events');
+      return events;
+    } catch (e) {
+      if (kDebugMode) print('HolidayService: Error fetching from schulferien-api.de: $e');
+      return [];
+    }
+  }
+
+  Future<List<Event>> _fetchSchoolHolidaysFromFerienApi(String bundeslandCode, int year) async {
+    try {
+      if (kDebugMode) print('HolidayService: Fetching school holidays from ferien-api.de for $bundeslandCode/$year');
+
+      final response = await _dio.get(
+        'https://ferien-api.de/api/v1/holidays/$bundeslandCode/$year',
+        options: Options(
+          receiveTimeout: const Duration(seconds: 15),
+          sendTimeout: const Duration(seconds: 10),
+          responseType: ResponseType.json,
+        ),
+      );
+
+      if (response.statusCode != 200 || response.data == null) {
+        if (kDebugMode) print('HolidayService: ferien-api.de failed - status: ${response.statusCode}');
+        return [];
+      }
+
+      List<dynamic> data;
+      if (response.data is List) {
+        data = response.data as List<dynamic>;
+      } else if (response.data is String) {
+        data = jsonDecode(response.data as String) as List<dynamic>;
+      } else {
+        if (kDebugMode) print('HolidayService: Unexpected response type: ${response.data.runtimeType}');
+        return [];
+      }
+
+      if (kDebugMode) print('HolidayService: Got ${data.length} school holidays from ferien-api.de');
 
       final events = <Event>[];
       final now = DateTime.now();
@@ -273,7 +359,6 @@ class HolidayService {
           final endStr = holiday['end'] as String?;
 
           if (name == null || startStr == null || endStr == null) {
-            print('HolidayService: Skipping holiday with missing data');
             continue;
           }
 
@@ -291,29 +376,22 @@ class HolidayService {
             endTime: DateTime(end.year, end.month, end.day, 23, 59),
             allDay: true,
             category: 'vacation',
-            color: '#22C55E', // Green color for vacations
+            color: '#22C55E',
             createdAt: now,
             updatedAt: now,
           ));
-
-          print('HolidayService: Added vacation: $translatedName ($startStr - $endStr)');
         } catch (e) {
-          print('HolidayService: Error parsing holiday entry: $e');
           continue;
         }
       }
 
-      print('HolidayService: Successfully created ${events.length} vacation events');
       return events;
     } catch (e) {
-      print('HolidayService: Error fetching school holidays: $e');
+      if (kDebugMode) print('HolidayService: Error fetching from ferien-api.de: $e');
       return [];
     }
   }
 
-  /// Translate vacation names to German
-  /// API returns names like "osterferien nordrhein-westfalen 2025"
-  /// We want to extract just "Osterferien"
   String _translateVacationName(String name) {
     final translations = {
       'winterferien': 'Winterferien',
@@ -341,11 +419,9 @@ class HolidayService {
     return name;
   }
 
-  /// Save holidays to database (avoiding duplicates)
-  /// Returns the number of events successfully saved
   Future<int> _saveHolidaysToDatabase(List<Event> events) async {
     if (kIsWeb) {
-      print('HolidayService: Skipping DB save on web platform');
+      if (kDebugMode) print('HolidayService: Skipping DB save on web platform');
       return 0;
     }
 
@@ -365,22 +441,21 @@ class HolidayService {
         if (existing.isEmpty) {
           await db.insert('events', event.toMap());
           savedCount++;
-          print('HolidayService: Saved event: ${event.title}');
+          if (kDebugMode) print('HolidayService: Saved event: ${event.title}');
         } else {
           skippedCount++;
         }
       } catch (e) {
         errorCount++;
-        print('HolidayService: ERROR saving event "${event.title}": $e');
-        print('HolidayService: Event data: ${event.toMap()}');
+        if (kDebugMode) print('HolidayService: ERROR saving event "${event.title}": $e');
+        if (kDebugMode) print('HolidayService: Event data: ${event.toMap()}');
       }
     }
 
-    print('HolidayService: Database save complete - saved: $savedCount, skipped (duplicates): $skippedCount, errors: $errorCount');
+    if (kDebugMode) print('HolidayService: Database save complete - saved: $savedCount, skipped (duplicates): $skippedCount, errors: $errorCount');
     return savedCount;
   }
 
-  /// Delete all imported holidays
   Future<void> clearHolidays() async {
     if (kIsWeb) return;
 
@@ -392,14 +467,11 @@ class HolidayService {
     );
   }
 
-  /// Refresh holidays (clear and re-import)
   Future<List<Event>> refreshHolidays() async {
     await clearHolidays();
     return importHolidays();
   }
 
-  /// Check if holidays have been imported for the current year
-  /// Returns true only if BOTH public holidays AND school holidays exist
   Future<bool> hasImportedHolidays() async {
     if (kIsWeb) return true;
 
@@ -407,6 +479,8 @@ class HolidayService {
     final year = DateTime.now().year;
     final startOfYear = DateTime(year, 1, 1);
     final endOfYear = DateTime(year + 1, 6, 30);
+
+    final prevYearStart = DateTime(year - 1, 1, 1);
 
     final holidays = await db.query(
       'events',
@@ -418,19 +492,18 @@ class HolidayService {
     final vacations = await db.query(
       'events',
       where: 'category = ? AND start_time >= ? AND start_time <= ?',
-      whereArgs: ['vacation', startOfYear.toIso8601String(), endOfYear.toIso8601String()],
+      whereArgs: ['vacation', prevYearStart.toIso8601String(), endOfYear.toIso8601String()],
       limit: 1,
     );
 
     final hasHolidays = holidays.isNotEmpty;
     final hasVacations = vacations.isNotEmpty;
 
-    print('HolidayService: hasImportedHolidays - holidays: $hasHolidays, vacations: $hasVacations');
+    if (kDebugMode) print('HolidayService: hasImportedHolidays - holidays: $hasHolidays, vacations: $hasVacations');
 
     return hasHolidays && hasVacations;
   }
 
-  /// Get counts of imported holidays and vacations
   Future<Map<String, int>> getHolidayCounts() async {
     if (kIsWeb) return {'holidays': 0, 'vacations': 0};
 
@@ -452,7 +525,6 @@ class HolidayService {
     };
   }
 
-  /// Get all holidays from database
   Future<List<Event>> getHolidays() async {
     if (kIsWeb) return [];
 

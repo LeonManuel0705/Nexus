@@ -1,58 +1,66 @@
 import 'package:flutter/material.dart';
 
 class NexusTheme {
-
-  static const Color primaryColor = Color(0xFF667EEA);
-  static const Color primaryLight = Color(0xFF8B9EF0);
-  static const Color primaryDark = Color(0xFF5569D4);
-  static const Color secondaryColor = Color(0xFF764BA2);
+  // Primary colors - indigo system from TSX design
+  static const Color primaryColor = Color(0xFF4F46E5); // indigo-600
+  static const Color primaryLight = Color(0xFF6366F1); // indigo-500
+  static const Color primaryDark = Color(0xFF4338CA); // indigo-700
+  static const Color secondaryColor = Color(0xFF9333EA); // purple-600
   static const Color accentColor = Color(0xFFF093FB);
 
   static const List<Color> primaryGradient = [
-    Color(0xFF667EEA),
-    Color(0xFF764BA2),
+    Color(0xFF6366F1), // indigo-500
+    Color(0xFF9333EA), // purple-600
     Color(0xFFF093FB),
   ];
 
-  static const Color accent1 = Color(0xFF667EEA);
-  static const Color accent2 = Color(0xFF764BA2);
+  static const Color accent1 = Color(0xFF6366F1);
+  static const Color accent2 = Color(0xFF9333EA);
   static const Color accent3 = Color(0xFFF093FB);
 
-  static const Color darkBackground = Color(0xFF0F0F1A); // Desktop: #0f0f1a
-  static const Color darkSurface = Color(0xFF1E293B);
-  static const Color darkCard = Color(0xFF1E293B);
-  static const Color darkCardHover = Color(0xFF334155);
-  static const Color darkText = Color(0xFFF8FAFC);
-  static const Color darkTextSecondary = Color(0xFFCBD5E1);
-  static const Color darkTextMuted = Color(0xFF64748B);
-  static const Color darkBorder = Color(0xFF334155);
+  // Dark mode - zinc scale
+  static const Color darkBackground = Color(0xFF09090B); // zinc-950
+  static const Color darkSurface = Color(0xFF18181B); // zinc-900
+  static const Color darkCard = Color(0xFF18181B); // zinc-900
+  static const Color darkCardHover = Color(0xFF27272A); // zinc-800
+  static const Color darkText = Color(0xFFFAFAFA); // zinc-50
+  static const Color darkTextSecondary = Color(0xFFA1A1AA); // zinc-400
+  static const Color darkTextMuted = Color(0xFF71717A); // zinc-500
+  static const Color darkBorder = Color(0xFF27272A); // zinc-800
 
-  static const Color lightBackground = Color(0xFFFAFBFC); // Desktop: #fafbfc
-  static const Color lightSurface = Color(0xFFFFFFFF);
+  // Light mode - zinc scale
+  static const Color lightBackground = Color(0xFFFAFAFA); // zinc-50
+  static const Color lightSurface = Color(0xFFFFFFFF); // white
   static const Color lightCard = Color(0xFFFFFFFF);
-  static const Color lightText = Color(0xFF0F172A);
-  static const Color lightTextSecondary = Color(0xFF475569);
-  static const Color lightTextMuted = Color(0xFF94A3B8);
-  static const Color lightBorder = Color(0xFFE2E8F0);
+  static const Color lightText = Color(0xFF18181B); // zinc-900
+  static const Color lightTextSecondary = Color(0xFF52525B); // zinc-600
+  static const Color lightTextMuted = Color(0xFF71717A); // zinc-500
+  static const Color lightBorder = Color(0xFFE4E4E7); // zinc-200
 
-  static const Color success = Color(0xFF22C55E);
-  static const Color warning = Color(0xFFF59E0B);
-  static const Color danger = Color(0xFFEF4444);
-  static const Color info = Color(0xFF3B82F6);
+  // Semantic colors
+  static const Color success = Color(0xFF10B981); // emerald-500
+  static const Color warning = Color(0xFFF59E0B); // amber-500
+  static const Color danger = Color(0xFFF43F5E); // rose-500
+  static const Color info = Color(0xFF3B82F6); // blue-500
 
   static const Color primary = primaryColor;
   static const Color secondary = secondaryColor;
   static const Color error = danger;
-  static const Color blue = Color(0xFF667EEA);
-  static const Color green = Color(0xFF22C55E);
-  static const Color purple = Color(0xFF764BA2);
-  static const Color gray = Color(0xFF64748B);
+  static const Color blue = Color(0xFF3B82F6);
+  static const Color green = Color(0xFF10B981);
+  static const Color purple = Color(0xFF8B5CF6);
+  static const Color gray = Color(0xFF71717A);
   static const Color orange = Color(0xFFF97316);
   static const Color red = Color(0xFFEF4444);
   static const Color yellow = Color(0xFFFACC15);
   static const Color cyan = Color(0xFF06B6D4);
-  static const Color pink = Color(0xFFF093FB);
+  static const Color pink = Color(0xFFEC4899);
+  static const Color rose = Color(0xFFF43F5E);
+  static const Color amber = Color(0xFFF59E0B);
+  static const Color emerald = Color(0xFF10B981);
+  static const Color indigo = Color(0xFF4F46E5);
 
+  // Feature colors
   static const Color trainingColor = Color(0xFFEC4899);
   static const Color projectsColor = Color(0xFF8B5CF6);
   static const Color knowledgeColor = Color(0xFF06B6D4);
@@ -63,12 +71,103 @@ class NexusTheme {
   static const Color calendarColor = Color(0xFF6366F1);
   static const Color notesColor = Color(0xFFFACC15);
 
+  // Glass morphism
+  static const Color glassLight = Color(0x66FFFFFF); // white/40
+  static const Color glassDark = Color(0x66000000); // black/40
+  static const Color glassBorderLight = Color(0x33FFFFFF); // white/20
+  static const Color glassBorderDark = Color(0x1AFFFFFF); // white/10
+  static const Color glassShadowLight = Color(0x1A000000);
+  static const Color glassShadowDark = Color(0x4D000000);
+
+  static const double glassBlurLight = 10.0;
+  static const double glassBlurMedium = 12.0;
+  static const double glassBlurStrong = 20.0;
+
+  // Helper for gradient text
+  static Widget gradientText(String text, {double fontSize = 36, FontWeight fontWeight = FontWeight.w900, TextAlign? textAlign}) {
+    return Builder(builder: (context) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      return ShaderMask(
+        shaderCallback: (bounds) => LinearGradient(
+          colors: isDark
+              ? [Colors.white, const Color(0xFFA1A1AA)] // white to zinc-400
+              : [const Color(0xFF18181B), const Color(0xFF71717A)], // zinc-900 to zinc-500
+        ).createShader(bounds),
+        child: Text(
+          text,
+          textAlign: textAlign,
+          style: TextStyle(
+            fontSize: fontSize,
+            fontWeight: fontWeight,
+            color: Colors.white,
+            letterSpacing: -0.5,
+            height: 1.1,
+          ),
+        ),
+      );
+    });
+  }
+
+  // Helper for styled input decoration
+  static InputDecoration styledInput({
+    String? hint,
+    String? label,
+    Widget? prefixIcon,
+    Widget? suffixIcon,
+    required bool isDark,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      labelText: label,
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: isDark
+          ? const Color(0xFF27272A).withValues(alpha: 0.5) // zinc-800/50
+          : const Color(0xFFF4F4F5).withValues(alpha: 0.5), // zinc-100/50
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: primaryColor, width: 2),
+      ),
+      hintStyle: TextStyle(
+        color: isDark ? darkTextMuted : lightTextMuted,
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+      ),
+      labelStyle: TextStyle(
+        color: isDark ? darkTextMuted : lightTextMuted,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.5,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    );
+  }
+
+  // Helper for section label style
+  static TextStyle sectionLabel(bool isDark) {
+    return TextStyle(
+      fontSize: 11,
+      fontWeight: FontWeight.w700,
+      color: isDark ? darkTextMuted : lightTextMuted,
+      letterSpacing: 0.8,
+    );
+  }
+
   static ThemeData darkTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
     primaryColor: primaryColor,
     scaffoldBackgroundColor: darkBackground,
-    fontFamily: 'PTSans',
+    fontFamily: 'Inter',
     colorScheme: const ColorScheme.dark(
       primary: primaryColor,
       secondary: secondaryColor,
@@ -83,7 +182,8 @@ class NexusTheme {
       titleTextStyle: TextStyle(
         color: darkText,
         fontSize: 24,
-        fontWeight: FontWeight.bold,
+        fontWeight: FontWeight.w700,
+        fontFamily: 'Inter',
       ),
       iconTheme: IconThemeData(color: darkText),
     ),
@@ -91,24 +191,26 @@ class NexusTheme {
       color: darkCard,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24),
         side: const BorderSide(color: darkBorder, width: 1),
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: darkSurface,
-      indicatorColor: primaryColor.withOpacity(0.2),
+      indicatorColor: primaryColor.withValues(alpha: 0.1),
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) {
           return const TextStyle(
             color: primaryColor,
             fontSize: 12,
             fontWeight: FontWeight.w600,
+            fontFamily: 'Inter',
           );
         }
         return const TextStyle(
           color: darkTextMuted,
           fontSize: 12,
+          fontFamily: 'Inter',
         );
       }),
       iconTheme: WidgetStateProperty.resolveWith((states) {
@@ -125,14 +227,14 @@ class NexusTheme {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: darkCard,
+      fillColor: const Color(0xFF27272A).withValues(alpha: 0.5),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: darkBorder),
+        borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: darkBorder),
+        borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -142,25 +244,26 @@ class NexusTheme {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     ),
     textTheme: const TextTheme(
-      headlineLarge: TextStyle(color: darkText, fontWeight: FontWeight.bold, fontSize: 32),
-      headlineMedium: TextStyle(color: darkText, fontWeight: FontWeight.bold, fontSize: 24),
+      headlineLarge: TextStyle(color: darkText, fontWeight: FontWeight.w900, fontSize: 36, letterSpacing: -0.5),
+      headlineMedium: TextStyle(color: darkText, fontWeight: FontWeight.w700, fontSize: 24, letterSpacing: -0.3),
       headlineSmall: TextStyle(color: darkText, fontWeight: FontWeight.w600, fontSize: 20),
       titleLarge: TextStyle(color: darkText, fontWeight: FontWeight.w600, fontSize: 18),
       titleMedium: TextStyle(color: darkText, fontWeight: FontWeight.w500, fontSize: 16),
       titleSmall: TextStyle(color: darkTextSecondary, fontSize: 14),
-      bodyLarge: TextStyle(color: darkText, fontSize: 16),
-      bodyMedium: TextStyle(color: darkTextSecondary, fontSize: 14),
+      bodyLarge: TextStyle(color: darkText, fontWeight: FontWeight.w500, fontSize: 16),
+      bodyMedium: TextStyle(color: darkTextSecondary, fontWeight: FontWeight.w500, fontSize: 14),
       bodySmall: TextStyle(color: darkTextMuted, fontSize: 12),
+      labelSmall: TextStyle(color: darkTextMuted, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8),
     ),
     dividerColor: darkBorder,
     dialogTheme: DialogThemeData(
       backgroundColor: darkSurface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
     ),
     bottomSheetTheme: const BottomSheetThemeData(
       backgroundColor: darkSurface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
     ),
     snackBarTheme: SnackBarThemeData(
@@ -195,8 +298,8 @@ class NexusTheme {
     ),
     listTileTheme: const ListTileThemeData(
       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      titleTextStyle: TextStyle(color: darkText, fontSize: 16),
-      subtitleTextStyle: TextStyle(color: darkTextSecondary, fontSize: 14),
+      titleTextStyle: TextStyle(color: darkText, fontSize: 16, fontFamily: 'Inter'),
+      subtitleTextStyle: TextStyle(color: darkTextSecondary, fontSize: 14, fontFamily: 'Inter'),
     ),
   );
 
@@ -205,7 +308,7 @@ class NexusTheme {
     brightness: Brightness.light,
     primaryColor: primaryColor,
     scaffoldBackgroundColor: lightBackground,
-    fontFamily: 'PTSans',
+    fontFamily: 'Inter',
     colorScheme: const ColorScheme.light(
       primary: primaryColor,
       secondary: secondaryColor,
@@ -220,7 +323,8 @@ class NexusTheme {
       titleTextStyle: TextStyle(
         color: lightText,
         fontSize: 24,
-        fontWeight: FontWeight.bold,
+        fontWeight: FontWeight.w700,
+        fontFamily: 'Inter',
       ),
       iconTheme: IconThemeData(color: lightText),
     ),
@@ -228,24 +332,26 @@ class NexusTheme {
       color: lightCard,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24),
         side: const BorderSide(color: lightBorder, width: 1),
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: lightSurface,
-      indicatorColor: primaryColor.withOpacity(0.15),
+      indicatorColor: primaryColor.withValues(alpha: 0.1),
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) {
           return const TextStyle(
             color: primaryColor,
             fontSize: 12,
             fontWeight: FontWeight.w600,
+            fontFamily: 'Inter',
           );
         }
         return const TextStyle(
           color: lightTextMuted,
           fontSize: 12,
+          fontFamily: 'Inter',
         );
       }),
       iconTheme: WidgetStateProperty.resolveWith((states) {
@@ -262,42 +368,43 @@ class NexusTheme {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: lightBackground,
+      fillColor: const Color(0xFFF4F4F5).withValues(alpha: 0.5),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: lightBorder),
+        borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: lightBorder),
+        borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: primaryColor, width: 2),
       ),
-      hintStyle: TextStyle(color: lightTextMuted),
+      hintStyle: const TextStyle(color: lightTextMuted),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     ),
     textTheme: const TextTheme(
-      headlineLarge: TextStyle(color: lightText, fontWeight: FontWeight.bold, fontSize: 32),
-      headlineMedium: TextStyle(color: lightText, fontWeight: FontWeight.bold, fontSize: 24),
+      headlineLarge: TextStyle(color: lightText, fontWeight: FontWeight.w900, fontSize: 36, letterSpacing: -0.5),
+      headlineMedium: TextStyle(color: lightText, fontWeight: FontWeight.w700, fontSize: 24, letterSpacing: -0.3),
       headlineSmall: TextStyle(color: lightText, fontWeight: FontWeight.w600, fontSize: 20),
       titleLarge: TextStyle(color: lightText, fontWeight: FontWeight.w600, fontSize: 18),
       titleMedium: TextStyle(color: lightText, fontWeight: FontWeight.w500, fontSize: 16),
       titleSmall: TextStyle(color: lightTextSecondary, fontSize: 14),
-      bodyLarge: TextStyle(color: lightText, fontSize: 16),
-      bodyMedium: TextStyle(color: lightTextSecondary, fontSize: 14),
+      bodyLarge: TextStyle(color: lightText, fontWeight: FontWeight.w500, fontSize: 16),
+      bodyMedium: TextStyle(color: lightTextSecondary, fontWeight: FontWeight.w500, fontSize: 14),
       bodySmall: TextStyle(color: lightTextMuted, fontSize: 12),
+      labelSmall: TextStyle(color: lightTextMuted, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8),
     ),
     dividerColor: lightBorder,
     dialogTheme: DialogThemeData(
       backgroundColor: lightSurface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
     ),
     bottomSheetTheme: const BottomSheetThemeData(
       backgroundColor: lightSurface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
     ),
     snackBarTheme: SnackBarThemeData(
@@ -332,14 +439,14 @@ class NexusTheme {
     ),
     listTileTheme: const ListTileThemeData(
       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      titleTextStyle: TextStyle(color: lightText, fontSize: 16),
-      subtitleTextStyle: TextStyle(color: lightTextSecondary, fontSize: 14),
+      titleTextStyle: TextStyle(color: lightText, fontSize: 16, fontFamily: 'Inter'),
+      subtitleTextStyle: TextStyle(color: lightTextSecondary, fontSize: 14, fontFamily: 'Inter'),
     ),
   );
 }
 
 class GradientDecoration extends BoxDecoration {
-  GradientDecoration({
+  const GradientDecoration({
     super.borderRadius,
   }) : super(
           gradient: const LinearGradient(

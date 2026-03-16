@@ -1,21 +1,34 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../build_info.dart';
 import '../theme.dart';
+import 'notification_service.dart';
 
 class UpdateService {
-  static const String currentVersion = '0.2';
-  static const String currentVersionName = '0.2 Closed Beta';
+  static String get currentVersion => BuildInfo.version;
+  static String get currentVersionName => BuildInfo.versionName;
 
   static const String _versionUrl = 'https://nexus-lifehub.netlify.app/version.json';
   static const Duration _connectionTimeout = Duration(seconds: 2);
+  static const String _skippedVersionKey = 'update_skipped_version';
+  static const List<String> _trustedUpdateDomains = [
+    'nexus-lifehub.netlify.app',
+  ];
 
-  /// Check if an update is available
-  /// Returns null if no update available or connection failed
-  static Future<UpdateInfo?> checkForUpdate() async {
+  static const List<String> _trustedGitHubPaths = [
+    '/Leon-Byte/nexus/releases/',
+    '/Leon-Byte/Nexus/releases/',
+  ];
+
+  /// Check for update. Returns null if no update or if user skipped this version.
+  /// Set [ignoreSkipped] to true to check even for skipped versions (e.g. manual check).
+  static Future<UpdateInfo?> checkForUpdate({bool ignoreSkipped = false}) async {
     try {
       final response = await http.get(Uri.parse(_versionUrl))
           .timeout(_connectionTimeout);
@@ -25,10 +38,20 @@ class UpdateService {
         final remoteVersion = data['version'] as String;
 
         if (_isNewerVersion(remoteVersion, currentVersion)) {
+          if (!ignoreSkipped) {
+            final prefs = await SharedPreferences.getInstance();
+            final skippedVersion = prefs.getString(_skippedVersionKey);
+            if (skippedVersion == remoteVersion) return null;
+          }
+
+          final rawUpdateUrl = _getPlatformUrl(data) ?? data['updateUrl'] as String? ?? 'https://nexus-lifehub.netlify.app/download';
+          final updateUrl = _validateUpdateUrl(rawUpdateUrl)
+              ? rawUpdateUrl
+              : 'https://nexus-lifehub.netlify.app/download';
           return UpdateInfo(
             version: remoteVersion,
             versionName: data['versionName'] as String? ?? remoteVersion,
-            updateUrl: data['updateUrl'] as String? ?? 'https://nexus-lifehub.netlify.app/download',
+            updateUrl: updateUrl,
             changelog: (data['changelog'] as List<dynamic>?)
                 ?.map((e) => e.toString())
                 .toList() ?? [],
@@ -43,7 +66,54 @@ class UpdateService {
     return null;
   }
 
-  /// Compare versions (simple semver comparison)
+  /// Mark a version as skipped so the user won't be notified again.
+  static Future<void> skipVersion(String version) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_skippedVersionKey, version);
+  }
+
+  /// Send a system notification about the available update.
+  static Future<void> sendUpdateNotification(UpdateInfo updateInfo) async {
+    try {
+      final notificationService = NotificationService();
+      if (!notificationService.isInitialized) {
+        await notificationService.initialize();
+      }
+      await notificationService.showNotification(
+        id: 9999,
+        title: 'Nexus Update verfügbar',
+        body: '${updateInfo.versionName} ist jetzt verfügbar. Tippe um herunterzuladen.',
+        payload: updateInfo.updateUrl,
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('Update notification error: $e');
+    }
+  }
+
+  static String? _getPlatformUrl(Map<String, dynamic> data) {
+    final platformUrls = data['platformUrls'] as Map<String, dynamic>?;
+    if (platformUrls == null) return null;
+
+    String platformKey;
+    if (kIsWeb) {
+      platformKey = 'web';
+    } else if (Platform.isAndroid) {
+      platformKey = 'android';
+    } else if (Platform.isIOS) {
+      platformKey = 'ios';
+    } else if (Platform.isMacOS) {
+      platformKey = 'macos';
+    } else if (Platform.isWindows) {
+      platformKey = 'windows';
+    } else if (Platform.isLinux) {
+      platformKey = 'linux';
+    } else {
+      return null;
+    }
+
+    return platformUrls[platformKey] as String?;
+  }
+
   static bool _isNewerVersion(String remote, String current) {
     try {
       final remoteParts = remote.split('.').map(int.parse).toList();
@@ -59,12 +129,31 @@ class UpdateService {
     }
   }
 
-  /// Show update dialog
+  static bool _validateUpdateUrl(String url) {
+    try {
+      final uri = Uri.parse(url);
+      if (uri.scheme != 'https') return false;
+      final host = uri.host.toLowerCase();
+      if (_trustedUpdateDomains.any((domain) =>
+          host == domain || host.endsWith('.$domain'))) {
+        return true;
+      }
+      if (host == 'github.com') {
+        final path = uri.path.toLowerCase();
+        return _trustedGitHubPaths.any((trustedPath) =>
+            path.startsWith(trustedPath.toLowerCase()));
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<void> showUpdateDialog(BuildContext context, UpdateInfo updateInfo) async {
     return showDialog(
       context: context,
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.7),
+      barrierColor: Colors.black.withValues(alpha: 0.7),
       builder: (context) => UpdateDialog(updateInfo: updateInfo),
     );
   }
@@ -104,26 +193,26 @@ class UpdateDialog extends StatelessWidget {
             colors: isDark
                 ? [
                     NexusTheme.darkCard,
-                    NexusTheme.darkCard.withOpacity(0.95),
+                    NexusTheme.darkCard.withValues(alpha: 0.95),
                   ]
                 : [
                     NexusTheme.lightCard,
-                    NexusTheme.lightCard.withOpacity(0.98),
+                    NexusTheme.lightCard.withValues(alpha: 0.98),
                   ],
           ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: NexusTheme.primaryColor.withOpacity(0.3),
+            color: NexusTheme.primaryColor.withValues(alpha: 0.3),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: NexusTheme.primaryColor.withOpacity(0.15),
+              color: NexusTheme.primaryColor.withValues(alpha: 0.15),
               blurRadius: 40,
               spreadRadius: 0,
             ),
             BoxShadow(
-              color: Colors.black.withOpacity(0.3),
+              color: Colors.black.withValues(alpha: 0.3),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -132,6 +221,7 @@ class UpdateDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Header
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
@@ -140,8 +230,8 @@ class UpdateDialog extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    NexusTheme.primaryColor.withOpacity(0.1),
-                    NexusTheme.secondaryColor.withOpacity(0.05),
+                    NexusTheme.primaryColor.withValues(alpha: 0.1),
+                    NexusTheme.secondaryColor.withValues(alpha: 0.05),
                   ],
                 ),
               ),
@@ -159,7 +249,7 @@ class UpdateDialog extends StatelessWidget {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: NexusTheme.primaryColor.withOpacity(0.4),
+                          color: NexusTheme.primaryColor.withValues(alpha: 0.4),
                           blurRadius: 20,
                           spreadRadius: 2,
                         ),
@@ -187,17 +277,17 @@ class UpdateDialog extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                       gradient: LinearGradient(
                         colors: [
-                          NexusTheme.primaryColor.withOpacity(0.2),
-                          NexusTheme.secondaryColor.withOpacity(0.2),
+                          NexusTheme.primaryColor.withValues(alpha: 0.2),
+                          NexusTheme.secondaryColor.withValues(alpha: 0.2),
                         ],
                       ),
                       border: Border.all(
-                        color: NexusTheme.primaryColor.withOpacity(0.3),
+                        color: NexusTheme.primaryColor.withValues(alpha: 0.3),
                       ),
                     ),
                     child: Text(
                       'Version ${updateInfo.versionName}',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: NexusTheme.primaryColor,
@@ -208,6 +298,7 @@ class UpdateDialog extends StatelessWidget {
               ),
             ),
 
+            // Changelog
             if (updateInfo.changelog.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
@@ -234,9 +325,9 @@ class UpdateDialog extends StatelessWidget {
                             margin: const EdgeInsets.only(top: 6),
                             width: 6,
                             height: 6,
-                            decoration: BoxDecoration(
+                            decoration: const BoxDecoration(
                               shape: BoxShape.circle,
-                              gradient: const LinearGradient(
+                              gradient: LinearGradient(
                                 colors: NexusTheme.primaryGradient,
                               ),
                             ),
@@ -261,6 +352,7 @@ class UpdateDialog extends StatelessWidget {
                 ),
               ),
 
+            // Divider
             Container(
               height: 1,
               margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -269,17 +361,19 @@ class UpdateDialog extends StatelessWidget {
                   colors: [
                     Colors.transparent,
                     (isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder)
-                        .withOpacity(0.5),
+                        .withValues(alpha: 0.5),
                     Colors.transparent,
                   ],
                 ),
               ),
             ),
 
+            // Buttons
             Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
+                  // Download button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -295,7 +389,7 @@ class UpdateDialog extends StatelessWidget {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ).copyWith(
-                        backgroundColor: MaterialStateProperty.all(Colors.transparent),
+                        backgroundColor: WidgetStateProperty.all(Colors.transparent),
                       ),
                       child: Ink(
                         decoration: BoxDecoration(
@@ -307,7 +401,7 @@ class UpdateDialog extends StatelessWidget {
                           borderRadius: BorderRadius.circular(14),
                           boxShadow: [
                             BoxShadow(
-                              color: NexusTheme.primaryColor.withOpacity(0.3),
+                              color: NexusTheme.primaryColor.withValues(alpha: 0.3),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
@@ -326,7 +420,7 @@ class UpdateDialog extends StatelessWidget {
                               ),
                               SizedBox(width: 8),
                               Text(
-                                'Jetzt aktualisieren',
+                                'Herunterladen',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
@@ -340,26 +434,61 @@ class UpdateDialog extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                    ),
-                    child: Text(
-                      'Später',
-                      style: TextStyle(
-                        color: isDark
-                            ? NexusTheme.darkTextMuted
-                            : NexusTheme.lightTextMuted,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                  // Close and Skip row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: Text(
+                            'Später',
+                            style: TextStyle(
+                              color: isDark
+                                  ? NexusTheme.darkTextMuted
+                                  : NexusTheme.lightTextMuted,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+                      Container(
+                        width: 1,
+                        height: 20,
+                        color: (isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder)
+                            .withValues(alpha: 0.5),
+                      ),
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () {
+                            UpdateService.skipVersion(updateInfo.version);
+                            Navigator.of(context).pop();
+                          },
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: Text(
+                            'Überspringen',
+                            style: TextStyle(
+                              color: (isDark
+                                  ? NexusTheme.darkTextMuted
+                                  : NexusTheme.lightTextMuted).withValues(alpha: 0.7),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
 
+            // Installed version
             Container(
               padding: const EdgeInsets.only(bottom: 16),
               child: Text(
@@ -367,7 +496,7 @@ class UpdateDialog extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   color: (isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted)
-                      .withOpacity(0.6),
+                      .withValues(alpha: 0.6),
                 ),
               ),
             ),

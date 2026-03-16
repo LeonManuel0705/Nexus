@@ -290,14 +290,10 @@ const HubApp = {
     state: {
 
         theme: (function() {
+            const serverTheme = window.__serverTheme;
             const nexusTheme = localStorage.getItem('nexus-theme');
-            const hubTheme = localStorage.getItem('hub_theme');
-
-            const theme = nexusTheme || hubTheme || 'dark';
-
-            if (theme && !nexusTheme) {
-                localStorage.setItem('nexus-theme', theme);
-            }
+            const theme = serverTheme || nexusTheme || 'dark';
+            localStorage.setItem('nexus-theme', theme);
             return theme;
         })(),
         language: localStorage.getItem('hub_language') || 'en',
@@ -366,6 +362,7 @@ const HubApp = {
             this.clockIntervalId = setInterval(() => this.updateClock(), 1000);
         }
 
+        window.dispatchEvent(new CustomEvent('nexus-resume'));
     },
 
     initTheme() {
@@ -389,14 +386,30 @@ const HubApp = {
     },
 
     toggleTheme() {
-        const oldTheme = this.state.theme;
+        document.documentElement.classList.add('theme-transitioning');
+
         this.state.theme = this.state.theme === 'dark' ? 'light' : 'dark';
-        console.log(`[Nexus] Theme toggled: ${oldTheme} → ${this.state.theme}`);
         document.body.setAttribute('data-theme', this.state.theme);
         document.documentElement.setAttribute('data-theme', this.state.theme);
         localStorage.setItem('nexus-theme', this.state.theme);
-        localStorage.setItem('hub_theme', this.state.theme);
         this.updateThemeIcon();
+
+        var themeLabel = document.getElementById('themeLabel');
+        if (themeLabel) themeLabel.textContent = this.state.theme === 'dark' ? 'Dunkles Theme' : 'Helles Theme';
+
+        localStorage.setItem('nexus-theme-manual-override', Date.now().toString());
+
+        setTimeout(() => {
+            document.documentElement.classList.remove('theme-transitioning');
+        }, 500);
+
+        fetch('/api/hub/theme', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ theme: this.state.theme })
+        }).then(res => {
+            if (!res.ok) console.error('Theme save failed:', res.status);
+        }).catch(e => console.error('Theme save error:', e));
     },
 
     t(key) {
@@ -537,7 +550,7 @@ const HubApp = {
                 } catch (e) {  }
                 this.renderEmailList();
             } else {
-                if (list) list.innerHTML = `<p class="no-items">${data.error || this.t('no_emails')}</p>`;
+                if (list) list.innerHTML = `<p class="no-items">${this.escapeHtml(data.error || this.t('no_emails'))}</p>`;
             }
         } catch (err) {
             if (loading) loading.style.display = 'none';
@@ -569,8 +582,8 @@ const HubApp = {
         }
 
         html += this.state.emails.map(email => `
-            <div class="email-item ${!email.read ? 'unread' : ''}" data-id="${email.id}">
-                <span class="email-date">${email.date}</span>
+            <div class="email-item ${!email.read ? 'unread' : ''}" data-id="${this.escapeHtml(String(email.id))}">
+                <span class="email-date">${this.escapeHtml(email.date)}</span>
                 <div class="email-from">${this.escapeHtml(email.from_name || email.from)}</div>
                 <div class="email-subject">${this.escapeHtml(email.subject)}</div>
                 <div class="email-preview">${this.escapeHtml(email.preview)}</div>
@@ -604,7 +617,7 @@ const HubApp = {
                         <h3 class="email-detail-subject">${this.escapeHtml(data.email.subject)}</h3>
                         <div class="email-detail-meta">
                             <span><strong>${this.t('from')}:</strong> ${this.escapeHtml(data.email.from_name)} &lt;${this.escapeHtml(data.email.from)}&gt;</span>
-                            <span><strong>${this.t('date')}:</strong> ${data.email.date}</span>
+                            <span><strong>${this.t('date')}:</strong> ${this.escapeHtml(data.email.date)}</span>
                         </div>
                     </div>
                     <div class="email-detail-body">${this.escapeHtml(data.email.body)}</div>
@@ -862,7 +875,7 @@ const HubApp = {
             if (data.success && data.emails && data.emails.length > 0) {
                 container.innerHTML = data.emails.slice(0, 3).map(email => `
                     <a href="/hub/email" class="email-item ${!email.read ? 'unread' : ''}">
-                        <span class="email-date">${email.date}</span>
+                        <span class="email-date">${this.escapeHtml(email.date)}</span>
                         <div class="email-from">${this.escapeHtml(email.from_name || email.from)}</div>
                         <div class="email-subject">${this.escapeHtml(email.subject)}</div>
                     </a>
@@ -992,6 +1005,10 @@ const HubApp = {
     pomodoroComplete() {
         this.pausePomodoro();
         this.playNotificationSound();
+
+        if (typeof NexusNotifications !== 'undefined') {
+            NexusNotifications.notifyPomodoroComplete(this.state.pomodoroIsWork);
+        }
 
         const statusEl = document.getElementById('pomodoroStatus');
 
@@ -1306,13 +1323,15 @@ const HubApp = {
             <div class="bookmark-category">
                 <div class="category-header">${this.escapeHtml(cat)}</div>
                 <div class="category-links">
-                    ${this.state.bookmarks.filter(b => b.category === cat).map(b => `
-                        <a href="${this.escapeHtml(b.url)}" target="_blank" rel="noopener" class="bookmark-link" data-id="${b.id}">
+                    ${this.state.bookmarks.filter(b => b.category === cat).map(b => {
+                        const safeBookmarkUrl = (() => { try { const u = new URL(b.url); return ['http:', 'https:'].includes(u.protocol) ? b.url : '#'; } catch { return '#'; } })();
+                        return `
+                        <a href="${this.escapeHtml(safeBookmarkUrl)}" target="_blank" rel="noopener" class="bookmark-link" data-id="${b.id}">
                             <img src="https://www.google.com/s2/favicons?domain=${new URL(b.url).hostname}&sz=32"
                                  alt="" class="bookmark-favicon" onerror="this.style.display='none'">
                             <span>${this.escapeHtml(b.title)}</span>
                         </a>
-                    `).join('')}
+                    `}).join('')}
                 </div>
             </div>
         `).join('');
@@ -1540,7 +1559,7 @@ const HubApp = {
         if (!list) return;
 
         if (this.state.calendarError) {
-            const errorHtml = `<div class="calendar-error">${this.state.calendarError}</div>`;
+            const errorHtml = `<div class="calendar-error">${this.escapeHtml(this.state.calendarError)}</div>`;
             list.insertAdjacentHTML('beforebegin', errorHtml);
         }
 
@@ -1563,7 +1582,8 @@ const HubApp = {
         list.innerHTML = upcoming.map(event => {
             const isExternal = event.source === 'macos' || event.source === 'google' || event.source === 'external';
             const calendarName = event.calendar ? this.escapeHtml(event.calendar) : '';
-            const colorStyle = event.calendar_color ? `border-left-color: ${event.calendar_color}` : '';
+            const safeColor = /^#[0-9a-fA-F]{3,8}$/.test(event.calendar_color) ? event.calendar_color : '';
+            const colorStyle = safeColor ? `border-left-color: ${safeColor}` : '';
             return `
             <div class="event-item ${isExternal ? 'external-event' : 'local-event'}" data-id="${event.id}" data-source="${event.source || 'local'}" style="${colorStyle}">
                 <div class="event-date">${new Date(event.date + 'T12:00').toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })}${event.time ? ' · ' + event.time : ''}</div>
@@ -1768,6 +1788,19 @@ const HubApp = {
     },
 
     async initWeather() {
+        if (!this.state.location) {
+            try {
+                const res = await fetch('/api/hub/location');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success && data.location) {
+                        this.state.location = data.location;
+                        localStorage.setItem('hub_location', JSON.stringify(data.location));
+                    }
+                }
+            } catch (e) { }
+        }
+
         if (this.state.weather && this.state.location) {
             this.renderWeather();
             if (Date.now() - new Date(this.state.weather.timestamp) > 30 * 60 * 1000) {
@@ -1780,6 +1813,15 @@ const HubApp = {
         }
     },
 
+    _persistLocation(location) {
+        localStorage.setItem('hub_location', JSON.stringify(location));
+        fetch('/api/hub/location', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ location })
+        }).catch(() => {});
+    },
+
     async detectLocation() {
         const content = document.getElementById('weatherContent');
         if (content) content.innerHTML = '<div class="weather-loading">Detecting location...</div>';
@@ -1789,7 +1831,7 @@ const HubApp = {
             if (!response.ok) throw new Error('Location detection failed');
             const data = await response.json();
             this.state.location = { city: data.city, lat: data.latitude, lon: data.longitude };
-            localStorage.setItem('hub_location', JSON.stringify(this.state.location));
+            this._persistLocation(this.state.location);
             await this.refreshWeather();
         } catch (err) {
             const modal = document.getElementById('locationModal');
@@ -1810,7 +1852,7 @@ const HubApp = {
             if (!data.results?.length) throw new Error('City not found');
             const result = data.results[0];
             this.state.location = { city: result.name, lat: result.latitude, lon: result.longitude };
-            localStorage.setItem('hub_location', JSON.stringify(this.state.location));
+            this._persistLocation(this.state.location);
             await this.refreshWeather();
         } catch (err) {
             if (content) content.innerHTML = '<div class="weather-error">City not found</div>';
@@ -1940,12 +1982,15 @@ const HubApp = {
     },
 
     importData(file) {
+        const allowedKeys = ['nexus-theme', 'hub_theme', 'hub_language', 'hub_events', 'hub_weather', 'hub_location', 'hub_todos', 'hub_notes', 'hub_active_note', 'hub_bookmarks', 'hub_pomodoro'];
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
                 const data = JSON.parse(e.target.result);
                 Object.entries(data).forEach(([key, value]) => {
-                    localStorage.setItem(key, JSON.stringify(value));
+                    if (allowedKeys.includes(key)) {
+                        localStorage.setItem(key, JSON.stringify(value));
+                    }
                 });
                 location.reload();
             } catch (err) {
@@ -1956,9 +2001,8 @@ const HubApp = {
     },
 
     escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     },
 
     initEventListeners() {

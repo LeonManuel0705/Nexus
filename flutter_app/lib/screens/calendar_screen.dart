@@ -1,9 +1,18 @@
+import 'dart:ui';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/app_provider.dart';
+import '../providers/iserv_provider.dart';
+import '../providers/vbb_provider.dart';
 import '../models/event.dart';
+import '../main.dart' show MainScreen;
 import '../theme.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/animated_list_item.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -12,12 +21,21 @@ class CalendarScreen extends StatefulWidget {
   State<CalendarScreen> createState() => _CalendarScreenState();
 }
 
-class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProviderStateMixin {
+class _CalendarScreenState extends State<CalendarScreen> with TickerProviderStateMixin {
+  static const _daysOfWeek = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
   String _currentFilter = 'all';
   DateTime _selectedDate = DateTime.now();
   DateTime _focusedMonth = DateTime.now();
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+
+  // Month transition animation
+  late AnimationController _monthTransitionController;
+  double _monthSlideDirection = 1.0; // 1.0 = forward, -1.0 = backward
+
+  // Day events transition
+  late AnimationController _dayEventsController;
 
   @override
   void initState() {
@@ -31,11 +49,39 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
       curve: Curves.easeInOut,
     );
     _animationController.forward();
+
+    _monthTransitionController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+      value: 1.0,
+    );
+
+    _dayEventsController = AnimationController(
+      duration: const Duration(milliseconds: 250),
+      vsync: this,
+      value: 1.0,
+    );
+  }
+
+  void _changeMonth(int delta) {
+    _monthSlideDirection = delta > 0 ? 1.0 : -1.0;
+    _monthTransitionController.forward(from: 0.0);
+    setState(() {
+      _focusedMonth = DateTime(_focusedMonth.year, _focusedMonth.month + delta);
+    });
+  }
+
+  void _selectDate(DateTime date) {
+    if (_isSameDay(date, _selectedDate)) return;
+    _dayEventsController.forward(from: 0.0);
+    setState(() => _selectedDate = date);
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _monthTransitionController.dispose();
+    _dayEventsController.dispose();
     super.dispose();
   }
 
@@ -52,13 +98,11 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
   }
 
   List<Event> _getEventsForDate(List<Event> events, DateTime date) {
-    final dateKey = DateFormat('yyyy-MM-dd').format(date);
+    final checkDate = DateTime(date.year, date.month, date.day);
     return events.where((e) {
-      final eventStart = DateFormat('yyyy-MM-dd').format(e.startTime);
-      final eventEnd = DateFormat('yyyy-MM-dd').format(e.endTime);
-      final checkDate = DateFormat('yyyy-MM-dd').format(date);
-
-      return checkDate.compareTo(eventStart) >= 0 && checkDate.compareTo(eventEnd) <= 0;
+      final eventStart = DateTime(e.startTime.year, e.startTime.month, e.startTime.day);
+      final eventEnd = DateTime(e.endTime.year, e.endTime.month, e.endTime.day);
+      return !checkDate.isBefore(eventStart) && !checkDate.isAfter(eventEnd);
     }).toList();
   }
 
@@ -74,6 +118,8 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
         return const Color(0xFFEF4444);
       case 'vacation':
         return const Color(0xFF22C55E);
+      case 'iserv':
+        return const Color(0xFFF59E0B);
       case 'personal':
       default:
         return NexusTheme.accent3;
@@ -92,6 +138,8 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
         return Icons.celebration_rounded;
       case 'vacation':
         return Icons.beach_access_rounded;
+      case 'iserv':
+        return Icons.cloud_rounded;
       case 'personal':
       default:
         return Icons.person_rounded;
@@ -106,75 +154,120 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
 
     return Consumer<AppProvider>(
       builder: (context, provider, child) {
-        final filteredEvents = _filterEvents(provider.events);
-        final selectedDayEvents = _getEventsForDate(filteredEvents, _selectedDate);
+        return Consumer<IServProvider>(
+          builder: (context, iservProvider, child) {
+            final allEvents = [...provider.events, ...iservProvider.calendarEvents];
+            final filteredEvents = _filterEvents(allEvents);
+            final selectedDayEvents = _getEventsForDate(filteredEvents, _selectedDate);
 
-        return FadeTransition(
-          opacity: _fadeAnimation,
-          child: RefreshIndicator(
-            onRefresh: provider.refresh,
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: _buildHeader(context, isDark),
-                ),
+            return FadeTransition(
+              opacity: _fadeAnimation,
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  await provider.refresh();
+                  if (iservProvider.isConnected) {
+                    await iservProvider.syncData();
+                  }
+                },
+                child: CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _buildHeader(context, isDark, iservProvider),
+                    ),
 
-                SliverToBoxAdapter(
-                  child: _buildCalendarCard(context, isDark, provider.events, isTablet),
-                ),
+                    SliverToBoxAdapter(
+                      child: _buildCalendarCard(context, isDark, filteredEvents, isTablet),
+                    ),
 
-                SliverToBoxAdapter(
-                  child: _buildCategoryFilters(isDark),
-                ),
+                    SliverToBoxAdapter(
+                      child: _buildCategoryFilters(isDark),
+                    ),
 
-                SliverToBoxAdapter(
-                  child: _buildSelectedDayHeader(isDark, selectedDayEvents.length),
-                ),
-
-                if (selectedDayEvents.isEmpty)
-                  SliverToBoxAdapter(
-                    child: _buildEmptyDayState(context, isDark),
-                  )
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final event = selectedDayEvents[index];
-                          return _ModernEventCard(
-                            event: event,
-                            categoryColor: _getCategoryColor(event.category),
-                            categoryIcon: _getCategoryIcon(event.category),
-                            onDelete: () => provider.deleteEvent(event.id),
-                            onEdit: () => _showEditEventDialog(context, event),
-                            isFirst: index == 0,
-                            isLast: index == selectedDayEvents.length - 1,
+                    SliverToBoxAdapter(
+                      child: AnimatedBuilder(
+                        animation: _dayEventsController,
+                        builder: (context, child) {
+                          final progress = Curves.easeOutCubic.transform(_dayEventsController.value);
+                          return Opacity(
+                            opacity: progress.clamp(0.0, 1.0),
+                            child: Transform.translate(
+                              offset: Offset(0, 8 * (1.0 - progress)),
+                              child: child,
+                            ),
                           );
                         },
-                        childCount: selectedDayEvents.length,
+                        child: _buildSelectedDayHeader(isDark, selectedDayEvents.length),
                       ),
                     ),
-                  ),
 
-                if (!_isToday(_selectedDate))
-                  SliverToBoxAdapter(
-                    child: _buildUpcomingSection(context, isDark, filteredEvents),
-                  ),
+                    if (selectedDayEvents.isEmpty)
+                      SliverToBoxAdapter(
+                        child: _buildEmptyDayState(context, isDark),
+                      )
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        sliver: SliverList(
+                          key: ValueKey('events_${_currentFilter}_${_selectedDate.toIso8601String()}'),
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final event = selectedDayEvents[index];
+                              return AnimatedListItem(
+                                index: index,
+                                child: _ModernEventCard(
+                                  event: event,
+                                  categoryColor: _getCategoryColor(event.category),
+                                  categoryIcon: _getCategoryIcon(event.category),
+                                  onDelete: event.isIServEvent
+                                      ? null
+                                      : () => provider.deleteEvent(event.id),
+                                  onEdit: event.isIServEvent
+                                      ? null
+                                      : () => _showEditEventDialog(context, event),
+                                  isFirst: index == 0,
+                                  isLast: index == selectedDayEvents.length - 1,
+                                ),
+                              );
+                            },
+                            childCount: selectedDayEvents.length,
+                          ),
+                        ),
+                      ),
 
-                const SliverPadding(
-                  padding: EdgeInsets.only(bottom: 100),
-                  sliver: SliverToBoxAdapter(child: SizedBox()),
+                    if (!_isToday(_selectedDate))
+                      SliverToBoxAdapter(
+                        child: _buildUpcomingSection(context, isDark, filteredEvents),
+                      ),
+
+                    const SliverPadding(
+                      padding: EdgeInsets.only(bottom: 120),
+                      sliver: SliverToBoxAdapter(child: SizedBox()),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
   }
 
-  Widget _buildHeader(BuildContext context, bool isDark) {
+  Widget _buildHeader(BuildContext context, bool isDark, IServProvider iservProvider) {
+    String iservStatus;
+    if (!iservProvider.isConnected && iservProvider.username == null) {
+      iservStatus = 'IServ: nicht verbunden';
+    } else if (iservProvider.isSyncing) {
+      iservStatus = 'IServ: synchronisiert...';
+    } else {
+      final calCount = iservProvider.calendarEvents.length;
+      final evCount = iservProvider.events.length;
+      iservStatus = 'IServ: $calCount Termine ($evCount roh)';
+      if (iservProvider.lastSyncResult != null) {
+        iservStatus += ' | ${iservProvider.lastSyncResult}';
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
       child: Row(
@@ -183,12 +276,7 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Kalender',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                NexusTheme.gradientText('Kalender', fontSize: 36),
                 const SizedBox(height: 2),
                 Text(
                   DateFormat('EEEE, d. MMMM yyyy', 'de_DE').format(DateTime.now()),
@@ -196,18 +284,93 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
                     color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
                   ),
                 ),
+                const SizedBox(height: 4),
+                GestureDetector(
+                  onTap: kDebugMode ? () {
+                    final debugText = 'Status: $iservStatus\n'
+                        'Connected: ${iservProvider.isConnected}\n'
+                        'Username: ${iservProvider.username ?? "none"}\n'
+                        'IServ URL: ${iservProvider.iservUrl ?? "none"}\n'
+                        'IServ Events: ${iservProvider.events.length}\n'
+                        'Calendar Events: ${iservProvider.calendarEvents.length}\n'
+                        'Show in Calendar: ${iservProvider.showIServInCalendar}\n'
+                        'Last sync: ${iservProvider.lastSync}\n'
+                        'Last result: ${iservProvider.lastSyncResult}\n'
+                        '\n--- Provider Log ---\n${iservProvider.debugLog}'
+                        '\n--- API Log ---\n${iservProvider.serviceApiLog}'
+                        '\n--- Discovery Log ---\n${iservProvider.discoveryLog}';
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('IServ Debug'),
+                        content: SingleChildScrollView(
+                          child: SelectableText(
+                            debugText,
+                            style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: debugText));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Log kopiert'), duration: Duration(seconds: 1)),
+                              );
+                            },
+                            child: const Text('Kopieren'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              iservProvider.syncData();
+                            },
+                            child: const Text('Force Sync'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('OK'),
+                          ),
+                        ],
+                      ),
+                    );
+                  } : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: iservProvider.isConnected
+                          ? NexusTheme.accent1.withValues(alpha: 0.1)
+                          : Colors.orange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: iservProvider.isConnected
+                            ? NexusTheme.accent1.withValues(alpha: 0.3)
+                            : Colors.orange.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Text(
+                      iservStatus,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: iservProvider.isConnected
+                            ? NexusTheme.accent1
+                            : Colors.orange,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
           Container(
             decoration: BoxDecoration(
-              gradient: LinearGradient(
+              gradient: const LinearGradient(
                 colors: [NexusTheme.primaryColor, NexusTheme.accent1],
               ),
               borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: NexusTheme.primaryColor.withOpacity(0.3),
+                  color: NexusTheme.primaryColor.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
@@ -216,7 +379,7 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: () => showAddEventDialog(context),
+                onTap: () => showAddEventDialog(context, initialDate: _selectedDate),
                 borderRadius: BorderRadius.circular(14),
                 child: const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -248,24 +411,22 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
     final firstDayOfMonth = DateTime(_focusedMonth.year, _focusedMonth.month, 1);
     final startingWeekday = firstDayOfMonth.weekday;
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-      decoration: BoxDecoration(
-        color: isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
+    final eventsByDay = <int, List<Event>>{};
+    for (int day = 1; day <= daysInMonth; day++) {
+      final date = DateTime(_focusedMonth.year, _focusedMonth.month, day);
+      eventsByDay[day] = _getEventsForDate(allEvents, date);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: GlassCard(
+            borderRadius: 20,
+            padding: EdgeInsets.zero,
+            child: Column(
+            children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
             child: Row(
@@ -274,37 +435,46 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
                   icon: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+                      color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.chevron_left_rounded, size: 20),
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _focusedMonth = DateTime(_focusedMonth.year, _focusedMonth.month - 1);
-                    });
-                  },
+                  onPressed: () => _changeMonth(-1),
                 ),
                 Expanded(
                   child: GestureDetector(
                     onTap: () => _showMonthPicker(context),
-                    child: Column(
-                      children: [
-                        Text(
-                          DateFormat('MMMM', 'de_DE').format(_focusedMonth),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
+                    child: AnimatedBuilder(
+                      animation: _monthTransitionController,
+                      builder: (context, child) {
+                        final progress = Curves.easeOutCubic.transform(_monthTransitionController.value);
+                        return Opacity(
+                          opacity: progress.clamp(0.0, 1.0),
+                          child: Transform.translate(
+                            offset: Offset(20 * _monthSlideDirection * (1.0 - progress), 0),
+                            child: child,
                           ),
-                        ),
-                        Text(
-                          '${_focusedMonth.year}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                        );
+                      },
+                      child: Column(
+                        children: [
+                          Text(
+                            DateFormat('MMMM', 'de_DE').format(_focusedMonth),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
                           ),
-                        ),
-                      ],
+                          Text(
+                            '${_focusedMonth.year}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -312,16 +482,12 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
                   icon: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+                      color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.chevron_right_rounded, size: 20),
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _focusedMonth = DateTime(_focusedMonth.year, _focusedMonth.month + 1);
-                    });
-                  },
+                  onPressed: () => _changeMonth(1),
                 ),
               ],
             ),
@@ -331,7 +497,7 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+              children: _daysOfWeek
                   .map((day) => SizedBox(
                         width: isTablet ? 50 : 40,
                         child: Text(
@@ -341,7 +507,7 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: day == 'Sa' || day == 'So'
-                                ? NexusTheme.primaryColor.withOpacity(0.7)
+                                ? NexusTheme.primaryColor.withValues(alpha: 0.7)
                                 : (isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted),
                           ),
                         ),
@@ -351,41 +517,55 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
           ),
           const SizedBox(height: 8),
 
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-            child: GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 7,
-                childAspectRatio: isTablet ? 1.2 : 1.0,
-                mainAxisSpacing: 4,
-                crossAxisSpacing: 4,
+          AnimatedBuilder(
+            animation: _monthTransitionController,
+            builder: (context, child) {
+              final progress = Curves.easeOutCubic.transform(_monthTransitionController.value);
+              return Opacity(
+                opacity: progress.clamp(0.0, 1.0),
+                child: child,
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+              child: GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 7,
+                  childAspectRatio: 0.7,
+                  mainAxisSpacing: 4,
+                  crossAxisSpacing: 4,
+                ),
+                itemCount: 42,
+                itemBuilder: (context, index) {
+                  final dayOffset = index - startingWeekday + 2;
+                  if (dayOffset < 1 || dayOffset > daysInMonth) {
+                    return const SizedBox();
+                  }
+
+                  final date = DateTime(_focusedMonth.year, _focusedMonth.month, dayOffset);
+                  final dayEvents = eventsByDay[dayOffset] ?? const [];
+                  final isToday = _isToday(date);
+                  final isSelected = _isSameDay(date, _selectedDate);
+                  final isWeekend = date.weekday == 6 || date.weekday == 7;
+
+                  return _CalendarDay(
+                    day: dayOffset,
+                    events: dayEvents,
+                    isToday: isToday,
+                    isSelected: isSelected,
+                    isWeekend: isWeekend,
+                    isDark: isDark,
+                    onTap: () => _selectDate(date),
+                    onDoubleTap: () {
+                      _selectDate(date);
+                      showAddEventDialog(context, initialDate: date);
+                    },
+                    getCategoryColor: _getCategoryColor,
+                  );
+                },
               ),
-              itemCount: 42,
-              itemBuilder: (context, index) {
-                final dayOffset = index - startingWeekday + 2;
-                if (dayOffset < 1 || dayOffset > daysInMonth) {
-                  return const SizedBox();
-                }
-
-                final date = DateTime(_focusedMonth.year, _focusedMonth.month, dayOffset);
-                final dayEvents = _getEventsForDate(allEvents, date);
-                final isToday = _isToday(date);
-                final isSelected = _isSameDay(date, _selectedDate);
-                final isWeekend = date.weekday == 6 || date.weekday == 7;
-
-                return _CalendarDay(
-                  day: dayOffset,
-                  events: dayEvents,
-                  isToday: isToday,
-                  isSelected: isSelected,
-                  isWeekend: isWeekend,
-                  isDark: isDark,
-                  onTap: () => setState(() => _selectedDate = date),
-                  getCategoryColor: _getCategoryColor,
-                );
-              },
             ),
           ),
 
@@ -407,6 +587,9 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
               ),
             ),
         ],
+      ),
+      ),
+        ),
       ),
     );
   }
@@ -432,9 +615,6 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
         itemBuilder: (context, index) {
           final (filter, label, icon) = categories[index];
           final isSelected = _currentFilter == filter;
-          final color = filter == 'all'
-              ? NexusTheme.primaryColor
-              : _getCategoryColor(filter);
 
           return Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -443,21 +623,18 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: () => setState(() => _currentFilter = filter),
-                  borderRadius: BorderRadius.circular(12),
+                  onTap: () {
+                    _dayEventsController.forward(from: 0.0);
+                    setState(() => _currentFilter = filter);
+                  },
+                  borderRadius: BorderRadius.circular(9999),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? color.withOpacity(0.15)
-                          : (isDark ? NexusTheme.darkCard : NexusTheme.lightCard),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected
-                            ? color
-                            : (isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder),
-                        width: isSelected ? 1.5 : 1,
-                      ),
+                          ? const Color(0xFF4F46E5)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(9999),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -465,7 +642,7 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
                         Icon(
                           icon,
                           size: 16,
-                          color: isSelected ? color : (isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted),
+                          color: isSelected ? Colors.white : NexusTheme.darkTextMuted,
                         ),
                         const SizedBox(width: 6),
                         Text(
@@ -473,7 +650,7 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                            color: isSelected ? color : null,
+                            color: isSelected ? Colors.white : NexusTheme.darkTextMuted,
                           ),
                         ),
                       ],
@@ -503,42 +680,21 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: NexusTheme.primaryColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.event_rounded,
-              color: NexusTheme.primaryColor,
-              size: 20,
-            ),
+          Text(
+            label.toUpperCase(),
+            style: NexusTheme.sectionLabel(isDark),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                Text(
-                  eventCount == 0
-                      ? 'Keine Termine'
-                      : '$eventCount ${eventCount == 1 ? 'Termin' : 'Termine'}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
-                  ),
-                ),
-              ],
+          const SizedBox(height: 4),
+          Text(
+            eventCount == 0
+                ? 'Keine Termine'
+                : '$eventCount ${eventCount == 1 ? 'Termin' : 'Termine'}',
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
             ),
           ),
         ],
@@ -547,56 +703,65 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
   }
 
   Widget _buildEmptyDayState(BuildContext context, bool isDark) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder,
+    return AnimatedBuilder(
+      animation: _dayEventsController,
+      builder: (context, child) {
+        final t = Curves.easeOut.transform(_dayEventsController.value);
+        return Opacity(
+          opacity: t,
+          child: Transform.scale(
+            scale: 0.9 + 0.1 * t,
+            child: child,
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: GlassCard(
+          borderRadius: 16,
+          padding: const EdgeInsets.all(32),
+          child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: NexusTheme.primaryColor.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.event_available_rounded,
+                size: 40,
+                color: NexusTheme.primaryColor,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Keine Termine',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'An diesem Tag ist nichts geplant',
+              style: TextStyle(
+                color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+              ),
+            ),
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: () => showAddEventDialog(context, initialDate: _selectedDate),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Termin hinzufügen'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: NexusTheme.primaryColor,
+                side: const BorderSide(color: NexusTheme.primaryColor),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+            ),
+          ],
         ),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: NexusTheme.primaryColor.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.event_available_rounded,
-              size: 40,
-              color: NexusTheme.primaryColor,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Keine Termine',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'An diesem Tag ist nichts geplant',
-            style: TextStyle(
-              color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
-            ),
-          ),
-          const SizedBox(height: 20),
-          OutlinedButton.icon(
-            onPressed: () => showAddEventDialog(context),
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Termin hinzufugen'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: NexusTheme.primaryColor,
-              side: BorderSide(color: NexusTheme.primaryColor),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -615,37 +780,28 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                Icons.upcoming_rounded,
-                color: NexusTheme.primaryColor,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Kommende Termine',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-            ],
+          Text(
+            'KOMMENDE TERMINE',
+            style: NexusTheme.sectionLabel(isDark),
           ),
           const SizedBox(height: 12),
-          ...upcoming.map((event) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _UpcomingEventCard(
-              event: event,
-              categoryColor: _getCategoryColor(event.category),
-              categoryIcon: _getCategoryIcon(event.category),
-              isDark: isDark,
-              onTap: () {
-                setState(() {
-                  _selectedDate = event.startTime;
-                  _focusedMonth = DateTime(event.startTime.year, event.startTime.month);
-                });
-              },
+          ...upcoming.asMap().entries.map((entry) => AnimatedListItem(
+            index: entry.key,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _UpcomingEventCard(
+                event: entry.value,
+                categoryColor: _getCategoryColor(entry.value.category),
+                categoryIcon: _getCategoryIcon(entry.value.category),
+                isDark: isDark,
+                onTap: () {
+                  _dayEventsController.forward(from: 0.0);
+                  setState(() {
+                    _selectedDate = entry.value.startTime;
+                    _focusedMonth = DateTime(entry.value.startTime.year, entry.value.startTime.month);
+                  });
+                },
+              ),
             ),
           )),
         ],
@@ -687,7 +843,7 @@ class _CalendarScreenState extends State<CalendarScreen> with SingleTickerProvid
   }
 }
 
-class _CalendarDay extends StatelessWidget {
+class _CalendarDay extends StatefulWidget {
   final int day;
   final List<Event> events;
   final bool isToday;
@@ -695,6 +851,7 @@ class _CalendarDay extends StatelessWidget {
   final bool isWeekend;
   final bool isDark;
   final VoidCallback onTap;
+  final VoidCallback? onDoubleTap;
   final Color Function(String) getCategoryColor;
 
   const _CalendarDay({
@@ -705,60 +862,108 @@ class _CalendarDay extends StatelessWidget {
     required this.isWeekend,
     required this.isDark,
     required this.onTap,
+    this.onDoubleTap,
     required this.getCategoryColor,
   });
 
   @override
+  State<_CalendarDay> createState() => _CalendarDayState();
+}
+
+class _CalendarDayState extends State<_CalendarDay> with SingleTickerProviderStateMixin {
+  late AnimationController _scaleController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 100),
+      vsync: this,
+      lowerBound: 0.92,
+      upperBound: 1.0,
+      value: 1.0,
+    );
+  }
+
+  @override
+  void dispose() {
+    _scaleController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final eventColors = events
-        .map((e) => getCategoryColor(e.category))
-        .toSet()
-        .take(3)
-        .toList();
+    // Build proportional color segments: count events per category color
+    final colorCounts = <Color, int>{};
+    for (final event in widget.events) {
+      final color = widget.getCategoryColor(event.category);
+      colorCounts[color] = (colorCounts[color] ?? 0) + 1;
+    }
+    final hasEvents = widget.events.isNotEmpty;
 
     return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? NexusTheme.primaryColor
-              : isToday
-                  ? NexusTheme.primaryColor.withOpacity(0.1)
-                  : null,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Stack(
-          alignment: Alignment.center,
+      onTap: widget.onTap,
+      onDoubleTap: widget.onDoubleTap,
+      onTapDown: (_) => _scaleController.reverse(),
+      onTapUp: (_) => _scaleController.forward(),
+      onTapCancel: () => _scaleController.forward(),
+      child: ScaleTransition(
+        scale: _scaleController,
+        child: Column(
           children: [
-            Text(
-              '$day',
-              style: TextStyle(
-                fontWeight: isToday || isSelected ? FontWeight.bold : FontWeight.w500,
-                fontSize: 14,
-                color: isSelected
-                    ? Colors.white
-                    : isToday
-                        ? NexusTheme.primaryColor
-                        : isWeekend
-                            ? NexusTheme.primaryColor.withOpacity(0.6)
-                            : null,
+            Expanded(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                decoration: BoxDecoration(
+                  color: widget.isSelected
+                      ? const Color(0xFF4F46E5)
+                      : null,
+                  borderRadius: BorderRadius.circular(12),
+                  border: widget.isToday && !widget.isSelected
+                      ? Border.all(color: const Color(0xFF4F46E5), width: 2)
+                      : null,
+                  boxShadow: widget.isToday
+                      ? [BoxShadow(color: const Color(0xFF4F46E5).withValues(alpha: 0.4), blurRadius: 10, spreadRadius: -2)]
+                      : null,
+                ),
+                child: Center(
+                  child: Text(
+                    '${widget.day}',
+                    style: TextStyle(
+                      fontWeight: widget.isToday || widget.isSelected ? FontWeight.bold : FontWeight.w500,
+                      fontSize: 14,
+                      color: widget.isSelected
+                          ? Colors.white
+                          : widget.isToday
+                              ? NexusTheme.primaryColor
+                              : widget.isWeekend
+                                  ? NexusTheme.primaryColor.withValues(alpha: 0.6)
+                                  : null,
+                    ),
+                  ),
+                ),
               ),
             ),
-            if (eventColors.isNotEmpty)
-              Positioned(
-                bottom: 4,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: eventColors.map((color) => Container(
-                    width: 5,
-                    height: 5,
-                    margin: const EdgeInsets.symmetric(horizontal: 1),
-                    decoration: BoxDecoration(
-                      color: isSelected ? Colors.white : color,
-                      shape: BoxShape.circle,
+            if (hasEvents)
+              Padding(
+                padding: const EdgeInsets.only(left: 4, right: 4, top: 1),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: SizedBox(
+                    height: 4,
+                    child: Row(
+                      children: colorCounts.entries.map((entry) {
+                        return Expanded(
+                          flex: entry.value,
+                          child: Container(
+                            color: widget.isSelected
+                                ? Colors.white.withValues(alpha: 0.85)
+                                : entry.key,
+                          ),
+                        );
+                      }).toList(),
                     ),
-                  )).toList(),
+                  ),
                 ),
               ),
           ],
@@ -768,12 +973,12 @@ class _CalendarDay extends StatelessWidget {
   }
 }
 
-class _ModernEventCard extends StatelessWidget {
+class _ModernEventCard extends StatefulWidget {
   final Event event;
   final Color categoryColor;
   final IconData categoryIcon;
-  final VoidCallback onDelete;
-  final VoidCallback onEdit;
+  final VoidCallback? onDelete;
+  final VoidCallback? onEdit;
   final bool isFirst;
   final bool isLast;
 
@@ -781,64 +986,75 @@ class _ModernEventCard extends StatelessWidget {
     required this.event,
     required this.categoryColor,
     required this.categoryIcon,
-    required this.onDelete,
-    required this.onEdit,
+    this.onDelete,
+    this.onEdit,
     required this.isFirst,
     required this.isLast,
   });
 
   @override
+  State<_ModernEventCard> createState() => _ModernEventCardState();
+}
+
+class _ModernEventCardState extends State<_ModernEventCard> with SingleTickerProviderStateMixin {
+  late AnimationController _slideController;
+
+  @override
+  void initState() {
+    super.initState();
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 150),
+      vsync: this,
+    );
+  }
+
+  @override
+  void dispose() {
+    _slideController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isReadOnly = widget.onDelete == null;
 
-    return Dismissible(
-      key: Key(event.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: NexusTheme.danger,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Icon(Icons.delete_rounded, color: Colors.white),
-      ),
-      onDismissed: (_) => onDelete(),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: categoryColor.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+    Widget card = GestureDetector(
+      onTapDown: (_) => _slideController.forward(),
+      onTapUp: (_) => _slideController.reverse(),
+      onTapCancel: () => _slideController.reverse(),
+      child: AnimatedBuilder(
+        animation: _slideController,
+        builder: (context, child) {
+          return Transform.translate(
+            offset: Offset(4 * _slideController.value, 0),
+            child: child,
+          );
+        },
+        child: Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: GlassCard(
+          borderRadius: 16,
+          padding: EdgeInsets.zero,
+          onTap: widget.onEdit,
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border(
+                left: BorderSide(color: widget.categoryColor, width: 4),
+              ),
             ),
-          ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onEdit,
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
+            padding: const EdgeInsets.all(16),
+            child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: categoryColor.withOpacity(0.15),
+                      color: widget.categoryColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
-                      categoryIcon,
-                      color: categoryColor,
+                      widget.categoryIcon,
+                      color: widget.categoryColor,
                       size: 22,
                     ),
                   ),
@@ -848,7 +1064,7 @@ class _ModernEventCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          event.title,
+                          widget.event.title,
                           style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 15,
@@ -864,7 +1080,7 @@ class _ModernEventCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              event.allDay ? 'Ganztags' : event.timeRange,
+                              widget.event.allDay ? 'Ganztags' : widget.event.timeRange,
                               style: TextStyle(
                                 fontSize: 13,
                                 color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
@@ -872,7 +1088,7 @@ class _ModernEventCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                        if (event.location != null && event.location!.isNotEmpty) ...[
+                        if (widget.event.location != null && widget.event.location!.isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Row(
                             children: [
@@ -884,12 +1100,34 @@ class _ModernEventCard extends StatelessWidget {
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
-                                  event.location!,
+                                  widget.event.location!,
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
                                   ),
                                   overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              GestureDetector(
+                                onTap: () {
+                                  context.read<VbbProvider>().setPendingDestination(widget.event.location!);
+                                  MainScreen.navigateTo(15);
+                                },
+                                child: Tooltip(
+                                  message: 'Route planen',
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: widget.categoryColor.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Icon(
+                                      Icons.directions_transit_rounded,
+                                      size: 16,
+                                      color: widget.categoryColor,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
@@ -901,24 +1139,62 @@ class _ModernEventCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: categoryColor.withOpacity(0.1),
+                      color: widget.categoryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      Event.categories[event.category] ?? event.category,
+                      Event.categories[widget.event.category] ?? widget.event.category,
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: categoryColor,
+                        color: widget.categoryColor,
                       ),
                     ),
                   ),
                 ],
-              ),
             ),
           ),
         ),
       ),
+      ),
+    );
+
+    if (isReadOnly) return card;
+
+    return Dismissible(
+      key: Key(widget.event.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: NexusTheme.danger,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Icon(Icons.delete_rounded, color: Colors.white),
+      ),
+      confirmDismiss: (_) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Termin löschen'),
+            content: const Text('Möchtest du diesen Termin wirklich löschen?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Abbrechen'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Löschen', style: TextStyle(color: NexusTheme.danger)),
+              ),
+            ],
+          ),
+        ) ?? false;
+      },
+      onDismissed: (_) => widget.onDelete?.call(),
+      child: card,
     );
   }
 }
@@ -940,60 +1216,48 @@ class _UpcomingEventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 4,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: categoryColor,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return GlassCard(
+      borderRadius: 12,
+      padding: const EdgeInsets.all(12),
+      onTap: onTap,
+      child: Row(
                   children: [
-                    Text(
-                      event.title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
+                    Container(
+                      width: 4,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: categoryColor,
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    Text(
-                      DateFormat('EEEE, d. MMM', 'de_DE').format(event.startTime),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            event.title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                          Text(
+                            DateFormat('EEEE, d. MMM', 'de_DE').format(event.startTime),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
                     ),
                   ],
                 ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -1062,7 +1326,7 @@ class _MonthPickerSheet extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: isSelected
                             ? NexusTheme.primaryColor
-                            : (isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03)),
+                            : (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03)),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       alignment: Alignment.center,
@@ -1088,8 +1352,9 @@ class _MonthPickerSheet extends StatelessWidget {
 
 class _EventDialog extends StatefulWidget {
   final Event? event;
+  final DateTime? initialDate;
 
-  const _EventDialog({this.event});
+  const _EventDialog({this.event, this.initialDate});
 
   @override
   State<_EventDialog> createState() => _EventDialogState();
@@ -1110,8 +1375,20 @@ class _EventDialogState extends State<_EventDialog> {
     _titleController = TextEditingController(text: widget.event?.title ?? '');
     _descriptionController = TextEditingController(text: widget.event?.description ?? '');
     _locationController = TextEditingController(text: widget.event?.location ?? '');
-    _startTime = widget.event?.startTime ?? DateTime.now();
-    _endTime = widget.event?.endTime ?? DateTime.now().add(const Duration(hours: 1));
+
+    if (widget.event != null) {
+      _startTime = widget.event!.startTime;
+      _endTime = widget.event!.endTime;
+    } else {
+      final date = widget.initialDate ?? DateTime.now();
+      final now = DateTime.now();
+      // If the selected date is today, use the next full hour; otherwise use 9:00
+      final bool isToday = date.year == now.year && date.month == now.month && date.day == now.day;
+      final int startHour = isToday ? now.hour + 1 : 9;
+      _startTime = DateTime(date.year, date.month, date.day, startHour, 0);
+      _endTime = _startTime.add(const Duration(hours: 1));
+    }
+
     _allDay = widget.event?.allDay ?? false;
     _category = widget.event?.category ?? 'personal';
   }
@@ -1143,7 +1420,7 @@ class _EventDialogState extends State<_EventDialog> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: NexusTheme.primaryColor.withOpacity(0.1),
+                      color: NexusTheme.primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -1211,7 +1488,7 @@ class _EventDialogState extends State<_EventDialog> {
               const SizedBox(height: 16),
 
               DropdownButtonFormField<String>(
-                value: _category,
+                initialValue: _category,
                 decoration: InputDecoration(
                   labelText: 'Kategorie',
                   prefixIcon: const Icon(Icons.category_rounded),
@@ -1271,15 +1548,34 @@ class _EventDialogState extends State<_EventDialog> {
                   if (widget.event != null)
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () {
-                          context.read<AppProvider>().deleteEvent(widget.event!.id);
-                          Navigator.pop(context);
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Termin löschen'),
+                              content: const Text('Möchtest du diesen Termin wirklich löschen?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Abbrechen'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('Löschen', style: TextStyle(color: NexusTheme.danger)),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true && context.mounted) {
+                            context.read<AppProvider>().deleteEvent(widget.event!.id);
+                            Navigator.pop(context);
+                          }
                         },
                         icon: const Icon(Icons.delete_rounded),
                         label: const Text('Loschen'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: NexusTheme.danger,
-                          side: BorderSide(color: NexusTheme.danger),
+                          side: const BorderSide(color: NexusTheme.danger),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                       ),
@@ -1346,7 +1642,7 @@ class _EventDialogState extends State<_EventDialog> {
     }
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (_titleController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Bitte Titel eingeben')),
@@ -1355,38 +1651,55 @@ class _EventDialogState extends State<_EventDialog> {
     }
 
     final provider = context.read<AppProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
 
-    if (widget.event != null) {
-      provider.updateEvent(widget.event!.copyWith(
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim().isEmpty
-            ? null
-            : _descriptionController.text.trim(),
-        location: _locationController.text.trim().isEmpty
-            ? null
-            : _locationController.text.trim(),
-        startTime: _startTime,
-        endTime: _endTime,
-        allDay: _allDay,
-        category: _category,
-      ));
-    } else {
-      provider.addEvent(
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim().isEmpty
-            ? null
-            : _descriptionController.text.trim(),
-        location: _locationController.text.trim().isEmpty
-            ? null
-            : _locationController.text.trim(),
-        startTime: _startTime,
-        endTime: _endTime,
-        allDay: _allDay,
-        category: _category,
+    try {
+      if (widget.event != null) {
+        await provider.updateEvent(widget.event!.copyWith(
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim().isEmpty
+              ? null
+              : _descriptionController.text.trim(),
+          location: _locationController.text.trim().isEmpty
+              ? null
+              : _locationController.text.trim(),
+          startTime: _startTime,
+          endTime: _endTime,
+          allDay: _allDay,
+          category: _category,
+        ));
+      } else {
+        await provider.addEvent(
+          title: _titleController.text.trim(),
+          description: _descriptionController.text.trim().isEmpty
+              ? null
+              : _descriptionController.text.trim(),
+          location: _locationController.text.trim().isEmpty
+              ? null
+              : _locationController.text.trim(),
+          startTime: _startTime,
+          endTime: _endTime,
+          allDay: _allDay,
+          category: _category,
+        );
+      }
+
+      navigator.pop();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(widget.event != null ? 'Termin aktualisiert' : 'Termin gespeichert'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Fehler beim Speichern: $e'),
+          backgroundColor: NexusTheme.danger,
+        ),
       );
     }
-
-    Navigator.pop(context);
   }
 }
 
@@ -1440,7 +1753,7 @@ class _DateTimeButton extends StatelessWidget {
               if (!allDay)
                 Text(
                   DateFormat('HH:mm').format(dateTime),
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 13,
                     color: NexusTheme.primaryColor,
                   ),
@@ -1453,9 +1766,9 @@ class _DateTimeButton extends StatelessWidget {
   }
 }
 
-void showAddEventDialog(BuildContext context) {
+void showAddEventDialog(BuildContext context, {DateTime? initialDate}) {
   showDialog(
     context: context,
-    builder: (context) => const _EventDialog(),
+    builder: (context) => _EventDialog(initialDate: initialDate),
   );
 }

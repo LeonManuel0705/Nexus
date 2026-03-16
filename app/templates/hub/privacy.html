@@ -14,24 +14,26 @@
             Einstellungen
         </a>
         <h1 class="page-title">Datenschutzerklärung</h1>
-        <p class="page-subtitle">Stand: Januar 2026</p>
+        <p class="page-subtitle">Stand: Februar 2026</p>
     </div>
 
     <div class="legal-content glass-card" style="padding: 32px; line-height: 1.8;">
         <section class="legal-section">
             <h2>1. Überblick</h2>
             <p>
-                Der Schutz deiner persönlichen Daten ist uns wichtig. Diese Datenschutzerklärung
-                informiert dich darüber, welche Daten bei der Nutzung von Nexus erhoben und
-                wie sie verwendet werden.
+                Der Schutz deiner persönlichen Daten ist uns wichtig. Nexus wurde nach dem
+                Prinzip <strong>"Local-First"</strong> entwickelt: Alle deine Daten werden
+                ausschließlich lokal auf deinem eigenen Gerät gespeichert. Es gibt keinen
+                zentralen Nexus-Server, an den Daten gesendet werden.
             </p>
         </section>
 
         <section class="legal-section">
             <h2>2. Datenspeicherung</h2>
             <p>
-                Deine Daten werden auf dem <strong>Nexus-Server</strong> in einer
-                Datenbank gespeichert:
+                Alle deine Daten werden <strong>ausschließlich lokal</strong> auf deinem Gerät
+                in einer lokalen Datenbank gespeichert. Es werden keine Daten an einen
+                externen Nexus-Server übertragen. Dazu gehören:
             </p>
             <ul>
                 <li>Aufgaben und To-Dos</li>
@@ -40,22 +42,29 @@
                 <li>Trainings-Daten</li>
                 <li>Projekte und Wissensdatenbank</li>
                 <li>Reviews und Notizen</li>
+                <li>Einstellungen und Präferenzen</li>
             </ul>
             <p style="margin-top: 12px;">
-                Einige Einstellungen und Präferenzen werden zusätzlich im Browser
-                zwischengespeichert, um die Performance zu verbessern.
+                Sensible Daten wie Zugangsdaten und API-Tokens werden zusätzlich
+                verschlüsselt auf deinem Gerät abgelegt.
             </p>
         </section>
 
         <section class="legal-section">
             <h2>3. Drittanbieter-Dienste</h2>
+            <p>
+                Nexus kommuniziert nur dann mit externen Diensten, wenn du die
+                entsprechende Funktion aktiv nutzt. In diesen Fällen werden Daten
+                <strong>direkt zwischen deinem Gerät und dem jeweiligen Dienst</strong>
+                ausgetauscht — nicht über einen Nexus-Server.
+            </p>
 
             <h3 style="font-size: 16px; margin-top: 20px; margin-bottom: 8px;">Google-Dienste</h3>
-            <p>Bei Verbindung mit Google werden folgende Daten verarbeitet:</p>
+            <p>Bei Verbindung mit Google werden folgende Daten direkt mit Google ausgetauscht:</p>
             <ul>
-                <li><strong>Google Kalender:</strong> Termine werden von Google abgerufen und angezeigt</li>
-                <li><strong>Gmail:</strong> E-Mails werden abgerufen und angezeigt (nur Lesen)</li>
-                <li><strong>OAuth-Token:</strong> Wird lokal gespeichert für die Authentifizierung</li>
+                <li><strong>Google Kalender:</strong> Termine werden direkt von Google abgerufen und angezeigt</li>
+                <li><strong>Gmail:</strong> E-Mails werden direkt abgerufen und angezeigt (nur Lesen)</li>
+                <li><strong>OAuth-Token:</strong> Wird verschlüsselt auf deinem Gerät gespeichert</li>
             </ul>
             <p style="margin-top: 8px;">
                 Für Google-Dienste gelten die
@@ -67,25 +76,29 @@
             <h3 style="font-size: 16px; margin-top: 20px; margin-bottom: 8px;">IServ</h3>
             <p>Bei Verbindung mit IServ:</p>
             <ul>
+                <li>Es wird eine direkte Verbindung zum IServ-Server deiner Schule hergestellt</li>
                 <li>Zugangsdaten werden nur für die Authentifizierung verwendet</li>
-                <li>Passwörter werden <strong>nicht</strong> dauerhaft gespeichert</li>
-                <li>Vertretungsplan-Daten werden lokal gecached</li>
+                <li>Vertretungsplan-Daten werden lokal auf deinem Gerät gecached</li>
             </ul>
             <div style="background: var(--bg-tertiary); border-left: 3px solid var(--accent); padding: 12px 16px; margin-top: 12px; border-radius: 0 8px 8px 0;">
                 <p style="margin: 0; font-size: 14px;">
-                    <strong>Hinweis zu Drittanbieter-Cookies:</strong> Bei der Verbindung mit IServ
-                    wird eine direkte Verbindung zum IServ-Server deiner Schule hergestellt.
-                    Der IServ-Server deiner Schule kann dabei eigene Cookies setzen und
-                    eigene Daten erheben. Für diese Cookies und Datenverarbeitung ist
-                    ausschließlich deine Schule verantwortlich. Bitte informiere dich bei
-                    deiner Schule über deren Datenschutzbestimmungen.
+                    <strong>Hinweis zu Drittanbieter-Cookies:</strong> Der IServ-Server deiner Schule
+                    kann eigene Cookies setzen und eigene Daten erheben. Für diese Datenverarbeitung
+                    ist ausschließlich deine Schule verantwortlich.
                 </p>
             </div>
+
+            <h3 style="font-size: 16px; margin-top: 20px; margin-bottom: 8px;">Fahrplan (Deutsche Bahn / VBB)</h3>
+            <p>
+                Für Verbindungssuche und Abfahrtszeiten werden öffentliche Transport-APIs
+                verwendet. Dabei werden Suchanfragen (Start, Ziel, Zeit) direkt an den
+                jeweiligen Dienst übermittelt.
+            </p>
 
             <h3 style="font-size: 16px; margin-top: 20px; margin-bottom: 8px;">Open-Meteo (Wetter)</h3>
             <p>
                 Für Wetter-Daten wird der kostenlose Dienst Open-Meteo verwendet.
-                Dabei werden deine Standort-Koordinaten an deren Server übermittelt.
+                Dabei werden deine Standort-Koordinaten direkt an deren Server übermittelt.
                 <a href="https://open-meteo.com/en/terms" target="_blank" style="color: var(--accent);">
                     Open-Meteo Datenschutz
                 </a>
@@ -94,28 +107,33 @@
 
         <section class="legal-section">
             <h2>4. Deine Rechte</h2>
-            <p>Du hast jederzeit das Recht:</p>
+            <p>
+                Da alle Daten lokal auf deinem Gerät gespeichert werden, hast du die
+                volle Kontrolle:
+            </p>
             <ul>
-                <li><strong>Auskunft:</strong> Zu erfahren, welche Daten gespeichert sind</li>
-                <li><strong>Löschung:</strong> Alle Daten über "Einstellungen > Alle Daten löschen" zu entfernen</li>
-                <li><strong>Widerruf:</strong> Drittanbieter-Verbindungen jederzeit zu trennen</li>
-                <li><strong>Export:</strong> Deine Daten zu exportieren (Backup-Funktion)</li>
+                <li><strong>Einsicht:</strong> Alle Daten sind direkt auf deinem Gerät einsehbar</li>
+                <li><strong>Löschung:</strong> Über "Einstellungen > Alle Daten löschen" kannst du alles entfernen</li>
+                <li><strong>Widerruf:</strong> Drittanbieter-Verbindungen kannst du jederzeit trennen</li>
+                <li><strong>Export:</strong> Nutze die Backup-Funktion, um deine Daten zu exportieren</li>
             </ul>
         </section>
 
         <section class="legal-section">
             <h2>5. Cookies und Tracking</h2>
             <p>
-                Nexus verwendet <strong>keine</strong> Tracking-Cookies oder Analyse-Tools.
-                Es werden nur technisch notwendige Cookies für die Session-Verwaltung verwendet.
+                Nexus verwendet <strong>keine</strong> Tracking-Cookies, Analyse-Tools oder
+                Telemetrie. Es werden nur technisch notwendige Session-Daten für die lokale
+                Kommunikation zwischen App und lokalem Server verwendet.
             </p>
         </section>
 
         <section class="legal-section">
             <h2>6. Datensicherheit</h2>
             <p>
-                Da die meisten Daten lokal gespeichert werden, liegt die Sicherheit
-                in deiner Hand. Empfehlungen:
+                Alle sensiblen Dateien (Zugangsdaten, API-Tokens, Konfigurationen) werden
+                mit Fernet-Verschlüsselung auf deinem Gerät geschützt. Da sämtliche Daten
+                lokal gespeichert werden, liegt die Sicherheit in deiner Hand:
             </p>
             <ul>
                 <li>Halte dein Gerät mit Updates aktuell</li>

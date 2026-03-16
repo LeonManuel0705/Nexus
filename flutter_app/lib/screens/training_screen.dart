@@ -1,7 +1,12 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/database_service.dart' if (dart.library.html) '../services/database_service_web.dart';
 import '../theme.dart';
+import '../widgets/animated_list_item.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/page_fade_in.dart';
 
 class TrainingScreen extends StatefulWidget {
   const TrainingScreen({super.key});
@@ -67,7 +72,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
     } catch (e, stackTrace) {
       debugPrint('TrainingScreen._loadData error: $e');
       debugPrint('Stack trace: $stackTrace');
-      _error = 'Fehler beim Laden: $e';
+      _error = 'Fehler beim Laden der Trainingsdaten.';
     } finally {
       setState(() => _isLoading = false);
     }
@@ -103,56 +108,65 @@ class _TrainingScreenState extends State<TrainingScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Stack(
+    return PageFadeIn(
+      child: Stack(
       children: [
-        _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-                ? _buildErrorView()
-                : RefreshIndicator(
-                    onRefresh: _loadData,
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: _isLoading
+              ? const Center(key: ValueKey('loading'), child: CircularProgressIndicator())
+              : _error != null
+                  ? KeyedSubtree(key: const ValueKey('error'), child: _buildErrorView())
+                  : RefreshIndicator(
+                      key: const ValueKey('content'),
+                      onRefresh: _loadData,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
 
-                          _buildModeToggle(isDark),
-                          const SizedBox(height: 16),
+                            _buildModeToggle(isDark),
+                            const SizedBox(height: 16),
 
-                          _buildWeekNavigation(),
-                          const SizedBox(height: 16),
+                            _buildWeekNavigation(),
+                            const SizedBox(height: 16),
 
-                          _buildPlanTypeInfo(),
-                          const SizedBox(height: 16),
+                            _buildPlanTypeInfo(),
+                            const SizedBox(height: 16),
 
-                          _buildScheduleSection(),
-                          const SizedBox(height: 24),
+                            _buildScheduleSection(),
+                            const SizedBox(height: 24),
 
-                          _buildTodaySession(),
-                          const SizedBox(height: 24),
+                            _buildTodaySession(),
+                            const SizedBox(height: 24),
 
-                          _buildHealthSection(),
-                          const SizedBox(height: 24),
+                            _buildHealthSection(),
+                            const SizedBox(height: 24),
 
-                          _buildGoalsSection(),
-                          const SizedBox(height: 80),
-                        ],
+                            _buildGoalsSection(),
+                            const SizedBox(height: 120),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
+        ),
         Positioned(
           right: 16,
           bottom: 16,
-          child: FloatingActionButton(
-            heroTag: 'fab_training',
-            onPressed: _showAddOptions,
-            backgroundColor: NexusTheme.trainingColor,
-            child: const Icon(Icons.add, color: Colors.white),
+          child: PageFadeIn(
+            delay: const Duration(milliseconds: 300),
+            child: FloatingActionButton(
+              heroTag: 'fab_training',
+              onPressed: _showAddOptions,
+              backgroundColor: NexusTheme.trainingColor,
+              child: const Icon(Icons.add, color: Colors.white),
+            ),
           ),
         ),
       ],
+      ),
     );
   }
 
@@ -160,14 +174,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
     return Row(
       children: [
         Expanded(
-          child: Text(
-            'Training',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : NexusTheme.lightText,
-            ),
-          ),
+          child: NexusTheme.gradientText('Training', fontSize: 36),
         ),
 
         Container(
@@ -220,7 +227,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, size: 64, color: NexusTheme.danger),
+            const Icon(Icons.error_outline, size: 64, color: NexusTheme.danger),
             const SizedBox(height: 16),
             Text(_error!, textAlign: TextAlign.center),
             const SizedBox(height: 16),
@@ -235,29 +242,10 @@ class _TrainingScreenState extends State<TrainingScreen> {
   }
 
   Widget _buildGlassCard({required Widget child, EdgeInsets? padding}) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
+    return GlassCard(
+      borderRadius: 16,
       padding: padding ?? const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withOpacity(0.05)
-            : Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.1)
-              : Colors.black.withOpacity(0.05),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withOpacity(0.2)
-                : Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+      enableTapScale: false,
       child: child,
     );
   }
@@ -308,19 +296,11 @@ class _TrainingScreenState extends State<TrainingScreen> {
   }
 
   Widget _buildPlanTypeInfo() {
-    return Container(
+    return GlassCard(
+      borderRadius: 16,
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: _isHolidayMode
-            ? NexusTheme.warning.withOpacity(0.15)
-            : NexusTheme.primaryColor.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _isHolidayMode
-              ? NexusTheme.warning.withOpacity(0.3)
-              : NexusTheme.primaryColor.withOpacity(0.3),
-        ),
-      ),
+      tint: _isHolidayMode ? NexusTheme.warning : NexusTheme.primaryColor,
+      enableTapScale: false,
       child: Row(
         children: [
           Icon(
@@ -370,7 +350,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Icon(Icons.calendar_view_week, size: 20, color: NexusTheme.primaryColor),
+                const Icon(Icons.calendar_view_week, size: 20, color: NexusTheme.primaryColor),
                 const SizedBox(width: 8),
                 Text(
                   'Trainingsplan',
@@ -395,7 +375,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
                     Icon(
                       Icons.fitness_center,
                       size: 48,
-                      color: Colors.grey.withOpacity(0.4),
+                      color: Colors.grey.withValues(alpha: 0.4),
                     ),
                     const SizedBox(height: 16),
                     const Text(
@@ -417,7 +397,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: 7,
-              separatorBuilder: (_, __) => Divider(height: 1, color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05)),
+              separatorBuilder: (_, __) => Divider(height: 1, color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05)),
               itemBuilder: (context, index) {
                 final dayIndex = index + 1;
                 final entry = schedule.where((e) => e.day == dayIndex).firstOrNull;
@@ -428,14 +408,17 @@ class _TrainingScreenState extends State<TrainingScreen> {
                     DateFormat('yyyy-MM-dd').format(s.date) ==
                     DateFormat('yyyy-MM-dd').format(date)).firstOrNull;
 
-                return _ScheduleDayTile(
-                  dayName: dayNames[index],
-                  date: date,
-                  entry: entry,
-                  isToday: isToday,
-                  isCompleted: session != null,
-                  onTap: () => _showEditDayDialog(dayIndex, entry),
-                  onComplete: entry != null ? () => _toggleDayComplete(date, entry) : null,
+                return AnimatedListItem(
+                  index: index,
+                  child: _ScheduleDayTile(
+                    dayName: dayNames[index],
+                    date: date,
+                    entry: entry,
+                    isToday: isToday,
+                    isCompleted: session != null,
+                    onTap: () => _showEditDayDialog(dayIndex, entry),
+                    onComplete: entry != null ? () => _toggleDayComplete(date, entry) : null,
+                  ),
                 );
               },
             ),
@@ -454,7 +437,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.today, size: 20, color: NexusTheme.accentColor),
+              const Icon(Icons.today, size: 20, color: NexusTheme.accentColor),
               const SizedBox(width: 8),
               Text(
                 'Heute',
@@ -464,12 +447,11 @@ class _TrainingScreenState extends State<TrainingScreen> {
           ),
           const SizedBox(height: 16),
             if (correctEntry == null || correctEntry.type == 'rest')
-              Container(
+              GlassCard(
+                borderRadius: 16,
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: NexusTheme.success.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                tint: NexusTheme.success,
+                enableTapScale: false,
                 child: Row(
                   children: [
                     Text(
@@ -497,20 +479,11 @@ class _TrainingScreenState extends State<TrainingScreen> {
                 ),
               )
             else
-              Container(
+              GlassCard(
+                borderRadius: 16,
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      NexusTheme.accent1.withOpacity(0.2),
-                      NexusTheme.accent2.withOpacity(0.2),
-                      NexusTheme.accent3.withOpacity(0.2),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                tint: NexusTheme.accentColor,
+                enableTapScale: false,
                 child: Row(
                   children: [
                     Text(
@@ -559,7 +532,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.favorite, size: 20, color: NexusTheme.trainingColor),
+              const Icon(Icons.favorite, size: 20, color: NexusTheme.trainingColor),
               const SizedBox(width: 8),
               Text(
                 'Wohlbefinden',
@@ -616,7 +589,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.flag, size: 20, color: NexusTheme.success),
+              const Icon(Icons.flag, size: 20, color: NexusTheme.success),
               const SizedBox(width: 8),
               Text(
                 'Ziele',
@@ -642,11 +615,14 @@ class _TrainingScreenState extends State<TrainingScreen> {
               ),
             )
           else
-            ...(_goals.map((goal) => _GoalTile(
-                  goal: goal,
-                  onEdit: () => _showGoalDialog(goal),
-                  onDelete: () => _deleteGoal(goal),
-                  onToggle: () => _toggleGoal(goal),
+            ...(_goals.asMap().entries.map((e) => AnimatedListItem(
+                  index: e.key,
+                  child: _GoalTile(
+                    goal: e.value,
+                    onEdit: () => _showGoalDialog(e.value),
+                    onDelete: () => _deleteGoal(e.value),
+                    onToggle: () => _toggleGoal(e.value),
+                  ),
                 ))),
         ],
       ),
@@ -656,6 +632,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
   void _showAddOptions() {
     showModalBottomSheet(
       context: context,
+      constraints: const BoxConstraints(maxWidth: 600),
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -722,8 +699,8 @@ class _TrainingScreenState extends State<TrainingScreen> {
             } catch (e) {
               debugPrint('Error saving schedule: $e');
               scaffoldMessenger.showSnackBar(
-                SnackBar(
-                  content: Text('Fehler: $e'),
+                const SnackBar(
+                  content: Text('Ein Fehler ist aufgetreten. Bitte versuche es erneut.'),
                   backgroundColor: Colors.red,
                 ),
               );
@@ -740,10 +717,11 @@ class _TrainingScreenState extends State<TrainingScreen> {
     final scheduleAtOpen = List<TrainingEntry>.from(_currentSchedule);
     final dayNames = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 
-    final result = await showModalBottomSheet<TrainingEntry?>(
+    final result = await showModalBottomSheet<Object?>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: const BoxConstraints(maxWidth: 600),
       builder: (context) => _EditDayBottomSheet(
         dayIndex: dayIndex,
         dayName: dayNames[dayIndex],
@@ -751,11 +729,34 @@ class _TrainingScreenState extends State<TrainingScreen> {
       ),
     );
 
-    if (result != null) {
+    if (result is String && result == 'delete') {
       try {
         final schedule = List<TrainingEntry>.from(scheduleAtOpen);
         schedule.removeWhere((e) => e.day == dayIndex);
-        schedule.add(result);
+        debugPrint('Deleting day $dayIndex, saving schedule with ${schedule.length} entries, isHoliday: $isHolidayAtOpen');
+        await _db.saveTrainingSchedule(schedule, isHoliday: isHolidayAtOpen);
+        await _loadData();
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(
+            content: Text('Tag gelöscht!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e, stackTrace) {
+        debugPrint('Error deleting day: $e');
+        debugPrint('Stack trace: $stackTrace');
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(
+            content: Text('Fehler beim Löschen. Bitte versuche es erneut.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } else if (result != null) {
+      try {
+        final schedule = List<TrainingEntry>.from(scheduleAtOpen);
+        schedule.removeWhere((e) => e.day == dayIndex);
+        schedule.add(result as TrainingEntry);
         debugPrint('Saving schedule with ${schedule.length} entries, isHoliday: $isHolidayAtOpen');
         await _db.saveTrainingSchedule(schedule, isHoliday: isHolidayAtOpen);
         debugPrint('Schedule saved, reloading data...');
@@ -771,8 +772,8 @@ class _TrainingScreenState extends State<TrainingScreen> {
         debugPrint('Error saving day: $e');
         debugPrint('Stack trace: $stackTrace');
         scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text('Fehler beim Speichern: $e'),
+          const SnackBar(
+            content: Text('Fehler beim Speichern. Bitte versuche es erneut.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -789,7 +790,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
           try {
             await _db.saveHealthLog(log);
             await _loadData();
-            if (mounted) {
+            if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Wohlbefinden gespeichert!'),
@@ -798,10 +799,11 @@ class _TrainingScreenState extends State<TrainingScreen> {
               );
             }
           } catch (e) {
-            if (mounted) {
+            debugPrint('Error saving health log: $e');
+            if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Fehler: $e'),
+                const SnackBar(
+                  content: Text('Ein Fehler ist aufgetreten. Bitte versuche es erneut.'),
                   backgroundColor: Colors.red,
                 ),
               );
@@ -821,7 +823,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
           try {
             await _db.saveTrainingGoal(goal);
             await _loadData();
-            if (mounted) {
+            if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Ziel gespeichert!'),
@@ -830,10 +832,11 @@ class _TrainingScreenState extends State<TrainingScreen> {
               );
             }
           } catch (e) {
-            if (mounted) {
+            debugPrint('Error saving goal: $e');
+            if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Fehler: $e'),
+                const SnackBar(
+                  content: Text('Ein Fehler ist aufgetreten. Bitte versuche es erneut.'),
                   backgroundColor: Colors.red,
                 ),
               );
@@ -864,10 +867,11 @@ class _TrainingScreenState extends State<TrainingScreen> {
         );
       }
     } catch (e) {
+      debugPrint('Error logging session: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Fehler: $e'),
+          const SnackBar(
+            content: Text('Ein Fehler ist aufgetreten. Bitte versuche es erneut.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -883,7 +887,9 @@ class _TrainingScreenState extends State<TrainingScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Training eintragen'),
-        content: Column(
+        content: SizedBox(
+          width: 460,
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
@@ -903,6 +909,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
               keyboardType: TextInputType.number,
             ),
           ],
+        ),
         ),
         actions: [
           TextButton(
@@ -937,10 +944,11 @@ class _TrainingScreenState extends State<TrainingScreen> {
           );
         }
       } catch (e) {
+        debugPrint('Error saving quick session: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Fehler beim Speichern: $e'),
+            const SnackBar(
+              content: Text('Fehler beim Speichern. Bitte versuche es erneut.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -969,10 +977,11 @@ class _TrainingScreenState extends State<TrainingScreen> {
       }
       await _loadData();
     } catch (e) {
+      debugPrint('Error toggling day complete: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Fehler: $e'),
+          const SnackBar(
+            content: Text('Ein Fehler ist aufgetreten. Bitte versuche es erneut.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1019,7 +1028,7 @@ class _ScheduleDayTile extends StatelessWidget {
         height: 44,
         decoration: BoxDecoration(
           color: isToday
-              ? NexusTheme.primaryColor.withOpacity(0.2)
+              ? NexusTheme.primaryColor.withValues(alpha: 0.2)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: isToday
@@ -1097,12 +1106,11 @@ class _HealthStatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Container(
+      child: GlassCard(
+        borderRadius: 16,
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
+        tint: color,
+        enableTapScale: false,
         child: Column(
           children: [
             Icon(icon, color: color, size: 20),
@@ -1149,6 +1157,26 @@ class _GoalTile extends StatelessWidget {
         color: NexusTheme.danger,
         child: const Icon(Icons.delete, color: Colors.white),
       ),
+      confirmDismiss: (direction) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Ziel löschen'),
+            content: const Text('Möchtest du dieses Ziel wirklich löschen?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Abbrechen'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: FilledButton.styleFrom(backgroundColor: NexusTheme.danger),
+                child: const Text('Löschen'),
+              ),
+            ],
+          ),
+        ) ?? false;
+      },
       onDismissed: (_) => onDelete(),
       child: ListTile(
         leading: GestureDetector(
@@ -1243,7 +1271,7 @@ class _EditScheduleScreenState extends State<_EditScheduleScreen> {
                       setState(() => _isSaving = true);
                       try {
                         await widget.onSave(_schedule);
-                        if (mounted) Navigator.pop(context);
+                        if (context.mounted) Navigator.pop(context);
                       } finally {
                         if (mounted) setState(() => _isSaving = false);
                       }
@@ -1260,28 +1288,18 @@ class _EditScheduleScreenState extends State<_EditScheduleScreen> {
       ),
       body: Column(
         children: [
-          Container(
+          GlassCard(
             margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            borderRadius: 16,
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: widget.isHoliday
-                    ? [NexusTheme.warning.withOpacity(0.2), NexusTheme.warning.withOpacity(0.1)]
-                    : [NexusTheme.primaryColor.withOpacity(0.2), NexusTheme.accentColor.withOpacity(0.1)],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: widget.isHoliday
-                    ? NexusTheme.warning.withOpacity(0.3)
-                    : NexusTheme.primaryColor.withOpacity(0.3),
-              ),
-            ),
+            tint: widget.isHoliday ? NexusTheme.warning : NexusTheme.primaryColor,
+            enableTapScale: false,
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: (widget.isHoliday ? NexusTheme.warning : NexusTheme.primaryColor).withOpacity(0.2),
+                    color: (widget.isHoliday ? NexusTheme.warning : NexusTheme.primaryColor).withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -1326,121 +1344,93 @@ class _EditScheduleScreenState extends State<_EditScheduleScreen> {
                 final entry = _schedule.where((e) => e.day == dayIndex).firstOrNull;
                 final hasEntry = entry != null;
 
-                return GestureDetector(
-                  onTap: () => _editDay(dayIndex, entry),
-                  child: Container(
+                return AnimatedListItem(
+                  index: index,
+                  child: GlassCard(
                     margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      gradient: hasEntry
-                          ? LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                _getTypeColor(entry.type).withOpacity(isDark ? 0.3 : 0.15),
-                                _getTypeColor(entry.type).withOpacity(isDark ? 0.15 : 0.05),
-                              ],
-                            )
-                          : null,
-                      color: hasEntry ? null : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: hasEntry
-                            ? _getTypeColor(entry.type).withOpacity(0.3)
-                            : (isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05)),
-                        width: hasEntry ? 1.5 : 1,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: hasEntry
-                              ? _getTypeColor(entry.type).withOpacity(0.1)
-                              : Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: hasEntry
-                                  ? _getTypeColor(entry.type).withOpacity(0.2)
-                                  : (isDark ? Colors.white.withOpacity(0.1) : Colors.grey.withOpacity(0.1)),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Center(
-                              child: hasEntry
-                                  ? Text(entry.icon, style: const TextStyle(fontSize: 24))
-                                  : Text(
-                                      dayNamesShort[index],
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                        color: isDark ? Colors.white54 : Colors.grey,
-                                      ),
-                                    ),
-                            ),
+                    borderRadius: 16,
+                    padding: const EdgeInsets.all(16),
+                    tint: hasEntry ? _getTypeColor(entry.type) : null,
+                    onTap: () => _editDay(dayIndex, entry),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: hasEntry
+                                ? _getTypeColor(entry.type).withValues(alpha: 0.2)
+                                : (isDark ? Colors.white.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1)),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  dayNames[index],
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 16,
-                                    color: isDark ? Colors.white : NexusTheme.lightText,
+                          child: Center(
+                            child: hasEntry
+                                ? Text(entry.icon, style: const TextStyle(fontSize: 24))
+                                : Text(
+                                    dayNamesShort[index],
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: isDark ? Colors.white54 : Colors.grey,
+                                    ),
                                   ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                dayNames[index],
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color: isDark ? Colors.white : NexusTheme.lightText,
                                 ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                hasEntry ? entry.title : 'Nicht geplant',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: hasEntry
+                                      ? (isDark ? Colors.white70 : Colors.black87)
+                                      : (isDark ? Colors.white38 : Colors.grey),
+                                ),
+                              ),
+                              if (hasEntry && entry.muscleGroups != null) ...[
                                 const SizedBox(height: 4),
                                 Text(
-                                  hasEntry ? entry.title : 'Nicht geplant',
+                                  entry.muscleGroups!,
                                   style: TextStyle(
-                                    fontSize: 14,
-                                    color: hasEntry
-                                        ? (isDark ? Colors.white70 : Colors.black87)
-                                        : (isDark ? Colors.white38 : Colors.grey),
+                                    fontSize: 12,
+                                    color: _getTypeColor(entry.type).withValues(alpha: 0.8),
                                   ),
                                 ),
-                                if (hasEntry && entry.muscleGroups != null) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    entry.muscleGroups!,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: _getTypeColor(entry.type).withOpacity(0.8),
-                                    ),
-                                  ),
-                                ],
                               ],
-                            ),
-                          ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (hasEntry)
-                                IconButton(
-                                  icon: Icon(Icons.delete_outline, color: NexusTheme.danger.withOpacity(0.7)),
-                                  onPressed: () {
-                                    setState(() {
-                                      _schedule.removeWhere((e) => e.day == dayIndex);
-                                    });
-                                  },
-                                ),
-                              Icon(
-                                Icons.chevron_right,
-                                color: isDark ? Colors.white38 : Colors.grey,
-                              ),
                             ],
                           ),
-                        ],
-                      ),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (hasEntry)
+                              IconButton(
+                                icon: Icon(Icons.delete_outline, color: NexusTheme.danger.withValues(alpha: 0.7)),
+                                onPressed: () {
+                                  setState(() {
+                                    _schedule.removeWhere((e) => e.day == dayIndex);
+                                  });
+                                },
+                              ),
+                            Icon(
+                              Icons.chevron_right,
+                              color: isDark ? Colors.white38 : Colors.grey,
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -1453,10 +1443,11 @@ class _EditScheduleScreenState extends State<_EditScheduleScreen> {
   }
 
   void _editDay(int dayIndex, TrainingEntry? existing) async {
-    final result = await showModalBottomSheet<TrainingEntry?>(
+    final result = await showModalBottomSheet<Object?>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: const BoxConstraints(maxWidth: 600),
       builder: (context) => _EditDayBottomSheet(
         dayIndex: dayIndex,
         dayName: dayNames[dayIndex - 1],
@@ -1464,7 +1455,11 @@ class _EditScheduleScreenState extends State<_EditScheduleScreen> {
       ),
     );
 
-    if (result != null) {
+    if (result is String && result == 'delete') {
+      setState(() {
+        _schedule.removeWhere((e) => e.day == dayIndex);
+      });
+    } else if (result is TrainingEntry) {
       setState(() {
         _schedule.removeWhere((e) => e.day == dayIndex);
         _schedule.add(result);
@@ -1526,15 +1521,28 @@ class _EditDayBottomSheetState extends State<_EditDayBottomSheet> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1A2E) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + bottomPadding),
-        child: SingleChildScrollView(
-          child: Column(
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark
+                ? const Color(0xFF1A1A2E).withValues(alpha: 0.9)
+                : Colors.white.withValues(alpha: 0.85),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border(
+              top: BorderSide(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : Colors.white.withValues(alpha: 0.8),
+              ),
+            ),
+          ),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + bottomPadding),
+            child: SingleChildScrollView(
+              child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1562,9 +1570,9 @@ class _EditDayBottomSheetState extends State<_EditDayBottomSheet> {
                   const Spacer(),
                   if (widget.existing != null)
                     TextButton.icon(
-                      onPressed: () => Navigator.pop(context),
-                      icon: Icon(Icons.delete_outline, color: NexusTheme.danger, size: 18),
-                      label: Text('Löschen', style: TextStyle(color: NexusTheme.danger)),
+                      onPressed: () => Navigator.pop(context, 'delete'),
+                      icon: const Icon(Icons.delete_outline, color: NexusTheme.danger, size: 18),
+                      label: const Text('Löschen', style: TextStyle(color: NexusTheme.danger)),
                     ),
                 ],
               ),
@@ -1597,7 +1605,7 @@ class _EditDayBottomSheetState extends State<_EditDayBottomSheet> {
                         margin: const EdgeInsets.only(right: 12),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
-                          color: isSelected ? opt.$4.withOpacity(0.2) : (isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1)),
+                          color: isSelected ? opt.$4.withValues(alpha: 0.2) : (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.withValues(alpha: 0.1)),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: isSelected ? opt.$4 : Colors.transparent,
@@ -1637,7 +1645,7 @@ class _EditDayBottomSheetState extends State<_EditDayBottomSheet> {
                 decoration: InputDecoration(
                   hintText: 'z.B. Chest Day, Beine, etc.',
                   filled: true,
-                  fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1),
+                  fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.withValues(alpha: 0.1),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
@@ -1661,7 +1669,7 @@ class _EditDayBottomSheetState extends State<_EditDayBottomSheet> {
                   decoration: InputDecoration(
                     hintText: 'z.B. Brust, Trizeps, Schultern',
                     filled: true,
-                    fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1),
+                    fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.withValues(alpha: 0.1),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -1686,7 +1694,7 @@ class _EditDayBottomSheetState extends State<_EditDayBottomSheet> {
                 decoration: InputDecoration(
                   hintText: 'Zusätzliche Hinweise...',
                   filled: true,
-                  fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1),
+                  fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.withValues(alpha: 0.1),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
@@ -1724,6 +1732,8 @@ class _EditDayBottomSheetState extends State<_EditDayBottomSheet> {
               ),
             ],
           ),
+        ),
+      ),
         ),
       ),
     );
@@ -1785,12 +1795,14 @@ class _EditDayDialogState extends State<_EditDayDialog> {
 
     return AlertDialog(
       title: Text('${dayNames[widget.dayIndex]} bearbeiten'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             DropdownButtonFormField<String>(
-              value: _type,
+              initialValue: _type,
               decoration: const InputDecoration(labelText: 'Typ'),
               items: _typeOptions.map((opt) => DropdownMenuItem(
                 value: opt.$1,
@@ -1841,6 +1853,7 @@ class _EditDayDialogState extends State<_EditDayDialog> {
           ],
         ),
       ),
+      ),
       actions: [
         TextButton(
           onPressed: _isSaving ? null : () => Navigator.pop(context),
@@ -1852,12 +1865,12 @@ class _EditDayDialogState extends State<_EditDayDialog> {
               setState(() => _isSaving = true);
               try {
                 await widget.onSave(null);
-                if (mounted) Navigator.pop(context);
+                if (context.mounted) Navigator.pop(context);
               } finally {
                 if (mounted) setState(() => _isSaving = false);
               }
             },
-            child: Text('Löschen', style: TextStyle(color: NexusTheme.danger)),
+            child: const Text('Löschen', style: TextStyle(color: NexusTheme.danger)),
           ),
         ElevatedButton(
           onPressed: _isSaving ? null : () async {
@@ -1877,7 +1890,7 @@ class _EditDayDialogState extends State<_EditDayDialog> {
                 muscleGroups: _muscleGroupsController.text.isEmpty ? null : _muscleGroupsController.text,
                 notes: _notesController.text.isEmpty ? null : _notesController.text,
               ));
-              if (mounted) Navigator.pop(context);
+              if (context.mounted) Navigator.pop(context);
             } finally {
               if (mounted) setState(() => _isSaving = false);
             }
@@ -1925,8 +1938,10 @@ class _HealthLogDialogState extends State<_HealthLogDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Wohlbefinden eintragen'),
-      content: SingleChildScrollView(
-        child: Column(
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildSlider('Schlaf (Stunden)', _sleep, 0, 12, (v) => setState(() => _sleep = v)),
@@ -1935,6 +1950,7 @@ class _HealthLogDialogState extends State<_HealthLogDialog> {
             _buildSlider('Erholung', _recovery.toDouble(), 1, 10, (v) => setState(() => _recovery = v.toInt())),
           ],
         ),
+      ),
       ),
       actions: [
         TextButton(
@@ -2016,8 +2032,11 @@ class _GoalDialogState extends State<_GoalDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(widget.existing != null ? 'Ziel bearbeiten' : 'Neues Ziel'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
             controller: _titleController,
@@ -2056,6 +2075,8 @@ class _GoalDialogState extends State<_GoalDialog> {
             },
           ),
         ],
+      ),
+      ),
       ),
       actions: [
         TextButton(

@@ -172,8 +172,9 @@ class SyncProvider extends ChangeNotifier {
 
       await loadEvents();
     } catch (e) {
+      debugPrint('Sync error: $e');
       _syncStatus = SyncStatus.error;
-      _error = 'Sync fehlgeschlagen: $e';
+      _error = 'Synchronisation fehlgeschlagen. Bitte versuche es erneut.';
     }
 
     notifyListeners();

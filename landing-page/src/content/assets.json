@@ -1,0 +1,17 @@
+{
+  "home_hero": "https://res.cloudinary.com/du5fldub3/image/upload/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/iter1/home_hero_interface.png",
+  "problem_solution": "https://res.cloudinary.com/du5fldub3/image/upload/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/iter1/problem_solution_comparison.png",
+  "privacy_shield": "https://res.cloudinary.com/du5fldub3/image/upload/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/iter1/privacy_shield_glass.png",
+  "testimonial_lukas": "https://res.cloudinary.com/du5fldub3/image/upload/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/iter1/testimonial_lukas.png",
+  "testimonial_sophie": "https://res.cloudinary.com/du5fldub3/image/upload/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/iter1/testimonial_sophie.png",
+  "features_hero": "https://res.cloudinary.com/du5fldub3/image/upload/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/iter1/features_hero_modular.png",
+  "feature_school": "https://res.cloudinary.com/du5fldub3/image/upload/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/iter1/feature_school_iso.png",
+  "feature_transit": "https://res.cloudinary.com/du5fldub3/image/upload/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/iter1/feature_transit_iso.png",
+  "feature_training": "https://res.cloudinary.com/du5fldub3/image/upload/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/iter1/feature_training_iso.png",
+  "feature_life": "https://res.cloudinary.com/du5fldub3/image/upload/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/iter1/feature_life_iso.png",
+  "usecase_student": "https://res.cloudinary.com/du5fldub3/image/upload/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/iter1/usecase_student_context.png",
+  "usecase_pro": "https://res.cloudinary.com/du5fldub3/image/upload/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/iter1/usecase_professional_context.png",
+  "privacy_hero": "https://res.cloudinary.com/du5fldub3/image/upload/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/iter1/privacy_hero_abstract.png",
+  "pricing_abstract": "https://res.cloudinary.com/du5fldub3/image/upload/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/iter1/pricing_card_abstract.png",
+  "about_hero": "https://res.cloudinary.com/du5fldub3/image/upload/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/iter1/about_hero_team_abstract.png"
+}

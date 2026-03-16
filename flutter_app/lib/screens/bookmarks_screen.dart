@@ -4,6 +4,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers/bookmark_provider.dart';
 import '../models/bookmark.dart';
 import '../theme.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/animated_list_item.dart';
+import '../widgets/page_fade_in.dart';
 
 class BookmarksScreen extends StatefulWidget {
   const BookmarksScreen({super.key});
@@ -38,10 +41,14 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          backgroundColor: NexusTheme.darkCard,
+        builder: (context, setState) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          return AlertDialog(
+          backgroundColor: isDark ? NexusTheme.darkCard : Colors.white,
           title: const Text('Lesezeichen hinzufügen'),
-          content: SingleChildScrollView(
+          content: SizedBox(
+            width: 460,
+            child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -66,13 +73,13 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: selectedCategory,
+                  initialValue: selectedCategory,
                   decoration: const InputDecoration(
                     labelText: 'Kategorie',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.category),
                   ),
-                  dropdownColor: NexusTheme.darkSurface,
+                  dropdownColor: isDark ? NexusTheme.darkSurface : Colors.white,
                   items: Bookmark.categories.map((c) => DropdownMenuItem(
                     value: c,
                     child: Text(c),
@@ -86,6 +93,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
               ],
             ),
           ),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -98,6 +106,17 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                   if (!url.startsWith('http://') && !url.startsWith('https://')) {
                     url = 'https://$url';
                   }
+                  final parsed = Uri.tryParse(url);
+                  if (parsed == null || !parsed.hasScheme || !parsed.hasAuthority ||
+                      (parsed.scheme != 'http' && parsed.scheme != 'https')) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Bitte eine gültige URL eingeben'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
                   context.read<BookmarkProvider>().addBookmark(
                     title: titleController.text.trim(),
                     url: url,
@@ -109,9 +128,13 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
               child: const Text('Hinzufügen'),
             ),
           ],
-        ),
+        );
+        },
       ),
-    );
+    ).then((_) {
+      titleController.dispose();
+      urlController.dispose();
+    });
   }
 
   Future<void> _launchUrl(String url) async {
@@ -123,126 +146,156 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: NexusTheme.darkBackground,
-      appBar: AppBar(
-        title: const Text('Lesezeichen'),
-        backgroundColor: NexusTheme.darkSurface,
-      ),
-      body: Consumer<BookmarkProvider>(
-        builder: (context, provider, child) {
-          if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return PageFadeIn(
+      child: Stack(
+        children: [
+          Consumer<BookmarkProvider>(
+            builder: (context, provider, child) {
+              if (provider.isLoading) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-          final bookmarks = _searchQuery.isEmpty
-              ? provider.filteredBookmarks
-              : provider.search(_searchQuery);
+              final categoryFiltered = provider.filteredBookmarks;
+              final bookmarks = _searchQuery.isEmpty
+                  ? categoryFiltered
+                  : categoryFiltered.where((b) =>
+                      b.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                      b.url.toLowerCase().contains(_searchQuery.toLowerCase())
+                    ).toList();
 
-          return Column(
-            children: [
-
-              Padding(
+              return ListView(
                 padding: const EdgeInsets.all(16),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Lesezeichen suchen...',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() => _searchQuery = '');
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: NexusTheme.darkSurface,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                children: [
+                  NexusTheme.gradientText('Lesezeichen', fontSize: 36),
+                  const SizedBox(height: 20),
+
+                  GlassCard(
+                    borderRadius: 16,
+                    padding: EdgeInsets.zero,
+                    hasShadow: false,
+                    child: TextField(
+                      controller: _searchController,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Lesezeichen suchen...',
+                        hintStyle: TextStyle(
+                          color: isDark ? Colors.white38 : Colors.black38,
+                        ),
+                        prefixIcon: Icon(
+                          Icons.search,
+                          color: isDark ? Colors.white54 : Colors.black54,
+                        ),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.clear,
+                                  color: isDark ? Colors.white54 : Colors.black54,
+                                ),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _searchQuery = '');
+                                },
+                              )
+                            : null,
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                      onChanged: (value) => setState(() => _searchQuery = value),
                     ),
                   ),
-                  onChanged: (value) => setState(() => _searchQuery = value),
-                ),
-              ),
 
-              SizedBox(
-                height: 40,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    _CategoryChip(
-                      label: 'Alle',
-                      count: provider.countByCategory['All'] ?? 0,
-                      isSelected: provider.selectedCategory == 'All',
-                      onTap: () => provider.setCategory('All'),
-                    ),
-                    const SizedBox(width: 8),
-                    ...Bookmark.categories.map((category) => Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: _CategoryChip(
-                        label: _getCategoryLabel(category),
-                        count: provider.countByCategory[category] ?? 0,
-                        isSelected: provider.selectedCategory == category,
-                        onTap: () => provider.setCategory(category),
-                        color: _getCategoryColor(category),
-                      ),
-                    )),
-                  ],
-                ),
-              ),
+                  const SizedBox(height: 16),
 
-              const SizedBox(height: 16),
-
-              Expanded(
-                child: bookmarks.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.bookmark_border,
-                              size: 64,
-                              color: Colors.white.withOpacity(0.2),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _searchQuery.isNotEmpty
-                                  ? 'Keine Ergebnisse'
-                                  : 'Keine Lesezeichen',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.5),
-                              ),
-                            ),
-                          ],
+                  SizedBox(
+                    height: 40,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        _CategoryChip(
+                          label: 'Alle',
+                          count: provider.countByCategory['All'] ?? 0,
+                          isSelected: provider.selectedCategory == 'All',
+                          onTap: () => provider.setCategory('All'),
                         ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: bookmarks.length,
-                        itemBuilder: (context, index) {
-                          final bookmark = bookmarks[index];
-                          return _BookmarkCard(
-                            bookmark: bookmark,
-                            onTap: () => _launchUrl(bookmark.url),
-                            onDelete: () => provider.deleteBookmark(bookmark.id),
-                          );
-                        },
-                      ),
+                        const SizedBox(width: 8),
+                        ...Bookmark.categories.map((category) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _CategoryChip(
+                            label: _getCategoryLabel(category),
+                            count: provider.countByCategory[category] ?? 0,
+                            isSelected: provider.selectedCategory == category,
+                            onTap: () => provider.setCategory(category),
+                            color: _getCategoryColor(category),
+                          ),
+                        )),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: bookmarks.isEmpty
+                        ? GlassCard(
+                            key: ValueKey('empty_${provider.selectedCategory}_$_searchQuery'),
+                            borderRadius: 16,
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.bookmark_border,
+                                  size: 64,
+                                  color: isDark ? Colors.white38 : Colors.black26,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _searchQuery.isNotEmpty
+                                      ? 'Keine Ergebnisse'
+                                      : 'Keine Lesezeichen',
+                                  style: TextStyle(
+                                    color: isDark ? Colors.white54 : Colors.black54,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Column(
+                            key: ValueKey('content_${provider.selectedCategory}_$_searchQuery'),
+                            children: bookmarks.asMap().entries.map((e) => AnimatedListItem(
+                              index: e.key,
+                              child: _BookmarkCard(
+                                bookmark: e.value,
+                                onTap: () => _launchUrl(e.value.url),
+                                onDelete: () => provider.deleteBookmark(e.value.id),
+                              ),
+                            )).toList(),
+                          ),
+                  ),
+
+                  const SizedBox(height: 120),
+                ],
+              );
+            },
+          ),
+
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: PageFadeIn(
+              delay: const Duration(milliseconds: 300),
+              child: FloatingActionButton(
+                heroTag: 'fab_bookmarks',
+                onPressed: _showAddBookmarkDialog,
+                backgroundColor: NexusTheme.primary,
+                child: const Icon(Icons.add, color: Colors.white),
               ),
-            ],
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'fab_bookmarks',
-        onPressed: _showAddBookmarkDialog,
-        backgroundColor: NexusTheme.primary,
-        child: const Icon(Icons.add),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -291,14 +344,9 @@ class _CategoryChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? (color ?? NexusTheme.primary).withOpacity(0.2)
-              : NexusTheme.darkSurface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? (color ?? NexusTheme.primary)
-                : NexusTheme.darkBorder,
-          ),
+              ? const Color(0xFF4F46E5) // indigo-600
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(9999), // rounded-full
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -307,24 +355,20 @@ class _CategoryChip extends StatelessWidget {
               label,
               style: TextStyle(
                 color: isSelected
-                    ? (color ?? NexusTheme.primary)
-                    : Colors.white70,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    ? Colors.white
+                    : const Color(0xFF71717A), // zinc-500
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                fontSize: 13,
               ),
             ),
             const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: (color ?? NexusTheme.primary).withOpacity(0.2),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '$count',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: color ?? NexusTheme.primary,
-                ),
+            Text(
+              '$count',
+              style: TextStyle(
+                fontSize: 12,
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.7)
+                    : const Color(0xFF71717A),
               ),
             ),
           ],
@@ -347,9 +391,31 @@ class _BookmarkCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Dismissible(
       key: Key(bookmark.id),
       direction: DismissDirection.endToStart,
+      confirmDismiss: (direction) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Löschen bestätigen'),
+            content: const Text('Möchtest du dieses Lesezeichen wirklich löschen?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Abbrechen'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Löschen'),
+              ),
+            ],
+          ),
+        ) ?? false;
+      },
       onDismissed: (_) => onDelete(),
       background: Container(
         alignment: Alignment.centerRight,
@@ -361,74 +427,78 @@ class _BookmarkCard extends StatelessWidget {
         ),
         child: const Icon(Icons.delete, color: Colors.white),
       ),
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        color: NexusTheme.darkCard,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: NexusTheme.darkBorder),
-        ),
-        child: InkWell(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: GlassCard(
+          borderRadius: 16,
+          padding: const EdgeInsets.all(16),
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: NexusTheme.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Text(
-                      bookmark.title.isNotEmpty
-                          ? bookmark.title[0].toUpperCase()
-                          : '?',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: NexusTheme.primary,
-                      ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: NexusTheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: Text(
+                    bookmark.title.isNotEmpty
+                        ? bookmark.title[0].toUpperCase()
+                        : '?',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: NexusTheme.primary,
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        bookmark.title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      bookmark.title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        color: isDark ? Colors.white : Colors.black87,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : Colors.black.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
                         bookmark.domain,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
-                          fontSize: 13,
+                          fontFamily: 'JetBrains Mono',
+                          color: isDark ? Colors.white54 : Colors.black54,
+                          fontSize: 11,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                const Icon(
-                  Icons.open_in_new,
-                  size: 20,
-                  color: Colors.white54,
-                ),
-              ],
-            ),
+              ),
+              Icon(
+                Icons.open_in_new,
+                size: 20,
+                color: isDark ? Colors.white54 : Colors.black38,
+              ),
+            ],
           ),
         ),
       ),

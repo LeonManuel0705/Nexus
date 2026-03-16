@@ -3,7 +3,7 @@ description: "A new Flutter project."
 
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 0.3.0+17
 
 environment:
   sdk: ^3.5.4
@@ -47,6 +47,7 @@ dependencies:
 
   cupertino_icons: ^1.0.8
 
+  hive: any
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -69,4 +70,14 @@ flutter:
 
   assets:
     - assets/nexus-logo.png
+
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/InterVariable.ttf
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+        - asset: assets/fonts/JetBrainsMono-Medium.ttf
+          weight: 500
 

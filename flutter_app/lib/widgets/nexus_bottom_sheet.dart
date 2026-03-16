@@ -1,5 +1,8 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../theme.dart';
+import '../utils/platform_utils.dart';
+import 'page_fade_in.dart';
 
 class NexusBottomSheet extends StatelessWidget {
   final String? title;
@@ -63,25 +66,62 @@ class NexusBottomSheet extends StatelessWidget {
       minChildSize: minChildSize,
       maxChildSize: maxChildSize,
       expand: false,
-      builder: (context, scrollController) => Container(
-        decoration: BoxDecoration(
-          color: isDark ? NexusTheme.darkSurface : NexusTheme.lightSurface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          children: [
-            if (showHandle) _buildHandle(),
-            if (title != null || showCloseButton) _buildHeader(context, isDark),
-            Expanded(
-              child: SingleChildScrollView(
-                controller: scrollController,
-                child: child,
+      builder: (context, scrollController) {
+        final sheetContainer = Container(
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.black.withValues(alpha: shouldUseBlur ? 0.7 : 0.85)
+                : Colors.white.withValues(alpha: shouldUseBlur ? 0.85 : 0.95),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            border: Border(
+              top: BorderSide(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : Colors.white.withValues(alpha: 0.8),
+                width: 1.5,
+              ),
+              left: BorderSide(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : Colors.white.withValues(alpha: 0.8),
+                width: 1.5,
+              ),
+              right: BorderSide(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : Colors.white.withValues(alpha: 0.8),
+                width: 1.5,
               ),
             ),
-            if (actions != null) _buildActions(context),
-          ],
-        ),
-      ),
+          ),
+          child: Column(
+            children: [
+              if (showHandle) _buildHandle(),
+              if (title != null || showCloseButton) _buildHeader(context, isDark),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  child: PageFadeIn(
+                    delay: const Duration(milliseconds: 150),
+                    child: child,
+                  ),
+                ),
+              ),
+              if (actions != null) _buildActions(context, isDark),
+            ],
+          ),
+        );
+
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          child: shouldUseBlur
+              ? BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                  child: sheetContainer,
+                )
+              : sheetContainer,
+        );
+      },
     );
   }
 
@@ -92,7 +132,7 @@ class NexusBottomSheet extends StatelessWidget {
         width: 40,
         height: 4,
         decoration: BoxDecoration(
-          color: Colors.grey.withOpacity(0.3),
+          color: Colors.grey.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(2),
         ),
       ),
@@ -128,7 +168,7 @@ class NexusBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildActions(BuildContext context) {
+  Widget _buildActions(BuildContext context, bool isDark) {
     return Container(
       padding: EdgeInsets.fromLTRB(
         16,
@@ -137,14 +177,16 @@ class NexusBottomSheet extends StatelessWidget {
         12 + MediaQuery.of(context).padding.bottom,
       ),
       decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
+        color: isDark
+            ? Colors.black.withValues(alpha: 0.3)
+            : Colors.white.withValues(alpha: 0.5),
+        border: Border(
+          top: BorderSide(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.1)
+                : Colors.black.withValues(alpha: 0.1),
           ),
-        ],
+        ),
       ),
       child: Row(
         children: actions!.map((action) {
@@ -189,7 +231,7 @@ class NexusActionSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
+    final actionSheetContainer = Container(
       padding: EdgeInsets.fromLTRB(
         16,
         16,
@@ -197,8 +239,18 @@ class NexusActionSheet extends StatelessWidget {
         16 + MediaQuery.of(context).padding.bottom,
       ),
       decoration: BoxDecoration(
-        color: isDark ? NexusTheme.darkSurface : NexusTheme.lightSurface,
+        color: isDark
+            ? Colors.black.withValues(alpha: shouldUseBlur ? 0.7 : 0.85)
+            : Colors.white.withValues(alpha: shouldUseBlur ? 0.85 : 0.95),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border(
+          top: BorderSide(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.15)
+                : Colors.white.withValues(alpha: 0.8),
+            width: 1.5,
+          ),
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -208,7 +260,7 @@ class NexusActionSheet extends StatelessWidget {
             height: 4,
             margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.3),
+              color: Colors.grey.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -225,6 +277,16 @@ class NexusActionSheet extends StatelessWidget {
         ],
       ),
     );
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      child: shouldUseBlur
+          ? BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+              child: actionSheetContainer,
+            )
+          : actionSheetContainer,
+    );
   }
 
   Widget _buildActionTile(BuildContext context, NexusActionItem action, bool isDark) {
@@ -232,11 +294,22 @@ class NexusActionSheet extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.08)
+            : Colors.white.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.1)
+              : Colors.white.withValues(alpha: 0.8),
+        ),
+      ),
       child: ListTile(
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: (color ?? NexusTheme.primary).withOpacity(0.2),
+            color: (color ?? NexusTheme.primary).withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(
@@ -259,7 +332,6 @@ class NexusActionSheet extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
-        tileColor: isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
       ),
     );
   }

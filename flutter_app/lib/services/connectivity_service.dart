@@ -1,11 +1,17 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show ValueNotifier, VoidCallback, kIsWeb;
 
 enum ConnectionStatus {
   online,
   offline,
   unknown,
+}
+
+bool get _isDesktop {
+  if (kIsWeb) return false;
+  return Platform.isMacOS || Platform.isWindows || Platform.isLinux;
 }
 
 class ConnectivityService {
@@ -15,6 +21,7 @@ class ConnectivityService {
 
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<ConnectivityResult>? _subscription;
+  Timer? _desktopPollTimer;
 
   final ValueNotifier<ConnectionStatus> status = ValueNotifier(ConnectionStatus.unknown);
   final ValueNotifier<bool> isOnline = ValueNotifier(true);
@@ -28,9 +35,45 @@ class ConnectivityService {
     if (_isInitialized) return;
     _isInitialized = true;
 
-    await _checkConnectivity();
+    if (_isDesktop) {
+      // Don't block startup — run first check in background
+      _httpReachabilityCheck();
+      _desktopPollTimer = Timer.periodic(
+        const Duration(seconds: 30),
+        (_) => _httpReachabilityCheck(),
+      );
+    } else {
+      await _checkConnectivity();
+      _subscription = _connectivity.onConnectivityChanged.listen(_handleConnectivityChange);
+    }
+  }
 
-    _subscription = _connectivity.onConnectivityChanged.listen(_handleConnectivityChange);
+  Future<void> _httpReachabilityCheck() async {
+    final wasOnline = isOnline.value;
+    try {
+      final result = await InternetAddress.lookup('example.com')
+          .timeout(const Duration(seconds: 2));
+      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+        status.value = ConnectionStatus.online;
+        isOnline.value = true;
+      } else {
+        status.value = ConnectionStatus.offline;
+        isOnline.value = false;
+      }
+    } catch (_) {
+      status.value = ConnectionStatus.offline;
+      isOnline.value = false;
+    }
+
+    if (!wasOnline && isOnline.value) {
+      for (final callback in _onConnectedCallbacks) {
+        callback();
+      }
+    } else if (wasOnline && !isOnline.value) {
+      for (final callback in _onDisconnectedCallbacks) {
+        callback();
+      }
+    }
   }
 
   Future<void> _checkConnectivity() async {
@@ -43,12 +86,10 @@ class ConnectivityService {
     _updateStatus(result);
 
     if (!wasOnline && isOnline.value) {
-
       for (final callback in _onConnectedCallbacks) {
         callback();
       }
     } else if (wasOnline && !isOnline.value) {
-
       for (final callback in _onDisconnectedCallbacks) {
         callback();
       }
@@ -66,11 +107,23 @@ class ConnectivityService {
   }
 
   Future<bool> checkIsOnline() async {
+    if (_isDesktop) {
+      try {
+        final result = await InternetAddress.lookup('example.com')
+            .timeout(const Duration(seconds: 2));
+        return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+      } catch (_) {
+        return false;
+      }
+    }
     final result = await _connectivity.checkConnectivity();
     return result != ConnectivityResult.none;
   }
 
   Future<String> getConnectionType() async {
+    if (_isDesktop) {
+      return isOnline.value ? 'Desktop' : 'None';
+    }
     final result = await _connectivity.checkConnectivity();
     switch (result) {
       case ConnectivityResult.wifi:
@@ -117,6 +170,7 @@ class ConnectivityService {
 
   void dispose() {
     _subscription?.cancel();
+    _desktopPollTimer?.cancel();
     _onConnectedCallbacks.clear();
     _onDisconnectedCallbacks.clear();
   }

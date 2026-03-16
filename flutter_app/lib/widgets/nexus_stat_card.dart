@@ -1,5 +1,7 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../theme.dart';
+import '../utils/platform_utils.dart';
 
 class NexusStatCard extends StatelessWidget {
   final String title;
@@ -9,6 +11,7 @@ class NexusStatCard extends StatelessWidget {
   final Color color;
   final VoidCallback? onTap;
   final bool isCompact;
+  final bool useGlass;
 
   const NexusStatCard({
     super.key,
@@ -19,6 +22,7 @@ class NexusStatCard extends StatelessWidget {
     required this.color,
     this.onTap,
     this.isCompact = false,
+    this.useGlass = true,
   });
 
   @override
@@ -29,12 +33,32 @@ class NexusStatCard extends StatelessWidget {
       return _buildCompact(context, isDark);
     }
 
-    return Card(
+    final statContent = Material(
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        child: Padding(
+        child: Container(
           padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withValues(alpha: shouldUseBlur ? 0.08 : 0.14)
+                : Colors.white.withValues(alpha: shouldUseBlur ? 0.65 : 0.80),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.15)
+                  : Colors.white.withValues(alpha: 0.8),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -43,7 +67,7 @@ class NexusStatCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.2),
+                      color: color.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(icon, color: color, size: 24),
@@ -80,22 +104,45 @@ class NexusStatCard extends StatelessWidget {
         ),
       ),
     );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: shouldUseBlur
+          ? BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: statContent,
+            )
+          : statContent,
+    );
   }
 
   Widget _buildCompact(BuildContext context, bool isDark) {
-    return Card(
+    final compactContent = Material(
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
+        child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withValues(alpha: shouldUseBlur ? 0.08 : 0.14)
+                : Colors.white.withValues(alpha: shouldUseBlur ? 0.65 : 0.80),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.15)
+                  : Colors.white.withValues(alpha: 0.8),
+              width: 1,
+            ),
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.2),
+                  color: color.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon, color: color, size: 18),
@@ -123,6 +170,16 @@ class NexusStatCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: shouldUseBlur
+          ? BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+              child: compactContent,
+            )
+          : compactContent,
     );
   }
 }

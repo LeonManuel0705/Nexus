@@ -94,7 +94,7 @@
     <section class="content-section">
         <div class="section-header">
             <h3 class="section-title">Wohlbefinden</h3>
-            <button class="btn-primary small" onclick="openLogHealthModal()">Einträgen</button>
+            <button class="btn-primary small" onclick="openLogHealthModal()">Eintragen</button>
         </div>
         <div class="health-stats" id="healthStats">
             <div class="health-stat">
@@ -430,7 +430,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ g.csp_nonce }}">
 let sessions = [];
 let healthLogs = [];
 let goals = [];
@@ -667,17 +667,17 @@ function renderTodaySession() {
     const exercises = session.exercises ? session.exercises.split('\n').filter(e => e.trim()) : [];
 
     container.innerHTML = `
-        <div class="training-session" onclick="openEditSessionModal('${session.id}')">
+        <div class="training-session" onclick="openEditSessionModal('${escapeHtml(session.id)}')">
             <div class="session-header">
-                <span class="session-type">${getSessionLabel(session.type)}</span>
-                <span class="session-duration">${session.duration ? session.duration + ' min' : ''} ${session.time ? '• ' + session.time : ''}</span>
+                <span class="session-type">${escapeHtml(getSessionLabel(session.type))}</span>
+                <span class="session-duration">${session.duration ? escapeHtml(String(session.duration)) + ' min' : ''} ${session.time ? '• ' + escapeHtml(session.time) : ''}</span>
             </div>
             ${exercises.length ? `
                 <div class="exercise-list">
-                    ${exercises.map(ex => `<div class="exercise-item"><span class="exercise-name">${ex}</span></div>`).join('')}
+                    ${exercises.map(ex => `<div class="exercise-item"><span class="exercise-name">${escapeHtml(ex)}</span></div>`).join('')}
                 </div>
             ` : ''}
-            ${session.notes ? `<p style="color: var(--text-muted); font-size: 13px; margin-top: 12px;">${session.notes}</p>` : ''}
+            ${session.notes ? `<p style="color: var(--text-muted); font-size: 13px; margin-top: 12px;">${escapeHtml(session.notes)}</p>` : ''}
         </div>
     `;
 }
@@ -711,12 +711,12 @@ function renderGoals() {
     }
 
     container.innerHTML = goals.map(g => `
-        <div class="project-card" onclick="openEditGoalModal('${g.id}')">
+        <div class="project-card" onclick="openEditGoalModal('${escapeHtml(g.id)}')">
             <div class="project-header">
-                <span class="project-name">${g.title}</span>
+                <span class="project-name">${escapeHtml(g.title)}</span>
                 ${g.completed ? '<span class="tag success">Erreicht</span>' : ''}
             </div>
-            ${g.target ? `<p class="project-goal">Ziel: ${g.target}</p>` : ''}
+            ${g.target ? `<p class="project-goal">Ziel: ${escapeHtml(g.target)}</p>` : ''}
             ${g.deadline ? `<p style="font-size: 12px; color: var(--text-muted);">Bis: ${new Date(g.deadline).toLocaleDateString('de-DE')}</p>` : ''}
         </div>
     `).join('');
@@ -1039,8 +1039,8 @@ function renderGymSchedule() {
                     <div class="schedule-day">${DAY_NAMES[dayNum]}</div>
                     <div class="schedule-icon">${entry.icon || '🏋️'}</div>
                     <div class="schedule-info">
-                        <span class="schedule-name">${entry.title}</span>
-                        <span class="schedule-time">${entry.muscle_groups || entry.notes || ''}</span>
+                        <span class="schedule-name">${escapeHtml(entry.title)}</span>
+                        <span class="schedule-time">${escapeHtml(entry.muscle_groups || entry.notes || '')}</span>
                     </div>
                     ${isEditMode ? '<span class="edit-indicator">✏️</span>' : ''}
                 </div>
@@ -1402,7 +1402,7 @@ function getSuggestedWorkout(date) {
 .schedule-card.editable:hover {
     border-color: var(--accent);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
 .schedule-card.empty {

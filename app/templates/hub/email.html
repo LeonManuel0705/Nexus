@@ -169,12 +169,13 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ g.csp_nonce }}">
     document.addEventListener('DOMContentLoaded', () => {
         HubApp.initEmail();
         HubApp.initEventListeners();
 
         window.addEventListener('message', async (event) => {
+            if (event.origin !== window.location.origin) return;
             if (event.data?.type === 'google-oauth-success') {
                 document.getElementById('addAccountModal').classList.remove('active');
                 document.getElementById('googleAuthModal').classList.remove('active');
