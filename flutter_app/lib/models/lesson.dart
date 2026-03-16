@@ -8,7 +8,8 @@ class Lesson {
   final String endTime;
   final int lessonNumber;
   final String? color;
-  final String? lessonType; // Seminarkurs, Grundkurs, Leistungskurs
+  final String? lessonType;
+  final String weekType;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -23,9 +24,13 @@ class Lesson {
     required this.lessonNumber,
     this.color,
     this.lessonType,
+    this.weekType = 'both',
     required this.createdAt,
     required this.updatedAt,
   });
+
+  static const weekTypes = ['both', 'A', 'B'];
+  static const weekTypeLabels = {'both': 'Beide Wochen', 'A': 'Nur A-Woche', 'B': 'Nur B-Woche'};
 
   Map<String, dynamic> toMap() {
     return {
@@ -39,6 +44,7 @@ class Lesson {
       'lesson_number': lessonNumber,
       'color': color,
       'lesson_type': lessonType,
+      'week_type': weekType,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -56,6 +62,7 @@ class Lesson {
       lessonNumber: map['lesson_number'],
       color: map['color'],
       lessonType: map['lesson_type'],
+      weekType: map['week_type'] ?? 'both',
       createdAt: DateTime.parse(map['created_at']),
       updatedAt: DateTime.parse(map['updated_at']),
     );
@@ -72,6 +79,7 @@ class Lesson {
     int? lessonNumber,
     String? color,
     String? lessonType,
+    String? weekType,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -86,6 +94,7 @@ class Lesson {
       lessonNumber: lessonNumber ?? this.lessonNumber,
       color: color ?? this.color,
       lessonType: lessonType ?? this.lessonType,
+      weekType: weekType ?? this.weekType,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

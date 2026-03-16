@@ -7,6 +7,11 @@ import '../models/task.dart';
 import '../models/event.dart';
 import '../services/weather_service.dart';
 import '../theme.dart';
+import '../widgets/page_fade_in.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/liquid_glass_card.dart';
+import '../widgets/animated_counter.dart';
+import '../widgets/animated_list_item.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -20,7 +25,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Event> _todayEvents = [];
   List<Event> _upcomingEvents = [];
   List<Map<String, dynamic>> _deadlines = [];
-  Map<String, int> _weeklyStats = {};
   bool _isLoading = true;
   String? _error;
   Timer? _clockTimer;
@@ -34,9 +38,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadData();
     _loadWeather();
 
-    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+    _clockTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) {
-        setState(() => _currentTime = DateTime.now());
+        final now = DateTime.now();
+        if (now.minute != _currentTime.minute) {
+          setState(() => _currentTime = now);
+        }
       }
     });
   }
@@ -48,17 +55,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  AppProvider? _provider;
+  Timer? _debounceTimer;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final provider = context.read<AppProvider>();
+    if (_provider != provider) {
+      _provider?.removeListener(_onProviderChanged);
+      _provider = provider;
+      _provider!.addListener(_onProviderChanged);
+    }
+  }
+
+  void _onProviderChanged() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 100), () {
+      if (mounted) _loadData();
+    });
+  }
+
   @override
   void dispose() {
+    _provider?.removeListener(_onProviderChanged);
+    _debounceTimer?.cancel();
     _clockTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    if (_isLoading) {
+      // Only show loading spinner on first load
+    } else {
+      setState(() => _error = null);
+    }
 
     try {
       final provider = context.read<AppProvider>();
@@ -68,15 +99,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       final deadlines = await _loadDeadlines(provider);
 
-      final stats = await _loadWeeklyStats(provider);
-
       if (mounted) {
         setState(() {
           _todayTasks = tasks;
           _todayEvents = events;
           _upcomingEvents = upcoming;
           _deadlines = deadlines;
-          _weeklyStats = stats;
           _isLoading = false;
         });
       }
@@ -116,7 +144,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           });
         }
       }
-    } catch (e) {
+    } catch (_) {
     }
 
     try {
@@ -138,31 +166,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           });
         }
       }
-    } catch (e) {
+    } catch (_) {
     }
 
     deadlines.sort((a, b) => (a['days'] as int).compareTo(b['days'] as int));
 
     return deadlines;
-  }
-
-  Future<Map<String, int>> _loadWeeklyStats(AppProvider provider) async {
-    int completedThisWeek = 0;
-    int openTasks = 0;
-
-    try {
-      final allTasks = await provider.getTodayTasks();
-      openTasks = allTasks.where((t) => !t.completed).length;
-      completedThisWeek = allTasks.where((t) => t.completed).length;
-    } catch (e) {
-    }
-
-    return {
-      'completed': completedThisWeek,
-      'open': openTasks,
-      'training': 0,
-      'exams': 0,
-    };
   }
 
   String _getGreeting() {
@@ -187,10 +196,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Consumer<AppProvider>(
       builder: (context, provider, child) {
-        return RefreshIndicator(
+        return PageFadeIn(
+          child: RefreshIndicator(
           onRefresh: () async {
             await provider.refresh();
+            if (!mounted) return;
             await _loadData();
+            if (!mounted) return;
             await _loadWeather();
           },
           child: SingleChildScrollView(
@@ -200,8 +212,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  NexusTheme.gradientText('Übersicht', fontSize: 36),
+                  const SizedBox(height: 16),
+
                   _buildHeroSection(context, isDark),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
+
+                  _buildStatusBar(isDark, provider),
+                  const SizedBox(height: 16),
 
                   if (_error != null) ...[
                     _buildErrorBanner(isDark),
@@ -209,7 +227,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
 
                   _buildQuickStats(context, isDark, provider),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
+
+                  _buildDailyCapacity(isDark),
+                  const SizedBox(height: 16),
 
                   if (_todayEvents.isNotEmpty || _upcomingEvents.isNotEmpty) ...[
                     _buildNextEventCard(context, isDark),
@@ -226,10 +247,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                   _buildEventsSection(context, isDark),
 
-                  const SizedBox(height: 80),
+                  const SizedBox(height: 100),
                 ],
               ),
             ),
+          ),
           ),
         );
       },
@@ -237,19 +259,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildHeroSection(BuildContext context, bool isDark) {
-    return Container(
+    return LiquidGlassCard(
+      borderRadius: 24,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withOpacity(0.05)
-            : Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.1)
-              : Colors.black.withOpacity(0.05),
-        ),
-      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -286,15 +298,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        NexusTheme.primaryColor.withOpacity(0.15),
-                        NexusTheme.secondaryColor.withOpacity(0.1),
+                        NexusTheme.primaryColor.withValues(alpha: 0.15),
+                        NexusTheme.secondaryColor.withValues(alpha: 0.1),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     _getGreeting(),
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                       color: NexusTheme.primaryColor,
@@ -318,8 +330,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark
-            ? Colors.white.withOpacity(0.08)
-            : NexusTheme.primaryColor.withOpacity(0.08),
+            ? Colors.white.withValues(alpha: 0.08)
+            : NexusTheme.primaryColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -367,18 +379,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: NexusTheme.danger.withOpacity(0.1),
+        color: NexusTheme.danger.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: NexusTheme.danger.withOpacity(0.3)),
+        border: Border.all(color: NexusTheme.danger.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, color: NexusTheme.danger, size: 20),
+          const Icon(Icons.error_outline, color: NexusTheme.danger, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               _error!,
-              style: TextStyle(color: NexusTheme.danger),
+              style: const TextStyle(color: NexusTheme.danger),
             ),
           ),
           IconButton(
@@ -393,43 +405,188 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildStatusBar(bool isDark, AppProvider provider) {
+    final openTasks = _todayTasks.where((t) => !t.completed).length;
+    final completedTasks = _todayTasks.where((t) => t.completed).length;
+    final hasDeadlines = _deadlines.isNotEmpty;
+    final hasTraining = provider.events.any((e) =>
+        e.category == 'training' &&
+        e.startTime.year == DateTime.now().year &&
+        e.startTime.month == DateTime.now().month &&
+        e.startTime.day == DateTime.now().day);
+
+    // Determine status colors
+    Color taskColor;
+    String taskLabel;
+    if (openTasks == 0 && completedTasks > 0) {
+      taskColor = NexusTheme.success;
+      taskLabel = 'Alles erledigt';
+    } else if (openTasks > 5) {
+      taskColor = NexusTheme.warning;
+      taskLabel = '$openTasks offen';
+    } else {
+      taskColor = NexusTheme.success;
+      taskLabel = '$openTasks offen';
+    }
+
+    Color deadlineColor = hasDeadlines ? NexusTheme.warning : NexusTheme.success;
+    String deadlineLabel = hasDeadlines ? '${_deadlines.length} fällig' : 'Keine';
+
+    Color trainingColor = hasTraining ? NexusTheme.success : (isDark ? Colors.white38 : Colors.black26);
+    String trainingLabel = hasTraining ? 'Heute geplant' : 'Kein Training';
+
+    return LiquidGlassCard(
+      borderRadius: 14,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _StatusDot(color: taskColor, label: 'Aufgaben', detail: taskLabel, isDark: isDark),
+          Container(width: 1, height: 28, color: isDark ? Colors.white12 : Colors.black12),
+          _StatusDot(color: deadlineColor, label: 'Deadlines', detail: deadlineLabel, isDark: isDark),
+          Container(width: 1, height: 28, color: isDark ? Colors.white12 : Colors.black12),
+          _StatusDot(color: trainingColor, label: 'Training', detail: trainingLabel, isDark: isDark),
+        ],
+      ),
+    );
+  }
+
   Widget _buildQuickStats(BuildContext context, bool isDark, AppProvider provider) {
     final openTasks = _todayTasks.where((t) => !t.completed).length;
     final completedTasks = _todayTasks.where((t) => t.completed).length;
     final eventsCount = _todayEvents.length;
 
-    return Row(
-      children: [
-        Expanded(
-          child: _QuickStatCard(
-            icon: Icons.check_circle,
-            value: completedTasks.toString(),
-            label: 'Erledigt',
-            color: NexusTheme.success,
-            isDark: isDark,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          SizedBox(
+            width: (MediaQuery.of(context).size.width - 56) / 3,
+            child: _QuickStatCard(
+              icon: Icons.check_circle,
+              numericValue: completedTasks,
+              label: 'Erledigt',
+              color: NexusTheme.success,
+              isDark: isDark,
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _QuickStatCard(
-            icon: Icons.pending_actions,
-            value: openTasks.toString(),
-            label: 'Offen',
-            color: openTasks > 5 ? NexusTheme.warning : NexusTheme.primaryColor,
-            isDark: isDark,
+          const SizedBox(width: 12),
+          SizedBox(
+            width: (MediaQuery.of(context).size.width - 56) / 3,
+            child: _QuickStatCard(
+              icon: Icons.pending_actions,
+              numericValue: openTasks,
+              label: 'Offen',
+              color: openTasks > 5 ? NexusTheme.warning : NexusTheme.primaryColor,
+              isDark: isDark,
+            ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _QuickStatCard(
-            icon: Icons.event,
-            value: eventsCount.toString(),
-            label: 'Termine',
-            color: NexusTheme.info,
-            isDark: isDark,
+          const SizedBox(width: 12),
+          SizedBox(
+            width: (MediaQuery.of(context).size.width - 56) / 3,
+            child: _QuickStatCard(
+              icon: Icons.event,
+              numericValue: eventsCount,
+              label: 'Termine',
+              color: NexusTheme.info,
+              isDark: isDark,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailyCapacity(bool isDark) {
+    final openTasks = _todayTasks.where((t) => !t.completed).toList();
+    final tasksWithEstimate = openTasks.where((t) => t.estimatedMinutes != null).toList();
+    if (tasksWithEstimate.isEmpty) return const SizedBox.shrink();
+
+    final totalMinutes = tasksWithEstimate.fold<int>(0, (sum, t) => sum + t.estimatedMinutes!);
+    final completedMinutes = _todayTasks
+        .where((t) => t.completed && t.estimatedMinutes != null)
+        .fold<int>(0, (sum, t) => sum + t.estimatedMinutes!);
+    final allEstimated = openTasks.length == tasksWithEstimate.length;
+    final hours = totalMinutes ~/ 60;
+    final mins = totalMinutes % 60;
+    final timeStr = hours > 0
+        ? (mins > 0 ? '${hours}h ${mins}min' : '${hours}h')
+        : '${mins}min';
+
+    final completedHours = completedMinutes ~/ 60;
+    final completedMins = completedMinutes % 60;
+    final completedStr = completedHours > 0
+        ? (completedMins > 0 ? '${completedHours}h ${completedMins}min' : '${completedHours}h')
+        : '${completedMins}min';
+
+    final progress = (completedMinutes + totalMinutes) > 0
+        ? completedMinutes / (completedMinutes + totalMinutes)
+        : 0.0;
+
+    return LiquidGlassCard(
+      borderRadius: 16,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.timer_outlined, size: 18, color: NexusTheme.info),
+              const SizedBox(width: 8),
+              Text(
+                'TAGESPLAN',
+                style: NexusTheme.sectionLabel(isDark),
+              ),
+              const Spacer(),
+              Text(
+                '$completedStr / ${allEstimated ? timeStr : '~$timeStr'}',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? Colors.white70 : Colors.black54,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: Stack(
+              children: [
+                Container(
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white12 : Colors.black12,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                FractionallySizedBox(
+                  widthFactor: progress.clamp(0.0, 1.0),
+                  child: Container(
+                    height: 6,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF6366F1), Color(0xFF9333EA)],
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!allEstimated) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${openTasks.length - tasksWithEstimate.length} Aufgaben ohne Zeitschätzung',
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? Colors.white38 : Colors.black38,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -453,22 +610,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       timeUntil = 'Jetzt';
     }
 
-    return Container(
+    return LiquidGlassCard(
+      borderRadius: 16,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            NexusTheme.primaryColor.withOpacity(isDark ? 0.2 : 0.15),
-            NexusTheme.secondaryColor.withOpacity(isDark ? 0.15 : 0.1),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: NexusTheme.primaryColor.withOpacity(0.2),
-        ),
-      ),
+      tint: NexusTheme.primaryColor.withValues(alpha: 0.15),
       child: Row(
         children: [
           Container(
@@ -492,12 +637,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Nächster Termin',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark ? Colors.white54 : Colors.black45,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  'NÄCHSTER TERMIN',
+                  style: NexusTheme.sectionLabel(isDark),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -521,7 +662,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
           ),
-          Icon(
+          const Icon(
             Icons.chevron_right,
             color: NexusTheme.primaryColor,
           ),
@@ -541,9 +682,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           isDark: isDark,
         ),
         const SizedBox(height: 12),
-        ...(_deadlines.take(3).map((deadline) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: _DeadlineCard(deadline: deadline, isDark: isDark),
+        ...(_deadlines.take(3).toList().asMap().entries.map((entry) => AnimatedListItem(
+          index: entry.key,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _DeadlineCard(deadline: entry.value, isDark: isDark),
+          ),
         ))),
       ],
     );
@@ -567,53 +711,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            child: Text('Alle', style: TextStyle(color: NexusTheme.primaryColor)),
+            child: const Text('Alle', style: TextStyle(color: NexusTheme.primaryColor)),
           ) : null,
         ),
         const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: isDark
-                ? Colors.white.withOpacity(0.05)
-                : Colors.white.withOpacity(0.7),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withOpacity(0.1)
-                  : Colors.black.withOpacity(0.05),
-            ),
-          ),
-          child: _isLoading
-              ? const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              : openTasks.isEmpty
-                  ? _EmptyStateCompact(
-                      icon: Icons.check_circle_outline,
-                      message: 'Keine Aufgaben',
-                      isDark: isDark,
-                    )
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: openTasks.take(5).length,
-                      separatorBuilder: (_, __) => Divider(
-                        height: 1,
-                        color: isDark ? Colors.white12 : Colors.black12,
+        GlassCard(
+          borderRadius: 16,
+          padding: EdgeInsets.zero,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: _isLoading
+                ? const Padding(
+                    key: ValueKey('tasks_loading'),
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : openTasks.isEmpty
+                    ? _EmptyStateCompact(
+                        key: const ValueKey('tasks_empty'),
+                        icon: Icons.check_circle_outline,
+                        message: 'Keine Aufgaben',
+                        isDark: isDark,
+                      )
+                    : ListView.separated(
+                        key: const ValueKey('tasks_content'),
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: openTasks.take(5).length,
+                        separatorBuilder: (_, __) => Divider(
+                          height: 1,
+                          color: isDark ? Colors.white12 : Colors.black12,
+                        ),
+                        itemBuilder: (context, index) {
+                          final task = openTasks[index];
+                          return AnimatedListItem(
+                            index: index,
+                            child: _TaskRow(
+                              task: task,
+                              isDark: isDark,
+                              onToggle: () async {
+                                await provider.toggleTaskComplete(task.id);
+                                await _loadData();
+                              },
+                            ),
+                          );
+                        },
                       ),
-                      itemBuilder: (context, index) {
-                        final task = openTasks[index];
-                        return _TaskRow(
-                          task: task,
-                          isDark: isDark,
-                          onToggle: () async {
-                            await provider.toggleTaskComplete(task.id);
-                            await _loadData();
-                          },
-                        );
-                      },
-                    ),
+          ),
         ),
       ],
     );
@@ -630,42 +774,101 @@ class _DashboardScreenState extends State<DashboardScreen> {
           isDark: isDark,
         ),
         const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: isDark
-                ? Colors.white.withOpacity(0.05)
-                : Colors.white.withOpacity(0.7),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withOpacity(0.1)
-                  : Colors.black.withOpacity(0.05),
-            ),
-          ),
-          child: _isLoading
-              ? const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              : _todayEvents.isEmpty
-                  ? _EmptyStateCompact(
-                      icon: Icons.event_available,
-                      message: 'Keine Termine',
-                      isDark: isDark,
-                    )
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _todayEvents.take(5).length,
-                      separatorBuilder: (_, __) => Divider(
-                        height: 1,
-                        color: isDark ? Colors.white12 : Colors.black12,
+        GlassCard(
+          borderRadius: 16,
+          padding: EdgeInsets.zero,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: _isLoading
+                ? const Padding(
+                    key: ValueKey('events_loading'),
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : _todayEvents.isEmpty
+                    ? _EmptyStateCompact(
+                        key: const ValueKey('events_empty'),
+                        icon: Icons.event_available,
+                        message: 'Keine Termine',
+                        isDark: isDark,
+                      )
+                    : ListView.separated(
+                        key: const ValueKey('events_content'),
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _todayEvents.take(5).length,
+                        separatorBuilder: (_, __) => Divider(
+                          height: 1,
+                          color: isDark ? Colors.white12 : Colors.black12,
+                        ),
+                        itemBuilder: (context, index) {
+                          final event = _todayEvents[index];
+                          return AnimatedListItem(
+                            index: index,
+                            child: _EventRow(event: event, isDark: isDark),
+                          );
+                        },
                       ),
-                      itemBuilder: (context, index) {
-                        final event = _todayEvents[index];
-                        return _EventRow(event: event, isDark: isDark);
-                      },
-                    ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatusDot extends StatelessWidget {
+  final Color color;
+  final String label;
+  final String detail;
+  final bool isDark;
+
+  const _StatusDot({
+    required this.color,
+    required this.label,
+    required this.detail,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color,
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.4),
+                blurRadius: 6,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white70 : Colors.black54,
+              ),
+            ),
+            Text(
+              detail,
+              style: TextStyle(
+                fontSize: 10,
+                color: isDark ? Colors.white38 : Colors.black38,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -674,14 +877,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 class _QuickStatCard extends StatelessWidget {
   final IconData icon;
-  final String value;
+  final int numericValue;
   final String label;
   final Color color;
   final bool isDark;
 
   const _QuickStatCard({
     required this.icon,
-    required this.value,
+    required this.numericValue,
     required this.label,
     required this.color,
     required this.isDark,
@@ -689,33 +892,24 @@ class _QuickStatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return LiquidGlassCard(
+      borderRadius: 16,
+      tint: color.withValues(alpha: 0.15),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withOpacity(0.05)
-            : Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.1)
-              : Colors.black.withOpacity(0.05),
-        ),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
+              color: color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 18),
           ),
           const SizedBox(height: 12),
-          Text(
-            value,
+          AnimatedCounter(
+            value: numericValue,
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -758,7 +952,7 @@ class _SectionHeader extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.15),
+            color: iconColor.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, size: 16, color: iconColor),
@@ -766,12 +960,8 @@ class _SectionHeader extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: Text(
-            title,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white : Colors.black87,
-            ),
+            title.toUpperCase(),
+            style: NexusTheme.sectionLabel(isDark),
           ),
         ),
         if (trailing != null) trailing!,
@@ -806,9 +996,9 @@ class _DeadlineCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: urgencyColor.withOpacity(isDark ? 0.15 : 0.08),
+        color: urgencyColor.withValues(alpha: isDark ? 0.15 : 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: urgencyColor.withOpacity(0.3)),
+        border: Border.all(color: urgencyColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -816,7 +1006,7 @@ class _DeadlineCard extends StatelessWidget {
             width: 50,
             padding: const EdgeInsets.symmetric(vertical: 6),
             decoration: BoxDecoration(
-              color: urgencyColor.withOpacity(0.2),
+              color: urgencyColor.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Center(
@@ -865,7 +1055,7 @@ class _DeadlineCard extends StatelessWidget {
                       Text(' - ', style: TextStyle(color: isDark ? Colors.white38 : Colors.black38)),
                       Text(
                         deadline['subject'] as String,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 11,
                           color: NexusTheme.primaryColor,
                           fontWeight: FontWeight.w500,
@@ -1062,6 +1252,7 @@ class _EmptyStateCompact extends StatelessWidget {
   final bool isDark;
 
   const _EmptyStateCompact({
+    super.key,
     required this.icon,
     required this.message,
     required this.isDark,

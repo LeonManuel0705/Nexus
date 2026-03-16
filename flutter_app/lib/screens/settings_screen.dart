@@ -1,10 +1,23 @@
+import 'dart:convert';
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/app_provider.dart';
 import '../providers/iserv_provider.dart';
 import '../services/holiday_service.dart';
+import '../services/notification_service.dart';
+import '../build_info.dart';
 import '../theme.dart';
+import '../widgets/animated_list_item.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/iserv_webview_login.dart';
+import '../widgets/page_fade_in.dart';
+import 'timetable_config_screen.dart';
+import '../widgets/timetable_setup_wizard.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -14,13 +27,11 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _abWeeksEnabled = true;
   String? _weatherCity;
-  double? _weatherLat;
-  double? _weatherLon;
   String? _bundesland;
   int? _graduationYear;
   bool _isImportingHolidays = false;
+  int _classLevel = 10;
 
   static const _bundeslaender = [
     'Baden-Württemberg',
@@ -50,19 +61,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _abWeeksEnabled = prefs.getBool('ab_weeks_enabled') ?? true;
       _weatherCity = prefs.getString('weather_city');
-      _weatherLat = prefs.getDouble('weather_lat');
-      _weatherLon = prefs.getDouble('weather_lon');
       _bundesland = prefs.getString('user_bundesland');
       _graduationYear = prefs.getInt('graduation_year');
+      _classLevel = prefs.getInt('school_class_level') ?? 10;
     });
-  }
-
-  Future<void> _saveAbWeeksSetting(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('ab_weeks_enabled', value);
-    setState(() => _abWeeksEnabled = value);
   }
 
   Future<void> _saveWeatherLocation(String city, double lat, double lon) async {
@@ -72,8 +75,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await prefs.setDouble('weather_lon', lon);
     setState(() {
       _weatherCity = city;
-      _weatherLat = lat;
-      _weatherLon = lon;
+    });
+  }
+
+  Future<void> _setClassLevel(int level) async {
+    final oldSystem = _classLevel <= 10 ? 'marks' : 'points';
+    final newSystem = level <= 10 ? 'marks' : 'points';
+
+    if (oldSystem != newSystem && _classLevel != 10) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Notensystem ändert sich'),
+          content: Text(
+            'Klasse $level verwendet ${level <= 10 ? "Noten (1-6)" : "Punkte (0-15)"}. '
+            'Bestehende ${oldSystem == "marks" ? "Noten" : "Punkte"} werden archiviert.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Fortfahren')),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('school_class_level', level);
+    await prefs.setString('grade_system', newSystem);
+    setState(() {
+      _classLevel = level;
     });
   }
 
@@ -83,138 +114,184 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Consumer<AppProvider>(
       builder: (context, provider, child) {
-        return ListView(
+        return PageFadeIn(
+          child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
 
-            Container(
-              padding: const EdgeInsets.all(20),
-              margin: const EdgeInsets.only(bottom: 24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    NexusTheme.primaryColor.withOpacity(0.15),
-                    NexusTheme.secondaryColor.withOpacity(0.1),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(16),
+            AnimatedListItem(
+              index: 0,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: NexusTheme.gradientText('Einstellungen', fontSize: 36),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [NexusTheme.primaryColor, NexusTheme.secondaryColor],
+            ),
+
+            AnimatedListItem(
+              index: 1,
+              child: _buildSectionTitle(context, 'Erscheinungsbild', Icons.palette),
+            ),
+            AnimatedListItem(
+              index: 2,
+              child: GlassCard(
+              padding: EdgeInsets.zero,
+              borderRadius: 16,
+              child: Column(children: [
+                _buildSwitchTile(
+                  icon: Icons.dark_mode,
+                  title: 'Dark Mode',
+                  subtitle: provider.themeMode == ThemeMode.dark || (provider.themeSwitchMode == 'system' && isDark)
+                      ? 'Aktiviert' : 'Deaktiviert',
+                  value: provider.themeMode == ThemeMode.dark || (provider.themeSwitchMode == 'system' && isDark),
+                  onChanged: provider.themeSwitchMode == 'manual' ? (_) => provider.toggleTheme() : null,
+                  isDark: isDark,
+                ),
+                const Divider(height: 1),
+                // Theme switch mode selector (Manual / System / Schedule)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: NexusTheme.primaryColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.brightness_auto, color: NexusTheme.primaryColor, size: 20),
                       ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.settings, color: Colors.white, size: 28),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Theme-Modus', style: Theme.of(context).textTheme.titleSmall),
+                            Text(
+                              provider.themeSwitchMode == 'manual' ? 'Manuell umschalten'
+                                  : provider.themeSwitchMode == 'system' ? 'Folgt dem System'
+                                  : 'Nach Zeitplan',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: Row(
+                    children: [
+                      _ThemeModeChip(
+                        icon: Icons.touch_app,
+                        label: 'Manuell',
+                        isSelected: provider.themeSwitchMode == 'manual',
+                        onTap: () => provider.setThemeSwitchMode('manual'),
+                        isDark: isDark,
+                      ),
+                      const SizedBox(width: 8),
+                      _ThemeModeChip(
+                        icon: Icons.phone_android,
+                        label: 'System',
+                        isSelected: provider.themeSwitchMode == 'system',
+                        onTap: () => provider.setThemeSwitchMode('system'),
+                        isDark: isDark,
+                      ),
+                      const SizedBox(width: 8),
+                      _ThemeModeChip(
+                        icon: Icons.schedule,
+                        label: 'Zeitplan',
+                        isSelected: provider.themeSwitchMode == 'schedule',
+                        onTap: () => provider.setThemeSwitchMode('schedule'),
+                        isDark: isDark,
+                      ),
+                    ],
+                  ),
+                ),
+                if (provider.themeSwitchMode == 'schedule') ...[
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                    child: Row(
                       children: [
-                        Text(
-                          'Einstellungen',
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: _ScheduleTimeButton(
+                            icon: Icons.light_mode,
+                            label: 'Light ab',
+                            time: provider.scheduleLightTime,
+                            onTap: () async {
+                              final picked = await showTimePicker(
+                                context: context,
+                                initialTime: provider.scheduleLightTime,
+                              );
+                              if (picked != null) {
+                                provider.setScheduleTimes(lightTime: picked);
+                              }
+                            },
+                            isDark: isDark,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Konfiguriere deinen Nexus Hub',
-                          style: TextStyle(
-                            color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _ScheduleTimeButton(
+                            icon: Icons.dark_mode,
+                            label: 'Dark ab',
+                            time: provider.scheduleDarkTime,
+                            onTap: () async {
+                              final picked = await showTimePicker(
+                                context: context,
+                                initialTime: provider.scheduleDarkTime,
+                              );
+                              if (picked != null) {
+                                provider.setScheduleTimes(darkTime: picked);
+                              }
+                            },
+                            isDark: isDark,
                           ),
                         ),
                       ],
                     ),
                   ),
                 ],
-              ),
-            ),
-
-            _buildSectionTitle(context, 'Erscheinungsbild', Icons.palette),
-            _buildCard(
-              isDark,
-              children: [
-                _buildSwitchTile(
-                  icon: Icons.dark_mode,
-                  title: 'Dark Mode',
-                  subtitle: provider.themeMode == ThemeMode.dark ? 'Aktiviert' : 'Deaktiviert',
-                  value: provider.themeMode == ThemeMode.dark,
-                  onChanged: (_) => provider.toggleTheme(),
-                  isDark: isDark,
-                ),
-                const Divider(height: 1),
-                _buildSwitchTile(
-                  icon: Icons.science,
-                  title: 'Demo-Modus',
-                  subtitle: provider.demoMode
-                      ? 'Zeigt Beispieldaten an'
-                      : 'Zeigt echte Daten an',
-                  value: provider.demoMode,
-                  onChanged: (_) => provider.toggleDemoMode(),
-                  isDark: isDark,
-                ),
-                if (provider.demoMode)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.amber.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.info_outline, size: 16, color: Colors.amber[700]),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Demo-Modus aktiv - Es werden Beispieldaten angezeigt.',
-                              style: TextStyle(fontSize: 12, color: Colors.amber[800]),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+              ]),
+            )),
             const SizedBox(height: 20),
 
-            _buildSectionTitle(context, 'Stundenplan', Icons.school),
-            _buildCard(
-              isDark,
-              children: [
+            AnimatedListItem(
+              index: 3,
+              child: _buildSectionTitle(context, 'Stundenplan', Icons.school),
+            ),
+            AnimatedListItem(
+              index: 4,
+              child: GlassCard(
+              padding: EdgeInsets.zero,
+              borderRadius: 16,
+              child: Column(children: [
                 _buildSwitchTile(
                   icon: Icons.swap_horiz,
                   title: 'A/B-Wochen',
-                  subtitle: _abWeeksEnabled
+                  subtitle: provider.abWeeksEnabled
                       ? 'Wechselnde Stundenpläne aktiv'
                       : 'Manche Schulen haben wechselnde A/B-Wochen',
-                  value: _abWeeksEnabled,
-                  onChanged: _saveAbWeeksSetting,
+                  value: provider.abWeeksEnabled,
+                  onChanged: (value) => provider.setAbWeeksEnabled(value),
                   isDark: isDark,
                 ),
-                if (_abWeeksEnabled)
+                if (provider.abWeeksEnabled)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: NexusTheme.primaryColor.withOpacity(0.1),
+                        color: NexusTheme.primaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.info_outline, size: 16, color: NexusTheme.primaryColor),
+                          const Icon(Icons.info_outline, size: 16, color: NexusTheme.primaryColor),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -229,19 +306,120 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            _buildSectionTitle(context, 'Feiertage & Ferien', Icons.celebration),
-            _buildCard(
-              isDark,
-              children: [
+                const Divider(height: 1),
                 ListTile(
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF22C55E).withOpacity(0.1),
+                      color: NexusTheme.primaryColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.grid_on, color: NexusTheme.primaryColor, size: 20),
+                  ),
+                  title: const Text('Stundenplan konfigurieren'),
+                  subtitle: const Text('Zeiten und Facher einrichten'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TimetableConfigScreen()),
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: NexusTheme.secondaryColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.auto_fix_high, color: NexusTheme.secondaryColor, size: 20),
+                  ),
+                  title: const Text('Stundenraster-Assistent'),
+                  subtitle: const Text('Zeiten neu konfigurieren'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (_) => const TimetableSetupWizard(),
+                  ),
+                ),
+              ]),
+            )),
+            const SizedBox(height: 20),
+
+            AnimatedListItem(
+              index: 5,
+              child: GlassCard(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                borderRadius: 12,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.school, color: NexusTheme.primaryColor, size: 20),
+                        SizedBox(width: 8),
+                        Text('Klassenstufe', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<int>(
+                      initialValue: _classLevel,
+                      decoration: InputDecoration(
+                        labelText: 'Aktuelle Klasse',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      items: List.generate(9, (i) => i + 5).map((grade) {
+                        final system = grade <= 10 ? 'Noten (1-6)' : 'Punkte (0-15)';
+                        return DropdownMenuItem(
+                          value: grade,
+                          child: Text('Klasse $grade — $system'),
+                        );
+                      }).toList(),
+                      onChanged: (v) { if (v != null) _setClassLevel(v); },
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          _classLevel <= 10 ? Icons.format_list_numbered : Icons.stars,
+                          size: 14,
+                          color: NexusTheme.primaryColor.withValues(alpha: 0.7),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _classLevel <= 10 ? 'Mittelstufe — einfacher Notendurchschnitt' : 'Oberstufe — 1/3 Klausur, 2/3 Sonstige',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark
+                                ? NexusTheme.darkTextMuted
+                                : NexusTheme.lightTextMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            AnimatedListItem(
+              index: 6,
+              child: _buildSectionTitle(context, 'Feiertage & Ferien', Icons.celebration),
+            ),
+            AnimatedListItem(
+              index: 7,
+              child: GlassCard(
+              padding: EdgeInsets.zero,
+              borderRadius: 16,
+              child: Column(children: [
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF22C55E).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(Icons.location_on, color: Color(0xFF22C55E), size: 20),
@@ -258,7 +436,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF3B82F6).withOpacity(0.1),
+                      color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(Icons.school, color: Color(0xFF3B82F6), size: 20),
@@ -277,7 +455,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEF4444).withOpacity(0.1),
+                      color: const Color(0xFFEF4444).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(Icons.refresh, color: Color(0xFFEF4444), size: 20),
@@ -304,9 +482,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.amber.withOpacity(0.1),
+                        color: Colors.amber.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         children: [
@@ -322,22 +500,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
-              ],
-            ),
+              ]),
+            )),
             const SizedBox(height: 20),
 
-            _buildSectionTitle(context, 'Wetter', Icons.wb_sunny),
-            _buildCard(
-              isDark,
-              children: [
+            AnimatedListItem(
+              index: 8,
+              child: _buildSectionTitle(context, 'Wetter', Icons.wb_sunny),
+            ),
+            AnimatedListItem(
+              index: 9,
+              child: GlassCard(
+              padding: EdgeInsets.zero,
+              borderRadius: 16,
+              child: Column(children: [
                 ListTile(
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: NexusTheme.warning.withOpacity(0.1),
+                      color: NexusTheme.warning.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(Icons.location_on, color: NexusTheme.warning, size: 20),
+                    child: const Icon(Icons.location_on, color: NexusTheme.warning, size: 20),
                   ),
                   title: const Text('Standort'),
                   subtitle: Text(_weatherCity ?? 'Nicht festgelegt'),
@@ -365,23 +549,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                 ),
-              ],
-            ),
+              ]),
+            )),
             const SizedBox(height: 20),
 
-            _buildSectionTitle(context, 'IServ-Konto', Icons.school),
-            Consumer<IServProvider>(
+            AnimatedListItem(
+              index: 10,
+              child: _buildSectionTitle(context, 'IServ-Konto', Icons.school),
+            ),
+            AnimatedListItem(
+              index: 11,
+              child: Consumer<IServProvider>(
               builder: (context, iservProvider, child) {
-                return _buildCard(
-                  isDark,
-                  children: [
+                return GlassCard(
+                  padding: EdgeInsets.zero,
+                  borderRadius: 16,
+                  child: Column(children: [
                     ListTile(
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: iservProvider.isConnected
-                              ? NexusTheme.success.withOpacity(0.1)
-                              : NexusTheme.primaryColor.withOpacity(0.1),
+                              ? NexusTheme.success.withValues(alpha: 0.1)
+                              : NexusTheme.primaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
@@ -408,9 +598,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               child: const Text('Verbinden'),
                             ),
                     ),
-                    if (iservProvider.isConnected)
+                    if (iservProvider.isConnected) ...[
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                         child: Wrap(
                           spacing: 8,
                           runSpacing: 8,
@@ -420,21 +610,180 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ],
                         ),
                       ),
-                  ],
+                      SwitchListTile(
+                        title: const Text('IServ-Termine im Kalender'),
+                        subtitle: const Text('IServ-Kalender in der App anzeigen'),
+                        value: iservProvider.showIServInCalendar,
+                        onChanged: (value) {
+                          iservProvider.showIServInCalendar = value;
+                        },
+                        secondary: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.cloud_rounded,
+                            color: Color(0xFFF59E0B),
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.school_outlined, color: Color(0xFF8B5CF6), size: 20),
+                        ),
+                        title: const Text('Klassenstufe'),
+                        subtitle: Text(iservProvider.userGrade != null
+                            ? 'Klasse ${iservProvider.userGrade} — Filtert JGST-Termine'
+                            : 'Nicht festgelegt'),
+                        trailing: TextButton(
+                          onPressed: () => _showGradeDialog(context, iservProvider),
+                          child: Text(iservProvider.userGrade != null ? 'Ändern' : 'Einstellen'),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.sync, color: Colors.blue, size: 20),
+                        ),
+                        title: Text('Termine: ${iservProvider.events.length} (${iservProvider.calendarEvents.length} im Kalender)'),
+                        subtitle: Text(
+                          iservProvider.lastSyncResult ?? 'Noch nicht synchronisiert',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        trailing: iservProvider.isSyncing
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : IconButton(
+                                onPressed: () => iservProvider.syncData(),
+                                icon: const Icon(Icons.refresh, size: 20),
+                              ),
+                      ),
+                      if (!kIsWeb && Platform.isMacOS) ...[
+                        const Divider(height: 1),
+                        ListTile(
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.notifications_active, color: Colors.orange, size: 20),
+                          ),
+                          title: const Text('Test-Benachrichtigung'),
+                          subtitle: Text(
+                            NotificationService().permissionGranted
+                                ? 'Berechtigung erteilt — macOS-Benachrichtigung testen'
+                                : 'Keine Berechtigung — in System-Einstellungen erlauben',
+                            style: TextStyle(
+                              color: NotificationService().permissionGranted
+                                  ? null
+                                  : Colors.red,
+                            ),
+                          ),
+                          trailing: TextButton(
+                            onPressed: () async {
+                              final ns = NotificationService();
+                              // If not initialized, try initializing first
+                              if (!ns.isInitialized) {
+                                await ns.initialize();
+                              }
+                              if (!ns.permissionGranted) {
+                                // Re-request permissions
+                                final granted = await ns.requestPermissions();
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(granted
+                                          ? 'Berechtigung erteilt!'
+                                          : 'Berechtigung verweigert. Bitte in System-Einstellungen → Datenschutz & Sicherheit → Mitteilungen aktivieren.'),
+                                      duration: const Duration(seconds: 5),
+                                    ),
+                                  );
+                                }
+                                return;
+                              }
+                              final status = await ns.getAuthorizationStatus();
+                              if (kDebugMode) print('NotificationService status: $status');
+                              final sent = await ns.showNotification(
+                                id: 9999,
+                                title: 'Nexus Benachrichtigung',
+                                body: 'macOS-Benachrichtigungen funktionieren!',
+                              );
+                              if (context.mounted) {
+                                // status: 0=notDetermined,1=denied,2=authorized,3=provisional
+                                // alertStyle: 0=none,1=banner,2=alert
+                                final authStatus = status['status'] ?? -1;
+                                final alertStyle = status['alertStyle'] ?? -1;
+                                String msg;
+                                if (!sent) {
+                                  msg = 'Fehler beim Senden. Status=$authStatus, Style=$alertStyle';
+                                } else if (alertStyle == 0) {
+                                  msg = 'Gesendet, aber Stil ist "Keine" — System-Einstellungen → Mitteilungen → Nexus → "Banner" wählen';
+                                } else {
+                                  msg = 'Benachrichtigung gesendet! (Status=$authStatus, Style=$alertStyle)';
+                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(msg),
+                                    duration: const Duration(seconds: 6),
+                                  ),
+                                );
+                              }
+                            },
+                            child: const Text('Senden'),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ]),
                 );
               },
+            )),
+            const SizedBox(height: 20),
+
+            // Notification settings (matching desktop)
+            AnimatedListItem(
+              index: 12,
+              child: _buildSectionTitle(context, 'Benachrichtigungen', Icons.notifications),
+            ),
+            AnimatedListItem(
+              index: 13,
+              child: _NotificationSettingsCard(isDark: isDark),
             ),
             const SizedBox(height: 20),
 
-            _buildSectionTitle(context, 'Google-Konten', Icons.account_circle),
-            _buildCard(
-              isDark,
-              children: [
+            AnimatedListItem(
+              index: 14,
+              child: _buildSectionTitle(context, 'Google-Konten', Icons.account_circle),
+            ),
+            AnimatedListItem(
+              index: 15,
+              child: GlassCard(
+              padding: EdgeInsets.zero,
+              borderRadius: 16,
+              child: Column(children: [
                 ListTile(
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
+                      color: Colors.blue.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(Icons.account_circle, color: Colors.blue, size: 20),
@@ -455,9 +804,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.amber.withOpacity(0.1),
+                      color: Colors.amber.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                      border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       children: [
@@ -473,33 +822,75 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                 ),
-              ],
-            ),
+              ]),
+            )),
             const SizedBox(height: 20),
 
-            _buildSectionTitle(context, 'Daten', Icons.storage),
-            _buildCard(
-              isDark,
-              children: [
+            AnimatedListItem(
+              index: 16,
+              child: _buildSectionTitle(context, 'Daten', Icons.storage),
+            ),
+            AnimatedListItem(
+              index: 17,
+              child: GlassCard(
+              padding: EdgeInsets.zero,
+              borderRadius: 16,
+              child: Column(children: [
+                _buildSwitchTile(
+                  icon: Icons.science_outlined,
+                  title: 'Beispieldaten anzeigen',
+                  subtitle: provider.demoMode ? 'Demo-Daten werden angezeigt' : 'Deine echten Daten werden angezeigt',
+                  value: provider.demoMode,
+                  onChanged: (value) async {
+                    await provider.setDemoMode(value);
+                    if (!value) await provider.refresh();
+                  },
+                  isDark: isDark,
+                ),
+                if (provider.demoMode)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.1),
+                        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.amber[700], size: 16),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'Im Demo-Modus werden Beispieldaten anstelle deiner echten Daten angezeigt. Deine Daten bleiben gespeichert.',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                const Divider(height: 1),
                 ListTile(
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: NexusTheme.primaryColor.withOpacity(0.1),
+                      color: NexusTheme.primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(Icons.task_alt, color: NexusTheme.primaryColor, size: 20),
+                    child: const Icon(Icons.task_alt, color: NexusTheme.primaryColor, size: 20),
                   ),
                   title: const Text('Aufgaben'),
                   trailing: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
-                      color: NexusTheme.primaryColor.withOpacity(0.1),
+                      color: NexusTheme.primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '${provider.tasks.length}',
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: NexusTheme.primaryColor,
                         fontWeight: FontWeight.bold,
                       ),
@@ -511,21 +902,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: NexusTheme.secondaryColor.withOpacity(0.1),
+                      color: NexusTheme.secondaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(Icons.event, color: NexusTheme.secondaryColor, size: 20),
+                    child: const Icon(Icons.event, color: NexusTheme.secondaryColor, size: 20),
                   ),
                   title: const Text('Termine'),
                   trailing: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
-                      color: NexusTheme.secondaryColor.withOpacity(0.1),
+                      color: NexusTheme.secondaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '${provider.events.length}',
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: NexusTheme.secondaryColor,
                         fontWeight: FontWeight.bold,
                       ),
@@ -537,81 +928,90 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: NexusTheme.accentColor.withOpacity(0.1),
+                      color: NexusTheme.accentColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(Icons.school, color: NexusTheme.accentColor, size: 20),
+                    child: const Icon(Icons.school, color: NexusTheme.accentColor, size: 20),
                   ),
                   title: const Text('Stundenplan-Einträge'),
                   trailing: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
-                      color: NexusTheme.accentColor.withOpacity(0.1),
+                      color: NexusTheme.accentColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '${provider.lessons.length}',
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: NexusTheme.accentColor,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ]),
+            )),
             const SizedBox(height: 20),
 
-            _buildSectionTitle(context, 'Gefahrenzone', Icons.warning, isWarning: true),
-            Container(
-              decoration: BoxDecoration(
-                color: isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: NexusTheme.danger.withOpacity(0.3)),
-              ),
+            AnimatedListItem(
+              index: 18,
+              child: _buildSectionTitle(context, 'Gefahrenzone', Icons.warning, isWarning: true),
+            ),
+            AnimatedListItem(
+              index: 19,
+              child: GlassCard(
+              padding: EdgeInsets.zero,
+              borderRadius: 16,
+              tint: NexusTheme.danger.withValues(alpha: 0.05),
               child: Column(
-                children: [
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: NexusTheme.warning.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
+                    children: [
+                      ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: NexusTheme.warning.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.delete_sweep, color: NexusTheme.warning, size: 20),
+                        ),
+                        title: const Text('Erledigte Aufgaben löschen'),
+                        subtitle: const Text('Entfernt alle abgeschlossenen Aufgaben'),
+                        onTap: () => _showDeleteCompletedDialog(context, provider),
                       ),
-                      child: Icon(Icons.delete_sweep, color: NexusTheme.warning, size: 20),
-                    ),
-                    title: const Text('Erledigte Aufgaben löschen'),
-                    subtitle: const Text('Entfernt alle abgeschlossenen Aufgaben'),
-                    onTap: () => _showDeleteCompletedDialog(context, provider),
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: NexusTheme.danger.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: NexusTheme.danger.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.delete_forever, color: NexusTheme.danger, size: 20),
+                        ),
+                        title: const Text('Alle Daten löschen'),
+                        subtitle: const Text('Setzt die App auf Werkseinstellungen zurück'),
+                        onTap: () => _showResetDialog(context, provider),
                       ),
-                      child: Icon(Icons.delete_forever, color: NexusTheme.danger, size: 20),
-                    ),
-                    title: const Text('Alle Daten löschen'),
-                    subtitle: const Text('Setzt die App auf Werkseinstellungen zurück'),
-                    onTap: () => _showResetDialog(context, provider),
+                    ],
                   ),
-                ],
-              ),
-            ),
+            )),
             const SizedBox(height: 20),
 
-            _buildSectionTitle(context, 'Über Nexus', Icons.info),
-            _buildCard(
-              isDark,
-              children: [
+            AnimatedListItem(
+              index: 20,
+              child: _buildSectionTitle(context, 'Über Nexus', Icons.info),
+            ),
+            AnimatedListItem(
+              index: 21,
+              child: GlassCard(
+              padding: EdgeInsets.zero,
+              borderRadius: 16,
+              child: Column(children: [
                 ListTile(
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
+                      gradient: const LinearGradient(
                         colors: NexusTheme.primaryGradient,
                       ),
                       borderRadius: BorderRadius.circular(8),
@@ -624,14 +1024,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          NexusTheme.primaryColor.withOpacity(0.2),
-                          NexusTheme.secondaryColor.withOpacity(0.2),
+                          NexusTheme.primaryColor.withValues(alpha: 0.2),
+                          NexusTheme.secondaryColor.withValues(alpha: 0.2),
                         ],
                       ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Text(
-                      '0.2 closed beta',
+                      '${BuildInfo.versionName} (Build ${BuildInfo.buildNumber})',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                   ),
@@ -641,7 +1041,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.purple.withOpacity(0.1),
+                      color: Colors.purple.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(Icons.person, color: Colors.purple, size: 20),
@@ -655,7 +1055,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       ShaderMask(
-                        shaderCallback: (bounds) => LinearGradient(
+                        shaderCallback: (bounds) => const LinearGradient(
                           colors: NexusTheme.primaryGradient,
                         ).createShader(bounds),
                         child: const Text(
@@ -686,11 +1086,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                 ),
-              ],
-            ),
+              ]),
+            )),
 
-            const SizedBox(height: 100),
+            const SizedBox(height: 120),
           ],
+        ),
         );
       },
     );
@@ -699,36 +1100,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildSectionTitle(BuildContext context, String title, IconData icon, {bool isWarning = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: 18,
-            color: isWarning ? NexusTheme.danger : NexusTheme.primaryColor,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+      child: GlassContainer(
+        borderRadius: 10,
+        blurSigma: 5,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 18,
               color: isWarning ? NexusTheme.danger : NexusTheme.primaryColor,
-              fontWeight: FontWeight.w600,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCard(bool isDark, {required List<Widget> children}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder,
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: isWarning ? NexusTheme.danger : NexusTheme.primaryColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
-      child: Column(children: children),
     );
   }
 
@@ -737,14 +1131,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String title,
     required String subtitle,
     required bool value,
-    required ValueChanged<bool> onChanged,
+    ValueChanged<bool>? onChanged,
     required bool isDark,
   }) {
     return ListTile(
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: NexusTheme.primaryColor.withOpacity(0.1),
+          color: NexusTheme.primaryColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(icon, color: NexusTheme.primaryColor, size: 20),
@@ -755,6 +1149,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         value: value,
         onChanged: onChanged,
         activeColor: NexusTheme.primaryColor,
+        activeTrackColor: NexusTheme.primaryColor.withValues(alpha: 0.3),
+        inactiveThumbColor: isDark ? Colors.white38 : Colors.grey[400],
+        inactiveTrackColor: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.08),
       ),
     );
   }
@@ -763,9 +1160,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: NexusTheme.primaryColor.withOpacity(0.1),
+        color: NexusTheme.primaryColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: NexusTheme.primaryColor.withOpacity(0.3)),
+        border: Border.all(color: NexusTheme.primaryColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -774,7 +1171,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(width: 6),
           Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 12,
               color: NexusTheme.primaryColor,
               fontWeight: FontWeight.w500,
@@ -811,8 +1208,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
               final city = controller.text.trim();
               if (city.isEmpty) return;
 
-              await _saveWeatherLocation(city, 52.52, 13.41);
-              if (mounted) {
+              try {
+                final geoUrl = Uri.parse(
+                  'https://geocoding-api.open-meteo.com/v1/search?name=${Uri.encodeComponent(city)}&count=1&language=de',
+                );
+                final response = await http.get(geoUrl);
+                if (response.statusCode == 200) {
+                  final data = jsonDecode(response.body);
+                  final results = data['results'] as List?;
+                  if (results != null && results.isNotEmpty) {
+                    final lat = (results[0]['latitude'] as num).toDouble();
+                    final lon = (results[0]['longitude'] as num).toDouble();
+                    await _saveWeatherLocation(city, lat, lon);
+                  } else {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Stadt nicht gefunden')),
+                      );
+                    }
+                    return;
+                  }
+                } else {
+                  await _saveWeatherLocation(city, 52.52, 13.41);
+                }
+              } catch (_) {
+                await _saveWeatherLocation(city, 52.52, 13.41);
+              }
+              if (context.mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Standort gesetzt: $city')),
@@ -823,7 +1245,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
-    );
+    ).then((_) => controller.dispose());
   }
 
   Future<void> _autoDetectLocation(BuildContext context) async {
@@ -836,128 +1258,156 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final urlController = TextEditingController();
     final usernameController = TextEditingController();
     final passwordController = TextEditingController();
-    bool isLoading = false;
-    String? error;
+    final screenContext = context;
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Mit IServ verbinden'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: urlController,
-                  decoration: const InputDecoration(
-                    labelText: 'IServ-URL',
-                    hintText: 'z.B. gymnasium-berlin.de',
-                    prefixIcon: Icon(Icons.link),
-                  ),
-                  keyboardType: TextInputType.url,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Mit IServ verbinden'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Gib deine IServ-URL und Anmeldedaten ein, oder nutze den WebView-Login.',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: urlController,
+                decoration: const InputDecoration(
+                  labelText: 'IServ-URL',
+                  hintText: 'z.B. gymnasium-berlin.de',
+                  prefixIcon: Icon(Icons.link),
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Benutzername',
-                    hintText: 'z.B. max.mustermann',
-                    prefixIcon: Icon(Icons.person),
-                  ),
+                keyboardType: TextInputType.url,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: usernameController,
+                decoration: const InputDecoration(
+                  labelText: 'Benutzername',
+                  prefixIcon: Icon(Icons.person),
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: passwordController,
-                  decoration: const InputDecoration(
-                    labelText: 'Passwort',
-                    prefixIcon: Icon(Icons.lock),
-                  ),
-                  obscureText: true,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passwordController,
+                decoration: const InputDecoration(
+                  labelText: 'Passwort',
+                  prefixIcon: Icon(Icons.lock),
                 ),
-                if (error != null) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: NexusTheme.danger.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.error_outline, color: NexusTheme.danger, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            error!,
-                            style: TextStyle(color: NexusTheme.danger, fontSize: 13),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
+                obscureText: true,
+                autocorrect: false,
+                enableSuggestions: false,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _directIServLogin(
+                  dialogContext,
+                  screenContext,
+                  urlController.text.trim(),
+                  usernameController.text.trim(),
+                  passwordController.text,
+                ),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: isLoading ? null : () => Navigator.pop(context),
-              child: const Text('Abbrechen'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Abbrechen'),
+          ),
+          TextButton(
+            onPressed: () {
+              final url = urlController.text.trim();
+              if (url.isEmpty) return;
+              Navigator.pop(dialogContext);
+              _startWebViewLogin(screenContext, url);
+            },
+            child: const Text('WebView Login'),
+          ),
+          FilledButton(
+            onPressed: () => _directIServLogin(
+              dialogContext,
+              screenContext,
+              urlController.text.trim(),
+              usernameController.text.trim(),
+              passwordController.text,
             ),
-            FilledButton(
-              onPressed: isLoading
-                  ? null
-                  : () async {
-                      if (urlController.text.trim().isEmpty ||
-                          usernameController.text.trim().isEmpty ||
-                          passwordController.text.isEmpty) {
-                        setDialogState(() => error = 'Bitte alle Felder ausfüllen');
-                        return;
-                      }
+            child: const Text('Anmelden'),
+          ),
+        ],
+      ),
+    ).then((_) {
+      urlController.dispose();
+      usernameController.dispose();
+      passwordController.dispose();
+    });
+  }
 
-                      setDialogState(() {
-                        isLoading = true;
-                        error = null;
-                      });
+  Future<void> _directIServLogin(BuildContext dialogContext, BuildContext screenContext, String url, String username, String password) async {
+    if (url.isEmpty || username.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(screenContext).showSnackBar(
+        const SnackBar(
+          content: Text('Bitte alle Felder ausfüllen'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
-                      try {
-                        final provider = context.read<IServProvider>();
-                        final result = await provider.connect(
-                          username: usernameController.text.trim(),
-                          password: passwordController.text,
-                          iservUrl: urlController.text.trim(),
-                        );
+    Navigator.pop(dialogContext);
 
-                        if (context.mounted) {
-                          if (result['success'] == true) {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('IServ erfolgreich verbunden')),
-                            );
-                          } else {
-                            setDialogState(() {
-                              error = result['error'] ?? 'Anmeldung fehlgeschlagen';
-                              isLoading = false;
-                            });
-                          }
-                        }
-                      } catch (e) {
-                        setDialogState(() {
-                          error = 'Verbindungsfehler: ${e.toString()}';
-                          isLoading = false;
-                        });
-                      }
-                    },
-              child: isLoading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text('Verbinden'),
-            ),
-          ],
+    if (!mounted) return;
+    final provider = screenContext.read<IServProvider>();
+    final result = await provider.connect(
+      username: username,
+      password: password,
+      iservUrl: url,
+    );
+
+    if (!mounted) return;
+    if (screenContext.mounted) {
+      if (result['success'] == true) {
+        ScaffoldMessenger.of(screenContext).showSnackBar(
+          const SnackBar(content: Text('IServ erfolgreich verbunden')),
+        );
+      } else {
+        ScaffoldMessenger.of(screenContext).showSnackBar(
+          SnackBar(content: Text(result['error'] ?? 'Anmeldung fehlgeschlagen')),
+        );
+      }
+    }
+  }
+
+  void _startWebViewLogin(BuildContext context, String url) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => IServWebViewLogin(
+          iservUrl: url,
+          onLoginSuccess: (cookies, username) async {
+            Navigator.of(context).pop();
+            final provider = context.read<IServProvider>();
+            final result = await provider.connectWithWebViewCookies(
+              iservUrl: url,
+              cookies: cookies,
+              username: username,
+            );
+            if (context.mounted) {
+              if (result['success'] == true) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('IServ erfolgreich verbunden')),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(result['error'] ?? 'Anmeldung fehlgeschlagen')),
+                );
+              }
+            }
+          },
+          onCancel: () => Navigator.of(context).pop(),
         ),
       ),
     );
@@ -1100,7 +1550,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   margin: const EdgeInsets.only(bottom: 4),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? NexusTheme.primaryColor.withOpacity(0.15)
+                        ? NexusTheme.primaryColor.withValues(alpha: 0.15)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
@@ -1119,7 +1569,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     trailing: isSelected
-                        ? Icon(Icons.check_circle, color: NexusTheme.primaryColor, size: 20)
+                        ? const Icon(Icons.check_circle, color: NexusTheme.primaryColor, size: 20)
                         : null,
                     onTap: () => setDialogState(() => selected = bundesland),
                   ),
@@ -1140,7 +1590,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       await prefs.setString('user_bundesland', selected!);
                       setState(() => _bundesland = selected);
 
-                      if (mounted) {
+                      if (context.mounted) {
                         _showRefreshHolidaysPrompt(context);
                       }
                     }
@@ -1169,7 +1619,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const Text('Schulzeit bis'),
               const SizedBox(height: 8),
               Text(
-                'Ferien und Feiertage werden bis zu diesem Jahr importiert.',
+                'Ferien und Feiertage werden bis zu den Sommerferien dieses Jahres importiert.',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.normal,
@@ -1198,7 +1648,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   margin: const EdgeInsets.only(bottom: 4),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? NexusTheme.primaryColor.withOpacity(0.15)
+                        ? NexusTheme.primaryColor.withValues(alpha: 0.15)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
@@ -1214,8 +1664,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       height: 36,
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? NexusTheme.primaryColor.withOpacity(0.2)
-                            : (isDark ? Colors.white10 : Colors.black.withOpacity(0.05)),
+                            ? NexusTheme.primaryColor.withValues(alpha: 0.2)
+                            : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Center(
@@ -1243,7 +1693,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     trailing: isSelected
-                        ? Icon(Icons.check_circle, color: NexusTheme.primaryColor, size: 20)
+                        ? const Icon(Icons.check_circle, color: NexusTheme.primaryColor, size: 20)
                         : null,
                     onTap: () => setDialogState(() => selected = year),
                   ),
@@ -1264,9 +1714,161 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       await prefs.setInt('graduation_year', selected!);
                       setState(() => _graduationYear = selected);
 
-                      if (mounted) {
+                      if (context.mounted) {
                         _showRefreshHolidaysPrompt(context);
                       }
+                    }
+                  : null,
+              child: const Text('Speichern'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showGradeDialog(BuildContext context, IServProvider iservProvider) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    int? selected = iservProvider.userGrade;
+    bool autoIncrement = iservProvider.gradeAutoIncrement;
+    final grades = List.generate(9, (i) => i + 5);
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Klassenstufe'),
+              const SizedBox(height: 8),
+              Text(
+                'Termine anderer Jahrgangsstufen (JGST) werden aus dem Kalender gefiltert.',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.normal,
+                  color: isDark ? Colors.white54 : Colors.black54,
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 400,
+            child: Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: grades.length,
+                    itemBuilder: (context, index) {
+                      final grade = grades[index];
+                      final isSelected = selected == grade;
+                      final label = grade <= 10
+                          ? 'Klasse $grade'
+                          : grade == 11
+                              ? 'Qualifikationsphase (Q1/Q2)'
+                              : grade == 12
+                                  ? 'Qualifikationsphase (Q3/Q4)'
+                                  : 'Klasse 13';
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 4),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? NexusTheme.primaryColor.withValues(alpha: 0.15)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSelected
+                                ? NexusTheme.primaryColor
+                                : Colors.transparent,
+                          ),
+                        ),
+                        child: ListTile(
+                          dense: true,
+                          leading: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? NexusTheme.primaryColor.withValues(alpha: 0.2)
+                                  : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '$grade',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: isSelected
+                                      ? NexusTheme.primaryColor
+                                      : (isDark ? Colors.white54 : Colors.black38),
+                                ),
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            label,
+                            style: TextStyle(
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                              color: isSelected ? NexusTheme.primaryColor : null,
+                            ),
+                          ),
+                          trailing: isSelected
+                              ? const Icon(Icons.check_circle, color: NexusTheme.primaryColor, size: 20)
+                              : null,
+                          onTap: () => setDialogState(() => selected = grade),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: const Text('Automatisch hochstufen', style: TextStyle(fontSize: 14)),
+                    subtitle: Text(
+                      'Jedes Schuljahr (August) +1',
+                      style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black45),
+                    ),
+                    value: autoIncrement,
+                    onChanged: (v) => setDialogState(() => autoIncrement = v),
+                    activeThumbColor: NexusTheme.primaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            if (selected != null)
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  iservProvider.setUserGrade(null);
+                  iservProvider.setGradeAutoIncrement(autoIncrement);
+                },
+                style: TextButton.styleFrom(foregroundColor: NexusTheme.danger),
+                child: const Text('Zurücksetzen'),
+              ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Abbrechen'),
+            ),
+            FilledButton(
+              onPressed: selected != null
+                  ? () {
+                      Navigator.pop(context);
+                      iservProvider.setUserGrade(selected);
+                      iservProvider.setGradeAutoIncrement(autoIncrement);
                     }
                   : null,
               child: const Text('Speichern'),
@@ -1309,7 +1911,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final holidayService = HolidayService();
       await holidayService.refreshHolidays();
 
-      if (mounted) {
+      if (context.mounted) {
         context.read<AppProvider>().refresh();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1319,10 +1921,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       }
     } catch (e) {
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Fehler beim Importieren: $e'),
+          const SnackBar(
+            content: Text('Fehler beim Importieren. Bitte versuche es erneut.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1334,3 +1936,378 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 }
+
+class _NotificationSettingsCard extends StatefulWidget {
+  final bool isDark;
+  const _NotificationSettingsCard({required this.isDark});
+
+  @override
+  State<_NotificationSettingsCard> createState() => _NotificationSettingsCardState();
+}
+
+class _NotificationSettingsCardState extends State<_NotificationSettingsCard> {
+  bool _masterToggle = true;
+  bool _calendarEnabled = true;
+  bool _tasksEnabled = true;
+  bool _homeworkEnabled = true;
+  bool _schoolEnabled = true;
+  bool _trainingEnabled = true;
+  bool _pomodoroEnabled = true;
+  bool _testsEnabled = true;
+  int _homeworkLeadDays = 1;
+  int _schoolLeadMinutes = 10;
+  int _trainingLeadMinutes = 15;
+  int _testsLeadDays = 1;
+  TimeOfDay _quietStart = const TimeOfDay(hour: 22, minute: 0);
+  TimeOfDay _quietEnd = const TimeOfDay(hour: 7, minute: 0);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _masterToggle = prefs.getBool('notif_master') ?? true;
+      _calendarEnabled = prefs.getBool('notif_calendar') ?? true;
+      _tasksEnabled = prefs.getBool('notif_tasks') ?? true;
+      _homeworkEnabled = prefs.getBool('notif_homework') ?? true;
+      _schoolEnabled = prefs.getBool('notif_school') ?? true;
+      _trainingEnabled = prefs.getBool('notif_training') ?? true;
+      _pomodoroEnabled = prefs.getBool('notif_pomodoro') ?? true;
+      _testsEnabled = prefs.getBool('notif_tests') ?? true;
+      _homeworkLeadDays = prefs.getInt('notif_homework_lead') ?? 1;
+      _schoolLeadMinutes = prefs.getInt('notif_school_lead') ?? 10;
+      _trainingLeadMinutes = prefs.getInt('notif_training_lead') ?? 15;
+      _testsLeadDays = prefs.getInt('notif_tests_lead') ?? 1;
+      _quietStart = TimeOfDay(
+        hour: prefs.getInt('notif_quiet_start_h') ?? 22,
+        minute: prefs.getInt('notif_quiet_start_m') ?? 0,
+      );
+      _quietEnd = TimeOfDay(
+        hour: prefs.getInt('notif_quiet_end_h') ?? 7,
+        minute: prefs.getInt('notif_quiet_end_m') ?? 0,
+      );
+    });
+  }
+
+  Future<void> _save(String key, dynamic value) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (value is bool) await prefs.setBool(key, value);
+    if (value is int) await prefs.setInt(key, value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    return GlassCard(
+      padding: EdgeInsets.zero,
+      borderRadius: 16,
+      child: Column(
+        children: [
+          // Master toggle
+          SwitchListTile(
+            secondary: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: NexusTheme.primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.notifications, color: NexusTheme.primaryColor, size: 20),
+            ),
+            title: const Text('Benachrichtigungen'),
+            subtitle: Text(_masterToggle ? 'Aktiviert' : 'Deaktiviert'),
+            value: _masterToggle,
+            onChanged: (v) {
+              setState(() => _masterToggle = v);
+              _save('notif_master', v);
+            },
+            activeColor: NexusTheme.primaryColor,
+            activeTrackColor: NexusTheme.primaryColor.withValues(alpha: 0.3),
+          ),
+
+          if (_masterToggle) ...[
+            const Divider(height: 1),
+
+            // Quiet hours
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.indigo.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.do_not_disturb, color: Colors.indigo, size: 20),
+              ),
+              title: const Text('Ruhezeitraum'),
+              subtitle: Text(
+                '${_quietStart.hour.toString().padLeft(2, '0')}:${_quietStart.minute.toString().padLeft(2, '0')} '
+                '— ${_quietEnd.hour.toString().padLeft(2, '0')}:${_quietEnd.minute.toString().padLeft(2, '0')}',
+              ),
+              trailing: TextButton(
+                onPressed: () async {
+                  final start = await showTimePicker(context: context, initialTime: _quietStart);
+                  if (start != null && mounted) {
+                    final end = await showTimePicker(context: context, initialTime: _quietEnd);
+                    if (end != null && mounted) {
+                      setState(() {
+                        _quietStart = start;
+                        _quietEnd = end;
+                      });
+                      _save('notif_quiet_start_h', start.hour);
+                      _save('notif_quiet_start_m', start.minute);
+                      _save('notif_quiet_end_h', end.hour);
+                      _save('notif_quiet_end_m', end.minute);
+                    }
+                  }
+                },
+                child: const Text('Ändern'),
+              ),
+            ),
+
+            // Category divider
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'KATEGORIEN',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1,
+                    color: isDark ? Colors.white38 : Colors.black38,
+                  ),
+                ),
+              ),
+            ),
+
+            _buildCategoryToggle('Kalender', 'Erinnerungen vor Terminen', _calendarEnabled, (v) {
+              setState(() => _calendarEnabled = v);
+              _save('notif_calendar', v);
+            }),
+            _buildCategoryToggle('Aufgaben', 'Fällige und überfällige Aufgaben', _tasksEnabled, (v) {
+              setState(() => _tasksEnabled = v);
+              _save('notif_tasks', v);
+            }),
+            _buildCategoryToggleWithLead(
+              'Hausaufgaben', 'Erinnerung vor Abgabe', _homeworkEnabled,
+              (v) { setState(() => _homeworkEnabled = v); _save('notif_homework', v); },
+              _homeworkLeadDays, 'Tage', 0, 30,
+              (v) { setState(() => _homeworkLeadDays = v); _save('notif_homework_lead', v); },
+            ),
+            _buildCategoryToggleWithLead(
+              'Stundenplan', 'Nächste Unterrichtsstunde', _schoolEnabled,
+              (v) { setState(() => _schoolEnabled = v); _save('notif_school', v); },
+              _schoolLeadMinutes, 'Min', 1, 60,
+              (v) { setState(() => _schoolLeadMinutes = v); _save('notif_school_lead', v); },
+            ),
+            _buildCategoryToggleWithLead(
+              'Training', 'Geplante Trainingseinheiten', _trainingEnabled,
+              (v) { setState(() => _trainingEnabled = v); _save('notif_training', v); },
+              _trainingLeadMinutes, 'Min', 1, 120,
+              (v) { setState(() => _trainingLeadMinutes = v); _save('notif_training_lead', v); },
+            ),
+            _buildCategoryToggle('Pomodoro', 'Arbeits-/Pausenphase beendet', _pomodoroEnabled, (v) {
+              setState(() => _pomodoroEnabled = v);
+              _save('notif_pomodoro', v);
+            }),
+            _buildCategoryToggleWithLead(
+              'Klausuren & Tests', 'Erinnerung vor Prüfungen', _testsEnabled,
+              (v) { setState(() => _testsEnabled = v); _save('notif_tests', v); },
+              _testsLeadDays, 'Tage', 0, 30,
+              (v) { setState(() => _testsLeadDays = v); _save('notif_tests_lead', v); },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryToggle(String title, String subtitle, bool value, ValueChanged<bool> onChanged) {
+    return SwitchListTile(
+      title: Text(title, style: const TextStyle(fontSize: 14)),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
+      value: value,
+      onChanged: onChanged,
+      activeColor: NexusTheme.primaryColor,
+      dense: true,
+    );
+  }
+
+  Widget _buildCategoryToggleWithLead(
+    String title, String subtitle, bool value, ValueChanged<bool> onToggle,
+    int leadValue, String leadUnit, int leadMin, int leadMax, ValueChanged<int> onLeadChanged,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 14)),
+                Text(subtitle, style: TextStyle(fontSize: 12, color: widget.isDark ? Colors.white54 : Colors.black45)),
+              ],
+            ),
+          ),
+          if (value)
+            SizedBox(
+              width: 56,
+              height: 32,
+              child: TextField(
+                controller: TextEditingController(text: '$leadValue'),
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 13),
+                decoration: InputDecoration(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  suffixText: leadUnit,
+                  suffixStyle: const TextStyle(fontSize: 10),
+                  isDense: true,
+                ),
+                onChanged: (s) {
+                  final v = int.tryParse(s);
+                  if (v != null && v >= leadMin && v <= leadMax) onLeadChanged(v);
+                },
+              ),
+            ),
+          const SizedBox(width: 8),
+          Switch(
+            value: value,
+            onChanged: onToggle,
+            activeColor: NexusTheme.primaryColor,
+            activeTrackColor: NexusTheme.primaryColor.withValues(alpha: 0.3),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ThemeModeChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final bool isDark;
+
+  const _ThemeModeChip({
+    required this.icon,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? NexusTheme.primaryColor.withValues(alpha: 0.15)
+                : (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03)),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected
+                  ? NexusTheme.primaryColor.withValues(alpha: 0.4)
+                  : Colors.transparent,
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: isSelected
+                    ? NexusTheme.primaryColor
+                    : (isDark ? Colors.white54 : Colors.black45),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  color: isSelected
+                      ? NexusTheme.primaryColor
+                      : (isDark ? Colors.white54 : Colors.black45),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ScheduleTimeButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final TimeOfDay time;
+  final VoidCallback onTap;
+  final bool isDark;
+
+  const _ScheduleTimeButton({
+    required this.icon,
+    required this.label,
+    required this.time,
+    required this.onTap,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.08),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: isDark ? Colors.white60 : Colors.black54),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white54 : Colors.black45,
+                  ),
+                ),
+                Text(
+                  '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

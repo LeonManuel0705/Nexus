@@ -5,10 +5,20 @@
 
 {% block content %}
 <div class="page-container" style="max-width: 1100px;">
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">Kalender</h1>
-            <p class="page-subtitle">Deine Termine im Überblick</p>
+    <div class="cal-page-header">
+        <div class="cal-header-left">
+            <div class="cal-header-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+            </div>
+            <div>
+                <h1 class="cal-title">Kalender</h1>
+                <p class="cal-subtitle">Deine Termine im Überblick</p>
+            </div>
         </div>
         <div class="page-actions">
             <select id="calendarAccountSelect" class="account-select" title="Kalender-Account">
@@ -20,58 +30,78 @@
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
                 </svg>
-                Termin
+                Neuer Termin
             </button>
         </div>
     </div>
 
-    <div class="filter-tabs">
-        <button class="filter-tab active" data-filter="all" onclick="setCalendarFilter('all')">Alle</button>
-        <button class="filter-tab" data-filter="school" onclick="setCalendarFilter('school')">Schule</button>
-        <button class="filter-tab" data-filter="training" onclick="setCalendarFilter('training')">Training</button>
-        <button class="filter-tab" data-filter="personal" onclick="setCalendarFilter('personal')">Privat</button>
-        <button class="filter-tab" data-filter="holiday" onclick="setCalendarFilter('holiday')">Feiertage</button>
+    <div class="cal-filters">
+        <button class="cal-filter active" data-filter="all" onclick="setCalendarFilter('all')">
+            <span class="cal-filter-dot" style="background: var(--accent-gradient);"></span>Alle
+        </button>
+        <button class="cal-filter" data-filter="school" onclick="setCalendarFilter('school')">
+            <span class="cal-filter-dot" style="background: #667eea;"></span>Schule
+        </button>
+        <button class="cal-filter" data-filter="training" onclick="setCalendarFilter('training')">
+            <span class="cal-filter-dot" style="background: #48bb78;"></span>Training
+        </button>
+        <button class="cal-filter" data-filter="personal" onclick="setCalendarFilter('personal')">
+            <span class="cal-filter-dot" style="background: #9f7aea;"></span>Privat
+        </button>
+        <button class="cal-filter" data-filter="holiday" onclick="setCalendarFilter('holiday')">
+            <span class="cal-filter-dot" style="background: #e74c3c;"></span>Feiertage
+        </button>
     </div>
 
     <div class="calendar-layout">
 
         <section class="widget glass-card calendar-widget">
-            <div class="widget-header">
-                <div class="calendar-nav">
-                    <button onclick="changeMonth(-1)" title="Vorheriger Monat">&lt;</button>
-                    <span id="calendarMonth">Monat Jahr</span>
-                    <button onclick="changeMonth(1)" title="Nächster Monat">&gt;</button>
+            <div class="cal-month-header">
+                <div class="cal-month-nav">
+                    <button class="cal-nav-btn" onclick="changeMonth(-1)" title="Vorheriger Monat">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <span class="cal-month-label" id="calendarMonth">Monat Jahr</span>
+                    <button class="cal-nav-btn" onclick="changeMonth(1)" title="Nächster Monat">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
                 </div>
-                <button class="icon-btn" onclick="goToToday()" title="Heute">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <button class="cal-today-btn" onclick="goToToday()" title="Heute">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"></circle>
                         <polyline points="12 6 12 12 16 14"></polyline>
                     </svg>
+                    Heute
                 </button>
             </div>
 
             <div class="calendar-grid">
-                <div class="calendar-weekdays">
-                    <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
+                <div class="calendar-weekdays" id="calendarWeekdays">
+                    <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span class="weekend">Sa</span><span class="weekend">So</span>
                 </div>
                 <div class="calendar-days" id="calendarDays"></div>
             </div>
         </section>
 
         <section class="widget glass-card events-widget">
-            <div class="widget-header">
-                <h3 id="eventsTitle">Heute</h3>
-                <span class="event-count" id="eventCount">0 Termine</span>
+            <div class="cal-events-header">
+                <h3 class="cal-events-date" id="eventsTitle">Heute</h3>
+                <span class="cal-events-badge" id="eventCount">0 Termine</span>
             </div>
             <div class="events-list" id="eventsList">
-                <div class="empty-state">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                        <line x1="16" y1="2" x2="16" y2="6"></line>
-                        <line x1="8" y1="2" x2="8" y2="6"></line>
-                        <line x1="3" y1="10" x2="21" y2="10"></line>
-                    </svg>
-                    <span>Keine Termine</span>
+                <div class="cal-empty-state">
+                    <div class="cal-empty-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                            <line x1="8" y1="14" x2="10" y2="14"></line>
+                            <line x1="14" y1="14" x2="16" y2="14"></line>
+                            <line x1="8" y1="18" x2="10" y2="18"></line>
+                        </svg>
+                    </div>
+                    <span>Keine Termine an diesem Tag</span>
                 </div>
             </div>
         </section>
@@ -91,6 +121,13 @@
             <input type="hidden" id="eventId" name="id">
             <input type="hidden" id="eventCalendarId" name="calendar_id">
             <input type="hidden" id="eventRecurringId" name="recurring_event_id">
+            <input type="hidden" id="eventSource" name="event_source">
+            <div class="form-group">
+                <label for="eventCalendarSource">Speichern in</label>
+                <select id="eventCalendarSource">
+                    <option value="local">Nexus (Lokal)</option>
+                </select>
+            </div>
             <div class="form-group">
                 <label for="eventTitle">Titel</label>
                 <input type="text" id="eventTitle" name="title" placeholder="Termin-Titel" required>
@@ -246,7 +283,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ g.csp_nonce }}">
 let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
 let selectedDate = new Date();
@@ -266,8 +303,14 @@ document.addEventListener('DOMContentLoaded', () => {
     loadEvents();
     loadCalendarAccounts();
     syncCachedChanges(); // Sync any offline changes
-});
 
+    // Override global quick-note FAB to open add-event modal on the calendar page
+    const fab = document.getElementById('fabButton');
+    if (fab) {
+        fab.onclick = () => openAddEventModal();
+        fab.title = 'Neuer Termin';
+    }
+});
 
 const CACHE_KEY = 'nexus-calendar-pending-changes';
 
@@ -338,7 +381,6 @@ async function syncCachedChanges() {
     }
 }
 
-
 let selectedBundesland = null;
 let bundeslaender = {};
 
@@ -361,9 +403,9 @@ function showBundeslandModal() {
     if (!grid) return;
 
     grid.innerHTML = Object.entries(bundeslaender).map(([code, name]) => `
-        <div class="bundesland-card" data-code="${code}" onclick="selectBundesland('${code}')">
-            <span class="bundesland-code">${code}</span>
-            <span class="bundesland-name">${name}</span>
+        <div class="bundesland-card" data-code="${escapeHtml(code)}" onclick="selectBundesland('${escapeHtml(code)}')">
+            <span class="bundesland-code">${escapeHtml(code)}</span>
+            <span class="bundesland-name">${escapeHtml(name)}</span>
         </div>
     `).join('');
 
@@ -458,46 +500,94 @@ function skipBundeslandSelection() {
 
 function renderCalendar() {
     const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-    document.getElementById('calendarMonth').textContent = `${monthNames[currentMonth]} ${currentYear}`;
 
-    const container = document.getElementById('calendarDays');
-    container.innerHTML = '';
+    // Only animate the month label when the month actually changed
+    const labelEl = document.getElementById('calendarMonth');
+    if (_monthSlideDir !== 0) {
+        const outClass = _monthSlideDir > 0 ? 'month-label-changing-fwd' : 'month-label-changing-bwd';
+        const inClass  = _monthSlideDir > 0 ? 'month-label-appear-fwd'   : 'month-label-appear-bwd';
+        labelEl.classList.remove('month-label-changing-fwd','month-label-changing-bwd','month-label-appear-fwd','month-label-appear-bwd');
+        labelEl.classList.add(outClass);
+        setTimeout(() => {
+            labelEl.textContent = `${monthNames[currentMonth]} ${currentYear}`;
+            labelEl.classList.remove(outClass);
+            labelEl.classList.add(inClass);
+            labelEl.addEventListener('animationend', () => labelEl.classList.remove(inClass), { once: true });
+        }, 120);
+    } else {
+        labelEl.textContent = `${monthNames[currentMonth]} ${currentYear}`;
+    }
 
     const firstDay = new Date(currentYear, currentMonth, 1);
     const lastDay = new Date(currentYear, currentMonth + 1, 0);
     const startDay = (firstDay.getDay() + 6) % 7; // Monday = 0
 
-    for (let i = 0; i < startDay; i++) {
-        container.innerHTML += '<div class="day-cell empty"></div>';
-    }
-
     const today = new Date();
+    const todayDow = (today.getDay() + 6) % 7; // Monday = 0
+
+    document.querySelectorAll('#calendarWeekdays span').forEach((el, i) => {
+        el.classList.toggle('current-day', i === todayDow &&
+            currentMonth === today.getMonth() && currentYear === today.getFullYear());
+    });
+
+    // Build the new grid HTML (always 6 rows = 42 cells to prevent height jumps)
+    let html = '';
+    for (let i = 0; i < startDay; i++) {
+        html += '<div class="day-cell empty"></div>';
+    }
     for (let day = 1; day <= lastDay.getDate(); day++) {
         const date = new Date(currentYear, currentMonth, day);
         const dateStr = formatLocalDate(date);
+        const dow = (date.getDay() + 6) % 7;
         const isToday = date.toDateString() === today.toDateString();
         const isSelected = date.toDateString() === selectedDate.toDateString();
+        const isWeekend = dow >= 5;
         const dayEvents = getEventsForDate(dateStr);
 
         let classes = 'day-cell';
         if (isToday) classes += ' today';
         if (isSelected) classes += ' selected';
+        if (isWeekend) classes += ' weekend';
         if (dayEvents.length > 0) classes += ' has-events';
 
         const eventPreviews = dayEvents.slice(0, 3).map(e => {
-            const color = e.calendar_color || getCategoryColor(e.category) || '#6366f1';
+            const rawColor = e.calendar_color || getCategoryColor(e.category) || '#6366f1';
+            const color = /^#[0-9a-fA-F]{3,8}$/.test(rawColor) ? rawColor : '#6366f1';
             const title = e.title.length > 12 ? e.title.substring(0, 12) + '…' : e.title;
             return `<div class="event-preview" style="background: ${color};" title="${escapeHtml(e.title)}">${escapeHtml(title)}</div>`;
         }).join('');
-
         const moreCount = dayEvents.length > 3 ? `<div class="event-more">+${dayEvents.length - 3}</div>` : '';
 
-        container.innerHTML += `
-            <div class="${classes}" onclick="selectDate(${day})">
-                <span class="day-number">${day}</span>
-                <div class="day-events">${eventPreviews}${moreCount}</div>
-            </div>
-        `;
+        html += `<div class="${classes}" onclick="selectDate(${day})">
+            <span class="day-number">${day}</span>
+            <div class="day-events">${eventPreviews}${moreCount}</div>
+        </div>`;
+    }
+    // Pad to 42 cells (6 rows × 7 cols) so the grid height never changes
+    const totalCells = startDay + lastDay.getDate();
+    for (let i = totalCells; i < 42; i++) {
+        html += '<div class="day-cell empty filler"></div>';
+    }
+
+    const container = document.getElementById('calendarDays');
+
+    if (_monthSlideDir !== 0) {
+        // Cross-fade slide: animate old content out, swap, animate new in
+        const dir = _monthSlideDir;
+        _monthSlideDir = 0;
+
+        container.classList.add(dir > 0 ? 'slide-out-left' : 'slide-out-right');
+        container.addEventListener('animationend', () => {
+            container.classList.remove('slide-out-left', 'slide-out-right');
+            container.innerHTML = html;
+            void container.offsetWidth;
+            container.classList.add(dir > 0 ? 'slide-in-from-right' : 'slide-in-from-left');
+            container.addEventListener('animationend', () => {
+                container.classList.remove('slide-in-from-right', 'slide-in-from-left');
+            }, { once: true });
+        }, { once: true });
+    } else {
+        container.innerHTML = html;
     }
 }
 
@@ -522,6 +612,8 @@ function getEventsForDate(dateStr) {
                 if (e.source !== 'iserv') return false;
             } else if (accountFilter === 'holiday') {
                 if (e.source !== 'holiday') return false;
+            } else if (accountFilter === 'nexus') {
+                if (e.source !== 'nexus') return false;
             } else if (accountFilter === 'local') {
                 if (e.source !== 'local') return false;
             } else {
@@ -548,7 +640,7 @@ function getCategoryColor(category) {
 
 function escapeHtml(str) {
     if (!str) return '';
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function checkHasEvents(date) {
@@ -559,7 +651,57 @@ function checkHasEvents(date) {
 function selectDate(day) {
     selectedDate = new Date(currentYear, currentMonth, day);
     renderCalendar();
+    // Pulse the selected cell (non-empty cells are ordered day 1…N)
+    const cells = document.querySelectorAll('#calendarDays .day-cell:not(.empty)');
+    const el = cells[day - 1];
+    if (el) {
+        el.classList.add('day-pulse');
+        el.addEventListener('animationend', () => el.classList.remove('day-pulse'), { once: true });
+    }
     updateEventsForDate();
+}
+
+function buildEventListHTML(dayEvents) {
+    if (dayEvents.length === 0) {
+        return `<div class="cal-empty-state">
+            <div class="cal-empty-icon">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                    <line x1="8" y1="14" x2="10" y2="14"></line>
+                    <line x1="14" y1="14" x2="16" y2="14"></line>
+                    <line x1="8" y1="18" x2="10" y2="18"></line>
+                </svg>
+            </div>
+            <span>Keine Termine an diesem Tag</span>
+        </div>`;
+    }
+    return dayEvents.map((e, i) => {
+        const safeCalColor = /^#[0-9a-fA-F]{3,8}$/.test(e.calendar_color) ? e.calendar_color : '';
+        const borderColor = safeCalColor || getCategoryColor(e.category || 'personal');
+        const calendarName = e.calendar || getCategoryLabel(e.category);
+        const hasLocation = e.location && e.location.trim().length > 0;
+        const timeStr = e.start_time || 'Ganztägig';
+        const isAllDay = !e.start_time;
+        return `<div class="cal-event-card category-${escapeHtml(e.category || 'personal')}" data-event-id="${escapeHtml(String(e.id))}" style="border-left-color: ${borderColor}; animation-delay: ${i * 0.06}s;">
+            <div class="cal-event-time ${isAllDay ? 'all-day' : ''}">${escapeHtml(timeStr)}</div>
+            <div class="cal-event-body" onclick="openEditEventModal('${escapeHtml(String(e.id))}')">
+                <div class="cal-event-title">${escapeHtml(e.title)}</div>
+                ${hasLocation ? `<div class="cal-event-location">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 5.4 7 12 8 12s8-6.6 8-12a8 8 0 0 0-8-8z"/></svg>
+                    ${escapeHtml(e.location)}
+                </div>` : ''}
+            </div>
+            <div class="cal-event-meta">
+                ${hasLocation ? `<button class="cal-route-btn" onclick="event.stopPropagation(); openRouteModal('${escapeHtml(String(e.id))}')" title="Route planen">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l18-5-5 18-4-8-9-5z"/></svg>
+                </button>` : ''}
+                <span class="cal-event-tag" style="--tag-color: ${borderColor};">${escapeHtml(calendarName)}</span>
+            </div>
+        </div>`;
+    }).join('');
 }
 
 function updateEventsForDate() {
@@ -576,47 +718,57 @@ function updateEventsForDate() {
         title = selectedDate.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
     }
 
-    document.getElementById('eventsTitle').textContent = title;
-    document.getElementById('eventCount').textContent = `${dayEvents.length} Termin${dayEvents.length !== 1 ? 'e' : ''}`;
+    // Animate title/badge update
+    const titleEl = document.getElementById('eventsTitle');
+    const badgeEl = document.getElementById('eventCount');
+    titleEl.classList.add('panel-header-updating');
+    setTimeout(() => {
+        titleEl.textContent = title;
+        badgeEl.textContent = `${dayEvents.length} Termin${dayEvents.length !== 1 ? 'e' : ''}`;
+        titleEl.classList.remove('panel-header-updating');
+        titleEl.classList.add('panel-header-updated');
+        titleEl.addEventListener('animationend', () => titleEl.classList.remove('panel-header-updated'), { once: true });
+        // Pulse badge when count > 0
+        if (dayEvents.length > 0) {
+            badgeEl.classList.add('badge-pop');
+            badgeEl.addEventListener('animationend', () => badgeEl.classList.remove('badge-pop'), { once: true });
+        }
+    }, 100);
 
     const container = document.getElementById('eventsList');
-    if (dayEvents.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                    <line x1="16" y1="2" x2="16" y2="6"></line>
-                    <line x1="8" y1="2" x2="8" y2="6"></line>
-                    <line x1="3" y1="10" x2="21" y2="10"></line>
-                </svg>
-                <span>Keine Termine</span>
-            </div>
-        `;
-        return;
-    }
+    const newHTML = buildEventListHTML(dayEvents);
 
-    container.innerHTML = dayEvents.map(e => {
-        const colorStyle = e.calendar_color ? `border-left: 4px solid ${e.calendar_color};` : '';
-        const calendarName = e.calendar || getCategoryLabel(e.category);
-        const hasLocation = e.location && e.location.trim().length > 0;
-        return `
-        <div class="event-item category-${e.category || 'personal'}" style="${colorStyle}">
-            <div class="event-time">${e.start_time || 'Ganztägig'}</div>
-            <div class="event-info" onclick="openEditEventModal('${e.id}')">
-                <div class="event-title">${escapeHtml(e.title)}</div>
-                ${hasLocation ? `<div class="event-location">📍 ${escapeHtml(e.location)}</div>` : ''}
-            </div>
-            <div class="event-actions">
-                ${hasLocation ? `<button class="btn-route" onclick="event.stopPropagation(); openRouteModal('${e.id}')" title="Route planen">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="10" r="3"/>
-                        <path d="M12 2a8 8 0 0 0-8 8c0 5.4 7 12 8 12s8-6.6 8-12a8 8 0 0 0-8-8z"/>
-                    </svg>
-                </button>` : ''}
-                <span class="tag" ${e.calendar_color ? `style="background: ${e.calendar_color}20; color: ${e.calendar_color}"` : ''}>${calendarName}</span>
-            </div>
-        </div>
-    `}).join('');
+    // Freeze current height for smooth transition
+    const oldHeight = container.offsetHeight;
+    container.style.minHeight = oldHeight + 'px';
+
+    // Step 1: fade current content out
+    container.classList.add('events-content-leaving');
+
+    setTimeout(() => {
+        // Step 2: swap content
+        container.innerHTML = newHTML;
+        container.classList.remove('events-content-leaving');
+
+        // Step 3: animate height to new natural height
+        const newHeight = container.scrollHeight;
+        if (Math.abs(newHeight - oldHeight) > 10) {
+            container.style.transition = 'min-height 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)';
+            container.style.minHeight = newHeight + 'px';
+            container.addEventListener('transitionend', () => {
+                container.style.minHeight = '';
+                container.style.transition = '';
+            }, { once: true });
+        } else {
+            container.style.minHeight = '';
+        }
+
+        // Step 4: fade new content in
+        container.classList.add('events-content-entering');
+        requestAnimationFrame(() => {
+            container.classList.remove('events-content-entering');
+        });
+    }, 140);
 }
 
 function getCategoryLabel(cat) {
@@ -624,12 +776,15 @@ function getCategoryLabel(cat) {
     return labels[cat] || cat;
 }
 
+let _monthSlideDir = 0;
+
 function changeMonth(delta) {
+    _monthSlideDir = delta;
     currentMonth += delta;
     if (currentMonth > 11) { currentMonth = 0; currentYear++; }
     if (currentMonth < 0) { currentMonth = 11; currentYear--; }
     renderCalendar();
-    loadEvents();
+    loadEvents(false); // selected date unchanged — don't re-render the events panel
 }
 
 function goToToday() {
@@ -643,13 +798,14 @@ function goToToday() {
 
 function setCalendarFilter(filter) {
     calendarFilter = filter;
-    document.querySelectorAll('.filter-tab').forEach(tab => {
+    document.querySelectorAll('.cal-filter').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.filter === filter);
     });
+    renderCalendar();
     updateEventsForDate();
 }
 
-async function loadEvents() {
+async function loadEvents(updatePanel = true) {
     try {
         events = [];
 
@@ -674,6 +830,7 @@ async function loadEvents() {
 
         await loadCalDAVEvents(startStr, endStr);
 
+        await loadNexusCalendarEvents();
 
         await loadLocalCalendarEvents();
 
@@ -693,7 +850,7 @@ async function loadEvents() {
         });
 
         renderCalendar();
-        updateEventsForDate();
+        if (updatePanel) updateEventsForDate();
     } catch (err) {
         console.log('Calendar API not available:', err);
     }
@@ -856,6 +1013,36 @@ async function loadHolidaysFromDatabase() {
     }
 }
 
+async function loadNexusCalendarEvents() {
+    try {
+        const response = await fetch('/api/hub/school/calendar');
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!data.events) return;
+
+        const nexusEvents = data.events.map(e => ({
+            id: `nexus_${e.id}`,
+            _rawId: e.id,
+            title: e.title || 'Unbenannt',
+            start_date: e.date || '',
+            start_time: e.time || null,
+            end_date: e.end_date || e.date || '',
+            end_time: e.end_time || null,
+            location: e.location || '',
+            description: e.description || '',
+            all_day: !e.time,
+            category: e.category || 'personal',
+            source: 'nexus',
+            calendar: 'Nexus',
+            calendar_color: '#6c63ff'
+        })).filter(e => e.start_date);
+
+        events = events.concat(nexusEvents);
+    } catch (err) {
+        console.log('Nexus calendar not available:', err);
+    }
+}
+
 async function loadLocalCalendarEvents() {
     try {
         const response = await fetch('/api/calendar/local');
@@ -931,13 +1118,68 @@ function processLocalEvents(data) {
     events = events.concat(localEvents);
 }
 
+// Loaded calendar accounts for the "save to" selector
+let _calendarSelectorAccounts = null;
+
+async function populateCalendarSelector(preselect = null) {
+    const sel = document.getElementById('eventCalendarSource');
+    sel.innerHTML = '<option value="local">Nexus (Lokal)</option>';
+
+    if (!_calendarSelectorAccounts) {
+        _calendarSelectorAccounts = { google: [], caldav: [] };
+        try {
+            const r = await fetch('/api/email/google/accounts');
+            if (r.ok) {
+                const d = await r.json();
+                _calendarSelectorAccounts.google = d.accounts || [];
+            }
+        } catch (_) {}
+        try {
+            const r = await fetch('/api/calendar/caldav/accounts');
+            if (r.ok) {
+                const d = await r.json();
+                _calendarSelectorAccounts.caldav = d.accounts || [];
+            }
+        } catch (_) {}
+    }
+
+    if (_calendarSelectorAccounts.google.length > 0) {
+        const grp = document.createElement('optgroup');
+        grp.label = 'Google Kalender';
+        _calendarSelectorAccounts.google.forEach(acc => {
+            const o = document.createElement('option');
+            o.value = `google:primary:${acc.email}`;
+            o.textContent = `Google – ${acc.email}`;
+            grp.appendChild(o);
+        });
+        sel.appendChild(grp);
+    }
+
+    if (_calendarSelectorAccounts.caldav.length > 0) {
+        const grp = document.createElement('optgroup');
+        grp.label = 'CalDAV';
+        _calendarSelectorAccounts.caldav.forEach(acc => {
+            const calUrl = acc.calendars?.[0]?.url || '';
+            const o = document.createElement('option');
+            o.value = `caldav:${acc.id}:${calUrl}`;
+            o.textContent = acc.name || acc.username;
+            grp.appendChild(o);
+        });
+        sel.appendChild(grp);
+    }
+
+    if (preselect) sel.value = preselect;
+}
+
 function openAddEventModal() {
     document.getElementById('eventForm').reset();
     document.getElementById('eventId').value = '';
+    document.getElementById('eventSource').value = '';
     document.getElementById('eventCalendarId').value = 'primary';
     document.getElementById('eventModalTitle').textContent = 'Neuer Termin';
     document.getElementById('deleteEventBtn').style.display = 'none';
     document.getElementById('eventDate').value = formatLocalDate(selectedDate);
+    populateCalendarSelector('local');
     openModal('eventModal');
 }
 
@@ -951,11 +1193,20 @@ function openEditEventModal(eventId) {
     }
 
     if (ev.source === 'holiday' || ev.category === 'holiday') {
-        alert(`Feiertag: ${ev.title}\n\nDatum: ${ev.start_date}\n\nFeiertage können nicht bearbeitet werden.`);
+        showToast(`Feiertage können nicht bearbeitet werden.`, 'info');
         return;
     }
 
+    // Determine which calendar source to pre-select
+    let sourceValue = 'local';
+    if (ev.source === 'google') {
+        sourceValue = `google:${ev.calendar_id || 'primary'}:${ev.account || ''}`;
+    } else if (ev.source === 'caldav') {
+        sourceValue = `caldav:${ev.account_id || ''}:`;
+    }
+
     document.getElementById('eventId').value = ev.id;
+    document.getElementById('eventSource').value = ev.source || '';
     document.getElementById('eventCalendarId').value = ev.calendar_id || 'primary';
     document.getElementById('eventRecurringId').value = ev.recurring_event_id || '';
     document.getElementById('eventTitle').value = ev.title;
@@ -969,54 +1220,86 @@ function openEditEventModal(eventId) {
     document.getElementById('eventModalTitle').textContent = 'Termin bearbeiten';
     document.getElementById('deleteEventBtn').style.display = 'block';
 
+    populateCalendarSelector(sourceValue);
     openModal('eventModal');
 }
 
 function showIServEventInfo(ev) {
-    const timeDisplay = ev.start_time ? `${ev.start_time}${ev.end_time ? ' - ' + ev.end_time : ''}` : 'Ganztägig';
-    alert(`IServ Termin\n\n${ev.title}\n\nDatum: ${ev.start_date}\nUhrzeit: ${timeDisplay}${ev.location ? '\nOrt: ' + ev.location : ''}${ev.description ? '\n\nBeschreibung: ' + ev.description : ''}\n\nHinweis: IServ-Termine können nur in IServ bearbeitet werden.`);
+    const timeDisplay = ev.start_time ? `${ev.start_time}${ev.end_time ? ' – ' + ev.end_time : ''}` : 'Ganztägig';
+    showToast(`IServ: ${ev.title} – ${ev.start_date} ${timeDisplay} (nur in IServ bearbeitbar)`, 'info');
 }
 
 async function saveEvent(e) {
     e.preventDefault();
     const formData = new FormData(e.target);
     const eventId = formData.get('id');
-    const calendarId = formData.get('calendar_id') || 'primary';
-    const savedAccount = localStorage.getItem('nexus-google-calendar-account') || '';
-    const eventData = {
-        title: formData.get('title'),
-        date: formData.get('start_date'),
-        time: formData.get('start_time'),
-        end_date: formData.get('end_date'),
-        end_time: formData.get('end_time'),
-        category: formData.get('category'),
-        location: formData.get('location'),
-        description: formData.get('description'),
-        account: savedAccount,
-        calendar_id: calendarId
-    };
+    const source = document.getElementById('eventCalendarSource').value;
+
+    const title = formData.get('title');
+    const startDate = formData.get('start_date');
+    const startTime = formData.get('start_time') || null;
+    const endDate = formData.get('end_date') || null;
+    const endTime = formData.get('end_time') || null;
+    const category = formData.get('category');
+    const location = formData.get('location') || '';
+    const description = formData.get('description') || '';
+
+    let url, method, body;
+
+    if (source === 'local' || !source) {
+        // Save to Nexus local calendar — strip "nexus_" prefix for the API
+        const rawId = eventId ? eventId.replace(/^nexus_/, '') : null;
+        const isEdit = rawId && formData.get('event_source') === 'nexus';
+        url = isEdit ? `/api/hub/school/calendar/${rawId}` : '/api/hub/school/calendar';
+        method = isEdit ? 'PUT' : 'POST';
+        body = { title, date: startDate, time: startTime, end_date: endDate, end_time: endTime, category, description, location };
+
+    } else if (source.startsWith('google:')) {
+        const parts = source.split(':');
+        const calId = parts[1] || 'primary';
+        const account = parts.slice(2).join(':');
+        url = eventId ? `/api/calendar/events/${eventId}` : '/api/calendar/events';
+        method = eventId ? 'PUT' : 'POST';
+        body = { title, date: startDate, time: startTime, end_date: endDate, end_time: endTime, category, location, description, account, calendar_id: calId };
+
+    } else if (source.startsWith('caldav:')) {
+        const parts = source.split(':');
+        const accountId = parts[1];
+        const calUrl = parts.slice(2).join(':');
+        url = '/api/calendar/caldav/events';
+        method = 'POST';
+        body = { account_id: accountId, calendar_url: calUrl, title, start_date: startDate, start_time: startTime, end_date: endDate, end_time: endTime, description, location };
+    }
+
+    const saveBtn = e.target.querySelector('[type="submit"]');
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="btn-spinner"></span>Speichern…';
+    }
 
     try {
-        const url = eventId ? `/api/calendar/events/${eventId}` : '/api/calendar/events';
-        const method = eventId ? 'PUT' : 'POST';
         const response = await fetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(eventData)
+            body: JSON.stringify(body)
         });
-        if (response.ok) {
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok && (data.success !== false)) {
             closeModal('eventModal');
-            loadEvents();
+            _calendarSelectorAccounts = null; // Reset cache so next open is fresh
+            // Slight delay so modal exit animation plays before list reloads
+            setTimeout(() => {
+                loadEvents();
+                showToast('Termin gespeichert', 'success');
+            }, 220);
         } else {
-            cacheEventChange(eventId ? 'update' : 'create', eventData, eventId, calendarId);
-            alert('Änderung wird synchronisiert, sobald eine Verbindung besteht.');
-            closeModal('eventModal');
-            loadEvents();
+            showToast(data.error || `Fehler beim Speichern (${response.status})`, 'error');
         }
     } catch (err) {
-        cacheEventChange(eventId ? 'update' : 'create', eventData, eventId, calendarId);
-        alert('Keine Verbindung. Änderung wird lokal gespeichert.');
-        closeModal('eventModal');
+        showToast('Netzwerkfehler – bitte erneut versuchen', 'error');
+    } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = 'Speichern'; }
     }
 }
 
@@ -1034,7 +1317,7 @@ function deleteEvent() {
     if (isRecurring) {
         messageEl.textContent = 'Dies ist ein wiederkehrender Termin. Was möchtest du tun?';
         optionsDiv.innerHTML = `
-            <button class="btn-secondary" onclick="performDeleteEvent('${eventId}', '${calendarId}', false, '')">
+            <button class="btn-secondary" onclick="performDeleteEvent('${escapeHtml(String(eventId))}', '${escapeHtml(String(calendarId))}', false, '')">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                     <line x1="16" y1="2" x2="16" y2="6"></line>
@@ -1042,7 +1325,7 @@ function deleteEvent() {
                 </svg>
                 Nur dieses Mal löschen
             </button>
-            <button class="btn-secondary btn-danger" onclick="performDeleteEvent('${eventId}', '${calendarId}', true, '${recurringEventId}')">
+            <button class="btn-secondary btn-danger" onclick="performDeleteEvent('${escapeHtml(String(eventId))}', '${escapeHtml(String(calendarId))}', true, '${escapeHtml(String(recurringEventId))}')">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="3 6 5 6 21 6"></polyline>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -1054,7 +1337,7 @@ function deleteEvent() {
     } else {
         messageEl.textContent = 'Möchtest du diesen Termin wirklich löschen?';
         optionsDiv.innerHTML = `
-            <button class="btn-secondary btn-danger" onclick="performDeleteEvent('${eventId}', '${calendarId}', false, '')">
+            <button class="btn-secondary btn-danger" onclick="performDeleteEvent('${escapeHtml(String(eventId))}', '${escapeHtml(String(calendarId))}', false, '')">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="3 6 5 6 21 6"></polyline>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -1070,30 +1353,50 @@ function deleteEvent() {
 }
 
 async function performDeleteEvent(eventId, calendarId, deleteAll, recurringEventId) {
-    const savedAccount = localStorage.getItem('nexus-google-calendar-account') || '';
+    // Detect Nexus local events by ID or source
+    const ev = events.find(e => e.id === eventId);
+    const isNexus = ev && (ev.source === 'nexus' || (ev.source !== 'google' && ev.source !== 'caldav' && ev.source !== 'iserv' && ev.source !== 'holiday' && ev.source !== 'local' && !ev.source?.includes('iserv')));
 
-    let url = `/api/calendar/events/${eventId}?account=${encodeURIComponent(savedAccount)}&calendar_id=${encodeURIComponent(calendarId)}`;
+    // Nexus local events: strip the "nexus_" prefix added during load
+    const rawId = isNexus ? eventId.replace(/^nexus_/, '') : eventId;
 
-    if (deleteAll && recurringEventId) {
-        url += `&delete_all=true&recurring_event_id=${encodeURIComponent(recurringEventId)}`;
+    let url, method = 'DELETE';
+    if (isNexus) {
+        url = `/api/hub/school/calendar/${rawId}`;
+    } else {
+        const savedAccount = localStorage.getItem('nexus-google-calendar-account') || '';
+        url = `/api/calendar/events/${eventId}?account=${encodeURIComponent(savedAccount)}&calendar_id=${encodeURIComponent(calendarId)}`;
+        if (deleteAll && recurringEventId) {
+            url += `&delete_all=true&recurring_event_id=${encodeURIComponent(recurringEventId)}`;
+        }
+    }
+
+    // Animate the event card out before the API call
+    const card = document.querySelector(`.cal-event-card[data-event-id="${CSS.escape(eventId)}"]`);
+    if (card) {
+        card.classList.add('card-removing');
     }
 
     try {
-        const response = await fetch(url, { method: 'DELETE' });
+        const response = await fetch(url, { method });
         if (response.ok) {
             closeModal('deleteEventModal');
-            loadEvents();
-            showToast(deleteAll ? 'Alle Wiederholungen gelöscht' : 'Termin gelöscht', 'success');
+            setTimeout(() => {
+                // Optimistically remove from local array so the panel updates instantly
+                events = events.filter(e => String(e.id) !== String(eventId));
+                renderCalendar();        // refresh grid dots
+                updateEventsForDate();   // show empty state immediately if no events left
+                loadEvents(false);       // sync with server silently (no second panel update)
+                showToast(deleteAll ? 'Alle Wiederholungen gelöscht' : 'Termin gelöscht', 'success');
+            }, card ? 320 : 0);
         } else {
-            cacheEventChange('delete', { calendar_id: calendarId, delete_all: deleteAll }, eventId, calendarId);
-            showToast('Löschung wird synchronisiert, sobald eine Verbindung besteht.', 'info');
-            closeModal('deleteEventModal');
-            loadEvents();
+            if (card) card.classList.remove('card-removing');
+            const d = await response.json().catch(() => ({}));
+            showToast(d.error || 'Fehler beim Löschen', 'error');
         }
     } catch (err) {
-        cacheEventChange('delete', { calendar_id: calendarId, delete_all: deleteAll }, eventId, calendarId);
-        showToast('Keine Verbindung. Löschung wird lokal gespeichert.', 'info');
-        closeModal('deleteEventModal');
+        if (card) card.classList.remove('card-removing');
+        showToast('Netzwerkfehler – bitte erneut versuchen', 'error');
     }
 }
 
@@ -1104,32 +1407,35 @@ function showToast(message, type = 'info') {
     const toast = document.createElement('div');
     toast.className = `toast-notification toast-${type}`;
     toast.textContent = message;
-    toast.style.cssText = `
-        position: fixed;
-        bottom: 100px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: ${type === 'success' ? 'var(--success, #22c55e)' : type === 'error' ? 'var(--danger, #ef4444)' : 'var(--accent, #667eea)'};
-        color: white;
-        padding: 12px 24px;
-        border-radius: 8px;
-        font-weight: 500;
-        z-index: 10000;
-        animation: slideUp 0.3s ease-out;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    `;
     document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+
+    // Auto-dismiss with fade-out
+    const timer = setTimeout(() => {
+        toast.classList.add('toast-hiding');
+        toast.addEventListener('animationend', () => toast.remove(), { once: true });
+    }, 2800);
+
+    toast.addEventListener('click', () => {
+        clearTimeout(timer);
+        toast.classList.add('toast-hiding');
+        toast.addEventListener('animationend', () => toast.remove(), { once: true });
+    });
 }
 
 function openModal(id) {
-    document.getElementById(id).classList.add('active');
+    const modal = document.getElementById(id);
+    modal.classList.remove('modal-closing');
+    modal.classList.add('active');
 }
 
 function closeModal(id) {
-    document.getElementById(id).classList.remove('active');
+    const modal = document.getElementById(id);
+    if (!modal.classList.contains('active')) return;
+    modal.classList.add('modal-closing');
+    modal.addEventListener('animationend', () => {
+        modal.classList.remove('active', 'modal-closing');
+    }, { once: true });
 }
-
 
 let currentUserLocation = null;
 let currentRouteEvent = null;
@@ -1349,9 +1655,9 @@ function renderRouteResults(data) {
                 return `<div class="route-leg transit">
                     <span class="leg-icon">${productEmoji}</span>
                     <div class="leg-details">
-                        <div class="leg-line">${line.name || 'Linie'} ${delayBadge}</div>
-                        <div class="leg-stations">${leg.departure?.station || ''} → ${leg.arrival?.station || ''}</div>
-                        ${leg.departure?.platform ? `<div class="leg-platform">Gleis ${leg.departure.platform}</div>` : ''}
+                        <div class="leg-line">${escapeHtml(line.name || 'Linie')} ${delayBadge}</div>
+                        <div class="leg-stations">${escapeHtml(leg.departure?.station || '')} → ${escapeHtml(leg.arrival?.station || '')}</div>
+                        ${leg.departure?.platform ? `<div class="leg-platform">Gleis ${escapeHtml(String(leg.departure.platform))}</div>` : ''}
                     </div>
                 </div>`;
             }
@@ -1401,7 +1707,6 @@ function getProductEmoji(product) {
     return emojis[product] || '🚃';
 }
 
-
 function openAddCalendarAccountModal() {
     document.getElementById('addCalendarAccountForm').reset();
     document.getElementById('calAccountError').style.display = 'none';
@@ -1448,6 +1753,7 @@ async function addCalendarAccount(e) {
 
         if (result.success) {
             closeModal('addCalendarAccountModal');
+            _calendarSelectorAccounts = null; // Invalidate cache
             loadCalendarAccounts();
             loadEvents();
         } else {
@@ -1473,7 +1779,8 @@ async function loadCalendarAccounts() {
         { value: 'google', label: 'Google' },
         { value: 'iserv', label: 'IServ' },
         { value: 'holiday', label: 'Feiertage & Ferien' },
-        { value: 'local', label: 'Lokaler Kalender' }
+        { value: 'nexus', label: 'Nexus (Lokal)' },
+        { value: 'local', label: 'macOS Kalender' }
     ];
 
     sourceOptions.forEach(src => {
@@ -1554,80 +1861,317 @@ async function loadCalendarAccounts() {
 </script>
 
 <style>
-.calendar-layout {
-    display: grid;
-    grid-template-columns: 1fr 350px;
-    gap: 20px;
+/* ========== CALENDAR SOURCE SELECTOR ========== */
+#eventCalendarSource {
+    background: var(--bg-secondary);
+    border: 1.5px solid var(--accent);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    padding: 9px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    width: 100%;
+    cursor: pointer;
+}
+#eventCalendarSource optgroup {
+    color: var(--text-muted);
+    font-weight: 700;
+    font-size: 11px;
+}
+#eventCalendarSource option {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
 }
 
+/* ========== PAGE HEADER ========== */
+.cal-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--card-border);
+    position: relative;
+}
+.cal-page-header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 120px;
+    height: 2px;
+    background: var(--accent-gradient);
+    border-radius: 1px;
+}
+.cal-header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.cal-header-icon {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-gradient);
+    border-radius: var(--radius-sm);
+    color: white;
+    box-shadow: 0 4px 14px rgba(102, 126, 234, 0.3);
+}
+.cal-title {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+}
+.cal-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+/* ========== FILTER CHIPS ========== */
+.cal-filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+}
+.cal-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 18px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+.cal-filter:hover {
+    border-color: rgba(102, 126, 234, 0.3);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+.cal-filter.active {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.15));
+    border-color: rgba(102, 126, 234, 0.4);
+    color: var(--accent);
+    box-shadow: 0 2px 12px rgba(102, 126, 234, 0.15);
+}
+.cal-filter-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.cal-filter.active .cal-filter-dot {
+    box-shadow: 0 0 6px currentColor;
+}
+
+/* ========== LAYOUT ========== */
+.calendar-layout {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 20px;
+    align-items: start;
+}
 .calendar-widget {
     padding: 24px;
 }
-
 .events-widget {
-    padding: 20px;
-    max-height: 600px;
+    padding: 22px;
+    max-height: 650px;
     overflow-y: auto;
 }
+.events-widget::-webkit-scrollbar {
+    width: 4px;
+}
+.events-widget::-webkit-scrollbar-track {
+    background: transparent;
+}
+.events-widget::-webkit-scrollbar-thumb {
+    background: var(--card-border);
+    border-radius: 2px;
+}
 
-/* Calendar Day Cells with Event Previews */
+/* ========== MONTH NAVIGATION ========== */
+.cal-month-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 22px;
+}
+.cal-month-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.cal-nav-btn {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--card-border);
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+}
+.cal-nav-btn:hover {
+    background: var(--accent-gradient);
+    color: white;
+    border-color: transparent;
+    transform: scale(1.1);
+    box-shadow: 0 3px 12px rgba(102, 126, 234, 0.3);
+}
+.cal-nav-btn:active {
+    transform: scale(0.92);
+}
+.cal-month-label {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-primary);
+    min-width: 160px;
+    text-align: center;
+    letter-spacing: -0.3px;
+}
+.cal-today-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+.cal-today-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-light);
+}
+
+/* ========== WEEKDAY HEADERS ========== */
+.calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 6px;
+}
+.calendar-weekdays span {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    padding: 8px 0 6px;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid transparent;
+    transition: all var(--transition-fast);
+}
+.calendar-weekdays span.weekend {
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+.calendar-weekdays span.current-day {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+/* ========== DAY CELLS ========== */
 .calendar-days {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 4px;
 }
-
 .day-cell {
-    min-height: 80px;
-    padding: 4px;
+    min-height: 82px;
+    padding: 5px;
     background: var(--bg-tertiary);
-    border: 1px solid var(--card-border);
+    border: 1.5px solid var(--card-border);
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: all var(--transition-fast);
     display: flex;
     flex-direction: column;
+    position: relative;
 }
-
 .day-cell:hover {
     border-color: var(--accent);
     background: var(--bg-secondary);
+    transform: scale(1.03);
+    z-index: 2;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
-
 .day-cell.empty {
     background: transparent;
-    border: none;
+    border-color: transparent;
     cursor: default;
+    min-height: 0;
+}
+.day-cell.empty:hover {
+    transform: none;
+    box-shadow: none;
+}
+.day-cell.weekend {
+    background: color-mix(in srgb, var(--bg-tertiary) 80%, transparent);
+}
+.day-cell.weekend .day-number {
+    opacity: 0.6;
 }
 
+/* Today */
 .day-cell.today {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.12), rgba(118, 75, 162, 0.08));
     border-color: var(--accent);
-    background: var(--accent-light);
+    box-shadow: 0 0 0 1px var(--accent), 0 4px 20px rgba(102, 126, 234, 0.2);
 }
-
+.day-cell.today:hover {
+    box-shadow: 0 0 0 1px var(--accent), 0 6px 24px rgba(102, 126, 234, 0.3);
+}
 .day-cell.today .day-number {
-    background: var(--accent);
+    background: var(--accent-gradient);
     color: white;
     border-radius: 50%;
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    opacity: 1;
 }
 
+/* Selected */
 .day-cell.selected {
-    border: 2px solid var(--accent);
+    border-color: var(--accent);
     background: var(--accent-light);
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.25);
+}
+.day-cell.selected:not(.today) .day-number {
+    color: var(--accent);
+    font-weight: 700;
 }
 
 .day-number {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--text-primary);
-    margin-bottom: 4px;
+    margin-bottom: 3px;
+    line-height: 1;
 }
-
 .day-events {
     flex: 1;
     display: flex;
@@ -1635,27 +2179,51 @@ async function loadCalendarAccounts() {
     gap: 2px;
     overflow: hidden;
 }
-
 .event-preview {
-    font-size: 10px;
-    font-weight: 500;
+    font-size: 9px;
+    font-weight: 600;
     color: white;
-    padding: 2px 4px;
-    border-radius: 3px;
+    padding: 2px 5px;
+    border-radius: 4px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    line-height: 1.2;
+    line-height: 1.3;
+    letter-spacing: 0.1px;
 }
-
 .event-more {
     font-size: 10px;
     color: var(--text-muted);
-    font-weight: 500;
-    padding: 2px 4px;
+    font-weight: 600;
+    padding: 1px 5px;
 }
 
-.event-item {
+/* ========== EVENTS PANEL ========== */
+.cal-events-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--card-border);
+}
+.cal-events-date {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.3px;
+}
+.cal-events-badge {
+    padding: 4px 12px;
+    background: var(--accent-light);
+    color: var(--accent);
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Event Cards */
+.cal-event-card {
     display: flex;
     align-items: center;
     gap: 14px;
@@ -1663,87 +2231,195 @@ async function loadCalendarAccounts() {
     background: var(--bg-tertiary);
     border: 1px solid var(--card-border);
     border-radius: var(--radius-sm);
+    border-left: 4px solid var(--accent);
     cursor: pointer;
     margin-bottom: 10px;
     transition: all var(--transition-fast);
-    border-left: 4px solid var(--accent);
+    position: relative;
+    overflow: hidden;
+    animation: calEventSlideIn 0.3s ease both;
+}
+@keyframes calEventSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+.cal-event-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent-gradient);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+    z-index: 0;
+}
+.cal-event-card:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    border-color: transparent;
+}
+.cal-event-card:hover::before {
+    opacity: 1;
+}
+.cal-event-card:hover .cal-event-time,
+.cal-event-card:hover .cal-event-title,
+.cal-event-card:hover .cal-event-location,
+.cal-event-card:hover .cal-event-tag {
+    color: white;
+    position: relative;
+    z-index: 1;
+}
+.cal-event-card:hover .cal-event-location svg {
+    stroke: white;
+}
+.cal-event-card:hover .cal-route-btn {
+    position: relative;
+    z-index: 1;
+    background: rgba(255,255,255,0.2);
+    border-color: rgba(255,255,255,0.3);
+    color: white;
+}
+.cal-event-card:hover .cal-event-tag {
+    background: rgba(255,255,255,0.2) !important;
 }
 
-.event-item:hover {
-    border-color: var(--accent);
-}
+/* Category borders */
+.cal-event-card.category-school { border-left-color: #667eea; }
+.cal-event-card.category-training { border-left-color: #48bb78; }
+.cal-event-card.category-personal { border-left-color: #9f7aea; }
+.cal-event-card.category-work { border-left-color: #ed8936; }
+.cal-event-card.category-iserv { border-left-color: #3498db; }
+.cal-event-card.category-holiday { border-left-color: #e74c3c; }
 
-.event-item.category-school {
-    border-left-color: #667eea;
-}
-
-.event-item.category-training {
-    border-left-color: #48bb78;
-}
-
-.event-item.category-personal {
-    border-left-color: #9f7aea;
-}
-
-.event-item.category-work {
-    border-left-color: #ed8936;
-}
-
-.event-item.category-iserv {
-    border-left-color: #3498db;
-}
-
-.event-item.category-holiday {
-    border-left-color: #e74c3c;
-}
-
-.event-time {
+.cal-event-time {
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--accent);
-    min-width: 60px;
+    min-width: 58px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
 }
-
-.event-info {
+.cal-event-time.all-day {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+.cal-event-body {
     flex: 1;
+    min-width: 0;
+    position: relative;
+    z-index: 1;
 }
-
-.event-info .event-title {
+.cal-event-title {
     font-size: 14px;
     font-weight: 600;
     color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
-
-.event-location {
+.cal-event-location {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     font-size: 12px;
     color: var(--text-muted);
-    margin-top: 2px;
+    margin-top: 3px;
 }
-
-.event-count {
-    font-size: 13px;
-    color: var(--text-muted);
+.cal-event-location svg {
+    flex-shrink: 0;
+    stroke: var(--text-muted);
+    transition: stroke var(--transition-fast);
 }
-
-.event-actions {
+.cal-event-meta {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
 }
-
-.btn-route {
-    padding: 6px;
+.cal-route-btn {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: var(--accent-light);
-    border: 1px solid var(--accent);
-    border-radius: var(--radius-xs);
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    border-radius: 50%;
     cursor: pointer;
     color: var(--accent);
     transition: all var(--transition-fast);
 }
-
-.btn-route:hover {
+.cal-route-btn:hover {
     background: var(--accent);
     color: white;
+    transform: scale(1.1);
+    box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
+}
+.cal-event-tag {
+    padding: 3px 10px;
+    background: color-mix(in srgb, var(--tag-color, var(--accent)) 12%, transparent);
+    color: var(--tag-color, var(--accent));
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: all var(--transition-fast);
+}
+
+/* Empty State */
+.cal-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 20px;
+    gap: 12px;
+    text-align: center;
+}
+.cal-empty-icon {
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-light);
+    border-radius: 50%;
+    color: var(--accent);
+    opacity: 0.6;
+}
+.cal-empty-state span {
+    font-size: 14px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 900px) {
+    .calendar-layout {
+        grid-template-columns: 1fr;
+    }
+    .cal-page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 14px;
+    }
+    .day-cell {
+        min-height: 60px;
+        padding: 3px;
+    }
+    .event-preview {
+        font-size: 8px;
+        padding: 1px 3px;
+    }
 }
 
 /* Route Modal Styles */
@@ -2085,15 +2761,208 @@ async function loadCalendarAccounts() {
     flex-shrink: 0;
 }
 
+/* ========== CALENDAR GRID: FIXED HEIGHT (always 6 rows × 82px) ========== */
+/* Every cell — empty or not — is exactly 82px. Using height+max-height (not just
+   min-height) so that nothing can collapse or expand the row, ever. */
+.calendar-days {
+    grid-auto-rows: 82px;
+}
+.day-cell {
+    height: 82px !important;
+    max-height: 82px !important;
+    min-height: unset !important;
+    overflow: hidden;
+}
+/* Keep empty/filler cells invisible but still full-height */
+.day-cell.empty {
+    height: 82px !important;
+    min-height: unset !important;
+}
+.day-cell.filler {
+    background: transparent !important;
+    border-color: transparent !important;
+    cursor: default !important;
+    pointer-events: none;
+}
+
+/* ========== MONTH FADE ANIMATIONS (no translateX = no layout shift ever) ========== */
+@keyframes monthFadeOut {
+    from { opacity: 1; transform: scale(1); }
+    to   { opacity: 0; transform: scale(0.97); }
+}
+@keyframes monthFadeIn {
+    from { opacity: 0; transform: scale(1.02); }
+    to   { opacity: 1; transform: scale(1); }
+}
+/* Use same keyframes for left/right — direction is conveyed by the month label */
+.calendar-days.slide-out-left,
+.calendar-days.slide-out-right  { animation: monthFadeOut 0.16s ease-in both; }
+.calendar-days.slide-in-from-right,
+.calendar-days.slide-in-from-left { animation: monthFadeIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* ========== MONTH LABEL TRANSITION ========== */
+@keyframes monthLabelOutLeft  { from { opacity:1; transform:translateX(0);    } to { opacity:0; transform:translateX(-14px); } }
+@keyframes monthLabelOutRight { from { opacity:1; transform:translateX(0);    } to { opacity:0; transform:translateX(14px);  } }
+@keyframes monthLabelInRight  { from { opacity:0; transform:translateX(14px); } to { opacity:1; transform:translateX(0);     } }
+@keyframes monthLabelInLeft   { from { opacity:0; transform:translateX(-14px);} to { opacity:1; transform:translateX(0);     } }
+.cal-month-label { transition: none; }
+.cal-month-label.month-label-changing-fwd { animation: monthLabelOutLeft  0.12s ease-in both; }
+.cal-month-label.month-label-changing-bwd { animation: monthLabelOutRight 0.12s ease-in both; }
+.cal-month-label.month-label-appear-fwd   { animation: monthLabelInRight  0.18s ease-out both; }
+.cal-month-label.month-label-appear-bwd   { animation: monthLabelInLeft   0.18s ease-out both; }
+
+/* ========== DAY CELL PULSE ON SELECT ========== */
+@keyframes dayPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.5); }
+    60%  { box-shadow: 0 0 0 8px rgba(102, 126, 234, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0); }
+}
+.day-cell.day-pulse {
+    animation: dayPulse 0.45s ease-out forwards;
+}
+
+/* ========== MODAL CLOSE ANIMATION ========== */
+@keyframes modalContentClose {
+    from { transform: scale(1);    opacity: 1; }
+    to   { transform: scale(0.88) translateY(20px); opacity: 0; }
+}
+@keyframes modalBackdropClose {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+}
+.modal.modal-closing {
+    animation: modalBackdropClose 0.24s ease-in forwards;
+    pointer-events: none;
+}
+.modal.modal-closing .modal-content {
+    animation: modalContentClose 0.24s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* ========== EVENT CARD DELETE ANIMATION ========== */
+@keyframes cardSlideOut {
+    0%   { opacity: 1; transform: translateX(0); max-height: 100px; margin-bottom: 10px; padding-top: 14px; padding-bottom: 14px; }
+    40%  { opacity: 0.4; transform: translateX(24px); }
+    100% { opacity: 0; transform: translateX(40px); max-height: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; }
+}
+.cal-event-card.card-removing {
+    animation: cardSlideOut 0.32s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+/* ========== SAVE BUTTON SPINNER ========== */
+.btn-spinner {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    border: 2px solid rgba(255,255,255,0.35);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.65s linear infinite;
+    margin-right: 7px;
+    vertical-align: middle;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ========== TOAST NOTIFICATION ========== */
 @keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translate(-50%, 20px);
-    }
-    to {
-        opacity: 1;
-        transform: translate(-50%, 0);
-    }
+    from { opacity: 0; transform: translate(-50%, 20px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes slideDown {
+    from { opacity: 1; transform: translate(-50%, 0); }
+    to   { opacity: 0; transform: translate(-50%, 12px); }
+}
+.toast-notification {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    padding: 12px 22px;
+    border-radius: 10px;
+    font-weight: 500;
+    font-size: 14px;
+    z-index: 10000;
+    animation: slideUp 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    cursor: pointer;
+    white-space: nowrap;
+    max-width: 90vw;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+.toast-notification.toast-hiding {
+    animation: slideDown 0.22s ease-in forwards;
+}
+.toast-success { background: linear-gradient(135deg, #22c55e, #16a34a); }
+.toast-error   { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.toast-info    { background: linear-gradient(135deg, #667eea, #764ba2); }
+
+/* ========== EVENT CARD STAGGER (refined) ========== */
+.cal-event-card {
+    animation: calEventSlideIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes calEventSlideIn {
+    from { opacity: 0; transform: translateY(12px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ========== EMPTY STATE ENTRANCE ========== */
+@keyframes emptyStateIn {
+    0%   { opacity: 0; transform: scale(0.88) translateY(16px); }
+    70%  { transform: scale(1.03) translateY(-3px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.cal-empty-state {
+    animation: emptyStateIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* ========== EVENT PANEL CONTENT CROSS-FADE ========== */
+.events-content-leaving {
+    opacity: 0;
+    transform: translateY(5px) scale(0.98);
+    transition: opacity 0.13s ease-in, transform 0.13s ease-in;
+}
+.events-content-entering {
+    opacity: 0;
+    transform: translateY(-6px);
+}
+#eventsList {
+    transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+}
+
+/* ========== PANEL HEADER CROSS-FADE ========== */
+@keyframes headerFadeOut {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(-6px); }
+}
+@keyframes headerFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.panel-header-updating { animation: headerFadeOut 0.1s ease-in both; }
+.panel-header-updated  { animation: headerFadeIn  0.18s ease-out both; }
+
+/* ========== BADGE POP ========== */
+@keyframes badgePop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.25); }
+    100% { transform: scale(1); }
+}
+.badge-pop { animation: badgePop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* ========== EVENT DOT ENTRANCE IN MONTH GRID ========== */
+@keyframes dotPop {
+    0%   { opacity: 0; transform: scaleX(0.4); }
+    60%  { transform: scaleX(1.08); }
+    100% { opacity: 1; transform: scaleX(1); }
+}
+.event-preview {
+    animation: dotPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    transform-origin: left center;
 }
 </style>
 {% endblock %}

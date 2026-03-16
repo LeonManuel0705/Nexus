@@ -8,6 +8,10 @@ class IServService {
   bool get isConnected => false;
   String? get iservUrl => null;
 
+  String get apiLog => '';
+  String get discoveryLog => '';
+  void clearApiLog() {}
+
   Future<Map<String, dynamic>> connect({
     required String username,
     required String password,
@@ -38,7 +42,7 @@ class IServService {
 
   Future<List<IServExercise>> getExercises() async => [];
 
-  Future<List<IServEvent>> getEvents() async => [];
+  Future<List<IServEvent>> getEvents({int? userGrade}) async => [];
 
   Future<List<IServNotification>> getCachedNotifications() async => [];
 

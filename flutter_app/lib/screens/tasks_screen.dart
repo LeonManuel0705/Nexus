@@ -1,9 +1,15 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/app_provider.dart';
 import '../models/task.dart';
 import '../theme.dart';
+import '../widgets/page_fade_in.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/animated_list_item.dart';
+import '../widgets/swipe_to_dismiss.dart';
 
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
@@ -52,8 +58,6 @@ class _TasksScreenState extends State<TasksScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Consumer<AppProvider>(
       builder: (context, provider, child) {
         final filteredTasks = _filterTasks(provider.tasks);
@@ -62,42 +66,36 @@ class _TasksScreenState extends State<TasksScreen> {
         final normalPriority = filteredTasks.where((t) => t.priority == 'medium').toList();
         final lowPriority = filteredTasks.where((t) => t.priority == 'low').toList();
 
-        return RefreshIndicator(
+        return PageFadeIn(
+          child: RefreshIndicator(
           onRefresh: provider.refresh,
           child: CustomScrollView(
             slivers: [
 
+              // Screen header with gradient text + add button
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Aufgaben',
-                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Verwalte deine To-Dos',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      FilledButton.icon(
-                        onPressed: () => showAddTaskDialog(context),
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Neue Aufgabe'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: NexusTheme.primaryColor,
+                      NexusTheme.gradientText('Aufgaben', fontSize: 36),
+                      GestureDetector(
+                        onTap: () => showAddTaskDialog(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4F46E5),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.add, color: Colors.white, size: 18),
+                              SizedBox(width: 6),
+                              Text('Neu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -105,19 +103,25 @@ class _TasksScreenState extends State<TasksScreen> {
                 ),
               ),
 
+              // Filter chips
               SliverToBoxAdapter(
-                child: Container(
-                  height: 44,
-                  margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  child: ListView(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
-                    children: [
-                      _buildFilterChip('today', 'Heute'),
-                      _buildFilterChip('week', 'Diese Woche'),
-                      _buildFilterChip('later', 'Später'),
-                      _buildFilterChip('all', 'Alle'),
-                      _buildFilterChip('completed', 'Erledigt'),
-                    ],
+                    child: Row(
+                      children: [
+                        _buildFilterChip('today', 'Heute'),
+                        const SizedBox(width: 8),
+                        _buildFilterChip('week', 'Diese Woche'),
+                        const SizedBox(width: 8),
+                        _buildFilterChip('later', 'Später'),
+                        const SizedBox(width: 8),
+                        _buildFilterChip('all', 'Alle'),
+                        const SizedBox(width: 8),
+                        _buildFilterChip('completed', 'Erledigt'),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -137,10 +141,11 @@ class _TasksScreenState extends State<TasksScreen> {
               ],
 
               const SliverPadding(
-                padding: EdgeInsets.only(bottom: 100),
+                padding: EdgeInsets.only(bottom: 120),
                 sliver: SliverToBoxAdapter(child: SizedBox()),
               ),
             ],
+          ),
           ),
         );
       },
@@ -149,17 +154,24 @@ class _TasksScreenState extends State<TasksScreen> {
 
   Widget _buildFilterChip(String filter, String label) {
     final isSelected = _currentFilter == filter;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label),
-        selected: isSelected,
-        onSelected: (_) => setState(() => _currentFilter = filter),
-        selectedColor: NexusTheme.primaryColor.withOpacity(0.2),
-        checkmarkColor: NexusTheme.primaryColor,
-        labelStyle: TextStyle(
-          color: isSelected ? NexusTheme.primaryColor : null,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+    return GestureDetector(
+      onTap: () => setState(() => _currentFilter = filter),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF4F46E5) : Colors.transparent,
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 200),
+          style: TextStyle(
+            color: isSelected ? Colors.white : const Color(0xFF71717A),
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 14,
+          ),
+          child: Text(label),
         ),
       ),
     );
@@ -183,7 +195,7 @@ class _TasksScreenState extends State<TasksScreen> {
             Icon(
               Icons.task_alt,
               size: 64,
-              color: NexusTheme.primaryColor.withOpacity(0.5),
+              color: NexusTheme.primaryColor.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -212,27 +224,78 @@ class _TasksScreenState extends State<TasksScreen> {
   ) {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Group header
             Padding(
-              padding: const EdgeInsets.only(bottom: 8, left: 4),
-              child: Text(
-                title,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${tasks.length}',
+                      style: TextStyle(
+                        color: color,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            ...tasks.map((task) => _TaskListItem(
-              task: task,
-              onToggle: () => provider.toggleTaskComplete(task.id),
-              onDelete: () => provider.deleteTask(task.id),
-              onEdit: () => _showEditTaskDialog(context, task),
-            )),
+            // Task items wrapped in GlassCard
+            GlassCard(
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 0),
+              borderRadius: 20,
+              enableTapScale: false,
+              child: Column(
+                children: List.generate(tasks.length, (i) {
+                  final task = tasks[i];
+                  return AnimatedListItem(
+                    index: i,
+                    child: SwipeToDismissWidget(
+                      onDismiss: () => provider.deleteTask(task.id),
+                      confirmTitle: 'Aufgabe löschen?',
+                      confirmMessage: 'Möchtest du diese Aufgabe wirklich löschen?',
+                      confirmLabel: 'Löschen',
+                      cancelLabel: 'Abbrechen',
+                      child: _TaskListItem(
+                        task: task,
+                        onToggle: () => provider.toggleTaskComplete(task.id),
+                        onDelete: () => provider.deleteTask(task.id),
+                        onEdit: () => _showEditTaskDialog(context, task),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
           ],
         ),
       ),
@@ -260,17 +323,6 @@ class _TaskListItem extends StatelessWidget {
     required this.onEdit,
   });
 
-  Color get priorityColor {
-    switch (task.priority) {
-      case 'high':
-        return NexusTheme.danger;
-      case 'medium':
-        return NexusTheme.warning;
-      default:
-        return NexusTheme.success;
-    }
-  }
-
   Color get categoryColor {
     switch (task.category) {
       case 'school':
@@ -286,141 +338,216 @@ class _TaskListItem extends StatelessWidget {
     }
   }
 
+  Widget _buildPriorityBadge() {
+    String label;
+    Color bgColor;
+    Color textColor;
+
+    switch (task.priority) {
+      case 'high':
+        label = 'Hoch';
+        bgColor = const Color(0xFFFEE2E2);
+        textColor = const Color(0xFFE11D48);
+        break;
+      case 'medium':
+        label = 'Mittel';
+        bgColor = const Color(0xFFFEF3C7); // amber-100
+        textColor = const Color(0xFFD97706); // amber-600
+        break;
+      default:
+        label = 'Niedrig';
+        bgColor = const Color(0xFFD1FAE5); // emerald-100
+        textColor = const Color(0xFF059669); // emerald-600
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: textColor,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isOverdue = task.dueDate != null &&
-        task.dueDate!.isBefore(DateTime.now()) &&
-        !task.completed;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = task.dueDate != null
+        ? DateTime(task.dueDate!.year, task.dueDate!.month, task.dueDate!.day)
+        : null;
+    final isOverdue = !task.completed && dueDay != null && dueDay.isBefore(today);
 
-    return Dismissible(
-      key: Key(task.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: NexusTheme.danger,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Icon(Icons.delete, color: Colors.white),
-      ),
-      onDismissed: (_) => onDelete(),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder,
-          ),
-        ),
-        child: InkWell(
-          onTap: onEdit,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
+    final double itemOpacity = task.completed ? 0.6 : 1.0;
 
-                GestureDetector(
-                  onTap: onToggle,
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: task.completed ? NexusTheme.success : Colors.transparent,
-                      border: Border.all(
-                        color: task.completed ? NexusTheme.success : priorityColor,
-                        width: 2,
-                      ),
-                    ),
-                    child: task.completed
-                        ? const Icon(Icons.check, size: 16, color: Colors.white)
-                        : null,
-                  ),
+    return Opacity(
+      opacity: itemOpacity,
+      child: InkWell(
+        onTap: onEdit,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              // Check toggle - circle/checkCircle icon
+              GestureDetector(
+                onTap: onToggle,
+                child: Icon(
+                  task.completed ? Icons.check_circle : Icons.circle_outlined,
+                  color: task.completed
+                      ? const Color(0xFF10B981) // emerald-500
+                      : (isDark ? const Color(0xFF71717A) : const Color(0xFFA1A1AA)),
+                  size: 26,
                 ),
-                const SizedBox(width: 12),
+              ),
+              const SizedBox(width: 12),
 
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        task.title,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                          decoration: task.completed ? TextDecoration.lineThrough : null,
-                          color: task.completed
-                              ? (isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted)
-                              : null,
-                        ),
-                      ),
-                      if (task.description != null && task.description!.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          task.description!,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          if (task.dueDate != null) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: isOverdue
-                                    ? NexusTheme.danger.withOpacity(0.1)
-                                    : (isDark ? NexusTheme.darkSurface : NexusTheme.lightSurface),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                _formatDueDate(task.dueDate!),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                  color: isOverdue ? NexusTheme.danger : null,
-                                ),
-                              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            task.title,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              decoration: task.completed ? TextDecoration.lineThrough : null,
+                              color: task.completed
+                                  ? (isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted)
+                                  : null,
                             ),
-                            const SizedBox(width: 8),
-                          ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildPriorityBadge(),
+                      ],
+                    ),
+                    if (task.description != null && task.description!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        task.description!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                          decoration: task.completed ? TextDecoration.lineThrough : null,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        if (task.dueDate != null) ...[
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: categoryColor.withOpacity(0.1),
+                              color: isOverdue
+                                  ? NexusTheme.danger.withValues(alpha: 0.1)
+                                  : (isDark ? NexusTheme.darkSurface : NexusTheme.lightSurface),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              Task.categories[task.category] ?? task.category,
+                              _formatDueDate(task.dueDate!),
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w500,
-                                color: categoryColor,
+                                color: isOverdue ? NexusTheme.danger : null,
                               ),
                             ),
                           ),
+                          const SizedBox(width: 8),
                         ],
-                      ),
-                    ],
-                  ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: categoryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            Task.categories[task.category] ?? task.category,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: categoryColor,
+                            ),
+                          ),
+                        ),
+                        if (task.estimatedMinutes != null) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: NexusTheme.info.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.timer_outlined, size: 12, color: NexusTheme.info),
+                                const SizedBox(width: 3),
+                                Text(
+                                  Task.timeEstimates[task.estimatedMinutes] ?? '${task.estimatedMinutes} Min',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    color: NexusTheme.info,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        if (task.repeatType != null) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: NexusTheme.secondaryColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.repeat, size: 12, color: NexusTheme.secondaryColor),
+                                const SizedBox(width: 3),
+                                Text(
+                                  Task.repeatTypes[task.repeatType] ?? task.repeatType!,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    color: NexusTheme.secondaryColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
                 ),
+              ),
 
-                Icon(
-                  Icons.chevron_right,
-                  color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
-                ),
-              ],
-            ),
+              Icon(
+                Icons.chevron_right,
+                color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+              ),
+            ],
           ),
         ),
       ),
@@ -460,6 +587,10 @@ class _TaskDialogState extends State<_TaskDialog> {
   DateTime? _dueDate;
   String _priority = 'medium';
   String _category = 'general';
+  int? _estimatedMinutes;
+  String? _repeatType;
+  List<int> _repeatWeekdays = [];
+  DateTime? _repeatEndDate;
 
   @override
   void initState() {
@@ -469,6 +600,10 @@ class _TaskDialogState extends State<_TaskDialog> {
     _dueDate = widget.task?.dueDate;
     _priority = widget.task?.priority ?? 'medium';
     _category = widget.task?.category ?? 'general';
+    _estimatedMinutes = widget.task?.estimatedMinutes;
+    _repeatType = widget.task?.repeatType;
+    _repeatWeekdays = List<int>.from(widget.task?.repeatWeekdays ?? []);
+    _repeatEndDate = widget.task?.repeatEndDate;
   }
 
   @override
@@ -482,7 +617,9 @@ class _TaskDialogState extends State<_TaskDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(widget.task != null ? 'Aufgabe bearbeiten' : 'Neue Aufgabe'),
-      content: SingleChildScrollView(
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -544,8 +681,114 @@ class _TaskDialogState extends State<_TaskDialog> {
               ).toList(),
               onChanged: (value) => setState(() => _category = value!),
             ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<int?>(
+              value: _estimatedMinutes,
+              decoration: const InputDecoration(
+                labelText: 'Geschätzte Dauer (optional)',
+                prefixIcon: Icon(Icons.timer_outlined),
+              ),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('Keine Angabe')),
+                ...Task.timeEstimates.entries.map((e) =>
+                  DropdownMenuItem(value: e.key, child: Text(e.value))
+                ),
+              ],
+              onChanged: (value) => setState(() => _estimatedMinutes = value),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String?>(
+              value: _repeatType,
+              decoration: const InputDecoration(
+                labelText: 'Wiederholung',
+                prefixIcon: Icon(Icons.repeat),
+              ),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('Keine')),
+                ...Task.repeatTypes.entries.map((e) =>
+                  DropdownMenuItem(value: e.key, child: Text(e.value))
+                ),
+              ],
+              onChanged: (value) => setState(() {
+                _repeatType = value;
+                if (value != 'custom') _repeatWeekdays = [];
+              }),
+            ),
+            if (_repeatType == 'custom') ...[
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Wochentage',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(7, (index) {
+                  final day = index + 1;
+                  final selected = _repeatWeekdays.contains(day);
+                  return GestureDetector(
+                    onTap: () => setState(() {
+                      if (selected) {
+                        _repeatWeekdays.remove(day);
+                      } else {
+                        _repeatWeekdays.add(day);
+                        _repeatWeekdays.sort();
+                      }
+                    }),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: selected
+                            ? NexusTheme.primaryColor
+                            : NexusTheme.primaryColor.withValues(alpha: 0.08),
+                        border: Border.all(
+                          color: selected
+                              ? NexusTheme.primaryColor
+                              : NexusTheme.primaryColor.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        Task.weekdayLabels[index],
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: selected ? Colors.white : NexusTheme.primaryColor,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ],
+            if (_repeatType != null) ...[
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.event_busy_outlined),
+                title: Text(_repeatEndDate != null
+                    ? 'Endet am ${DateFormat('dd.MM.yyyy').format(_repeatEndDate!)}'
+                    : 'Enddatum (optional)'),
+                trailing: _repeatEndDate != null
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => setState(() => _repeatEndDate = null),
+                      )
+                    : null,
+                onTap: _selectRepeatEndDate,
+              ),
+            ],
           ],
         ),
+      ),
       ),
       actions: [
         if (widget.task != null)
@@ -591,6 +834,18 @@ class _TaskDialogState extends State<_TaskDialog> {
     }
   }
 
+  Future<void> _selectRepeatEndDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _repeatEndDate ?? DateTime.now().add(const Duration(days: 30)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 10)),
+    );
+    if (date != null && mounted) {
+      setState(() => _repeatEndDate = date);
+    }
+  }
+
   void _save() {
     if (_titleController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -599,7 +854,19 @@ class _TaskDialogState extends State<_TaskDialog> {
       return;
     }
 
+    if (_dueDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bitte Datum und Uhrzeit angeben')),
+      );
+      return;
+    }
+
     final provider = context.read<AppProvider>();
+
+    final repeatWeekdays = _repeatType == 'custom' && _repeatWeekdays.isNotEmpty
+        ? _repeatWeekdays
+        : null;
+    final repeatEndDate = _repeatType != null ? _repeatEndDate : null;
 
     if (widget.task != null) {
       provider.updateTask(widget.task!.copyWith(
@@ -610,6 +877,10 @@ class _TaskDialogState extends State<_TaskDialog> {
         dueDate: _dueDate,
         priority: _priority,
         category: _category,
+        estimatedMinutes: _estimatedMinutes,
+        repeatType: _repeatType,
+        repeatWeekdays: repeatWeekdays,
+        repeatEndDate: repeatEndDate,
       ));
     } else {
       provider.addTask(
@@ -620,6 +891,10 @@ class _TaskDialogState extends State<_TaskDialog> {
         dueDate: _dueDate,
         priority: _priority,
         category: _category,
+        estimatedMinutes: _estimatedMinutes,
+        repeatType: _repeatType,
+        repeatWeekdays: repeatWeekdays,
+        repeatEndDate: repeatEndDate,
       );
     }
 

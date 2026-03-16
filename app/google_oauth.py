@@ -1,15 +1,19 @@
 import os
 import json
 import base64
+import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from pathlib import Path
 
 from dotenv import load_dotenv
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
+
+from .crypto_utils import encrypt_file, decrypt_file
 
 try:
     from google.oauth2.credentials import Credentials
@@ -22,8 +26,8 @@ except ImportError:
 
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
-CREDENTIALS_FILE = os.path.join(DATA_DIR, "google_credentials.json")
-TOKENS_FILE = os.path.join(DATA_DIR, "google_tokens.json")
+CREDENTIALS_FILE = Path(DATA_DIR) / "google_credentials.json"
+TOKENS_FILE = Path(DATA_DIR) / "google_tokens.json"
 
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
 GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET')
@@ -40,7 +44,7 @@ def is_google_oauth_configured() -> bool:
 
     if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
         return GOOGLE_API_AVAILABLE
-    return GOOGLE_API_AVAILABLE and os.path.exists(CREDENTIALS_FILE)
+    return GOOGLE_API_AVAILABLE and CREDENTIALS_FILE.exists()
 
 def get_oauth_status() -> Dict:
 
@@ -52,7 +56,7 @@ def get_oauth_status() -> Dict:
         }
 
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        if not os.path.exists(CREDENTIALS_FILE):
+        if not CREDENTIALS_FILE.exists():
             return {
                 "configured": False,
                 "authenticated": False,
@@ -70,22 +74,18 @@ def get_oauth_status() -> Dict:
 
 def load_tokens() -> Dict:
 
-    if not os.path.exists(TOKENS_FILE):
-        return {}
     try:
-        with open(TOKENS_FILE, 'r') as f:
-            return json.load(f)
-    except:
+        data = decrypt_file(TOKENS_FILE)
+        return data if data else {}
+    except Exception:
         return {}
 
 def save_tokens(tokens: Dict) -> bool:
 
-    os.makedirs(DATA_DIR, exist_ok=True)
     try:
-        with open(TOKENS_FILE, 'w') as f:
-            json.dump(tokens, f, indent=2)
+        encrypt_file(tokens, TOKENS_FILE)
         return True
-    except:
+    except Exception:
         return False
 
 def get_credentials(email: str) -> Optional[Credentials]:
@@ -99,9 +99,9 @@ def get_credentials(email: str) -> Optional[Credentials]:
     creds = Credentials(
         token=token_data.get('token'),
         refresh_token=token_data.get('refresh_token'),
-        token_uri=token_data.get('token_uri'),
-        client_id=token_data.get('client_id'),
-        client_secret=token_data.get('client_secret'),
+        token_uri='https://oauth2.googleapis.com/token',
+        client_id=GOOGLE_CLIENT_ID or token_data.get('client_id'),
+        client_secret=GOOGLE_CLIENT_SECRET or token_data.get('client_secret'),
         scopes=SCOPES
     )
 
@@ -140,22 +140,20 @@ def _get_oauth_client_config() -> Dict:
             }
         }
 
-    if os.path.exists(CREDENTIALS_FILE):
-        with open(CREDENTIALS_FILE, 'r') as f:
-            creds_data = json.load(f)
-
-            if "installed" in creds_data:
-                installed = creds_data["installed"]
-                return {
-                    "web": {
-                        "client_id": installed["client_id"],
-                        "client_secret": installed["client_secret"],
-                        "auth_uri": installed.get("auth_uri", "https://accounts.google.com/o/oauth2/auth"),
-                        "token_uri": installed.get("token_uri", "https://oauth2.googleapis.com/token"),
-                        "redirect_uris": [GOOGLE_REDIRECT_URI]
-                    }
+    creds_data = decrypt_file(CREDENTIALS_FILE)
+    if creds_data:
+        if "installed" in creds_data:
+            installed = creds_data["installed"]
+            return {
+                "web": {
+                    "client_id": installed["client_id"],
+                    "client_secret": installed["client_secret"],
+                    "auth_uri": installed.get("auth_uri", "https://accounts.google.com/o/oauth2/auth"),
+                    "token_uri": installed.get("token_uri", "https://oauth2.googleapis.com/token"),
+                    "redirect_uris": [GOOGLE_REDIRECT_URI]
                 }
-            return creds_data
+            }
+        return creds_data
 
     return None
 
@@ -187,7 +185,8 @@ def start_oauth_flow() -> Dict:
             "message": "Open this URL in your browser and authorize access"
         }
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logging.error(f"Google OAuth flow error: {e}")
+        return {"success": False, "error": "Failed to start Google sign-in"}
 
 def complete_oauth_flow(auth_code: str) -> Dict:
 
@@ -232,7 +231,8 @@ def complete_oauth_flow(auth_code: str) -> Dict:
         }
 
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logging.error(f"Google OAuth completion error: {e}")
+        return {"success": False, "error": "Failed to complete Google sign-in"}
 
 def remove_google_account(email: str) -> bool:
 
@@ -308,7 +308,8 @@ def fetch_gmail_messages(email: str, max_results: int = 20) -> Dict:
         return {"success": True, "emails": emails}
 
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logging.error(f"Gmail fetch error: {e}")
+        return {"success": False, "error": "Failed to fetch emails"}
 
 def get_gmail_message_detail(email: str, msg_id: str) -> Dict:
 
@@ -382,7 +383,8 @@ def get_gmail_message_detail(email: str, msg_id: str) -> Dict:
         }
 
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logging.error(f"Gmail message detail error: {e}")
+        return {"success": False, "error": "Failed to fetch email details"}
 
 def send_gmail(from_email: str, to_email: str, subject: str, body: str) -> Dict:
 
@@ -392,6 +394,9 @@ def send_gmail(from_email: str, to_email: str, subject: str, body: str) -> Dict:
 
     try:
         service = build('gmail', 'v1', credentials=creds)
+
+        to_email = to_email.replace('\r', '').replace('\n', '')
+        subject = subject.replace('\r', '').replace('\n', '')
 
         message = MIMEMultipart()
         message['To'] = to_email
@@ -408,7 +413,8 @@ def send_gmail(from_email: str, to_email: str, subject: str, body: str) -> Dict:
         return {"success": True, "message": "Email sent successfully"}
 
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logging.error(f"Gmail send error: {e}")
+        return {"success": False, "error": "Failed to send email"}
 
 def fetch_google_calendar_events(days_ahead: int = 30, account_email: str = None,
                                   start_date: str = None, end_date: str = None) -> Dict:
@@ -528,10 +534,11 @@ def fetch_google_calendar_events(days_ahead: int = 30, account_email: str = None
                 "message": "Calendar access not granted. Please sign out and sign in again to grant calendar permission.",
                 "events": []
             }
+        logging.error(f"Google Calendar error: {error_msg}")
         return {
             "success": False,
             "error": "api_error",
-            "message": f"Could not fetch calendar: {error_msg}",
+            "message": "Failed to fetch calendar events",
             "events": []
         }
 
@@ -569,7 +576,8 @@ def get_google_calendars(account_email: str = None) -> Dict:
         return {"success": True, "calendars": result, "account": email}
 
     except Exception as e:
-        return {"success": False, "error": str(e), "calendars": []}
+        logging.error(f"Google calendars error: {e}")
+        return {"success": False, "error": "Google API error", "calendars": []}
 
 def create_google_calendar_event(
     title: str,
@@ -634,7 +642,8 @@ def create_google_calendar_event(
         }
 
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logging.error(f"Google calendar create event error: {e}")
+        return {"success": False, "error": "Failed to create calendar event"}
 
 def update_google_calendar_event(
     event_id: str,
@@ -705,7 +714,8 @@ def update_google_calendar_event(
         }
 
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logging.error(f"Google calendar update event error: {e}")
+        return {"success": False, "error": "Failed to update calendar event"}
 
 def delete_google_calendar_event(
     event_id: str,
@@ -745,7 +755,8 @@ def delete_google_calendar_event(
             return {"success": True, "message": "Termin gelöscht"}
 
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logging.error(f"Google calendar delete event error: {e}")
+        return {"success": False, "error": "Failed to delete calendar event"}
 
 def delete_gmail_message(email: str, msg_id: str, permanent: bool = False) -> Dict:
 
@@ -772,4 +783,5 @@ def delete_gmail_message(email: str, msg_id: str, permanent: bool = False) -> Di
         return {"success": True, "message": "Email deleted successfully"}
 
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logging.error(f"Gmail delete error: {e}")
+        return {"success": False, "error": "Failed to delete email"}

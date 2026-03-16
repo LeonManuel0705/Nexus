@@ -21,6 +21,7 @@ class NotesProvider extends ChangeNotifier {
 
   QuickNote? get activeNote {
     if (_activeNoteId == null) return null;
+    if (_notes.isEmpty) return null;
     return _notes.firstWhere(
       (n) => n.id == _activeNoteId,
       orElse: () => _notes.first,

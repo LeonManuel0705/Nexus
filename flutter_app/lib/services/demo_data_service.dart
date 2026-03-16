@@ -1,3 +1,4 @@
+import '../build_info.dart';
 import '../models/task.dart';
 import '../models/event.dart';
 import '../models/lesson.dart';
@@ -20,7 +21,7 @@ class DemoDataService {
     return [
       Task(
         id: 'demo-task-1',
-        title: 'Nexus v0.3 Features planen',
+        title: 'Nexus v${BuildInfo.version} Features planen',
         description: 'Neue Features für die nächste Version dokumentieren',
         dueDate: _today,
         completed: false,
@@ -240,6 +241,7 @@ class DemoDataService {
         endTime: '09:30',
         lessonNumber: 1,
         color: '#EF4444',
+        weekType: 'both',
         createdAt: now,
         updatedAt: now,
       ),
@@ -253,19 +255,35 @@ class DemoDataService {
         endTime: '11:15',
         lessonNumber: 2,
         color: '#3B82F6',
+        weekType: 'A',
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Lesson(
+        id: 'demo-lesson-2b',
+        subject: 'Physik',
+        teacher: 'Hr. Klein',
+        room: 'C203',
+        dayOfWeek: todayWeekday,
+        startTime: '09:45',
+        endTime: '11:15',
+        lessonNumber: 2,
+        color: '#22C55E',
+        weekType: 'B',
         createdAt: now,
         updatedAt: now,
       ),
       Lesson(
         id: 'demo-lesson-3',
         subject: 'Informatik',
-        teacher: 'Hr. Müller',
+        teacher: 'Hr. Muller',
         room: 'PC-Raum 1',
         dayOfWeek: todayWeekday,
         startTime: '11:30',
         endTime: '13:00',
         lessonNumber: 3,
         color: '#8B5CF6',
+        weekType: 'both',
         createdAt: now,
         updatedAt: now,
       ),
@@ -279,6 +297,7 @@ class DemoDataService {
         endTime: '15:15',
         lessonNumber: 4,
         color: '#F59E0B',
+        weekType: 'both',
         createdAt: now,
         updatedAt: now,
       ),

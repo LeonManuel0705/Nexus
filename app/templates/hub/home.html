@@ -138,13 +138,18 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ g.csp_nonce }}">
 document.addEventListener('DOMContentLoaded', () => {
     updateClock();
     setInterval(updateClock, 1000);
 
     loadDashboardData();
     initNotifications();
+
+    window.addEventListener('nexus-resume', () => {
+        updateClock();
+        loadDashboardData();
+    });
 });
 
 function updateClock() {
@@ -166,78 +171,70 @@ function updateClock() {
 }
 
 async function initNotifications() {
+    // NexusNotifications (loaded in base.html) handles all notification logic.
+    // Show a one-time permission prompt on the home page for first-visit discovery.
     if ('Notification' in window && Notification.permission === 'default') {
-        const askBtn = document.createElement('button');
-        askBtn.className = 'notification-prompt';
-        askBtn.innerHTML = '🔔 Benachrichtigungen aktivieren';
-        askBtn.onclick = async () => {
-            const permission = await Notification.requestPermission();
-            if (permission === 'granted') {
-                askBtn.remove();
-                checkDeadlineNotifications();
-            }
-        };
-        if (Notification.permission !== 'granted') {
+        if (localStorage.getItem('nexus-notif-enabled') !== 'true' &&
+            !localStorage.getItem('notification_prompt_dismissed')) {
+            const askBtn = document.createElement('button');
+            askBtn.className = 'notification-prompt';
+            askBtn.innerHTML = '\uD83D\uDD14 Benachrichtigungen aktivieren';
+            askBtn.onclick = async () => {
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    askBtn.remove();
+                    localStorage.setItem('nexus-notif-enabled', 'true');
+                    if (typeof NexusNotifications !== 'undefined') {
+                        NexusNotifications.restart();
+                    }
+                }
+            };
             const statusBar = document.querySelector('.status-bar');
-            if (statusBar && !localStorage.getItem('notification_prompt_dismissed')) {
-                statusBar.appendChild(askBtn);
-            }
+            if (statusBar) statusBar.appendChild(askBtn);
         }
     }
 }
 
-function checkDeadlineNotifications() {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
-
-    const lastNotified = localStorage.getItem('last_deadline_notification');
-    const today = new Date().toISOString().split('T')[0];
-
-    if (lastNotified === today) return;
-
-    const urgentItems = document.querySelectorAll('.deadline-item.urgent');
-    if (urgentItems.length > 0) {
-        const titles = Array.from(urgentItems).map(el =>
-            el.querySelector('.deadline-title')?.textContent
-        ).filter(Boolean).slice(0, 3);
-
-        new Notification('Deadlines heute!', {
-            body: titles.join(', '),
-            icon: '/static/icon-192.png',
-            tag: 'deadline-urgent',
-            requireInteraction: true
-        });
-
-        localStorage.setItem('last_deadline_notification', today);
-    }
-}
-
 async function loadDashboardData() {
-    if (!NexusConnection.state.lastCheck) {
-        await NexusConnection.init();
-    }
+    // Weather needs internet (calls open-meteo.com) — only load when online
+    if (navigator.onLine) loadWeather();
 
+    // Always load local data immediately (tasks are local DB, no internet needed)
+    const loads = [loadTodayTasks()];
+
+    // Only add network-dependent loads if we know we're online
     const conn = NexusConnection.state;
-
-    await loadTodayTasks();
-
     if (conn.internetAvailable || conn.iservAvailable) {
-        await loadNextEvent();
-        await loadUpcomingEvents();
+        loads.push(loadNextEvent());
+        loads.push(loadUpcomingEvents());
     }
 
     if (conn.iservAvailable) {
-        await loadSchoolAlerts();
+        loads.push(loadSchoolAlerts());
     }
 
-    if (conn.internetAvailable && !conn.isSchoolNetwork) {
-        loadWeather();
-    } else if (conn.isSchoolNetwork) {
-        document.getElementById('weatherDesc').textContent = 'Schulnetzwerk';
-        document.getElementById('weatherTemp').textContent = '--';
-        document.getElementById('weatherIcon').textContent = '🏫';
-    }
+    await Promise.allSettled(loads);
 
     updateStatusBar();
+
+    // If connectivity wasn't checked yet, load network-dependent data after check completes
+    if (!conn.lastCheck && navigator.onLine) {
+        window.addEventListener('nexus-connection-ready', async (e) => {
+            const freshConn = e.detail || NexusConnection.state;
+            const extraLoads = [];
+            if (freshConn.internetAvailable || freshConn.iservAvailable) {
+                extraLoads.push(loadNextEvent());
+                extraLoads.push(loadUpcomingEvents());
+            }
+            if (freshConn.iservAvailable) {
+                extraLoads.push(loadSchoolAlerts());
+            }
+            if (extraLoads.length) {
+                await Promise.allSettled(extraLoads);
+                updateStatusBar();
+            }
+        }, { once: true });
+    }
 }
 
 async function loadTodayTasks() {
@@ -262,11 +259,11 @@ function renderTodayTasks(tasks) {
 
     const topTasks = tasks.slice(0, 5);
     container.innerHTML = topTasks.map(task => `
-        <div class="task-item ${task.completed ? 'completed' : ''}" data-id="${task.id}">
-            <button class="task-checkbox ${task.completed ? 'checked' : ''}" onclick="toggleTask('${task.id}')">
+        <div class="task-item ${task.completed ? 'completed' : ''}" data-id="${escapeHtml(String(task.id))}">
+            <button class="task-checkbox ${task.completed ? 'checked' : ''}" onclick="toggleTask('${escapeHtml(String(task.id))}')">
                 ${task.completed ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ''}
             </button>
-            <span class="task-title">${task.title}</span>
+            <span class="task-title">${escapeHtml(task.title)}</span>
             ${task.priority === 'high' ? '<span class="task-priority high">!</span>' : ''}
         </div>
     `).join('');
@@ -312,9 +309,9 @@ function renderNextEvent(event) {
     container.innerHTML = `
         <div class="next-event">
             <div class="event-time-until">${timeUntil}</div>
-            <div class="event-title">${event.title}</div>
+            <div class="event-title">${escapeHtml(event.title)}</div>
             <div class="event-details">
-                ${event.start_time || 'Ganztägig'} ${event.location ? '• ' + event.location : ''}
+                ${event.start_time || 'Ganztägig'} ${event.location ? '• ' + escapeHtml(event.location) : ''}
             </div>
         </div>
     `;
@@ -364,7 +361,7 @@ function renderUpcomingEvents(events) {
             ${dayEvents.slice(0, 2).map(e => `
                 <div class="upcoming-event">
                     <span class="event-time">${e.start_time || '○'}</span>
-                    <span class="event-name">${e.title}</span>
+                    <span class="event-name">${escapeHtml(e.title)}</span>
                 </div>
             `).join('')}
         </div>`;
@@ -375,38 +372,23 @@ function renderUpcomingEvents(events) {
 
 async function loadWeather() {
     try {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-                const { latitude, longitude } = pos.coords;
-                const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weathercode`);
-                if (response.ok) {
-                    const data = await response.json();
-                    updateWeather(data.current);
-                }
-            }, () => {
-                fetchWeatherByCity();
-            });
+        const response = await fetch('/api/hub/weather');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.current) {
+                updateWeather(data.current);
+            }
         }
     } catch (err) {
         console.log('Weather not available');
     }
 }
 
-async function fetchWeatherByCity() {
-    try {
-        const response = await fetch('https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m,weathercode');
-        if (response.ok) {
-            const data = await response.json();
-            updateWeather(data.current);
-        }
-    } catch (err) {}
-}
-
 function updateWeather(current) {
     if (!current) return;
 
     const temp = Math.round(current.temperature_2m);
-    const code = current.weathercode;
+    const code = current.weather_code;
 
     document.getElementById('weatherTemp').textContent = temp + '°';
 
@@ -597,10 +579,10 @@ function renderDeadlines(alerts) {
                     ${countdownHtml}
                 </div>
                 <div class="deadline-content">
-                    <div class="deadline-title">${alert.title}</div>
+                    <div class="deadline-title">${escapeHtml(alert.title)}</div>
                     <div class="deadline-meta">
                         <span class="deadline-type">${typeIcon} ${typeLabel}</span>
-                        <span class="deadline-subject">${alert.subject}</span>
+                        <span class="deadline-subject">${escapeHtml(alert.subject)}</span>
                     </div>
                 </div>
             </div>

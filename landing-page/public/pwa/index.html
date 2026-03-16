@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <base href="/pwa/">
+  <base href="/">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
@@ -9,21 +9,21 @@
   <meta name="description" content="Nexus - Dein persönlicher Produktivitäts-Hub für Schule, Studium und Alltag.">
   <meta name="theme-color" content="#667EEA">
 
-  <!-- iOS PWA Configuration -->
+  
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Nexus">
   <meta name="mobile-web-app-capable" content="yes">
 
-  <!-- iOS Icons -->
+  
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
   <link rel="apple-touch-icon" sizes="192x192" href="icons/Icon-192.png">
   <link rel="apple-touch-icon" sizes="512x512" href="icons/Icon-512.png">
 
-  <!-- iOS Splash Screens -->
+  
   <meta name="apple-mobile-web-app-orientations" content="portrait">
 
-  <!-- Prevent phone number detection -->
+  
   <meta name="format-detection" content="telephone=no">
 
   <link rel="icon" type="image/png" href="favicon.png"/>
@@ -31,7 +31,7 @@
   <title>Nexus</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- iOS status bar and safe area styling -->
+  
   <style>
     html, body {
       margin: 0;
@@ -97,7 +97,7 @@
   </style>
 </head>
 <body>
-  <!-- Loading screen while Flutter initializes -->
+  
   <div class="loading" id="loading">
     <img class="loading-logo" src="icons/Icon-192.png" alt="Nexus">
     <div class="loading-text">Nexus</div>
@@ -115,6 +115,14 @@
           loading.style.display = 'none';
         }, 300);
       }
+
+      // Pre-cache all assets for offline use after app loads
+      setTimeout(function() {
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage('downloadOffline');
+          console.log('Nexus: Caching assets for offline use...');
+        }
+      }, 2000);
     });
   </script>
   <script src="flutter_bootstrap.js" async></script>

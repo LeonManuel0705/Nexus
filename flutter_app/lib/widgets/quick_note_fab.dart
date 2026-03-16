@@ -1,18 +1,25 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import '../providers/notes_provider.dart';
 import '../theme.dart';
+import '../utils/platform_utils.dart';
+import 'page_fade_in.dart';
 
 class QuickNoteFab extends StatelessWidget {
   const QuickNoteFab({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return FloatingActionButton(
-      heroTag: 'quick_note_fab',
-      onPressed: () => showQuickNoteModal(context),
-      backgroundColor: NexusTheme.primaryColor,
-      child: const Icon(Icons.add, color: Colors.white),
+    return PageFadeIn(
+      delay: const Duration(milliseconds: 300),
+      child: FloatingActionButton(
+        heroTag: 'quick_note_fab',
+        onPressed: () => showQuickNoteModal(context),
+        backgroundColor: NexusTheme.primaryColor,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
     );
   }
 }
@@ -22,6 +29,7 @@ void showQuickNoteModal(BuildContext context) {
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    constraints: const BoxConstraints(maxWidth: 600),
     builder: (context) => const QuickNoteModal(),
   );
 }
@@ -79,11 +87,21 @@ class _QuickNoteModalState extends State<QuickNoteModal> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
 
-    return Container(
+    final modalContainer = Container(
       margin: EdgeInsets.only(bottom: keyboardHeight),
       decoration: BoxDecoration(
-        color: isDark ? NexusTheme.darkSurface : NexusTheme.lightSurface,
+        color: isDark
+            ? Colors.black.withValues(alpha: shouldUseBlur ? 0.7 : 0.85)
+            : Colors.white.withValues(alpha: shouldUseBlur ? 0.85 : 0.95),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border(
+          top: BorderSide(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.15)
+                : Colors.white.withValues(alpha: 0.8),
+            width: 1.5,
+          ),
+        ),
       ),
       child: SafeArea(
         child: SingleChildScrollView(
@@ -100,7 +118,7 @@ class _QuickNoteModalState extends State<QuickNoteModal> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.3),
+                      color: Colors.grey.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -173,8 +191,8 @@ class _QuickNoteModalState extends State<QuickNoteModal> {
                     hintText: _getTitleHint(),
                     filled: true,
                     fillColor: isDark
-                        ? Colors.white.withOpacity(0.05)
-                        : Colors.black.withOpacity(0.05),
+                        ? Colors.white.withValues(alpha: 0.05)
+                        : Colors.black.withValues(alpha: 0.05),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -205,8 +223,8 @@ class _QuickNoteModalState extends State<QuickNoteModal> {
                     hintText: 'Details...',
                     filled: true,
                     fillColor: isDark
-                        ? Colors.white.withOpacity(0.05)
-                        : Colors.black.withOpacity(0.05),
+                        ? Colors.white.withValues(alpha: 0.05)
+                        : Colors.black.withValues(alpha: 0.05),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -267,6 +285,16 @@ class _QuickNoteModalState extends State<QuickNoteModal> {
         ),
       ),
     );
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      child: shouldUseBlur
+          ? BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: modalContainer,
+            )
+          : modalContainer,
+    );
   }
 
   Widget _buildTypeSelector() {
@@ -307,12 +335,12 @@ class _QuickNoteModalState extends State<QuickNoteModal> {
     return Container(
       decoration: BoxDecoration(
         color: isDark
-            ? Colors.white.withOpacity(0.05)
-            : Colors.black.withOpacity(0.05),
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.black.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
       ),
       child: DropdownButtonFormField<int>(
-        value: _selectedSubjectId,
+        initialValue: _selectedSubjectId,
         decoration: const InputDecoration(
           border: InputBorder.none,
           contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -338,8 +366,8 @@ class _QuickNoteModalState extends State<QuickNoteModal> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: isDark
-              ? Colors.white.withOpacity(0.05)
-              : Colors.black.withOpacity(0.05),
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.black.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -409,8 +437,12 @@ class _QuickNoteModalState extends State<QuickNoteModal> {
 
     setState(() => _isLoading = true);
 
+    final provider = context.read<AppProvider>();
+    final notesProvider = context.read<NotesProvider>();
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
-      final provider = context.read<AppProvider>();
       final title = _titleController.text.trim();
       final content = _contentController.text.trim();
 
@@ -423,6 +455,18 @@ class _QuickNoteModalState extends State<QuickNoteModal> {
           );
           break;
         case 'homework':
+          if (_selectedSubjectId == null) {
+            messenger.showSnackBar(
+              SnackBar(
+                content: const Text('Bitte wähle ein Fach aus'),
+                backgroundColor: NexusTheme.danger,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            );
+            setState(() => _isLoading = false);
+            return;
+          }
           await provider.addHomework(
             title: title,
             subjectId: _selectedSubjectId,
@@ -438,12 +482,13 @@ class _QuickNoteModalState extends State<QuickNoteModal> {
             title: title,
             content: content.isNotEmpty ? content : null,
           );
+          await notesProvider.loadNotes();
           break;
       }
 
       if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        navigator.pop();
+        messenger.showSnackBar(
           SnackBar(
             content: Text(_getSuccessMessage()),
             backgroundColor: NexusTheme.success,
@@ -454,9 +499,9 @@ class _QuickNoteModalState extends State<QuickNoteModal> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
-            content: Text('Fehler beim Speichern: $e'),
+            content: const Text('Fehler beim Speichern. Bitte versuche es erneut.'),
             backgroundColor: NexusTheme.danger,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -499,41 +544,61 @@ class _TypeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final chipContainer = AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? NexusTheme.primaryColor.withValues(alpha: isDark ? 0.25 : 0.2)
+            : (isDark
+                ? Colors.white.withValues(alpha: shouldUseBlur ? 0.08 : 0.14)
+                : Colors.white.withValues(alpha: shouldUseBlur ? 0.5 : 0.7)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
           color: isSelected
-              ? NexusTheme.primaryColor.withOpacity(0.15)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
+              ? NexusTheme.primaryColor.withValues(alpha: 0.5)
+              : (isDark
+                  ? Colors.white.withValues(alpha: 0.15)
+                  : Colors.white.withValues(alpha: 0.6)),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 18,
             color: isSelected
                 ? NexusTheme.primaryColor
-                : Colors.grey.withOpacity(0.3),
+                : (isDark ? Colors.white70 : Colors.black54),
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: isSelected ? NexusTheme.primaryColor : Colors.grey,
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: isSelected
+                  ? NexusTheme.primaryColor
+                  : (isDark ? Colors.white70 : Colors.black54),
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              fontSize: 13,
             ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? NexusTheme.primaryColor : Colors.grey,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: shouldUseBlur
+            ? BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                child: chipContainer,
+              )
+            : chipContainer,
       ),
     );
   }

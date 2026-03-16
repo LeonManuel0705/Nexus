@@ -11,8 +11,6 @@ class VbbService {
   VbbService._internal();
 
   static const String _baseUrl = 'https://v6.vbb.transport.rest';
-  static const Duration _locationCacheTtl = Duration(days: 7);
-  static const Duration _routeCacheTtl = Duration(minutes: 30);
 
   final DatabaseService _db = DatabaseService();
   final ConnectivityService _connectivity = ConnectivityService();
@@ -26,31 +24,28 @@ class VbbService {
       return cached;
     }
 
-    if (!_connectivity.isOnline.value) {
-      return [];
-    }
-
+    final http.Response response;
     try {
-      final response = await http.get(
+      response = await http.get(
         Uri.parse('$_baseUrl/locations?query=${Uri.encodeComponent(query)}&results=10'),
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        final locations = data
-            .map((json) => VbbLocation.fromApiResponse(json as Map<String, dynamic>))
-            .where((loc) => loc.id.isNotEmpty && loc.name.isNotEmpty)
-            .toList();
-
-        await _db.cacheVbbLocations(query, locations);
-
-        return locations;
-      }
+      ).timeout(const Duration(seconds: 10));
     } catch (e) {
-
+      throw Exception('Netzwerkfehler: Server nicht erreichbar ($e)');
     }
 
-    return [];
+    if (response.statusCode != 200) {
+      throw Exception('Server-Fehler (${response.statusCode})');
+    }
+
+    final List<dynamic> data = jsonDecode(response.body);
+    final locations = data
+        .map((json) => VbbLocation.fromApiResponse(json as Map<String, dynamic>))
+        .where((loc) => loc.id.isNotEmpty && loc.name.isNotEmpty)
+        .toList();
+
+    await _db.cacheVbbLocations(query, locations);
+
+    return locations;
   }
 
   Future<VbbLocation?> getStation(String id) async {
@@ -61,14 +56,13 @@ class VbbService {
     try {
       final response = await http.get(
         Uri.parse('$_baseUrl/stops/$id'),
-      );
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         return VbbLocation.fromApiResponse(data);
       }
-    } catch (e) {
-
+    } catch (_) {
     }
 
     return null;
@@ -87,65 +81,60 @@ class VbbService {
       return cached;
     }
 
-    if (!_connectivity.isOnline.value) {
-      return [];
+    final params = {
+      'from': fromId,
+      'to': toId,
+      'results': '5',
+      'stopovers': 'true',
+      'tickets': 'true',
+    };
+
+    if (departure != null) {
+      params[isDeparture ? 'departure' : 'arrival'] = departure.toIso8601String();
     }
 
+    final uri = Uri.parse('$_baseUrl/journeys').replace(queryParameters: params);
+    final http.Response response;
     try {
-      final params = {
-        'from': fromId,
-        'to': toId,
-        'results': '5',
-        'stopovers': 'true',
-      };
-
-      if (departure != null) {
-        params[isDeparture ? 'departure' : 'arrival'] = departure.toIso8601String();
-      }
-
-      final uri = Uri.parse('$_baseUrl/journeys').replace(queryParameters: params);
-      final response = await http.get(uri);
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final journeysJson = data['journeys'] as List;
-        final journeys = journeysJson
-            .map((json) => VbbJourney.fromApiResponse(json as Map<String, dynamic>))
-            .toList();
-
-        await _db.cacheVbbRoutes(cacheKey, journeys);
-
-        return journeys;
-      }
+      response = await http.get(uri).timeout(const Duration(seconds: 15));
     } catch (e) {
-
+      throw Exception('Netzwerkfehler: Server nicht erreichbar ($e)');
     }
 
-    return [];
+    if (response.statusCode != 200) {
+      throw Exception('Server-Fehler (HTTP ${response.statusCode})');
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final journeysJson = data['journeys'] as List;
+    final journeys = journeysJson
+        .map((json) => VbbJourney.fromApiResponse(json as Map<String, dynamic>))
+        .toList();
+
+    await _db.cacheVbbRoutes(cacheKey, journeys);
+
+    return journeys;
   }
 
   Future<List<VbbDeparture>> getDepartures(String stationId, {int duration = 30}) async {
-    if (!_connectivity.isOnline.value) {
-      return [];
-    }
-
+    final http.Response response;
     try {
-      final response = await http.get(
+      response = await http.get(
         Uri.parse('$_baseUrl/stops/$stationId/departures?duration=$duration&results=20'),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final departuresJson = data['departures'] as List;
-        return departuresJson
-            .map((json) => VbbDeparture.fromApiResponse(json as Map<String, dynamic>))
-            .toList();
-      }
+      ).timeout(const Duration(seconds: 10));
     } catch (e) {
-
+      throw Exception('Netzwerkfehler: Server nicht erreichbar ($e)');
     }
 
-    return [];
+    if (response.statusCode != 200) {
+      throw Exception('Server-Fehler (${response.statusCode})');
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final departuresJson = data['departures'] as List;
+    return departuresJson
+        .map((json) => VbbDeparture.fromApiResponse(json as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<VbbKnownLocation>> getKnownLocations() async {
@@ -237,5 +226,40 @@ class VbbService {
 
   Future<void> clearOldCache() async {
     await _db.clearOldVbbCache();
+  }
+
+  // Ticket management
+  Future<List<VbbTicket>> getTickets() async {
+    return await _db.getVbbTickets();
+  }
+
+  Future<VbbTicket> addTicket({
+    required String ticketType,
+    required String ticketName,
+    required String zoneCoverage,
+    DateTime? validFrom,
+    DateTime? validUntil,
+    bool autoRenews = false,
+  }) async {
+    final ticket = VbbTicket(
+      id: _uuid.v4(),
+      ticketType: ticketType,
+      ticketName: ticketName,
+      zoneCoverage: zoneCoverage,
+      validFrom: validFrom,
+      validUntil: validUntil,
+      autoRenews: autoRenews,
+      createdAt: DateTime.now(),
+    );
+    await _db.insertVbbTicket(ticket);
+    return ticket;
+  }
+
+  Future<void> updateTicket(VbbTicket ticket) async {
+    await _db.updateVbbTicket(ticket);
+  }
+
+  Future<void> removeTicket(String id) async {
+    await _db.deleteVbbTicket(id);
   }
 }

@@ -1,0 +1,8 @@
+# robots.txt
+# Allow all crawlers to index the site
+
+User-agent: *
+Allow: /
+
+# Disallow API routes
+Disallow: /api/

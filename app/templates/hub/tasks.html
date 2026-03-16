@@ -47,9 +47,18 @@
 {% block modals %}
 
 <div class="modal" id="addTaskModal">
-    <div class="modal-content">
+    <div class="modal-content task-modal">
+        <div class="task-modal-accent"></div>
         <div class="modal-header">
-            <h3>Neue Aufgabe</h3>
+            <div class="task-modal-title">
+                <div class="task-modal-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </div>
+                <h3>Neue Aufgabe</h3>
+            </div>
             <button class="modal-close" onclick="closeModal('addTaskModal')">&times;</button>
         </div>
         <form id="addTaskForm" onsubmit="saveTask(event)">
@@ -75,26 +84,28 @@
                     </select>
                 </div>
             </div>
-            <div class="form-group">
-                <label for="taskCategory">Kategorie</label>
-                <select id="taskCategory" name="category">
-                    <option value="general">Allgemein</option>
-                    <option value="school">Schule</option>
-                    <option value="training">Training</option>
-                    <option value="project">Projekt</option>
-                    <option value="personal">Privat</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="taskRepeatType">Wiederholung</label>
-                <select id="taskRepeatType" name="repeat_type" onchange="toggleRepeatOptions('add')">
-                    <option value="none">Keine</option>
-                    <option value="daily">Täglich</option>
-                    <option value="weekly">Wöchentlich</option>
-                    <option value="monthly">Monatlich</option>
-                    <option value="yearly">Jährlich</option>
-                    <option value="custom">Benutzerdefiniert</option>
-                </select>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="taskCategory">Kategorie</label>
+                    <select id="taskCategory" name="category">
+                        <option value="general">Allgemein</option>
+                        <option value="school">Schule</option>
+                        <option value="training">Training</option>
+                        <option value="project">Projekt</option>
+                        <option value="personal">Privat</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="taskRepeatType">Wiederholung</label>
+                    <select id="taskRepeatType" name="repeat_type" onchange="toggleRepeatOptions('add')">
+                        <option value="none">Keine</option>
+                        <option value="daily">Täglich</option>
+                        <option value="weekly">Wöchentlich</option>
+                        <option value="monthly">Monatlich</option>
+                        <option value="yearly">Jährlich</option>
+                        <option value="custom">Benutzerdefiniert</option>
+                    </select>
+                </div>
             </div>
             <div class="form-group repeat-options" id="addRepeatOptions" style="display: none;">
                 <label>Wochentage</label>
@@ -121,9 +132,18 @@
 </div>
 
 <div class="modal" id="editTaskModal">
-    <div class="modal-content">
+    <div class="modal-content task-modal">
+        <div class="task-modal-accent"></div>
         <div class="modal-header">
-            <h3>Aufgabe bearbeiten</h3>
+            <div class="task-modal-title">
+                <div class="task-modal-icon edit">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                </div>
+                <h3>Aufgabe bearbeiten</h3>
+            </div>
             <button class="modal-close" onclick="closeModal('editTaskModal')">&times;</button>
         </div>
         <form id="editTaskForm" onsubmit="updateTask(event)">
@@ -195,6 +215,51 @@
     </div>
 </div>
 
+<div class="modal" id="completeRecurringModal">
+    <div class="modal-content task-modal">
+        <div class="task-modal-accent"></div>
+        <div class="modal-header">
+            <div class="task-modal-title">
+                <div class="task-modal-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 11 12 14 22 4"></polyline>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                    </svg>
+                </div>
+                <h3>Wiederkehrende Aufgabe</h3>
+            </div>
+            <button class="modal-close" onclick="closeModal('completeRecurringModal')">&times;</button>
+        </div>
+        <div class="recurring-choice-content">
+            <p>Wie möchtest du diese Aufgabe abschließen?</p>
+            <div class="recurring-choice-options">
+                <button class="recurring-choice-btn" onclick="completeRecurringOnce()">
+                    <div class="recurring-choice-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                    </div>
+                    <div class="recurring-choice-text">
+                        <strong>Nur dieses Mal</strong>
+                        <span>Erledigt, nächste Wiederholung wird erstellt</span>
+                    </div>
+                </button>
+                <button class="recurring-choice-btn stop" onclick="completeRecurringAll()">
+                    <div class="recurring-choice-icon stop">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        </svg>
+                    </div>
+                    <div class="recurring-choice-text">
+                        <strong>Alle beenden</strong>
+                        <span>Erledigt, keine weiteren Wiederholungen</span>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal" id="deleteTaskModal">
     <div class="modal-content">
         <div class="modal-header">
@@ -212,7 +277,19 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<style>
+@keyframes taskFadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.task-item-full.animate-in {
+    animation: taskFadeInUp 0.25s ease-out both;
+}
+.task-group.animate-in {
+    animation: taskFadeInUp 0.25s ease-out both;
+}
+</style>
+<script nonce="{{ g.csp_nonce }}">
 let currentFilter = 'today';
 let tasks = [];
 let homework = [];
@@ -328,6 +405,14 @@ function renderTasks() {
     }
 
     container.innerHTML = html;
+
+    // Stagger animate task items
+    let delay = 0;
+    container.querySelectorAll('.task-group, .task-item-full').forEach(el => {
+        el.classList.add('animate-in');
+        el.style.animationDelay = `${delay}ms`;
+        delay += 40;
+    });
 }
 
 function filterHomework(hw) {
@@ -366,21 +451,22 @@ function filterHomework(hw) {
 function renderTaskItems(taskList) {
     return taskList.map(task => {
         const isHomework = task.isHomework;
-        const toggleFunc = isHomework ? `toggleHomework('${task.originalId}')` : `toggleTask('${task.id}')`;
-        const editFunc = isHomework ? `window.location.href='/hub/school?tab=homework'` : `openEditTaskModal('${task.id}')`;
+        const toggleFunc = isHomework ? `toggleHomework('${escapeHtml(String(task.originalId))}')` : `toggleTask('${escapeHtml(String(task.id))}')`;
+        const editFunc = isHomework ? `window.location.href='/hub/school?tab=homework'` : `openEditTaskModal('${escapeHtml(String(task.id))}')`;
         const categoryLabel = isHomework ? task.subjectName : getCategoryLabel(task.category);
+        const safePriority = ['low', 'medium', 'high'].includes(task.priority) ? task.priority : 'medium';
 
         return `
-        <div class="task-item-full ${task.completed ? 'completed' : ''} ${isHomework ? 'homework-item' : ''} priority-${task.priority}" data-id="${task.id}">
+        <div class="task-item-full ${task.completed ? 'completed' : ''} ${isHomework ? 'homework-item' : ''} priority-${safePriority}" data-id="${escapeHtml(String(task.id))}">
             <button class="task-checkbox ${task.completed ? 'checked' : ''}" onclick="${toggleFunc}">
                 ${task.completed ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ''}
             </button>
             <div class="task-content" onclick="${editFunc}">
-                <span class="task-title">${task.title}</span>
-                ${task.description ? `<span class="task-desc">${task.description}</span>` : ''}
+                <span class="task-title">${escapeHtml(task.title)}</span>
+                ${task.description ? `<span class="task-desc">${escapeHtml(task.description)}</span>` : ''}
                 <div class="task-meta">
                     ${task.due_date ? `<span class="task-due ${isOverdue(task.due_date) && !task.completed ? 'overdue' : ''}">${formatDate(task.due_date)}</span>` : ''}
-                    <span class="task-category tag ${isHomework ? 'tag-homework' : ''}">${categoryLabel}</span>
+                    <span class="task-category tag ${isHomework ? 'tag-homework' : ''}">${escapeHtml(categoryLabel)}</span>
                 </div>
             </div>
             ${isHomework ? `
@@ -392,7 +478,7 @@ function renderTaskItems(taskList) {
                 </svg>
             </a>
             ` : `
-            <button class="task-action" onclick="openEditTaskModal('${task.id}')" title="Bearbeiten">
+            <button class="task-action" onclick="openEditTaskModal('${escapeHtml(String(task.id))}')" title="Bearbeiten">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -447,11 +533,35 @@ function isOverdue(dateStr) {
 }
 
 function setFilter(filter) {
+    const oldFilter = currentFilter;
     currentFilter = filter;
     document.querySelectorAll('.filter-tab').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.filter === filter);
     });
-    loadTasks();
+
+    const container = document.getElementById('taskList');
+    const filters = ['today', 'week', 'later', 'all', 'completed'];
+    const oldIdx = filters.indexOf(oldFilter);
+    const newIdx = filters.indexOf(filter);
+    const direction = newIdx > oldIdx ? 1 : -1;
+
+    // Slide out old content
+    container.style.transition = 'opacity 0.15s ease, transform 0.15s ease';
+    container.style.opacity = '0';
+    container.style.transform = `translateX(${direction * -20}px)`;
+
+    setTimeout(() => {
+        loadTasks().then(() => {
+            // Slide in new content from opposite side
+            container.style.transition = 'none';
+            container.style.transform = `translateX(${direction * 20}px)`;
+            container.style.opacity = '0';
+            void container.offsetHeight; // force reflow
+            container.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out';
+            container.style.opacity = '1';
+            container.style.transform = 'translateX(0)';
+        });
+    }, 150);
 }
 
 function openAddTaskModal() {
@@ -569,13 +679,13 @@ function showDeleteOptions() {
     if (isRepeating) {
         messageEl.textContent = 'Dies ist eine wiederkehrende Aufgabe. Was möchtest du tun?';
         optionsDiv.innerHTML = `
-            <button class="btn-secondary" onclick="skipTaskOccurrence('${taskId}')">
+            <button class="btn-secondary" onclick="skipTaskOccurrence('${escapeHtml(String(taskId))}')">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="9 18 15 12 9 6"></polyline>
                 </svg>
                 Nur diese überspringen
             </button>
-            <button class="btn-secondary btn-danger" onclick="deleteTaskCompletely('${taskId}')">
+            <button class="btn-secondary btn-danger" onclick="deleteTaskCompletely('${escapeHtml(String(taskId))}')">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="3 6 5 6 21 6"></polyline>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -587,7 +697,7 @@ function showDeleteOptions() {
     } else {
         messageEl.textContent = 'Möchtest du diese Aufgabe wirklich löschen?';
         optionsDiv.innerHTML = `
-            <button class="btn-secondary btn-danger" onclick="deleteTaskCompletely('${taskId}')">
+            <button class="btn-secondary btn-danger" onclick="deleteTaskCompletely('${escapeHtml(String(taskId))}')">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="3 6 5 6 21 6"></polyline>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -658,13 +768,50 @@ function showToast(message, type = 'info') {
     }, 3000);
 }
 
+let pendingRecurringTaskId = null;
+
 async function toggleTask(taskId) {
+    const task = tasks.find(t => t.id == taskId);
+
+    // If it's a recurring task being completed (not uncompleted), show choice
+    if (task && !task.completed && task.repeat_type && task.repeat_type !== 'none') {
+        pendingRecurringTaskId = taskId;
+        openModal('completeRecurringModal');
+        return;
+    }
+
     try {
         await fetch(`/api/hub/tasks/${taskId}/toggle`, { method: 'POST' });
         loadTasks();
     } catch (err) {
         console.error('Error toggling task:', err);
     }
+}
+
+async function completeRecurringOnce() {
+    if (!pendingRecurringTaskId) return;
+    closeModal('completeRecurringModal');
+    try {
+        await fetch(`/api/hub/tasks/${pendingRecurringTaskId}/toggle`, { method: 'POST' });
+        loadTasks();
+        showToast('Erledigt, nächste Wiederholung erstellt', 'success');
+    } catch (err) {
+        console.error('Error completing recurring task:', err);
+    }
+    pendingRecurringTaskId = null;
+}
+
+async function completeRecurringAll() {
+    if (!pendingRecurringTaskId) return;
+    closeModal('completeRecurringModal');
+    try {
+        await fetch(`/api/hub/tasks/${pendingRecurringTaskId}/toggle?stop_recurrence=1`, { method: 'POST' });
+        loadTasks();
+        showToast('Erledigt, keine weiteren Wiederholungen', 'success');
+    } catch (err) {
+        console.error('Error completing recurring task:', err);
+    }
+    pendingRecurringTaskId = null;
 }
 
 function openModal(modalId) {
@@ -687,6 +834,136 @@ function toggleRepeatOptions(prefix) {
 </script>
 
 <style>
+/* Task modal redesign */
+.task-modal {
+    overflow: hidden;
+    padding: 0 !important;
+}
+
+.task-modal-accent {
+    height: 4px;
+    background: var(--accent-gradient);
+    border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.task-modal .modal-header {
+    padding: 24px 28px 0;
+    margin-bottom: 20px;
+}
+
+.task-modal form,
+.task-modal .recurring-choice-content,
+.task-modal .delete-modal-content {
+    padding: 0 28px 28px;
+}
+
+.task-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.task-modal-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--accent-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.task-modal-icon svg {
+    stroke: var(--accent);
+}
+
+.task-modal-icon.edit {
+    background: rgba(236, 201, 75, 0.12);
+}
+
+.task-modal-icon.edit svg {
+    stroke: var(--warning);
+}
+
+/* Recurring task choice dialog */
+.recurring-choice-content p {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+
+.recurring-choice-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.recurring-choice-btn {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-align: left;
+    width: 100%;
+    color: var(--text-primary);
+}
+
+.recurring-choice-btn:hover {
+    border-color: var(--accent);
+    background: var(--accent-light);
+    transform: translateX(4px);
+}
+
+.recurring-choice-btn.stop:hover {
+    border-color: var(--danger);
+    background: var(--danger-light);
+}
+
+.recurring-choice-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: var(--accent-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.recurring-choice-icon svg {
+    stroke: var(--accent);
+}
+
+.recurring-choice-icon.stop {
+    background: var(--danger-light);
+}
+
+.recurring-choice-icon.stop svg {
+    stroke: var(--danger);
+}
+
+.recurring-choice-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.recurring-choice-text strong {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.recurring-choice-text span {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
 /* Weekday selector for repeat tasks */
 .weekday-selector {
     display: flex;
@@ -808,7 +1085,7 @@ function toggleRepeatOptions(prefix) {
     color: var(--text-primary);
     font-size: 14px;
     font-weight: 500;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
     z-index: 10000;
     opacity: 0;
     transition: all 0.3s ease;

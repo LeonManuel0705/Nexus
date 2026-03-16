@@ -85,7 +85,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ g.csp_nonce }}">
     let subjects = [];
     let currentSubjectId = localStorage.getItem('pomodoro_subject') || '';
 
@@ -115,7 +115,7 @@
         if (!select) return;
 
         select.innerHTML = '<option value="">Kein Fach</option>' +
-            subjects.map(s => `<option value="${s.id}" ${s.id === currentSubjectId ? 'selected' : ''}>${s.name}</option>`).join('');
+            subjects.map(s => `<option value="${escapeHtml(String(s.id))}" ${s.id === currentSubjectId ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('');
     }
 
     function initPomodoroEnhancements() {
@@ -225,17 +225,18 @@
                 const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
                 const percent = Math.round((item.minutes / data.total_minutes) * 100);
 
+                const safeColor = /^#[0-9a-fA-F]{3,8}$/.test(color) ? color : '#6b7280';
                 html += `
                     <div class="subject-stat">
                         <div class="subject-info">
-                            <span class="subject-color" style="background: ${color}"></span>
-                            <span class="subject-name">${name}</span>
-                            <span class="subject-sessions">${item.sessions} Sitzung${item.sessions !== 1 ? 'en' : ''}</span>
+                            <span class="subject-color" style="background: ${safeColor}"></span>
+                            <span class="subject-name">${escapeHtml(name)}</span>
+                            <span class="subject-sessions">${parseInt(item.sessions) || 0} Sitzung${item.sessions !== 1 ? 'en' : ''}</span>
                         </div>
                         <div class="subject-bar-container">
-                            <div class="subject-bar" style="width: ${percent}%; background: ${color}"></div>
+                            <div class="subject-bar" style="width: ${percent}%; background: ${safeColor}"></div>
                         </div>
-                        <span class="subject-time">${timeStr}</span>
+                        <span class="subject-time">${escapeHtml(timeStr)}</span>
                     </div>
                 `;
             });

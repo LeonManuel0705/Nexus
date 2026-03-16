@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/notes_provider.dart';
 import '../theme.dart';
+import '../widgets/page_fade_in.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/animated_list_item.dart';
 
 class NotesScreen extends StatefulWidget {
   const NotesScreen({super.key});
@@ -104,10 +107,10 @@ class _NotesScreenState extends State<NotesScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: NexusTheme.danger.withOpacity(0.15),
+                  color: NexusTheme.danger.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(Icons.delete_outline, color: NexusTheme.danger, size: 32),
+                child: const Icon(Icons.delete_outline, color: NexusTheme.danger, size: 32),
               ),
               const SizedBox(height: 16),
               Text(
@@ -143,6 +146,7 @@ class _NotesScreenState extends State<NotesScreen> {
                       onPressed: () async {
                         await provider.deleteNote(provider.activeNoteId!);
                         _textController.text = provider.activeNote?.content ?? '';
+                        if (!context.mounted) return;
                         Navigator.pop(context);
                       },
                       style: FilledButton.styleFrom(
@@ -171,12 +175,13 @@ class _NotesScreenState extends State<NotesScreen> {
           return const Center(child: CircularProgressIndicator());
         }
 
-        return Stack(
-          children: [
-            ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _buildHeader(context, isDark, provider),
+        return PageFadeIn(
+          child: Stack(
+            children: [
+              ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  _buildHeader(context, isDark, provider),
                 const SizedBox(height: 20),
 
                 Row(
@@ -206,7 +211,7 @@ class _NotesScreenState extends State<NotesScreen> {
                 _buildSectionHeader(
                   context,
                   isDark: isDark,
-                  title: 'Deine Notizen',
+                  title: 'DEINE NOTIZEN',
                   icon: Icons.folder_outlined,
                   iconColor: NexusTheme.notesColor,
                 ),
@@ -219,14 +224,14 @@ class _NotesScreenState extends State<NotesScreen> {
                 _buildSectionHeader(
                   context,
                   isDark: isDark,
-                  title: 'Editor',
+                  title: 'EDITOR',
                   icon: Icons.edit_note,
                   iconColor: NexusTheme.primary,
                   trailing: provider.hasUnsavedChanges
                       ? Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.15),
+                            color: Colors.orange.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Row(
@@ -250,63 +255,48 @@ class _NotesScreenState extends State<NotesScreen> {
 
                 _buildEditor(context, isDark, provider),
 
-                const SizedBox(height: 100),
+                const SizedBox(height: 120),
               ],
             ),
 
-            Positioned(
-              right: 16,
-              bottom: 16,
-              child: FloatingActionButton(
-                heroTag: 'fab_notes',
-                onPressed: _createNewNote,
-                backgroundColor: NexusTheme.notesColor,
-                child: const Icon(Icons.add, color: Colors.white),
+              Positioned(
+                right: 16,
+                bottom: 16,
+                child: FloatingActionButton(
+                  heroTag: 'fab_notes',
+                  onPressed: _createNewNote,
+                  backgroundColor: NexusTheme.notesColor,
+                  child: const Icon(Icons.add, color: Colors.white),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
   }
 
   Widget _buildHeader(BuildContext context, bool isDark, NotesProvider provider) {
-    return Container(
+    return GlassCard(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withOpacity(0.05)
-            : Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.1)
-              : Colors.black.withOpacity(0.05),
-        ),
-      ),
+      borderRadius: 20,
+      enableTapScale: false,
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: NexusTheme.notesColor.withOpacity(0.15),
+              color: NexusTheme.notesColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(Icons.sticky_note_2, color: NexusTheme.notesColor, size: 28),
+            child: const Icon(Icons.sticky_note_2, color: NexusTheme.notesColor, size: 28),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Schnelle Notizen',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                ),
+                NexusTheme.gradientText('Notizen', fontSize: 36),
                 Text(
                   'Gedanken festhalten',
                   style: TextStyle(
@@ -343,7 +333,7 @@ class _NotesScreenState extends State<NotesScreen> {
         Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.15),
+            color: iconColor.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, size: 16, color: iconColor),
@@ -351,11 +341,7 @@ class _NotesScreenState extends State<NotesScreen> {
         const SizedBox(width: 10),
         Text(
           title,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
+          style: NexusTheme.sectionLabel(isDark),
         ),
         if (trailing != null) ...[
           const Spacer(),
@@ -373,25 +359,16 @@ class _NotesScreenState extends State<NotesScreen> {
     required String label,
     required Color color,
   }) {
-    return Container(
+    return GlassCard(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withOpacity(0.05)
-            : Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.1)
-              : Colors.black.withOpacity(0.05),
-        ),
-      ),
+      borderRadius: 16,
+      enableTapScale: false,
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
+              color: color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 20),
@@ -427,19 +404,10 @@ class _NotesScreenState extends State<NotesScreen> {
 
   Widget _buildNoteTabs(BuildContext context, bool isDark, NotesProvider provider) {
     if (provider.notes.isEmpty) {
-      return Container(
+      return GlassCard(
         padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: isDark
-              ? Colors.white.withOpacity(0.05)
-              : Colors.white.withOpacity(0.7),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.1)
-                : Colors.black.withOpacity(0.05),
-          ),
-        ),
+        borderRadius: 16,
+        enableTapScale: false,
         child: Column(
           children: [
             Icon(
@@ -477,54 +445,58 @@ class _NotesScreenState extends State<NotesScreen> {
         itemBuilder: (context, index) {
           final note = provider.notes[index];
           final isActive = note.id == provider.activeNoteId;
-          return Padding(
-            padding: EdgeInsets.only(right: index < provider.notes.length - 1 ? 10 : 0),
-            child: GestureDetector(
-              onTap: () => _switchNote(note.id),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: isActive
-                      ? NexusTheme.notesColor
-                      : (isDark
-                          ? Colors.white.withOpacity(0.05)
-                          : Colors.white.withOpacity(0.7)),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
+          return AnimatedListItem(
+            index: index,
+            child: Padding(
+              padding: EdgeInsets.only(right: index < provider.notes.length - 1 ? 10 : 0),
+              child: GestureDetector(
+                onTap: () => _switchNote(note.id),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
                     color: isActive
                         ? NexusTheme.notesColor
                         : (isDark
-                            ? Colors.white.withOpacity(0.1)
-                            : Colors.black.withOpacity(0.05)),
-                  ),
-                ),
-                alignment: Alignment.center,
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.description,
-                      size: 16,
-                      color: isActive
-                          ? Colors.white
-                          : (isDark ? Colors.white54 : Colors.black45),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      (note.preview.isEmpty
-                              ? 'Notiz ${index + 1}'
-                              : note.preview)
-                          .length > 12
-                          ? '${(note.preview.isEmpty ? 'Notiz ${index + 1}' : note.preview).substring(0, 12)}...'
-                          : (note.preview.isEmpty ? 'Notiz ${index + 1}' : note.preview),
-                      style: TextStyle(
-                        fontSize: 13,
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : Colors.white.withValues(alpha: 0.65)),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border(
+                      left: BorderSide(
                         color: isActive
-                            ? Colors.white
-                            : (isDark ? Colors.white70 : Colors.black87),
-                        fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                            ? const Color(0xFF6366F1) // indigo-500
+                            : Colors.transparent,
+                        width: isActive ? 3 : 0,
                       ),
                     ),
-                  ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.description,
+                        size: 16,
+                        color: isActive
+                            ? Colors.white
+                            : (isDark ? Colors.white54 : Colors.black45),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        (note.preview.isEmpty
+                                ? 'Notiz ${index + 1}'
+                                : note.preview)
+                            .length > 12
+                            ? '${(note.preview.isEmpty ? 'Notiz ${index + 1}' : note.preview).substring(0, 12)}...'
+                            : (note.preview.isEmpty ? 'Notiz ${index + 1}' : note.preview),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isActive
+                              ? Colors.white
+                              : (isDark ? Colors.white70 : Colors.black87),
+                          fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -535,22 +507,16 @@ class _NotesScreenState extends State<NotesScreen> {
   }
 
   Widget _buildEditor(BuildContext context, bool isDark, NotesProvider provider) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withOpacity(0.05)
-            : Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.1)
-              : Colors.black.withOpacity(0.05),
-        ),
-      ),
+    return GlassCard(
+      padding: EdgeInsets.zero,
+      borderRadius: 16,
+      enableTapScale: false,
       child: Column(
         children: [
           Container(
-            height: 300,
+            height: MediaQuery.of(context).size.height >= 768
+                ? MediaQuery.of(context).size.height * 0.5
+                : 300,
             padding: const EdgeInsets.all(16),
             child: provider.notes.isEmpty
                 ? Center(
@@ -577,6 +543,10 @@ class _NotesScreenState extends State<NotesScreen> {
                         color: isDark ? Colors.white38 : Colors.black38,
                       ),
                       border: InputBorder.none,
+                      filled: true,
+                      fillColor: isDark
+                          ? const Color(0xFF27272A).withValues(alpha: 0.3)
+                          : const Color(0xFFF4F4F5).withValues(alpha: 0.3),
                     ),
                     onChanged: _onTextChanged,
                   ),
@@ -588,8 +558,8 @@ class _NotesScreenState extends State<NotesScreen> {
               border: Border(
                 top: BorderSide(
                   color: isDark
-                      ? Colors.white.withOpacity(0.1)
-                      : Colors.black.withOpacity(0.05),
+                      ? Colors.white.withValues(alpha: 0.10)
+                      : Colors.white.withValues(alpha: 0.20),
                 ),
               ),
             ),
@@ -612,12 +582,12 @@ class _NotesScreenState extends State<NotesScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: NexusTheme.notesColor.withOpacity(0.15),
+                    color: NexusTheme.notesColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     '${provider.activeNote?.wordCount ?? 0} Wörter',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 11,
                       color: NexusTheme.notesColor,
                       fontWeight: FontWeight.w500,

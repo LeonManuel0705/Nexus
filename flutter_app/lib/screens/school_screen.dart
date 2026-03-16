@@ -1,15 +1,66 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/app_provider.dart';
 import '../providers/iserv_provider.dart';
 import '../models/lesson.dart';
+import '../models/timetable_period.dart';
 import '../services/database_service.dart' if (dart.library.html) '../services/database_service_web.dart';
 import '../theme.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/animated_list_item.dart';
 import '../widgets/iserv_webview_login.dart';
+import '../widgets/page_fade_in.dart';
+import '../widgets/timetable_setup_wizard.dart';
+
+Color _parseColor(dynamic colorValue, [Color fallback = Colors.grey]) {
+  if (colorValue == null) return fallback;
+  try {
+    final str = colorValue as String;
+    return Color(int.parse(str.replaceFirst('#', '0xFF')));
+  } catch (_) {
+    return fallback;
+  }
+}
+
+/// Mark options for Mittelstufe grade system (1+ to 6)
+const _markOptions = [
+  {'label': '1+', 'value': 0.7},
+  {'label': '1', 'value': 1.0},
+  {'label': '1-', 'value': 1.3},
+  {'label': '2+', 'value': 1.7},
+  {'label': '2', 'value': 2.0},
+  {'label': '2-', 'value': 2.3},
+  {'label': '3+', 'value': 2.7},
+  {'label': '3', 'value': 3.0},
+  {'label': '3-', 'value': 3.3},
+  {'label': '4+', 'value': 3.7},
+  {'label': '4', 'value': 4.0},
+  {'label': '4-', 'value': 4.3},
+  {'label': '5+', 'value': 4.7},
+  {'label': '5', 'value': 5.0},
+  {'label': '5-', 'value': 5.3},
+  {'label': '6', 'value': 6.0},
+];
+
+String _markValueToLabel(double value) {
+  for (final o in _markOptions) {
+    if (((o['value'] as double) - value).abs() < 0.05) return o['label'] as String;
+  }
+  return value.toStringAsFixed(1);
+}
+
+Color _getMarkColor(double value) {
+  if (value <= 1.3) return NexusTheme.success;
+  if (value <= 2.3) return Colors.lightGreen;
+  if (value <= 3.3) return const Color(0xFFF59E0B);
+  if (value <= 4.3) return Colors.orange;
+  return NexusTheme.danger;
+}
 
 class SchoolScreen extends StatefulWidget {
   const SchoolScreen({super.key});
@@ -18,11 +69,15 @@ class SchoolScreen extends StatefulWidget {
   State<SchoolScreen> createState() => _SchoolScreenState();
 }
 
-class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderStateMixin {
+class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMixin {
   late TabController _tabController;
-  bool _isAWeek = true;
+  bool _weekToggled = false;
+  bool? _lastKnownInversion;
   int _selectedSubTab = 0;
+  int _previousSubTab = 0;
   final DatabaseService _db = DatabaseService();
+
+  late AnimationController _tabTransitionController;
 
   final List<String> _subTabs = ['Stundenplan', 'Fächer', 'Hausaufgaben', 'Tests', 'Klausuren', 'Noten', 'IServ'];
   final List<String> _days = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
@@ -34,6 +89,8 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
   List<Map<String, dynamic>> _exams = [];
   List<Map<String, dynamic>> _grades = [];
   bool _isLoading = true;
+  String _gradeSystem = 'points';
+  int _classLevel = 10;
 
   final PageController _vertretungsplanPageController = PageController();
   int _currentVertretungsplanPage = 0;
@@ -42,19 +99,39 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _calculateCurrentWeek();
+    _tabTransitionController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+      value: 1.0, // start fully visible
+    );
     _loadAllData();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final provider = context.read<AppProvider>();
+      await provider.loadTimetablePeriods();
+      if (!provider.timetableSetupCompleted && mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const TimetableSetupWizard(),
+        );
+        if (mounted) {
+          await _loadAllData();
+        }
+      }
+    });
   }
 
   Future<void> _loadAllData() async {
     setState(() => _isLoading = true);
     try {
+      final prefs = await SharedPreferences.getInstance();
+      _classLevel = prefs.getInt('school_class_level') ?? 10;
+      _gradeSystem = _classLevel <= 10 ? 'marks' : 'points';
       _subjects = await _db.getSubjects();
       _homework = await _db.getHomework();
       await _loadTests();
       await _loadExams();
       await _loadGrades();
-    } catch (e) {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -116,33 +193,47 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
         created_at TEXT NOT NULL
       )
     ''');
+    try { await db.execute('ALTER TABLE grades ADD COLUMN grade_system TEXT DEFAULT \'points\''); } catch (_) {}
+    try { await db.execute('ALTER TABLE grades ADD COLUMN value REAL'); } catch (_) {}
     _grades = await db.rawQuery('''
-      SELECT g.*, s.name as subject_name, s.color as subject_color
+      SELECT g.*, s.name as subject_name, s.color as subject_color, s.course_type as course_type
       FROM grades g
       LEFT JOIN subjects s ON g.subject_id = s.id
       ORDER BY g.date DESC
     ''');
   }
 
-  void _calculateCurrentWeek() {
-    final now = DateTime.now();
-    final weekNumber = _getWeekNumber(now);
-    setState(() {
-      _isAWeek = weekNumber % 2 == 0;
-    });
-  }
-
-  int _getWeekNumber(DateTime date) {
-    final firstDayOfYear = DateTime(date.year, 1, 1);
-    final daysSinceFirst = date.difference(firstDayOfYear).inDays;
-    return ((daysSinceFirst + firstDayOfYear.weekday - 1) / 7).ceil();
+  bool _displayedIsAWeek(AppProvider provider) {
+    final baseIsAWeek = provider.isCurrentlyAWeek();
+    return _weekToggled ? !baseIsAWeek : baseIsAWeek;
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _tabTransitionController.dispose();
     _vertretungsplanPageController.dispose();
     super.dispose();
+  }
+
+  void _switchTab(int newIndex) async {
+    if (newIndex == _selectedSubTab) return;
+    _previousSubTab = _selectedSubTab;
+
+    // Fade out current content
+    await _tabTransitionController.animateTo(0,
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeIn,
+    );
+    if (!mounted) return;
+
+    setState(() => _selectedSubTab = newIndex);
+
+    // Fade + slide in new content
+    await _tabTransitionController.animateTo(1,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+    );
   }
 
   @override
@@ -151,88 +242,68 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
 
     return Consumer<AppProvider>(
       builder: (context, provider, child) {
-        return Column(
+        if (_lastKnownInversion != null && _lastKnownInversion != provider.abWeekInverted) {
+          _weekToggled = false;
+        }
+        _lastKnownInversion = provider.abWeekInverted;
+
+        return PageFadeIn(
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
+            Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    NexusTheme.primaryColor.withOpacity(0.15),
-                    NexusTheme.secondaryColor.withOpacity(0.1),
-                  ],
-                ),
-              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Schule',
-                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Fächer, Hausaufgaben & Klausuren',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
-                              ),
-                            ),
-                          ],
-                        ),
+                        child: NexusTheme.gradientText('Schule', fontSize: 36),
                       ),
-                      GestureDetector(
-                        onTap: () => setState(() => _isAWeek = !_isAWeek),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: _isAWeek
-                                  ? [NexusTheme.primaryColor, NexusTheme.secondaryColor]
-                                  : [NexusTheme.secondaryColor, NexusTheme.accentColor],
+                      if (provider.abWeeksEnabled)
+                        GestureDetector(
+                          onTap: () => setState(() => _weekToggled = !_weekToggled),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: _displayedIsAWeek(provider)
+                                    ? [NexusTheme.primaryColor, NexusTheme.secondaryColor]
+                                    : [NexusTheme.secondaryColor, NexusTheme.accentColor],
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (_displayedIsAWeek(provider) ? NexusTheme.primaryColor : NexusTheme.accentColor).withValues(alpha: 0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (_isAWeek ? NexusTheme.primaryColor : NexusTheme.accentColor).withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                _isAWeek ? 'A' : 'B',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _displayedIsAWeek(provider) ? 'A' : 'B',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 6),
-                              const Text(
-                                'Woche',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
+                                const SizedBox(width: 6),
+                                const Text(
+                                  'Woche',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -243,32 +314,10 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                         final isSelected = _selectedSubTab == index;
                         return Padding(
                           padding: EdgeInsets.only(right: index < _subTabs.length - 1 ? 8 : 0),
-                          child: GestureDetector(
-                            onTap: () => setState(() => _selectedSubTab = index),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? NexusTheme.primaryColor
-                                    : (isDark ? NexusTheme.darkCard : NexusTheme.lightCard),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? NexusTheme.primaryColor
-                                      : (isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder),
-                                ),
-                              ),
-                              child: Text(
-                                _subTabs[index],
-                                style: TextStyle(
-                                  color: isSelected
-                                      ? Colors.white
-                                      : (isDark ? NexusTheme.darkTextSecondary : NexusTheme.lightTextSecondary),
-                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
+                          child: _TabChip(
+                            label: _subTabs[index],
+                            isSelected: isSelected,
+                            onTap: () => _switchTab(index),
                           ),
                         );
                       }),
@@ -280,9 +329,25 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : _buildSubTabContent(provider, isDark),
+                  : AnimatedBuilder(
+                      animation: _tabTransitionController,
+                      builder: (context, child) {
+                        final t = _tabTransitionController.value;
+                        // Slide direction: right if going to higher tab, left if lower
+                        final slideDir = _selectedSubTab >= _previousSubTab ? 1.0 : -1.0;
+                        return Opacity(
+                          opacity: t.clamp(0.0, 1.0),
+                          child: Transform.translate(
+                            offset: Offset(20 * (1 - t) * slideDir, 0),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: _buildSubTabContent(provider, isDark),
+                    ),
             ),
           ],
+          ),
         );
       },
     );
@@ -312,15 +377,10 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
   Widget _buildStundenplanTab(AppProvider provider, bool isDark) {
     return Column(
       children: [
-        Container(
+        GlassCard(
           margin: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-          decoration: BoxDecoration(
-            color: isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder,
-            ),
-          ),
+          padding: EdgeInsets.zero,
+          borderRadius: 12,
           child: TabBar(
             controller: _tabController,
             tabs: const [
@@ -360,12 +420,26 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
     return tomorrow;
   }
 
+  bool _isTomorrowNextWeek() {
+    final today = DateTime.now().weekday;
+    return today >= 6;
+  }
+
   Widget _buildDaySchedule(AppProvider provider, int dayOfWeek, String dayLabel, bool isDark) {
     final now = DateTime.now();
     final isToday = dayLabel == 'Heute';
 
+    final displayed = _displayedIsAWeek(provider);
+    String currentWeekType;
+    if (dayLabel == 'Morgen' && _isTomorrowNextWeek()) {
+      currentWeekType = displayed ? 'B' : 'A';
+    } else {
+      currentWeekType = displayed ? 'A' : 'B';
+    }
+
     final lessonsForDay = provider.lessons
         .where((l) => l.dayOfWeek == dayOfWeek)
+        .where((l) => !provider.abWeeksEnabled || l.weekType == 'both' || l.weekType == currentWeekType)
         .toList()
       ..sort((a, b) => a.lessonNumber.compareTo(b.lessonNumber));
 
@@ -388,7 +462,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
+                    gradient: const LinearGradient(
                       colors: [NexusTheme.primaryColor, NexusTheme.secondaryColor],
                     ),
                     borderRadius: BorderRadius.circular(8),
@@ -414,7 +488,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
             ),
           ),
           if (lessonsForDay.isEmpty)
-            _buildEmptyDayState(isDark, dayOfWeek)
+            _buildEmptyDayState(context, isDark, dayOfWeek)
           else ...[
             ...lessonsForDay.map((lesson) => _LessonCard(
               lesson: lesson,
@@ -425,17 +499,17 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
             const SizedBox(height: 16),
             Center(
               child: OutlinedButton.icon(
-                onPressed: () => showAddLessonDialog(context, dayOfWeek: dayOfWeek),
+                onPressed: () => showAddLessonDialog(context, dayOfWeek: dayOfWeek, abWeeksEnabled: provider.abWeeksEnabled),
                 icon: const Icon(Icons.add),
                 label: const Text('Weitere Stunde hinzufügen'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: NexusTheme.primaryColor,
-                  side: BorderSide(color: NexusTheme.primaryColor.withOpacity(0.5)),
+                  side: BorderSide(color: NexusTheme.primaryColor.withValues(alpha: 0.5)),
                 ),
               ),
             ),
           ],
-          const SizedBox(height: 80),
+          const SizedBox(height: 120),
         ],
       ),
     );
@@ -467,31 +541,10 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
       }
     }
 
-    return Container(
+    return GlassCard(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: currentLesson != null
-              ? [NexusTheme.primaryColor.withOpacity(0.9), NexusTheme.secondaryColor.withOpacity(0.9)]
-              : [
-                  isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
-                  isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
-                ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: currentLesson == null ? Border.all(
-          color: isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder,
-        ) : null,
-        boxShadow: currentLesson != null ? [
-          BoxShadow(
-            color: NexusTheme.primaryColor.withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ] : null,
-      ),
+      borderRadius: 16,
+      tint: currentLesson != null ? NexusTheme.primaryColor : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -505,7 +558,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: (currentLesson != null ? Colors.greenAccent : NexusTheme.warning).withOpacity(0.5),
+                      color: (currentLesson != null ? Colors.greenAccent : NexusTheme.warning).withValues(alpha: 0.5),
                       blurRadius: 6,
                     ),
                   ],
@@ -545,7 +598,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
+                  color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -608,203 +661,420 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
   }
 
   Widget _buildWeekOverview(AppProvider provider, bool isDark) {
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+    final periods = provider.timetablePeriods
+        .map((m) => TimetablePeriod.fromMap(m))
+        .toList()
+      ..sort((a, b) => a.periodNumber.compareTo(b.periodNumber));
+
+    if (periods.isEmpty) {
+      return _buildEmptyPeriodsState(isDark);
+    }
+
+    final currentWeekType = _displayedIsAWeek(provider) ? 'A' : 'B';
+    final abWeeksEnabled = provider.abWeeksEnabled;
+
+    return Column(
       children: [
-        Center(
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder,
-              ),
-            ),
+        if (abWeeksEnabled)
+          GlassCard(
+            margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            padding: const EdgeInsets.all(12),
+            borderRadius: 12,
             child: Row(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [NexusTheme.primaryColor, NexusTheme.secondaryColor],
-                    ),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      _isAWeek ? 'A' : 'B',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
                 Text(
-                  '${_isAWeek ? 'A' : 'B'}-Woche',
+                  'Woche: ',
                   style: TextStyle(
                     color: isDark ? NexusTheme.darkText : NexusTheme.lightText,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
+                const SizedBox(width: 12),
+                _buildGlassWeekToggle(isDark, provider),
               ],
             ),
           ),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: _buildTimetableGrid(provider, periods, currentWeekType, abWeeksEnabled, isDark),
+            ),
+          ),
         ),
-        ...List.generate(5, (dayIndex) {
-          final dayOfWeek = dayIndex + 1;
-          final lessonsForDay = provider.lessons
-              .where((l) => l.dayOfWeek == dayOfWeek)
-              .toList()
-            ..sort((a, b) => a.lessonNumber.compareTo(b.lessonNumber));
-
-          final isToday = DateTime.now().weekday == dayOfWeek;
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              color: isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isToday
-                    ? NexusTheme.primaryColor.withOpacity(0.5)
-                    : (isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder),
-                width: isToday ? 2 : 1,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isToday
-                        ? NexusTheme.primaryColor.withOpacity(0.1)
-                        : Colors.transparent,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        _daysFull[dayIndex],
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: isToday
-                              ? NexusTheme.primaryColor
-                              : (isDark ? NexusTheme.darkText : NexusTheme.lightText),
-                        ),
-                      ),
-                      if (isToday) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: NexusTheme.primaryColor,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Text(
-                            'Heute',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                      const Spacer(),
-                      Text(
-                        '${lessonsForDay.length} Std.',
-                        style: TextStyle(
-                          color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (lessonsForDay.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'Frei',
-                      style: TextStyle(
-                        color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  )
-                else
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                    child: Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: lessonsForDay.map((lesson) {
-                        final lessonColor = lesson.color != null
-                            ? Color(int.parse(lesson.color!.replaceFirst('#', '0xFF')))
-                            : NexusTheme.primaryColor;
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: lessonColor.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: lessonColor.withOpacity(0.3),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 18,
-                                height: 18,
-                                decoration: BoxDecoration(
-                                  color: lessonColor,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '${lesson.lessonNumber}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                lesson.subject,
-                                style: TextStyle(
-                                  color: isDark ? NexusTheme.darkText : NexusTheme.lightText,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-              ],
-            ),
-          );
-        }),
-        const SizedBox(height: 80),
       ],
     );
   }
 
-  Widget _buildEmptyDayState(bool isDark, int dayOfWeek) {
+  Widget _buildGlassWeekToggle(bool isDark, AppProvider provider) {
+    return GlassContainer(
+      borderRadius: 10,
+      blurSigma: 8,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildWeekToggleButton('A', true, isDark, provider),
+          _buildWeekToggleButton('B', false, isDark, provider),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeekToggleButton(String label, bool isAWeekButton, bool isDark, AppProvider provider) {
+    final isSelected = _displayedIsAWeek(provider) == isAWeekButton;
+    return GestureDetector(
+      onTap: () => setState(() => _weekToggled = (isAWeekButton != provider.isCurrentlyAWeek())),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? const LinearGradient(
+                  colors: [NexusTheme.primaryColor, NexusTheme.secondaryColor],
+                )
+              : null,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected
+                ? Colors.white
+                : (isDark ? Colors.white70 : Colors.black54),
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyPeriodsState(bool isDark) {
+    return Center(
+      child: GlassCard(
+        padding: const EdgeInsets.all(32),
+        borderRadius: 20,
+        child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: NexusTheme.primaryColor.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.schedule_outlined,
+                    size: 48,
+                    color: NexusTheme.primaryColor,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Keine Unterrichtszeiten',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Konfiguriere zuerst deine Schulstunden',
+                  style: TextStyle(
+                    color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/timetable-config');
+                  },
+                  icon: const Icon(Icons.settings),
+                  label: const Text('Zeiten konfigurieren'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: NexusTheme.primaryColor,
+                  ),
+                ),
+              ],
+            ),
+      ),
+    );
+  }
+  Widget _buildTimetableGrid(
+    AppProvider provider,
+    List<TimetablePeriod> periods,
+    String weekType,
+    bool abWeeksEnabled,
+    bool isDark,
+  ) {
+    const cellWidth = 85.0;
+    const cellHeight = 70.0;
+    const headerHeight = 44.0;
+    const periodColumnWidth = 65.0;
+
+    return GlassContainer(
+      borderRadius: 16,
+      blurSigma: 10,
+      child: Table(
+            defaultColumnWidth: const FixedColumnWidth(cellWidth),
+            columnWidths: const {0: FixedColumnWidth(periodColumnWidth)},
+            border: TableBorder.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.1)
+                  : Colors.black.withValues(alpha: 0.08),
+              width: 1,
+            ),
+            children: [
+              TableRow(
+                children: [
+                  SizedBox(
+                    height: headerHeight,
+                    child: Center(
+                      child: Text(
+                        'Zeit',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                  ..._days.asMap().entries.map((entry) {
+                    final dayIndex = entry.key;
+                    final day = entry.value;
+                    final isToday = DateTime.now().weekday == dayIndex + 1;
+                    return SizedBox(
+                      height: headerHeight,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: isToday
+                              ? LinearGradient(
+                                  colors: [
+                                    NexusTheme.primaryColor.withValues(alpha: 0.3),
+                                    NexusTheme.secondaryColor.withValues(alpha: 0.2),
+                                  ],
+                                )
+                              : LinearGradient(
+                                  colors: [
+                                    NexusTheme.primaryColor.withValues(alpha: 0.1),
+                                    NexusTheme.secondaryColor.withValues(alpha: 0.1),
+                                  ],
+                                ),
+                        ),
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                day,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isToday
+                                      ? NexusTheme.primaryColor
+                                      : (isDark ? NexusTheme.darkText : NexusTheme.lightText),
+                                ),
+                              ),
+                              if (isToday)
+                                Container(
+                                  margin: const EdgeInsets.only(top: 2),
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
+                                    color: NexusTheme.primaryColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+              ...periods.map((period) => TableRow(
+                children: [
+                  SizedBox(
+                    height: cellHeight,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.03)
+                          : Colors.white.withValues(alpha: 0.3),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [NexusTheme.primaryColor, NexusTheme.secondaryColor],
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${period.periodNumber}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            period.startTime,
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                            ),
+                          ),
+                          Text(
+                            period.endTime,
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  ...List.generate(5, (dayIndex) {
+                    final dayOfWeek = dayIndex + 1;
+                    final lessonsForCell = provider.lessons
+                        .where((l) => l.dayOfWeek == dayOfWeek && l.lessonNumber == period.periodNumber)
+                        .where((l) => !abWeeksEnabled || l.weekType == 'both' || l.weekType == weekType)
+                        .toList();
+
+                    return SizedBox(
+                      height: cellHeight,
+                      child: _buildGridCell(
+                        lessonsForCell,
+                        dayOfWeek,
+                        period,
+                        abWeeksEnabled,
+                        isDark,
+                      ),
+                    );
+                  }),
+                ],
+              )),
+            ],
+          ),
+    );
+  }
+
+  Widget _buildGridCell(
+    List<Lesson> lessons,
+    int dayOfWeek,
+    TimetablePeriod period,
+    bool abWeeksEnabled,
+    bool isDark,
+  ) {
+    if (lessons.isEmpty) {
+      return InkWell(
+        onTap: () => _showAddLessonForCell(dayOfWeek, period, abWeeksEnabled),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.02)
+                : Colors.white.withValues(alpha: 0.2),
+          ),
+          child: Center(
+            child: Icon(
+              Icons.add,
+              color: (isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted).withValues(alpha: 0.3),
+              size: 20,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (lessons.isEmpty) return const SizedBox.shrink();
+    final lesson = lessons.first;
+    final color = _parseColor(lesson.color, NexusTheme.primaryColor);
+
+    return InkWell(
+      onTap: () => _showEditLessonForCell(lesson, abWeeksEnabled),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: isDark ? 0.25 : 0.2),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              lesson.subject.length > 8
+                  ? '${lesson.subject.substring(0, 8)}.'
+                  : lesson.subject,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+                color: color,
+              ),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (lesson.room != null && lesson.room!.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                lesson.room!,
+                style: TextStyle(
+                  fontSize: 9,
+                  color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+            if (lesson.weekType != 'both' && abWeeksEnabled) ...[
+              const SizedBox(height: 2),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  lesson.weekType,
+                  style: TextStyle(
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddLessonForCell(int dayOfWeek, TimetablePeriod period, bool abWeeksEnabled) {
+    showAddLessonDialog(
+      context,
+      dayOfWeek: dayOfWeek,
+      lessonNumber: period.periodNumber,
+      startTime: period.startTime,
+      endTime: period.endTime,
+      abWeeksEnabled: abWeeksEnabled,
+    );
+  }
+
+  void _showEditLessonForCell(Lesson lesson, bool abWeeksEnabled) {
+    showEditLessonDialog(context, lesson, abWeeksEnabled: abWeeksEnabled);
+  }
+
+  Widget _buildEmptyDayState(BuildContext context, bool isDark, int dayOfWeek) {
+    final abWeeksEnabled = context.read<AppProvider>().abWeeksEnabled;
     return Container(
       padding: const EdgeInsets.all(32),
       child: Column(
@@ -813,7 +1083,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
           Icon(
             Icons.wb_sunny_outlined,
             size: 64,
-            color: NexusTheme.primaryColor.withOpacity(0.5),
+            color: NexusTheme.primaryColor.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           Text(
@@ -833,7 +1103,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
           ),
           const SizedBox(height: 24),
           FilledButton.icon(
-            onPressed: () => showAddLessonDialog(context, dayOfWeek: dayOfWeek),
+            onPressed: () => showAddLessonDialog(context, dayOfWeek: dayOfWeek, abWeeksEnabled: abWeeksEnabled),
             icon: const Icon(Icons.add),
             label: const Text('Stunde hinzufügen'),
             style: FilledButton.styleFrom(
@@ -860,12 +1130,15 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                ..._subjects.map((subject) => _SubjectCard(
-                  subject: subject,
-                  onEdit: () => _showEditSubjectDialog(subject, isDark),
-                  onDelete: () => _deleteSubject(subject['id']),
+                ..._subjects.asMap().entries.map((entry) => AnimatedListItem(
+                  index: entry.key,
+                  child: _SubjectCard(
+                    subject: entry.value,
+                    onEdit: () => _showEditSubjectDialog(entry.value, isDark),
+                    onDelete: () => _deleteSubject(entry.value['id']),
+                  ),
                 )),
-                const SizedBox(height: 80),
+                const SizedBox(height: 120),
               ],
             ),
     );
@@ -890,48 +1163,51 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
       context: context,
       builder: (context) => AlertDialog(
         title: Text(subject != null ? 'Fach bearbeiten' : 'Neues Fach'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Name',
-                  hintText: 'z.B. Mathematik',
+        content: SizedBox(
+          width: 460,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Name',
+                    hintText: 'z.B. Mathematik',
+                  ),
+                  autofocus: true,
                 ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: shortController,
-                decoration: const InputDecoration(
-                  labelText: 'Kürzel (optional)',
-                  hintText: 'z.B. MA',
+                const SizedBox(height: 16),
+                TextField(
+                  controller: shortController,
+                  decoration: const InputDecoration(
+                    labelText: 'Kürzel (optional)',
+                    hintText: 'z.B. MA',
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: teacherController,
-                decoration: const InputDecoration(
-                  labelText: 'Lehrer (optional)',
-                  prefixIcon: Icon(Icons.person),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: teacherController,
+                  decoration: const InputDecoration(
+                    labelText: 'Lehrer (optional)',
+                    prefixIcon: Icon(Icons.person),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: roomController,
-                decoration: const InputDecoration(
-                  labelText: 'Raum (optional)',
-                  prefixIcon: Icon(Icons.room),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: roomController,
+                  decoration: const InputDecoration(
+                    labelText: 'Raum (optional)',
+                    prefixIcon: Icon(Icons.room),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              _ColorPicker(
-                selectedColor: selectedColor,
-                onColorSelected: (color) => selectedColor = color,
-              ),
-            ],
+                const SizedBox(height: 16),
+                _ColorPicker(
+                  selectedColor: selectedColor,
+                  onColorSelected: (color) => selectedColor = color,
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
@@ -947,9 +1223,9 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                 await _db.updateSubject(
                   subject['id'],
                   name: nameController.text.trim(),
-                  shortName: shortController.text.trim(),
-                  teacher: teacherController.text.trim(),
-                  room: roomController.text.trim(),
+                  shortName: shortController.text.trim().isEmpty ? null : shortController.text.trim(),
+                  teacher: teacherController.text.trim().isEmpty ? null : teacherController.text.trim(),
+                  room: roomController.text.trim().isEmpty ? null : roomController.text.trim(),
                   color: selectedColor,
                 );
               } else {
@@ -962,7 +1238,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                 );
               }
               await _loadAllData();
-              if (mounted) Navigator.pop(context);
+              if (context.mounted) Navigator.pop(context);
             },
             child: const Text('Speichern'),
           ),
@@ -1013,24 +1289,30 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
               children: [
                 if (openHomework.isNotEmpty) ...[
                   _SectionHeader(title: 'Offen (${openHomework.length})', isDark: isDark),
-                  ...openHomework.map((hw) => _HomeworkCard(
-                    homework: hw,
-                    onToggle: () => _toggleHomework(hw),
-                    onEdit: () => _showHomeworkDialog(hw, isDark),
-                    onDelete: () => _deleteHomework(hw['id']),
+                  ...openHomework.asMap().entries.map((entry) => AnimatedListItem(
+                    index: entry.key,
+                    child: _HomeworkCard(
+                      homework: entry.value,
+                      onToggle: () => _toggleHomework(entry.value),
+                      onEdit: () => _showHomeworkDialog(entry.value, isDark),
+                      onDelete: () => _deleteHomework(entry.value['id']),
+                    ),
                   )),
                 ],
                 if (completedHomework.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   _SectionHeader(title: 'Erledigt (${completedHomework.length})', isDark: isDark),
-                  ...completedHomework.map((hw) => _HomeworkCard(
-                    homework: hw,
-                    onToggle: () => _toggleHomework(hw),
-                    onEdit: () => _showHomeworkDialog(hw, isDark),
-                    onDelete: () => _deleteHomework(hw['id']),
+                  ...completedHomework.asMap().entries.map((entry) => AnimatedListItem(
+                    index: entry.key,
+                    child: _HomeworkCard(
+                      homework: entry.value,
+                      onToggle: () => _toggleHomework(entry.value),
+                      onEdit: () => _showHomeworkDialog(entry.value, isDark),
+                      onDelete: () => _deleteHomework(entry.value['id']),
+                    ),
                   )),
                 ],
-                const SizedBox(height: 80),
+                const SizedBox(height: 120),
               ],
             ),
     );
@@ -1047,7 +1329,9 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: Text(homework != null ? 'Hausaufgabe bearbeiten' : 'Neue Hausaufgabe'),
-          content: SingleChildScrollView(
+          content: SizedBox(
+            width: 460,
+            child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1058,7 +1342,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<int?>(
-                  value: selectedSubjectId,
+                  initialValue: selectedSubjectId,
                   decoration: const InputDecoration(labelText: 'Fach'),
                   items: [
                     const DropdownMenuItem(value: null, child: Text('Kein Fach')),
@@ -1101,6 +1385,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
               ],
             ),
           ),
+          ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
             FilledButton(
@@ -1125,7 +1410,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                   );
                 }
                 await _loadAllData();
-                if (mounted) Navigator.pop(context);
+                if (context.mounted) Navigator.pop(context);
               },
               child: const Text('Speichern'),
             ),
@@ -1171,24 +1456,30 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
               children: [
                 if (upcoming.isNotEmpty) ...[
                   _SectionHeader(title: 'Anstehend (${upcoming.length})', isDark: isDark),
-                  ...upcoming.map((t) => _TestExamCard(
-                    item: t,
-                    isExam: false,
-                    onEdit: () => _showTestExamDialog(t, isExam: false, isDark: isDark),
-                    onDelete: () => _deleteTest(t['id']),
+                  ...upcoming.asMap().entries.map((entry) => AnimatedListItem(
+                    index: entry.key,
+                    child: _TestExamCard(
+                      item: entry.value,
+                      isExam: false,
+                      onEdit: () => _showTestExamDialog(entry.value, isExam: false, isDark: isDark),
+                      onDelete: () => _deleteTest(entry.value['id']),
+                    ),
                   )),
                 ],
                 if (past.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   _SectionHeader(title: 'Vergangen (${past.length})', isDark: isDark),
-                  ...past.map((t) => _TestExamCard(
-                    item: t,
-                    isExam: false,
-                    onEdit: () => _showTestExamDialog(t, isExam: false, isDark: isDark),
-                    onDelete: () => _deleteTest(t['id']),
+                  ...past.asMap().entries.map((entry) => AnimatedListItem(
+                    index: entry.key,
+                    child: _TestExamCard(
+                      item: entry.value,
+                      isExam: false,
+                      onEdit: () => _showTestExamDialog(entry.value, isExam: false, isDark: isDark),
+                      onDelete: () => _deleteTest(entry.value['id']),
+                    ),
                   )),
                 ],
-                const SizedBox(height: 80),
+                const SizedBox(height: 120),
               ],
             ),
     );
@@ -1220,24 +1511,30 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
               children: [
                 if (upcoming.isNotEmpty) ...[
                   _SectionHeader(title: 'Anstehend (${upcoming.length})', isDark: isDark),
-                  ...upcoming.map((e) => _TestExamCard(
-                    item: e,
-                    isExam: true,
-                    onEdit: () => _showTestExamDialog(e, isExam: true, isDark: isDark),
-                    onDelete: () => _deleteExam(e['id']),
+                  ...upcoming.asMap().entries.map((entry) => AnimatedListItem(
+                    index: entry.key,
+                    child: _TestExamCard(
+                      item: entry.value,
+                      isExam: true,
+                      onEdit: () => _showTestExamDialog(entry.value, isExam: true, isDark: isDark),
+                      onDelete: () => _deleteExam(entry.value['id']),
+                    ),
                   )),
                 ],
                 if (past.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   _SectionHeader(title: 'Vergangen (${past.length})', isDark: isDark),
-                  ...past.map((e) => _TestExamCard(
-                    item: e,
-                    isExam: true,
-                    onEdit: () => _showTestExamDialog(e, isExam: true, isDark: isDark),
-                    onDelete: () => _deleteExam(e['id']),
+                  ...past.asMap().entries.map((entry) => AnimatedListItem(
+                    index: entry.key,
+                    child: _TestExamCard(
+                      item: entry.value,
+                      isExam: true,
+                      onEdit: () => _showTestExamDialog(entry.value, isExam: true, isDark: isDark),
+                      onDelete: () => _deleteExam(entry.value['id']),
+                    ),
                   )),
                 ],
-                const SizedBox(height: 80),
+                const SizedBox(height: 120),
               ],
             ),
     );
@@ -1257,7 +1554,9 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
           title: Text(item != null
               ? '${isExam ? 'Klausur' : 'Test'} bearbeiten'
               : 'Neue${isExam ? ' Klausur' : 'r Test'}'),
-          content: SingleChildScrollView(
+          content: SizedBox(
+            width: 460,
+            child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1268,7 +1567,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<int?>(
-                  value: selectedSubjectId,
+                  initialValue: selectedSubjectId,
                   decoration: const InputDecoration(labelText: 'Fach'),
                   items: [
                     const DropdownMenuItem(value: null, child: Text('Kein Fach')),
@@ -1317,6 +1616,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
               ],
             ),
           ),
+          ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
             FilledButton(
@@ -1346,7 +1646,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                   });
                 }
                 await _loadAllData();
-                if (mounted) Navigator.pop(context);
+                if (context.mounted) Navigator.pop(context);
               },
               child: const Text('Speichern'),
             ),
@@ -1371,27 +1671,74 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
   String _selectedSemester = 'Q1';
 
   Widget _buildGradesTab(bool isDark) {
+    final isMarks = _gradeSystem == 'marks';
+    final semesters = isMarks
+        ? ['$_classLevel/1', '$_classLevel/2', 'all']
+        : ['Q1', 'Q2', 'Q3', 'Q4', 'all'];
+
+    // Ensure selected semester is valid for current system
+    if (!semesters.contains(_selectedSemester)) {
+      _selectedSemester = semesters.first;
+    }
+
+    // Split grades into current system and archived
+    final currentSemesters = isMarks
+        ? ['$_classLevel/1', '$_classLevel/2']
+        : ['Q1', 'Q2', 'Q3', 'Q4'];
+
+    final currentSystemGrades = _grades.where((g) {
+      final matchesSystem = (g['grade_system'] ?? 'points') == _gradeSystem;
+      if (!matchesSystem) return false;
+      if (isMarks) {
+        final sem = g['semester'] as String? ?? '';
+        return currentSemesters.contains(sem);
+      }
+      return true;
+    }).toList();
+
+    final archivedGrades = _grades.where((g) {
+      final matchesSystem = (g['grade_system'] ?? 'points') == _gradeSystem;
+      if (!matchesSystem) return true;
+      if (isMarks) {
+        final sem = g['semester'] as String? ?? '';
+        return !currentSemesters.contains(sem);
+      }
+      return false;
+    }).toList();
+
     final filteredGrades = _selectedSemester == 'all'
-        ? _grades
-        : _grades.where((g) => g['semester'] == _selectedSemester).toList();
-
-    final klausurGrades = filteredGrades.where((g) => g['type'] == 'Klausur').toList();
-    final sonstigeGrades = filteredGrades.where((g) => g['type'] != 'Klausur').toList();
-
-    double? klausurAvg = klausurGrades.isNotEmpty
-        ? klausurGrades.map((g) => g['points'] as int).reduce((a, b) => a + b) / klausurGrades.length
-        : null;
-    double? sonstigeAvg = sonstigeGrades.isNotEmpty
-        ? sonstigeGrades.map((g) => g['points'] as int).reduce((a, b) => a + b) / sonstigeGrades.length
-        : null;
+        ? currentSystemGrades
+        : currentSystemGrades.where((g) => g['semester'] == _selectedSemester).toList();
 
     double? overallAvg;
-    if (klausurAvg != null && sonstigeAvg != null) {
-      overallAvg = (klausurAvg * 1 + sonstigeAvg * 2) / 3;
-    } else if (klausurAvg != null) {
-      overallAvg = klausurAvg;
-    } else if (sonstigeAvg != null) {
-      overallAvg = sonstigeAvg;
+    double? klausurAvg;
+    double? sonstigeAvg;
+
+    if (isMarks) {
+      // Marks mode: simple average of all mark values
+      final marksWithValue = filteredGrades.where((g) => g['value'] != null).toList();
+      if (marksWithValue.isNotEmpty) {
+        overallAvg = marksWithValue.map((g) => (g['value'] as num).toDouble()).reduce((a, b) => a + b) / marksWithValue.length;
+      }
+    } else {
+      // Points mode: 1/3 Klausur + 2/3 Sonstige
+      final klausurGrades = filteredGrades.where((g) => g['type'] == 'Klausur').toList();
+      final sonstigeGradesList = filteredGrades.where((g) => g['type'] != 'Klausur').toList();
+
+      klausurAvg = klausurGrades.isNotEmpty
+          ? klausurGrades.map((g) => g['points'] as int).reduce((a, b) => a + b) / klausurGrades.length
+          : null;
+      sonstigeAvg = sonstigeGradesList.isNotEmpty
+          ? sonstigeGradesList.map((g) => g['points'] as int).reduce((a, b) => a + b) / sonstigeGradesList.length
+          : null;
+
+      if (klausurAvg != null && sonstigeAvg != null) {
+        overallAvg = (klausurAvg * 1 + sonstigeAvg * 2) / 3;
+      } else if (klausurAvg != null) {
+        overallAvg = klausurAvg;
+      } else if (sonstigeAvg != null) {
+        overallAvg = sonstigeAvg;
+      }
     }
 
     return RefreshIndicator(
@@ -1404,31 +1751,28 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: ['Q1', 'Q2', 'Q3', 'Q4', 'all'].map((semester) {
+                children: semesters.map((semester) {
                   final isSelected = _selectedSemester == semester;
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: GestureDetector(
                       onTap: () => setState(() => _selectedSemester = semester),
-                      child: Container(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
                         padding: EdgeInsets.symmetric(
                           horizontal: semester == 'all' ? 16 : 14,
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          gradient: isSelected
-                              ? LinearGradient(colors: [NexusTheme.primaryColor, NexusTheme.secondaryColor])
-                              : null,
-                          color: isSelected ? null : (isDark ? NexusTheme.darkCard : NexusTheme.lightCard),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isSelected ? Colors.transparent : (isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder),
-                          ),
+                          color: isSelected
+                              ? const Color(0xFF4F46E5)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(9999),
                         ),
                         child: Text(
                           semester == 'all' ? 'Alle' : semester,
                           style: TextStyle(
-                            color: isSelected ? Colors.white : (isDark ? NexusTheme.darkTextSecondary : NexusTheme.lightTextSecondary),
+                            color: isSelected ? Colors.white : const Color(0xFF71717A),
                             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                           ),
                         ),
@@ -1441,33 +1785,27 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
           ),
 
           if (overallAvg != null)
-            Container(
+            GlassCard(
               padding: const EdgeInsets.all(16),
               margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    NexusTheme.primaryColor.withOpacity(0.15),
-                    NexusTheme.secondaryColor.withOpacity(0.1),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(16),
-              ),
+              borderRadius: 16,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildSummaryItem('Gesamt', overallAvg.toStringAsFixed(1), NexusTheme.primaryColor, isDark),
-                  if (klausurAvg != null)
-                    _buildSummaryItem('Klausuren (1/3)', klausurAvg.toStringAsFixed(1), NexusTheme.secondaryColor, isDark),
-                  if (sonstigeAvg != null)
-                    _buildSummaryItem('Sonstige (2/3)', sonstigeAvg.toStringAsFixed(1), NexusTheme.accentColor, isDark),
+                  if (isMarks)
+                    _buildSummaryItem('Gesamt', overallAvg.toStringAsFixed(1), NexusTheme.primaryColor, isDark)
+                  else ...[
+                    _buildSummaryItem('Gesamt', overallAvg.toStringAsFixed(1), NexusTheme.primaryColor, isDark),
+                    if (klausurAvg != null)
+                      _buildSummaryItem('Klausuren (1/3)', klausurAvg.toStringAsFixed(1), NexusTheme.secondaryColor, isDark),
+                    if (sonstigeAvg != null)
+                      _buildSummaryItem('Sonstige (2/3)', sonstigeAvg.toStringAsFixed(1), NexusTheme.accentColor, isDark),
+                  ],
                 ],
               ),
             ),
 
-          _FullGradeCalculatorCard(isDark: isDark, subjects: _subjects),
+          _FullGradeCalculatorCard(isDark: isDark, subjects: _subjects, gradeSystem: _gradeSystem),
           const SizedBox(height: 16),
 
           Row(
@@ -1487,7 +1825,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
               padding: const EdgeInsets.all(32),
               child: Column(
                 children: [
-                  Icon(Icons.grade, size: 48, color: NexusTheme.primaryColor.withOpacity(0.5)),
+                  Icon(Icons.grade, size: 48, color: NexusTheme.primaryColor.withValues(alpha: 0.5)),
                   const SizedBox(height: 16),
                   Text(
                     'Keine Noten eingetragen',
@@ -1508,8 +1846,64 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
           else
             ..._buildGradesBySubject(filteredGrades, isDark),
 
-          const SizedBox(height: 80),
+          // Archive section for grades from the other system
+          if (archivedGrades.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            _buildArchiveSection(archivedGrades, isDark),
+          ],
+
+          const SizedBox(height: 120),
         ],
+      ),
+    );
+  }
+
+  Widget _buildArchiveSection(List<Map<String, dynamic>> archivedGrades, bool isDark) {
+    final archiveLabel = _gradeSystem == 'marks'
+        ? 'Archiv (andere Klassenstufen & Punkte)'
+        : 'Archiv (Noten)';
+
+    // Group by subject
+    final Map<int, List<Map<String, dynamic>>> bySubject = {};
+    for (final g in archivedGrades) {
+      final sid = g['subject_id'] as int;
+      bySubject.putIfAbsent(sid, () => []).add(g);
+    }
+
+    return GlassCard(
+      padding: EdgeInsets.zero,
+      borderRadius: 12,
+      child: ExpansionTile(
+        leading: Icon(Icons.archive_outlined, color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted),
+        title: Text(archiveLabel, style: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+        )),
+        subtitle: Text('${archivedGrades.length} Noten', style: TextStyle(
+          fontSize: 12,
+          color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+        )),
+        children: bySubject.entries.map((entry) {
+          final grades = entry.value;
+          final subjectName = grades.first['subject_name'] ?? 'Unbekannt';
+          final isArchivedMarks = (grades.first['grade_system'] ?? 'points') == 'marks';
+
+          return ListTile(
+            dense: true,
+            title: Text(subjectName as String, style: TextStyle(
+              color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+            )),
+            subtitle: Text(
+              grades.map((g) {
+                if (isArchivedMarks && g['value'] != null) {
+                  return _markValueToLabel((g['value'] as num).toDouble());
+                }
+                return '${g['points']}P';
+              }).join(', '),
+              style: TextStyle(fontSize: 12, color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -1521,7 +1915,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
           width: 50,
           height: 50,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
+            color: color.withValues(alpha: 0.2),
             shape: BoxShape.circle,
           ),
           child: Center(
@@ -1549,34 +1943,40 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
   }
 
   void _showAddGradeDialog(bool isDark) {
+    final isMarks = _gradeSystem == 'marks';
     int? selectedSubjectId;
-    String selectedSemester = _selectedSemester == 'all' ? 'Q1' : _selectedSemester;
+    final defaultSemester = isMarks ? '$_classLevel/1' : 'Q1';
+    String selectedSemester = _selectedSemester == 'all' ? defaultSemester : _selectedSemester;
     String selectedType = 'Mündlich';
     final pointsController = TextEditingController();
+    double? selectedMarkValue;
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Neue Note'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+          content: SizedBox(
+            width: 460,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
               children: [
+                // Subject dropdown — hide LK/GK badges in marks mode
                 DropdownButtonFormField<int?>(
-                  value: selectedSubjectId,
+                  initialValue: selectedSubjectId,
                   decoration: const InputDecoration(labelText: 'Fach'),
                   items: _subjects.map((s) => DropdownMenuItem(
                     value: s['id'] as int,
                     child: Row(
                       children: [
                         Text(s['name'] as String),
-                        if (s['course_type'] != null) ...[
+                        if (!isMarks && s['course_type'] != null) ...[
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: s['course_type'] == 'LK' ? NexusTheme.primaryColor.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
+                              color: s['course_type'] == 'LK' ? NexusTheme.primaryColor.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -1591,15 +1991,18 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                   onChanged: (v) => setDialogState(() => selectedSubjectId = v),
                 ),
                 const SizedBox(height: 16),
+                // Semester dropdown — HJ1/HJ2 for marks, Q1-Q4 for points
                 DropdownButtonFormField<String>(
-                  value: selectedSemester,
+                  initialValue: selectedSemester,
                   decoration: const InputDecoration(labelText: 'Halbjahr'),
-                  items: ['Q1', 'Q2', 'Q3', 'Q4'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                  items: (isMarks ? ['$_classLevel/1', '$_classLevel/2'] : ['Q1', 'Q2', 'Q3', 'Q4'])
+                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                      .toList(),
                   onChanged: (v) => setDialogState(() => selectedSemester = v!),
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: selectedType,
+                  initialValue: selectedType,
                   decoration: const InputDecoration(labelText: 'Art'),
                   items: ['Klausur', 'Mündlich', 'Test', 'Referat', 'Hausarbeit', 'Sonstige']
                       .map((t) => DropdownMenuItem(value: t, child: Text(t)))
@@ -1607,55 +2010,88 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                   onChanged: (v) => setDialogState(() => selectedType = v!),
                 ),
                 const SizedBox(height: 16),
-                TextField(
-                  controller: pointsController,
-                  decoration: const InputDecoration(
-                    labelText: 'Punkte (0-15)',
-                    hintText: 'z.B. 12',
+                if (isMarks)
+                  // Marks mode: dropdown with 16 options (1+ to 6)
+                  DropdownButtonFormField<double>(
+                    initialValue: selectedMarkValue,
+                    decoration: const InputDecoration(labelText: 'Note'),
+                    items: _markOptions.map((o) => DropdownMenuItem(
+                      value: o['value'] as double,
+                      child: Text('${o['label']}  (${(o['value'] as double).toStringAsFixed(1)})'),
+                    )).toList(),
+                    onChanged: (v) => setDialogState(() => selectedMarkValue = v),
+                  )
+                else
+                  // Points mode: text field 0-15
+                  TextField(
+                    controller: pointsController,
+                    decoration: const InputDecoration(
+                      labelText: 'Punkte (0-15)',
+                      hintText: 'z.B. 12',
+                    ),
+                    keyboardType: TextInputType.number,
                   ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03),
-                    borderRadius: BorderRadius.circular(8),
+                if (!isMarks) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      children: [
+                        Text('Gewichtung:', style: TextStyle(fontSize: 12, color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted)),
+                        const SizedBox(height: 4),
+                        Text(
+                          selectedType == 'Klausur' ? 'Zählt zu Klausuren (1/3)' : 'Zählt zu Sonstige (2/3)',
+                          style: TextStyle(fontWeight: FontWeight.w500, color: isDark ? NexusTheme.darkText : NexusTheme.lightText),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Column(
-                    children: [
-                      Text('Gewichtung:', style: TextStyle(fontSize: 12, color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted)),
-                      const SizedBox(height: 4),
-                      Text(
-                        selectedType == 'Klausur' ? 'Zählt zu Klausuren (1/3)' : 'Zählt zu Sonstige (2/3)',
-                        style: TextStyle(fontWeight: FontWeight.w500, color: isDark ? NexusTheme.darkText : NexusTheme.lightText),
-                      ),
-                    ],
-                  ),
-                ),
+                ],
               ],
             ),
+          ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
             FilledButton(
               onPressed: () async {
-                if (selectedSubjectId == null || pointsController.text.isEmpty) return;
-                final points = int.tryParse(pointsController.text);
-                if (points == null || points < 0 || points > 15) return;
+                if (selectedSubjectId == null) return;
 
                 final db = await _db.database;
-                await db.insert('grades', {
-                  'id': DateTime.now().millisecondsSinceEpoch.toString(),
-                  'subject_id': selectedSubjectId,
-                  'semester': selectedSemester,
-                  'type': selectedType,
-                  'points': points,
-                  'date': DateTime.now().toIso8601String(),
-                  'created_at': DateTime.now().toIso8601String(),
-                });
+                if (isMarks) {
+                  if (selectedMarkValue == null) return;
+                  await db.insert('grades', {
+                    'id': DateTime.now().millisecondsSinceEpoch.toString(),
+                    'subject_id': selectedSubjectId,
+                    'semester': selectedSemester,
+                    'type': selectedType,
+                    'points': 0,
+                    'value': selectedMarkValue,
+                    'grade_system': 'marks',
+                    'date': DateTime.now().toIso8601String(),
+                    'created_at': DateTime.now().toIso8601String(),
+                  });
+                } else {
+                  if (pointsController.text.isEmpty) return;
+                  final points = int.tryParse(pointsController.text);
+                  if (points == null || points < 0 || points > 15) return;
+                  await db.insert('grades', {
+                    'id': DateTime.now().millisecondsSinceEpoch.toString(),
+                    'subject_id': selectedSubjectId,
+                    'semester': selectedSemester,
+                    'type': selectedType,
+                    'points': points,
+                    'grade_system': 'points',
+                    'date': DateTime.now().toIso8601String(),
+                    'created_at': DateTime.now().toIso8601String(),
+                  });
+                }
                 await _loadAllData();
-                if (mounted) Navigator.pop(context);
+                if (context.mounted) Navigator.pop(context);
               },
               child: const Text('Speichern'),
             ),
@@ -1666,20 +2102,77 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
   }
 
   List<Widget> _buildGradesBySubject(List<Map<String, dynamic>> grades, bool isDark) {
+    final isMarks = _gradeSystem == 'marks';
     final Map<int, List<Map<String, dynamic>>> gradesBySubject = {};
     for (final grade in grades) {
       final subjectId = grade['subject_id'] as int;
       gradesBySubject.putIfAbsent(subjectId, () => []).add(grade);
     }
 
-    return gradesBySubject.entries.map((entry) {
+    return gradesBySubject.entries.where((entry) => entry.value.isNotEmpty).map((entry) {
       final subjectGrades = entry.value;
       final subjectName = subjectGrades.first['subject_name'] ?? 'Unbekannt';
-      final subjectColor = subjectGrades.first['subject_color'] != null
-          ? Color(int.parse((subjectGrades.first['subject_color'] as String).replaceFirst('#', '0xFF')))
-          : NexusTheme.primaryColor;
       final courseType = subjectGrades.first['course_type'];
 
+      if (isMarks) {
+        // Marks mode: simple average of mark values
+        final marksWithValue = subjectGrades.where((g) => g['value'] != null).toList();
+        if (marksWithValue.isEmpty) return const SizedBox.shrink();
+        final avgMark = marksWithValue.map((g) => (g['value'] as num).toDouble()).reduce((a, b) => a + b) / marksWithValue.length;
+        final avgColor = _getMarkColor(avgMark);
+
+        return GlassCard(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: EdgeInsets.zero,
+          borderRadius: 12,
+          child: ExpansionTile(
+            leading: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: avgColor.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(
+                child: Text(
+                  _markValueToLabel(avgMark),
+                  style: TextStyle(color: avgColor, fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+            ),
+            title: Text(subjectName as String, overflow: TextOverflow.ellipsis),
+            subtitle: Text('${subjectGrades.length} Noten'),
+            children: subjectGrades.map((g) {
+              final markVal = g['value'] != null ? (g['value'] as num).toDouble() : 0.0;
+              final markColor = _getMarkColor(markVal);
+              return ListTile(
+                leading: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: markColor.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Center(
+                    child: Text(
+                      _markValueToLabel(markVal),
+                      style: TextStyle(color: markColor, fontWeight: FontWeight.bold, fontSize: 11),
+                    ),
+                  ),
+                ),
+                title: Text(g['type'] as String),
+                subtitle: Text(g['semester'] as String),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                  onPressed: () => _deleteGrade(g['id']),
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      }
+
+      // Points mode: 1/3 Klausur + 2/3 Sonstige
       final klausuren = subjectGrades.where((g) => g['type'] == 'Klausur').toList();
       final sonstige = subjectGrades.where((g) => g['type'] != 'Klausur').toList();
 
@@ -1694,19 +2187,16 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
         avgPoints = sonstige.map((g) => g['points'] as int).reduce((a, b) => a + b) / sonstige.length;
       }
 
-      return Container(
+      return GlassCard(
         margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder),
-        ),
+        padding: EdgeInsets.zero,
+        borderRadius: 12,
         child: ExpansionTile(
           leading: Container(
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: _getGradeColor(avgPoints.round()).withOpacity(0.2),
+              color: _getGradeColor(avgPoints.round()).withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Center(
@@ -1728,8 +2218,8 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: courseType == 'LK'
-                        ? NexusTheme.primaryColor.withOpacity(0.2)
-                        : Colors.grey.withOpacity(0.2),
+                        ? NexusTheme.primaryColor.withValues(alpha: 0.2)
+                        : Colors.grey.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -1750,7 +2240,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: _getGradeColor(g['points'] as int).withOpacity(0.2),
+                color: _getGradeColor(g['points'] as int).withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Center(
@@ -1808,26 +2298,23 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
           length: 3,
           child: Column(
             children: [
-              Container(
+              GlassCard(
                 margin: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: NexusTheme.success.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: NexusTheme.success.withOpacity(0.3)),
-                ),
+                borderRadius: 12,
+                tint: NexusTheme.success,
                 child: Row(
                   children: [
                     Container(
                       width: 8,
                       height: 8,
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         color: NexusTheme.success,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Text(
+                    const Text(
                       'IServ verbunden',
                       style: TextStyle(
                         color: NexusTheme.success,
@@ -1842,15 +2329,10 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                   ],
                 ),
               ),
-              Container(
+              GlassCard(
                 margin: const EdgeInsets.symmetric(horizontal: 20),
-                decoration: BoxDecoration(
-                  color: isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder,
-                  ),
-                ),
+                padding: EdgeInsets.zero,
+                borderRadius: 12,
                 child: TabBar(
                   tabs: const [
                     Tab(text: 'Aufgaben'),
@@ -1889,11 +2371,11 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
             Icon(
               Icons.hourglass_empty,
               size: 48,
-              color: NexusTheme.primaryColor.withOpacity(0.5),
+              color: NexusTheme.primaryColor.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             ShaderMask(
-              shaderCallback: (bounds) => LinearGradient(
+              shaderCallback: (bounds) => const LinearGradient(
                 colors: NexusTheme.primaryGradient,
               ).createShader(bounds),
               child: const Text(
@@ -2008,7 +2490,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
               const SizedBox(height: 16),
               if (isSessionExpired)
                 ElevatedButton.icon(
-                  onPressed: () => _showIServWebViewLogin(context),
+                  onPressed: () => _showIServLoginDialog(context),
                   icon: const Icon(Icons.login),
                   label: const Text('Neu anmelden'),
                   style: ElevatedButton.styleFrom(
@@ -2076,8 +2558,8 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: provider.isVertretungsplanFromCache
-                ? Colors.orange.withOpacity(0.1)
-                : NexusTheme.primaryColor.withOpacity(0.1),
+                ? Colors.orange.withValues(alpha: 0.1)
+                : NexusTheme.primaryColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
@@ -2160,7 +2642,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                     shape: BoxShape.circle,
                     color: isActive
                         ? NexusTheme.primaryColor
-                        : NexusTheme.primaryColor.withOpacity(0.3),
+                        : NexusTheme.primaryColor.withValues(alpha: 0.3),
                   ),
                 );
               }),
@@ -2196,12 +2678,12 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
             Uint8List.fromList(bytes),
             fit: BoxFit.contain,
             errorBuilder: (context, error, stackTrace) {
-              return Center(
+              return const Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.broken_image, size: 48, color: NexusTheme.error),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     Text('Bild konnte nicht geladen werden',
                       style: TextStyle(color: NexusTheme.error),
                     ),
@@ -2218,7 +2700,7 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.picture_as_pdf, size: 64, color: NexusTheme.primaryColor),
+              const Icon(Icons.picture_as_pdf, size: 64, color: NexusTheme.primaryColor),
               const SizedBox(height: 16),
               Text(
                 'PDF-Datei',
@@ -2249,13 +2731,13 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
         ),
       );
     } catch (e) {
-      return Center(
+      return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.error_outline, size: 48, color: NexusTheme.error),
-            const SizedBox(height: 8),
-            Text('Fehler beim Laden: $e',
+            SizedBox(height: 8),
+            Text('Fehler beim Laden. Bitte versuche es erneut.',
               style: TextStyle(color: NexusTheme.error, fontSize: 12),
               textAlign: TextAlign.center,
             ),
@@ -2292,20 +2774,6 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
     );
   }
 
-  String _formatCacheTime(DateTime cachedAt) {
-    final now = DateTime.now();
-    final diff = now.difference(cachedAt);
-    if (diff.inMinutes < 1) {
-      return 'gerade eben';
-    } else if (diff.inMinutes < 60) {
-      return 'vor ${diff.inMinutes} Min.';
-    } else if (diff.inHours < 24) {
-      return 'vor ${diff.inHours} Std.';
-    } else {
-      return '${cachedAt.day}.${cachedAt.month}. ${cachedAt.hour}:${cachedAt.minute.toString().padLeft(2, '0')}';
-    }
-  }
-
   Widget _buildEmptyState({
     required IconData icon,
     required String title,
@@ -2327,8 +2795,8 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    NexusTheme.primaryColor.withOpacity(0.2),
-                    NexusTheme.secondaryColor.withOpacity(0.1),
+                    NexusTheme.primaryColor.withValues(alpha: 0.2),
+                    NexusTheme.secondaryColor.withValues(alpha: 0.1),
                   ],
                 ),
                 shape: BoxShape.circle,
@@ -2366,29 +2834,150 @@ class _SchoolScreenState extends State<SchoolScreen> with SingleTickerProviderSt
   }
 
   void _showEditLessonDialog(BuildContext context, Lesson lesson) {
+    final abWeeksEnabled = context.read<AppProvider>().abWeeksEnabled;
     showDialog(
       context: context,
-      builder: (context) => _LessonDialog(lesson: lesson),
+      builder: (context) => _LessonDialog(lesson: lesson, abWeeksEnabled: abWeeksEnabled),
     );
   }
 
   void _showIServLoginDialog(BuildContext context) {
+    final provider = context.read<IServProvider>();
+    final savedUrl = provider.iservUrl ?? 'ehgwerder.de';
+    final urlController = TextEditingController(text: savedUrl);
+    final usernameController = TextEditingController();
+    final passwordController = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     showDialog(
       context: context,
-      builder: (context) => const _IServLoginDialog(),
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDark ? NexusTheme.darkCard : null,
+        title: const Text('Mit IServ verbinden'),
+        content: SizedBox(
+          width: 460,
+          child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Gib deine IServ-URL und Anmeldedaten ein, oder nutze den WebView-Login.',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: urlController,
+                decoration: const InputDecoration(
+                  labelText: 'IServ URL',
+                  hintText: 'z.B. gymnasium.iserv.de',
+                  prefixIcon: Icon(Icons.public),
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.url,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: usernameController,
+                decoration: const InputDecoration(
+                  labelText: 'Benutzername',
+                  prefixIcon: Icon(Icons.person),
+                  border: OutlineInputBorder(),
+                ),
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passwordController,
+                decoration: const InputDecoration(
+                  labelText: 'Passwort',
+                  prefixIcon: Icon(Icons.lock),
+                  border: OutlineInputBorder(),
+                ),
+                obscureText: true,
+                autocorrect: false,
+                enableSuggestions: false,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _directIServLogin(
+                  dialogContext,
+                  urlController.text.trim(),
+                  usernameController.text.trim(),
+                  passwordController.text,
+                ),
+              ),
+            ],
+          ),
+        ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Abbrechen'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _showIServWebViewLogin(context, urlController.text.trim());
+            },
+            child: const Text('WebView Login'),
+          ),
+          ElevatedButton(
+            onPressed: () => _directIServLogin(
+              dialogContext,
+              urlController.text.trim(),
+              usernameController.text.trim(),
+              passwordController.text,
+            ),
+            child: const Text('Anmelden'),
+          ),
+        ],
+      ),
     );
   }
 
-  void _showIServWebViewLogin(BuildContext context) {
+  Future<void> _directIServLogin(BuildContext dialogContext, String url, String username, String password) async {
+    if (url.isEmpty || username.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bitte alle Felder ausfüllen'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    Navigator.pop(dialogContext);
+
     final provider = context.read<IServProvider>();
-    final iservUrl = provider.iservUrl ?? 'ehgwerder.de'; // Use saved URL or default
+    final result = await provider.connect(
+      username: username,
+      password: password,
+      iservUrl: url,
+    );
+
+    if (!mounted) return;
+
+    if (result['success'] == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('IServ erfolgreich verbunden')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result['error'] ?? 'Anmeldung fehlgeschlagen')),
+      );
+    }
+  }
+
+  void _showIServWebViewLogin(BuildContext context, [String? url]) {
+    final provider = context.read<IServProvider>();
+    final iservUrl = url?.isNotEmpty == true ? url! : (provider.iservUrl ?? 'ehgwerder.de');
 
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => IServWebViewLogin(
           iservUrl: iservUrl,
           onLoginSuccess: (cookies, username) async {
-            Navigator.of(context).pop(); // Close WebView
+            Navigator.of(context).pop();
 
             final result = await provider.connectWithWebViewCookies(
               iservUrl: iservUrl,
@@ -2426,12 +3015,8 @@ class _SectionHeader extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
-        ),
+        title.toUpperCase(),
+        style: NexusTheme.sectionLabel(isDark),
       ),
     );
   }
@@ -2488,7 +3073,7 @@ class _ColorPickerState extends State<_ColorPicker> {
                   border: isSelected ? Border.all(color: Colors.white, width: 2) : null,
                   boxShadow: isSelected ? [
                     BoxShadow(
-                      color: Color(int.parse(color.replaceFirst('#', '0xFF'))).withOpacity(0.5),
+                      color: Color(int.parse(color.replaceFirst('#', '0xFF'))).withValues(alpha: 0.5),
                       blurRadius: 8,
                     ),
                   ] : null,
@@ -2512,10 +3097,7 @@ class _SubjectCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = subject['color'] != null
-        ? Color(int.parse((subject['color'] as String).replaceFirst('#', '0xFF')))
-        : NexusTheme.primaryColor;
+    final color = _parseColor(subject['color'], NexusTheme.primaryColor);
 
     return Dismissible(
       key: Key('subject_${subject['id']}'),
@@ -2530,21 +3112,38 @@ class _SubjectCard extends StatelessWidget {
         ),
         child: const Icon(Icons.delete, color: Colors.white),
       ),
+      confirmDismiss: (_) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Löschen bestätigen'),
+            content: const Text('Möchtest du diesen Eintrag wirklich löschen?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Abbrechen'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+                child: const Text('Löschen'),
+              ),
+            ],
+          ),
+        ) ?? false;
+      },
       onDismissed: (_) => onDelete(),
-      child: Container(
+      child: GlassCard(
         margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder),
-        ),
+        padding: EdgeInsets.zero,
+        borderRadius: 12,
+        onTap: onEdit,
         child: ListTile(
-          onTap: onEdit,
           leading: Container(
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Center(
@@ -2560,7 +3159,7 @@ class _SubjectCard extends StatelessWidget {
               ? Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(subject['room'] as String, style: TextStyle(color: color, fontSize: 12)),
@@ -2584,9 +3183,7 @@ class _HomeworkCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isCompleted = homework['completed'] == 1;
-    final color = homework['subject_color'] != null
-        ? Color(int.parse((homework['subject_color'] as String).replaceFirst('#', '0xFF')))
-        : NexusTheme.primaryColor;
+    final color = _parseColor(homework['subject_color'], NexusTheme.primaryColor);
 
     return Dismissible(
       key: Key('hw_${homework['id']}'),
@@ -2598,16 +3195,33 @@ class _HomeworkCard extends StatelessWidget {
         decoration: BoxDecoration(color: NexusTheme.danger, borderRadius: BorderRadius.circular(12)),
         child: const Icon(Icons.delete, color: Colors.white),
       ),
+      confirmDismiss: (_) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Löschen bestätigen'),
+            content: const Text('Möchtest du diesen Eintrag wirklich löschen?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Abbrechen'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+                child: const Text('Löschen'),
+              ),
+            ],
+          ),
+        ) ?? false;
+      },
       onDismissed: (_) => onDelete(),
-      child: Container(
+      child: GlassCard(
         margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder),
-        ),
+        padding: EdgeInsets.zero,
+        borderRadius: 12,
+        onTap: onEdit,
         child: ListTile(
-          onTap: onEdit,
           leading: GestureDetector(
             onTap: onToggle,
             child: Container(
@@ -2631,7 +3245,7 @@ class _HomeworkCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.15),
+                    color: color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -2665,9 +3279,7 @@ class _TestExamCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = item['subject_color'] != null
-        ? Color(int.parse((item['subject_color'] as String).replaceFirst('#', '0xFF')))
-        : NexusTheme.primaryColor;
+    final color = _parseColor(item['subject_color'], NexusTheme.primaryColor);
 
     return Dismissible(
       key: Key('${isExam ? 'exam' : 'test'}_${item['id']}'),
@@ -2679,21 +3291,38 @@ class _TestExamCard extends StatelessWidget {
         decoration: BoxDecoration(color: NexusTheme.danger, borderRadius: BorderRadius.circular(12)),
         child: const Icon(Icons.delete, color: Colors.white),
       ),
+      confirmDismiss: (_) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Löschen bestätigen'),
+            content: const Text('Möchtest du diesen Eintrag wirklich löschen?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Abbrechen'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+                child: const Text('Löschen'),
+              ),
+            ],
+          ),
+        ) ?? false;
+      },
       onDismissed: (_) => onDelete(),
-      child: Container(
+      child: GlassCard(
         margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: isDark ? NexusTheme.darkCard : NexusTheme.lightCard,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder),
-        ),
+        padding: EdgeInsets.zero,
+        borderRadius: 12,
+        onTap: onEdit,
         child: ListTile(
-          onTap: onEdit,
           leading: Container(
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(isExam ? Icons.edit_note : Icons.quiz, color: color),
@@ -2705,7 +3334,7 @@ class _TestExamCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.15),
+                    color: color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(item['subject_name'] as String, style: TextStyle(color: color, fontSize: 10)),
@@ -2723,10 +3352,10 @@ class _TestExamCard extends StatelessWidget {
               ? Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: NexusTheme.success.withOpacity(0.15),
+                    color: NexusTheme.success.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(item['grade'] as String, style: TextStyle(color: NexusTheme.success, fontWeight: FontWeight.bold)),
+                  child: Text(item['grade'] as String, style: const TextStyle(color: NexusTheme.success, fontWeight: FontWeight.bold)),
                 )
               : null,
         ),
@@ -2738,18 +3367,25 @@ class _TestExamCard extends StatelessWidget {
 class _FullGradeCalculatorCard extends StatefulWidget {
   final bool isDark;
   final List<Map<String, dynamic>> subjects;
+  final String gradeSystem;
 
-  const _FullGradeCalculatorCard({required this.isDark, required this.subjects});
+  const _FullGradeCalculatorCard({required this.isDark, required this.subjects, required this.gradeSystem});
 
   @override
   State<_FullGradeCalculatorCard> createState() => _FullGradeCalculatorCardState();
 }
 
-class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
+class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard>
+    with SingleTickerProviderStateMixin {
   bool _isExpanded = false;
+  late AnimationController _expandController;
+  late Animation<double> _expandAnimation;
+  late Animation<double> _fadeAnimation;
+  bool get _isMarks => widget.gradeSystem == 'marks';
 
   final _pointsController = TextEditingController();
   int? _selectedGradePoints;
+  double? _selectedMarkConvert;
   String _converterResult = '';
 
   final _currentAvgController = TextEditingController();
@@ -2783,6 +3419,52 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
     {'points': 1, 'grade': '5-', 'rating': 'Mangelhaft', 'color': Color(0xFFEF4444)},
     {'points': 0, 'grade': '6', 'rating': 'Ungenügend', 'color': Color(0xFF991B1B)},
   ];
+
+  // Marks table for the converter in marks mode
+  static const _marksTable = [
+    {'label': '1+', 'value': 0.7, 'rating': 'Sehr gut', 'color': Color(0xFF10B981)},
+    {'label': '1', 'value': 1.0, 'rating': 'Sehr gut', 'color': Color(0xFF10B981)},
+    {'label': '1-', 'value': 1.3, 'rating': 'Sehr gut', 'color': Color(0xFF10B981)},
+    {'label': '2+', 'value': 1.7, 'rating': 'Gut', 'color': Color(0xFF3B82F6)},
+    {'label': '2', 'value': 2.0, 'rating': 'Gut', 'color': Color(0xFF3B82F6)},
+    {'label': '2-', 'value': 2.3, 'rating': 'Gut', 'color': Color(0xFF3B82F6)},
+    {'label': '3+', 'value': 2.7, 'rating': 'Befriedigend', 'color': Color(0xFFF59E0B)},
+    {'label': '3', 'value': 3.0, 'rating': 'Befriedigend', 'color': Color(0xFFF59E0B)},
+    {'label': '3-', 'value': 3.3, 'rating': 'Befriedigend', 'color': Color(0xFFF59E0B)},
+    {'label': '4+', 'value': 3.7, 'rating': 'Ausreichend', 'color': Color(0xFFF97316)},
+    {'label': '4', 'value': 4.0, 'rating': 'Ausreichend', 'color': Color(0xFFF97316)},
+    {'label': '4-', 'value': 4.3, 'rating': 'Ausreichend', 'color': Color(0xFFF97316)},
+    {'label': '5+', 'value': 4.7, 'rating': 'Mangelhaft', 'color': Color(0xFFEF4444)},
+    {'label': '5', 'value': 5.0, 'rating': 'Mangelhaft', 'color': Color(0xFFEF4444)},
+    {'label': '5-', 'value': 5.3, 'rating': 'Mangelhaft', 'color': Color(0xFFEF4444)},
+    {'label': '6', 'value': 6.0, 'rating': 'Ungenügend', 'color': Color(0xFF991B1B)},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _expandController = AnimationController(
+      duration: const Duration(milliseconds: 350),
+      vsync: this,
+    );
+    _expandAnimation = CurvedAnimation(
+      parent: _expandController,
+      curve: Curves.easeInOutCubic,
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _expandController,
+      curve: const Interval(0.0, 0.8, curve: Curves.easeIn),
+    );
+  }
+
+  void _toggleExpand() {
+    setState(() => _isExpanded = !_isExpanded);
+    if (_isExpanded) {
+      _expandController.forward();
+    } else {
+      _expandController.reverse();
+    }
+  }
 
   String _pointsToGrade(int points) {
     if (points < 0 || points > 15) return '-';
@@ -2824,6 +3506,16 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
     }
   }
 
+  void _selectMarkForConvert(double? value) {
+    if (value != null) {
+      final entry = _marksTable.firstWhere((e) => ((e['value'] as double) - value).abs() < 0.05);
+      setState(() {
+        _selectedMarkConvert = value;
+        _converterResult = '${entry['label']} (${entry['rating']})';
+      });
+    }
+  }
+
   void _calculateNeededGrade() {
     final currentAvg = double.tryParse(_currentAvgController.text);
     final gradeCount = int.tryParse(_gradeCountController.text);
@@ -2837,18 +3529,60 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
     final neededGrade = targetAvg * (gradeCount + 1) - currentAvg * gradeCount;
 
     setState(() {
-      if (neededGrade < 0) {
-        _targetResult = 'Du brauchst weniger als 0 Punkte - Ziel bereits erreicht!';
-      } else if (neededGrade > 15) {
-        _targetResult = 'Du bräuchtest ${neededGrade.toStringAsFixed(1)} Punkte - leider nicht erreichbar';
+      if (_isMarks) {
+        // Marks: lower is better (1.0 best, 6.0 worst)
+        if (neededGrade > 6.0) {
+          _targetResult = 'Du bräuchtest ${neededGrade.toStringAsFixed(1)} - leider nicht erreichbar';
+        } else if (neededGrade < 0.7) {
+          _targetResult = 'Ziel bereits erreicht! Jede Note reicht aus.';
+        } else {
+          _targetResult = 'Du brauchst mindestens ${_markValueToLabel(neededGrade)} (${neededGrade.toStringAsFixed(1)})';
+        }
       } else {
-        final roundedGrade = neededGrade.ceil();
-        _targetResult = 'Du brauchst mindestens $roundedGrade Punkte (${_pointsToGrade(roundedGrade)})';
+        if (neededGrade < 0) {
+          _targetResult = 'Du brauchst weniger als 0 Punkte - Ziel bereits erreicht!';
+        } else if (neededGrade > 15) {
+          _targetResult = 'Du bräuchtest ${neededGrade.toStringAsFixed(1)} Punkte - leider nicht erreichbar';
+        } else {
+          final roundedGrade = neededGrade.ceil();
+          _targetResult = 'Du brauchst mindestens $roundedGrade Punkte (${_pointsToGrade(roundedGrade)})';
+        }
       }
     });
   }
 
   void _calculateSubjectGrade() {
+    if (_isMarks) {
+      _calculateSubjectGradeMarks();
+    } else {
+      _calculateSubjectGradePoints();
+    }
+  }
+
+  void _calculateSubjectGradeMarks() {
+    // Marks mode: simple average of all comma-separated mark values
+    final text = _sonstigeGradesController.text;
+    if (text.isEmpty) {
+      setState(() => _subjectGradeResult = 'Bitte Noten eingeben');
+      return;
+    }
+    final parts = text.split(RegExp(r'[,;\s]+'));
+    final List<double> values = [];
+    for (final part in parts) {
+      final v = double.tryParse(part.trim());
+      if (v != null && v >= 0.7 && v <= 6.0) values.add(v);
+    }
+    if (values.isEmpty) {
+      setState(() => _subjectGradeResult = 'Keine gültigen Noten erkannt');
+      return;
+    }
+    final avg = values.reduce((a, b) => a + b) / values.length;
+    setState(() {
+      _subjectGradeResult = 'Fachnote: ${_markValueToLabel(avg)} (${avg.toStringAsFixed(2)})\n${values.length} Noten';
+    });
+  }
+
+  void _calculateSubjectGradePoints() {
     List<double> klausurGrades = [];
     for (final controller in [_klausur1Controller, _klausur2Controller, _klausur3Controller, _klausur4Controller]) {
       final grade = double.tryParse(controller.text);
@@ -2903,6 +3637,7 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
 
   @override
   void dispose() {
+    _expandController.dispose();
     _pointsController.dispose();
     _currentAvgController.dispose();
     _gradeCountController.dispose();
@@ -2918,93 +3653,124 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            NexusTheme.primaryColor.withOpacity(0.1),
-            NexusTheme.secondaryColor.withOpacity(0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: NexusTheme.primaryColor.withOpacity(0.2)),
-      ),
+    return GlassCard(
+      padding: EdgeInsets.zero,
+      borderRadius: 16,
       child: Column(
         children: [
           InkWell(
-            onTap: () => setState(() => _isExpanded = !_isExpanded),
+            onTap: _toggleExpand,
             borderRadius: BorderRadius.circular(16),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  Icon(Icons.calculate, color: NexusTheme.primaryColor),
+                  const Icon(Icons.calculate, color: NexusTheme.primaryColor),
                   const SizedBox(width: 8),
                   const Text('Notenrechner', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const Spacer(),
-                  Icon(
-                    _isExpanded ? Icons.expand_less : Icons.expand_more,
-                    color: widget.isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                  AnimatedRotation(
+                    turns: _isExpanded ? 0.5 : 0.0,
+                    duration: const Duration(milliseconds: 350),
+                    curve: Curves.easeInOutCubic,
+                    child: Icon(
+                      Icons.expand_more,
+                      color: widget.isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                    ),
                   ),
                 ],
               ),
             ),
           ),
 
-          if (_isExpanded) ...[
-            const Divider(height: 1),
-            Padding(
+          SizeTransition(
+            sizeFactor: _expandAnimation,
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: Column(
+                children: [
+                  const Divider(height: 1),
+                  Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildSectionTitle('Punkte ⇄ Note'),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _pointsController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: 'Punkte (0-15)',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  // Section 1: Converter
+                  if (_isMarks) ...[
+                    _buildSectionTitle('Note ⇄ Bewertung'),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<double>(
+                      initialValue: _selectedMarkConvert,
+                      decoration: InputDecoration(
+                        labelText: 'Note auswählen',
+                        filled: true,
+                        fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      items: _marksTable.map((e) => DropdownMenuItem(
+                        value: e['value'] as double,
+                        child: Text('${e['label']}  (${(e['value'] as double).toStringAsFixed(1)})'),
+                      )).toList(),
+                      onChanged: _selectMarkForConvert,
+                    ),
+                  ] else ...[
+                    _buildSectionTitle('Punkte ⇄ Note'),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _pointsController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: 'Punkte (0-15)',
+                              filled: true,
+                              fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                            onChanged: (_) => _convertPointsToGrade(),
                           ),
-                          onChanged: (_) => _convertPointsToGrade(),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text('⇄', style: TextStyle(fontSize: 20, color: NexusTheme.primaryColor)),
-                      ),
-                      Expanded(
-                        child: DropdownButtonFormField<int>(
-                          value: _selectedGradePoints,
-                          decoration: InputDecoration(
-                            labelText: 'Note',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          child: Text('⇄', style: TextStyle(fontSize: 20, color: NexusTheme.primaryColor)),
+                        ),
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            initialValue: _selectedGradePoints,
+                            decoration: InputDecoration(
+                              labelText: 'Note',
+                              filled: true,
+                              fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                            items: _gradeTable.map((e) => DropdownMenuItem(
+                              value: e['points'] as int,
+                              child: Text('${e['grade']} (${e['points']}P)'),
+                            )).toList(),
+                            onChanged: _convertGradeToPoints,
                           ),
-                          items: _gradeTable.map((e) => DropdownMenuItem(
-                            value: e['points'] as int,
-                            child: Text('${e['grade']} (${e['points']}P)'),
-                          )).toList(),
-                          onChanged: _convertGradeToPoints,
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                   if (_converterResult.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: _selectedGradePoints != null
-                            ? _pointsToColor(_selectedGradePoints!).withOpacity(0.1)
-                            : Colors.grey.withOpacity(0.1),
+                        color: _isMarks
+                            ? (_selectedMarkConvert != null ? _getMarkColor(_selectedMarkConvert!).withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1))
+                            : (_selectedGradePoints != null ? _pointsToColor(_selectedGradePoints!).withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1)),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
@@ -3014,9 +3780,9 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
                             _converterResult,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
-                              color: _selectedGradePoints != null
-                                  ? _pointsToColor(_selectedGradePoints!)
-                                  : Colors.grey,
+                              color: _isMarks
+                                  ? (_selectedMarkConvert != null ? _getMarkColor(_selectedMarkConvert!) : Colors.grey)
+                                  : (_selectedGradePoints != null ? _pointsToColor(_selectedGradePoints!) : Colors.grey),
                             ),
                           ),
                         ],
@@ -3026,6 +3792,7 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
 
                   const SizedBox(height: 24),
 
+                  // Section 2: "Welche Note brauche ich?"
                   _buildSectionTitle('Welche Note brauche ich?'),
                   const SizedBox(height: 12),
                   Row(
@@ -3036,8 +3803,12 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           decoration: InputDecoration(
                             labelText: 'Aktueller Ø',
-                            hintText: 'z.B. 10.5',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            hintText: _isMarks ? 'z.B. 2.3' : 'z.B. 10.5',
+                            filled: true,
+                            fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           ),
                         ),
@@ -3050,7 +3821,11 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
                           decoration: InputDecoration(
                             labelText: 'Anzahl',
                             hintText: 'z.B. 5',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            filled: true,
+                            fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           ),
                         ),
@@ -3062,8 +3837,12 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           decoration: InputDecoration(
                             labelText: 'Ziel-Ø',
-                            hintText: 'z.B. 12',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            hintText: _isMarks ? 'z.B. 2.0' : 'z.B. 12',
+                            filled: true,
+                            fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           ),
                         ),
@@ -3077,7 +3856,7 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
                       onPressed: _calculateNeededGrade,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: NexusTheme.primaryColor,
-                        side: BorderSide(color: NexusTheme.primaryColor),
+                        side: const BorderSide(color: NexusTheme.primaryColor),
                       ),
                       child: const Text('Berechnen'),
                     ),
@@ -3087,7 +3866,7 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: NexusTheme.primaryColor.withOpacity(0.1),
+                        color: NexusTheme.primaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(_targetResult, textAlign: TextAlign.center),
@@ -3096,45 +3875,75 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
 
                   const SizedBox(height: 24),
 
-                  _buildSectionTitle('Fachnote berechnen (1/3 Klausur + 2/3 Sonstige)'),
-                  const SizedBox(height: 12),
-                  Text('Klausuren (1/3)', style: TextStyle(fontSize: 12, color: widget.isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted)),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(child: _buildSmallInput(_klausur1Controller, 'K1')),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildSmallInput(_klausur2Controller, 'K2')),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildSmallInput(_klausur3Controller, 'K3')),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildSmallInput(_klausur4Controller, 'K4')),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text('Sonstige Leistungen (2/3)', style: TextStyle(fontSize: 12, color: widget.isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted)),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _sonstigeAvgController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(
-                      labelText: 'Ø Sonstige',
-                      hintText: 'z.B. 11.5',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  // Section 3: Subject grade calculator
+                  if (_isMarks) ...[
+                    _buildSectionTitle('Fachnote berechnen (Durchschnitt)'),
+                    const SizedBox(height: 12),
+                    Text('Noten (kommagetrennt)', style: TextStyle(fontSize: 12, color: widget.isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _sonstigeGradesController,
+                      decoration: InputDecoration(
+                        hintText: 'z.B. 2.0, 1.3, 2.7, 3.0',
+                        filled: true,
+                        fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                  ] else ...[
+                    _buildSectionTitle('Fachnote berechnen (1/3 Klausur + 2/3 Sonstige)'),
+                    const SizedBox(height: 12),
+                    Text('Klausuren (1/3)', style: TextStyle(fontSize: 12, color: widget.isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted)),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(child: _buildSmallInput(_klausur1Controller, 'K1')),
+                        const SizedBox(width: 8),
+                        Expanded(child: _buildSmallInput(_klausur2Controller, 'K2')),
+                        const SizedBox(width: 8),
+                        Expanded(child: _buildSmallInput(_klausur3Controller, 'K3')),
+                        const SizedBox(width: 8),
+                        Expanded(child: _buildSmallInput(_klausur4Controller, 'K4')),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text('Sonstige Leistungen (2/3)', style: TextStyle(fontSize: 12, color: widget.isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _sonstigeAvgController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(
+                        labelText: 'Ø Sonstige',
+                        hintText: 'z.B. 11.5',
+                        filled: true,
+                        fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text('oder einzelne Noten:', style: TextStyle(fontSize: 11, color: widget.isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted)),
-                  const SizedBox(height: 4),
-                  TextField(
-                    controller: _sonstigeGradesController,
-                    decoration: InputDecoration(
-                      hintText: 'z.B. 12, 11, 13, 10, 9',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ],
+                  if (!_isMarks) ...[
+                    const SizedBox(height: 8),
+                    Text('oder einzelne Noten:', style: TextStyle(fontSize: 11, color: widget.isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted)),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: _sonstigeGradesController,
+                      decoration: InputDecoration(
+                        hintText: 'z.B. 12, 11, 13, 10, 9',
+                        filled: true,
+                        fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
@@ -3142,7 +3951,7 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
                       onPressed: _calculateSubjectGrade,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: NexusTheme.primaryColor,
-                        side: BorderSide(color: NexusTheme.primaryColor),
+                        side: const BorderSide(color: NexusTheme.primaryColor),
                       ),
                       child: const Text('Fachnote berechnen'),
                     ),
@@ -3153,7 +3962,7 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: NexusTheme.primaryColor.withOpacity(0.1),
+                        color: NexusTheme.primaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(_subjectGradeResult, textAlign: TextAlign.center),
@@ -3162,7 +3971,8 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
 
                   const SizedBox(height: 24),
 
-                  _buildSectionTitle('Punkte-Noten-Tabelle'),
+                  // Section 4: Grade table
+                  _buildSectionTitle(_isMarks ? 'Noten-Tabelle' : 'Punkte-Noten-Tabelle'),
                   const SizedBox(height: 12),
                   Container(
                     decoration: BoxDecoration(
@@ -3175,59 +3985,102 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           decoration: BoxDecoration(
-                            color: NexusTheme.primaryColor.withOpacity(0.1),
+                            color: NexusTheme.primaryColor.withValues(alpha: 0.1),
                             borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
                           ),
                           child: Row(
                             children: [
-                              const Expanded(child: Text('Punkte', style: TextStyle(fontWeight: FontWeight.bold))),
+                              if (!_isMarks)
+                                const Expanded(child: Text('Punkte', style: TextStyle(fontWeight: FontWeight.bold))),
                               const Expanded(child: Text('Note', style: TextStyle(fontWeight: FontWeight.bold))),
+                              if (_isMarks)
+                                const Expanded(child: Text('Wert', style: TextStyle(fontWeight: FontWeight.bold))),
                               const Expanded(flex: 2, child: Text('Bewertung', style: TextStyle(fontWeight: FontWeight.bold))),
                             ],
                           ),
                         ),
-                        ...List.generate(_gradeTable.length, (index) {
-                          final entry = _gradeTable[index];
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: (entry['color'] as Color).withOpacity(0.05),
-                              border: index < _gradeTable.length - 1
-                                  ? Border(bottom: BorderSide(color: widget.isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder))
-                                  : null,
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    '${entry['points']}',
-                                    style: TextStyle(fontWeight: FontWeight.w600, color: entry['color'] as Color),
+                        if (_isMarks)
+                          ...List.generate(_marksTable.length, (index) {
+                            final entry = _marksTable[index];
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: (entry['color'] as Color).withValues(alpha: 0.05),
+                                border: index < _marksTable.length - 1
+                                    ? Border(bottom: BorderSide(color: widget.isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder))
+                                    : null,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      entry['label'] as String,
+                                      style: TextStyle(fontWeight: FontWeight.w600, color: entry['color'] as Color),
+                                    ),
                                   ),
-                                ),
-                                Expanded(
-                                  child: Text(
-                                    entry['grade'] as String,
-                                    style: TextStyle(fontWeight: FontWeight.w600, color: entry['color'] as Color),
+                                  Expanded(
+                                    child: Text(
+                                      (entry['value'] as double).toStringAsFixed(1),
+                                      style: TextStyle(fontWeight: FontWeight.w600, color: entry['color'] as Color),
+                                    ),
                                   ),
-                                ),
-                                Expanded(
-                                  flex: 2,
-                                  child: Text(
-                                    entry['rating'] as String,
-                                    style: TextStyle(color: entry['color'] as Color),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      entry['rating'] as String,
+                                      style: TextStyle(color: entry['color'] as Color),
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
+                                ],
+                              ),
+                            );
+                          })
+                        else
+                          ...List.generate(_gradeTable.length, (index) {
+                            final entry = _gradeTable[index];
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: (entry['color'] as Color).withValues(alpha: 0.05),
+                                border: index < _gradeTable.length - 1
+                                    ? Border(bottom: BorderSide(color: widget.isDark ? NexusTheme.darkBorder : NexusTheme.lightBorder))
+                                    : null,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '${entry['points']}',
+                                      style: TextStyle(fontWeight: FontWeight.w600, color: entry['color'] as Color),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      entry['grade'] as String,
+                                      style: TextStyle(fontWeight: FontWeight.w600, color: entry['color'] as Color),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      entry['rating'] as String,
+                                      style: TextStyle(color: entry['color'] as Color),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
-          ],
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -3257,7 +4110,11 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard> {
       textAlign: TextAlign.center,
       decoration: InputDecoration(
         hintText: hint,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        filled: true,
+        fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       ),
     );
@@ -3275,9 +4132,7 @@ class _LessonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final lessonColor = lesson.color != null
-        ? Color(int.parse(lesson.color!.replaceFirst('#', '0xFF')))
-        : NexusTheme.primaryColor;
+    final lessonColor = _parseColor(lesson.color, NexusTheme.primaryColor);
     final isWhiteColor = lesson.color == '#FFFFFF';
 
     return Dismissible(
@@ -3312,21 +4167,21 @@ class _LessonCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
           color: isDark
-              ? Colors.white.withOpacity(0.05)
-              : Colors.white.withOpacity(0.7),
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.white.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isCurrentLesson
                 ? NexusTheme.primaryColor
-                : (isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05)),
+                : (isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05)),
             width: isCurrentLesson ? 2 : 1,
           ),
           boxShadow: [
             if (isCurrentLesson)
-              BoxShadow(color: NexusTheme.primaryColor.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4))
+              BoxShadow(color: NexusTheme.primaryColor.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4))
             else
               BoxShadow(
-                color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.05),
+                color: isDark ? Colors.black.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -3348,7 +4203,7 @@ class _LessonCard extends StatelessWidget {
                     border: isWhiteColor ? Border.all(color: Colors.grey.shade300) : null,
                     boxShadow: [
                       BoxShadow(
-                        color: lessonColor.withOpacity(0.3),
+                        color: lessonColor.withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -3388,9 +4243,9 @@ class _LessonCard extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: lessonColor.withOpacity(0.15),
+                                color: lessonColor.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: lessonColor.withOpacity(0.3)),
+                                border: Border.all(color: lessonColor.withValues(alpha: 0.3)),
                               ),
                               child: Text(
                                 lesson.lessonType == 'Leistungskurs' ? 'LK' : lesson.lessonType == 'Grundkurs' ? 'GK' : 'SK',
@@ -3447,8 +4302,19 @@ class _LessonCard extends StatelessWidget {
 class _LessonDialog extends StatefulWidget {
   final Lesson? lesson;
   final int? dayOfWeek;
+  final int? lessonNumber;
+  final String? startTime;
+  final String? endTime;
+  final bool abWeeksEnabled;
 
-  const _LessonDialog({this.lesson, this.dayOfWeek});
+  const _LessonDialog({
+    this.lesson,
+    this.dayOfWeek,
+    this.lessonNumber,
+    this.startTime,
+    this.endTime,
+    this.abWeeksEnabled = true,
+  });
 
   @override
   State<_LessonDialog> createState() => _LessonDialogState();
@@ -3464,30 +4330,12 @@ class _LessonDialogState extends State<_LessonDialog> {
   String _endTime = '09:30';
   String? _selectedColor;
   String? _selectedLessonType;
+  String _selectedWeekType = 'both';
 
   static const _colorOptions = [
     '#667EEA', '#764BA2', '#F093FB', '#22C55E', '#F59E0B', '#EF4444', '#06B6D4', '#8B5CF6',
     '#9CA3AF', '#FFFFFF', '#EC4899', '#F472B6', '#6366F1', '#14B8A6', '#84CC16', '#A855F7',
   ];
-
-  static const _colorNames = {
-    '#667EEA': 'Blau',
-    '#764BA2': 'Lila',
-    '#F093FB': 'Pink hell',
-    '#22C55E': 'Grün',
-    '#F59E0B': 'Orange',
-    '#EF4444': 'Rot',
-    '#06B6D4': 'Cyan',
-    '#8B5CF6': 'Violett',
-    '#9CA3AF': 'Grau',
-    '#FFFFFF': 'Weiß',
-    '#EC4899': 'Pink',
-    '#F472B6': 'Rosa',
-    '#6366F1': 'Indigo',
-    '#14B8A6': 'Türkis',
-    '#84CC16': 'Lime',
-    '#A855F7': 'Lila hell',
-  };
 
   @override
   void initState() {
@@ -3497,11 +4345,12 @@ class _LessonDialogState extends State<_LessonDialog> {
     _roomController = TextEditingController(text: widget.lesson?.room ?? '');
     _dayOfWeek = widget.lesson?.dayOfWeek ?? widget.dayOfWeek ?? DateTime.now().weekday;
     if (_dayOfWeek > 5) _dayOfWeek = 1;
-    _lessonNumber = widget.lesson?.lessonNumber ?? 1;
-    _startTime = widget.lesson?.startTime ?? '08:00';
-    _endTime = widget.lesson?.endTime ?? '09:30';
+    _lessonNumber = widget.lesson?.lessonNumber ?? widget.lessonNumber ?? 1;
+    _startTime = widget.lesson?.startTime ?? widget.startTime ?? '08:00';
+    _endTime = widget.lesson?.endTime ?? widget.endTime ?? '09:30';
     _selectedColor = widget.lesson?.color;
     _selectedLessonType = widget.lesson?.lessonType;
+    _selectedWeekType = widget.lesson?.weekType ?? 'both';
 
     _subjectController.addListener(_onSubjectChanged);
   }
@@ -3558,10 +4407,12 @@ class _LessonDialogState extends State<_LessonDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(widget.lesson != null ? 'Stunde bearbeiten' : 'Neue Stunde'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             TextField(controller: _subjectController, decoration: const InputDecoration(labelText: 'Fach', hintText: 'z.B. Mathematik'), autofocus: true),
             const SizedBox(height: 16),
             TextField(controller: _teacherController, decoration: const InputDecoration(labelText: 'Lehrer (optional)', prefixIcon: Icon(Icons.person))),
@@ -3569,7 +4420,7 @@ class _LessonDialogState extends State<_LessonDialog> {
             TextField(controller: _roomController, decoration: const InputDecoration(labelText: 'Raum (optional)', prefixIcon: Icon(Icons.room))),
             const SizedBox(height: 16),
             DropdownButtonFormField<int>(
-              value: _dayOfWeek,
+              initialValue: _dayOfWeek,
               decoration: const InputDecoration(labelText: 'Tag', prefixIcon: Icon(Icons.calendar_today)),
               items: const [
                 DropdownMenuItem(value: 1, child: Text('Montag')),
@@ -3582,7 +4433,7 @@ class _LessonDialogState extends State<_LessonDialog> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<int>(
-              value: _lessonNumber,
+              initialValue: _lessonNumber,
               decoration: const InputDecoration(labelText: 'Stunde', prefixIcon: Icon(Icons.format_list_numbered)),
               items: List.generate(10, (i) => i + 1).map((n) => DropdownMenuItem(value: n, child: Text('$n. Stunde'))).toList(),
               onChanged: (value) => setState(() => _lessonNumber = value!),
@@ -3596,7 +4447,7 @@ class _LessonDialogState extends State<_LessonDialog> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedLessonType,
+              initialValue: _selectedLessonType,
               decoration: const InputDecoration(labelText: 'Kursart (optional)', prefixIcon: Icon(Icons.school)),
               items: const [
                 DropdownMenuItem(value: null, child: Text('Keine Angabe')),
@@ -3606,6 +4457,19 @@ class _LessonDialogState extends State<_LessonDialog> {
               ],
               onChanged: (value) => setState(() => _selectedLessonType = value),
             ),
+            if (widget.abWeeksEnabled) ...[
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedWeekType,
+                decoration: const InputDecoration(labelText: 'Woche', prefixIcon: Icon(Icons.calendar_view_week)),
+                items: const [
+                  DropdownMenuItem(value: 'both', child: Text('Beide Wochen')),
+                  DropdownMenuItem(value: 'A', child: Text('Nur A-Woche')),
+                  DropdownMenuItem(value: 'B', child: Text('Nur B-Woche')),
+                ],
+                onChanged: (value) => setState(() => _selectedWeekType = value!),
+              ),
+            ],
             const SizedBox(height: 16),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -3633,7 +4497,7 @@ class _LessonDialogState extends State<_LessonDialog> {
                                 : (isWhite ? Colors.grey.shade300 : Colors.transparent),
                             width: isSelected ? 2 : 1,
                           ),
-                          boxShadow: isSelected ? [BoxShadow(color: colorValue.withOpacity(0.5), blurRadius: 8)] : null,
+                          boxShadow: isSelected ? [BoxShadow(color: colorValue.withValues(alpha: 0.5), blurRadius: 8)] : null,
                         ),
                         child: isSelected ? Icon(Icons.check, color: isWhite ? Colors.black : Colors.white, size: 16) : null,
                       ),
@@ -3644,6 +4508,7 @@ class _LessonDialogState extends State<_LessonDialog> {
             ),
           ],
         ),
+      ),
       ),
       actions: [
         if (widget.lesson != null)
@@ -3670,7 +4535,11 @@ class _LessonDialogState extends State<_LessonDialog> {
     if (time != null && mounted) {
       final formatted = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
       setState(() {
-        if (isStart) _startTime = formatted; else _endTime = formatted;
+        if (isStart) {
+          _startTime = formatted;
+        } else {
+          _endTime = formatted;
+        }
       });
     }
   }
@@ -3694,6 +4563,7 @@ class _LessonDialogState extends State<_LessonDialog> {
         endTime: _endTime,
         color: _selectedColor,
         lessonType: _selectedLessonType,
+        weekType: _selectedWeekType,
       ));
     } else {
       provider.addLesson(
@@ -3706,6 +4576,7 @@ class _LessonDialogState extends State<_LessonDialog> {
         endTime: _endTime,
         color: _selectedColor,
         lessonType: _selectedLessonType,
+        weekType: _selectedWeekType,
       );
     }
 
@@ -3739,7 +4610,9 @@ class _IServLoginDialogState extends State<_IServLoginDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('IServ Anmeldung'),
-      content: SingleChildScrollView(
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -3747,27 +4620,28 @@ class _IServLoginDialogState extends State<_IServLoginDialog> {
             const SizedBox(height: 16),
             TextField(controller: _usernameController, decoration: const InputDecoration(labelText: 'Benutzername', prefixIcon: Icon(Icons.person))),
             const SizedBox(height: 16),
-            TextField(controller: _passwordController, decoration: const InputDecoration(labelText: 'Passwort', prefixIcon: Icon(Icons.lock)), obscureText: true),
+            TextField(controller: _passwordController, decoration: const InputDecoration(labelText: 'Passwort', prefixIcon: Icon(Icons.lock)), obscureText: true, autocorrect: false, enableSuggestions: false),
             if (_error != null) ...[
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: NexusTheme.danger.withOpacity(0.1),
+                  color: NexusTheme.danger.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: NexusTheme.danger.withOpacity(0.3)),
+                  border: Border.all(color: NexusTheme.danger.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline, color: NexusTheme.danger, size: 20),
+                    const Icon(Icons.error_outline, color: NexusTheme.danger, size: 20),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(_error!, style: TextStyle(color: NexusTheme.danger, fontSize: 13))),
+                    Expanded(child: Text(_error!, style: const TextStyle(color: NexusTheme.danger, fontSize: 13))),
                   ],
                 ),
               ),
             ],
           ],
         ),
+      ),
       ),
       actions: [
         TextButton(onPressed: _isLoading ? null : () => Navigator.pop(context), child: const Text('Abbrechen')),
@@ -3804,13 +4678,108 @@ class _IServLoginDialogState extends State<_IServLoginDialog> {
         }
       }
     } catch (e) {
-      if (mounted) setState(() { _error = 'Verbindungsfehler: ${e.toString()}'; _isLoading = false; });
+      debugPrint('Connection error: $e');
+      if (mounted) setState(() { _error = 'Verbindungsfehler. Bitte versuche es erneut.'; _isLoading = false; });
     }
   }
 }
 
-void showAddLessonDialog(BuildContext context, {int? dayOfWeek}) {
-  showDialog(context: context, builder: (context) => _LessonDialog(dayOfWeek: dayOfWeek));
+class _TabChip extends StatefulWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _TabChip({required this.label, required this.isSelected, required this.onTap});
+
+  @override
+  State<_TabChip> createState() => _TabChipState();
+}
+
+class _TabChipState extends State<_TabChip> with SingleTickerProviderStateMixin {
+  late AnimationController _scaleController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+      lowerBound: 0.95,
+      upperBound: 1.0,
+      value: 1.0,
+    );
+  }
+
+  @override
+  void dispose() {
+    _scaleController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _scaleController.animateTo(0.95),
+      onTapUp: (_) {
+        _scaleController.animateTo(1.0);
+        widget.onTap();
+      },
+      onTapCancel: () => _scaleController.animateTo(1.0),
+      child: ScaleTransition(
+        scale: _scaleController,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: widget.isSelected
+                ? const Color(0xFF4F46E5)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(9999),
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              color: widget.isSelected
+                  ? Colors.white
+                  : const Color(0xFF71717A),
+              fontWeight: widget.isSelected ? FontWeight.w600 : FontWeight.w500,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void showAddLessonDialog(
+  BuildContext context, {
+  int? dayOfWeek,
+  int? lessonNumber,
+  String? startTime,
+  String? endTime,
+  bool abWeeksEnabled = true,
+}) {
+  showDialog(
+    context: context,
+    builder: (context) => _LessonDialog(
+      dayOfWeek: dayOfWeek,
+      lessonNumber: lessonNumber,
+      startTime: startTime,
+      endTime: endTime,
+      abWeeksEnabled: abWeeksEnabled,
+    ),
+  );
+}
+
+void showEditLessonDialog(BuildContext context, Lesson lesson, {bool abWeeksEnabled = true}) {
+  showDialog(
+    context: context,
+    builder: (context) => _LessonDialog(
+      lesson: lesson,
+      abWeeksEnabled: abWeeksEnabled,
+    ),
+  );
 }
 
 class _FullscreenVertretungsplanViewer extends StatefulWidget {
@@ -3853,7 +4822,7 @@ class _FullscreenVertretungsplanViewerState extends State<_FullscreenVertretungs
   void _onTransformationChanged() {
     final scale = _transformationController.value.getMaxScaleOnAxis();
     final wasZoomed = _isZoomed;
-    _isZoomed = scale > 1.05; // Small threshold to avoid float precision issues
+    _isZoomed = scale > 1.05;
     if (wasZoomed != _isZoomed) {
       setState(() {});
     }
@@ -3868,7 +4837,7 @@ class _FullscreenVertretungsplanViewerState extends State<_FullscreenVertretungs
     if (_isZoomed) {
       _transformationController.value = Matrix4.identity();
     } else {
-      final scale = 2.5;
+      const scale = 2.5;
       final x = -position.dx * (scale - 1);
       final y = -position.dy * (scale - 1);
       _transformationController.value = Matrix4.identity()
@@ -4041,13 +5010,13 @@ class _FullscreenVertretungsplanViewerState extends State<_FullscreenVertretungs
                         Uint8List.fromList(bytes),
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) {
-                          return Center(
+                          return const Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(Icons.broken_image, size: 64, color: Colors.white54),
-                                const SizedBox(height: 12),
-                                const Text(
+                                SizedBox(height: 12),
+                                Text(
                                   'Bild konnte nicht geladen werden',
                                   style: TextStyle(color: Colors.white54),
                                 ),
@@ -4159,15 +5128,16 @@ class _FullscreenVertretungsplanViewerState extends State<_FullscreenVertretungs
         },
       );
     } catch (e) {
-      return Center(
+      debugPrint('Error loading content: $e');
+      return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 64, color: Colors.redAccent),
-            const SizedBox(height: 12),
+            Icon(Icons.error_outline, size: 64, color: Colors.redAccent),
+            SizedBox(height: 12),
             Text(
-              'Fehler: $e',
-              style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+              'Ein Fehler ist aufgetreten.',
+              style: TextStyle(color: Colors.redAccent, fontSize: 12),
               textAlign: TextAlign.center,
             ),
           ],

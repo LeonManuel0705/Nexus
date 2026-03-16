@@ -421,6 +421,18 @@ def init_db():
         )
     ''')
 
+    try:
+        cursor.execute('ALTER TABLE hub_timetable_settings ADD COLUMN grade_system TEXT DEFAULT \'points\'')
+        conn.commit()
+    except:
+        pass
+
+    try:
+        cursor.execute("ALTER TABLE hub_timetable_settings ADD COLUMN class_level INTEGER DEFAULT 10")
+        conn.commit()
+    except:
+        pass
+
     cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS hub_timetable_entries (
             id {pk},
@@ -440,6 +452,16 @@ def init_db():
     cursor.execute('''
         CREATE INDEX IF NOT EXISTS idx_timetable_day_block
         ON hub_timetable_entries(day, block, week)
+    ''')
+
+    cursor.execute(f'''
+        CREATE TABLE IF NOT EXISTS hub_timetable_periods (
+            id {pk},
+            period_number INTEGER NOT NULL UNIQUE,
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
     ''')
 
     cursor.execute(f'''
@@ -481,6 +503,61 @@ def init_db():
         ON hub_holidays(date)
     ''')
 
+    cursor.execute(f'''
+        CREATE TABLE IF NOT EXISTS hub_bookmarks (
+            id {pk},
+            title TEXT NOT NULL,
+            url TEXT NOT NULL,
+            category TEXT DEFAULT 'Other',
+            favicon TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    cursor.execute(f'''
+        CREATE TABLE IF NOT EXISTS hub_drawings (
+            id {pk},
+            name TEXT NOT NULL,
+            image_data TEXT NOT NULL,
+            background_type TEXT DEFAULT 'blank',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    cursor.execute(f'''
+        CREATE TABLE IF NOT EXISTS hub_user_tickets (
+            id {pk},
+            user_id TEXT,
+            ticket_type TEXT NOT NULL,
+            ticket_name TEXT NOT NULL,
+            zone_coverage TEXT NOT NULL,
+            valid_from TEXT,
+            valid_until TEXT,
+            auto_renews INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    cursor.execute(f'''
+        CREATE TABLE IF NOT EXISTS hub_monitored_routes (
+            id {pk},
+            user_id TEXT,
+            route_data TEXT NOT NULL,
+            from_name TEXT,
+            to_name TEXT,
+            departure_time TEXT NOT NULL,
+            status TEXT DEFAULT 'active',
+            last_check TEXT,
+            current_delays TEXT,
+            notifications_sent TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     if not _use_postgres:
         try:
             cursor.execute('ALTER TABLE hub_timetable_settings ADD COLUMN bundesland TEXT')
@@ -490,9 +567,32 @@ def init_db():
             cursor.execute('ALTER TABLE hub_timetable_settings ADD COLUMN holidays_imported_until INTEGER')
         except sqlite3.OperationalError:
             pass
+        try:
+            cursor.execute('ALTER TABLE hub_timetable_settings ADD COLUMN birthday TEXT')
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute('ALTER TABLE hub_timetable_settings ADD COLUMN theme TEXT DEFAULT \'dark\'')
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute('ALTER TABLE hub_timetable_settings ADD COLUMN location_json TEXT')
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("ALTER TABLE hub_timetable_settings ADD COLUMN theme_mode TEXT DEFAULT 'manual'")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute('ALTER TABLE hub_timetable_settings ADD COLUMN theme_schedule_json TEXT')
+        except sqlite3.OperationalError:
+            pass
 
     conn.commit()
     conn.close()
+
+    if not _use_postgres and os.path.exists(DATABASE_PATH):
+        os.chmod(DATABASE_PATH, 0o600)
 
 def create_folder(name: str, parent_id: Optional[int] = None) -> int:
     conn = get_connection()
@@ -645,12 +745,13 @@ def search_notes(query: str) -> List[Dict[str, Any]]:
         ''', (query,))
     else:
 
+        safe_query = '"' + query.replace('"', '""') + '"'
         cursor.execute('''
             SELECT notes.* FROM notes
             JOIN notes_fts ON notes.id = notes_fts.rowid
             WHERE notes_fts MATCH ?
             ORDER BY rank
-        ''', (query,))
+        ''', (safe_query,))
 
     notes = _fetchall_dict(cursor)
     conn.close()
@@ -1159,7 +1260,7 @@ def update_hub_task(task_id: int, title: str = None, description: str = None,
     conn.close()
     return affected > 0
 
-def toggle_hub_task(task_id: int) -> dict:
+def toggle_hub_task(task_id: int, stop_recurrence: bool = False) -> dict:
 
     from datetime import timedelta
     import json
@@ -1183,9 +1284,17 @@ def toggle_hub_task(task_id: int) -> dict:
         WHERE id = ?
     ''', (new_status, completed_at, task_id))
 
+    if stop_recurrence and new_status == 1:
+        cursor.execute('''
+            UPDATE hub_tasks
+            SET repeat_type = 'none', repeat_days = NULL, repeat_end_date = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ''', (task_id,))
+
     next_task_id = None
 
-    if new_status == 1 and task.get('repeat_type') and task['repeat_type'] != 'none':
+    if new_status == 1 and not stop_recurrence and task.get('repeat_type') and task['repeat_type'] != 'none':
         next_due_date = calculate_next_due_date(
             task.get('due_date'),
             task['repeat_type'],
@@ -2003,6 +2112,68 @@ def save_timetable_settings(has_ab_weeks: bool = True, block_count: int = 4,
     conn.close()
     return settings_id
 
+def get_user_theme(user_id: str = None) -> str:
+    conn = get_connection()
+    cursor = conn.cursor()
+    if user_id:
+        cursor.execute('SELECT theme FROM hub_timetable_settings WHERE user_id = ? ORDER BY id DESC LIMIT 1', (user_id,))
+    else:
+        cursor.execute('SELECT theme FROM hub_timetable_settings ORDER BY id DESC LIMIT 1')
+    row = cursor.fetchone()
+    conn.close()
+    if row and row['theme']:
+        return row['theme']
+    return 'dark'
+
+def save_user_theme(theme: str, user_id: str = None) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    if user_id:
+        cursor.execute('SELECT id FROM hub_timetable_settings WHERE user_id = ? LIMIT 1', (user_id,))
+    else:
+        cursor.execute('SELECT id FROM hub_timetable_settings ORDER BY id DESC LIMIT 1')
+    existing = cursor.fetchone()
+    if existing:
+        cursor.execute('UPDATE hub_timetable_settings SET theme = ? WHERE id = ?', (theme, existing['id']))
+    else:
+        cursor.execute('INSERT INTO hub_timetable_settings (theme, user_id) VALUES (?, ?)', (theme, user_id))
+    conn.commit()
+    conn.close()
+    return True
+
+def get_theme_preferences(user_id: str = None) -> Dict[str, Any]:
+    settings = get_timetable_settings(user_id)
+    if settings:
+        return {
+            'theme': settings.get('theme', 'dark'),
+            'theme_mode': settings.get('theme_mode', 'manual'),
+            'theme_schedule_json': settings.get('theme_schedule_json'),
+        }
+    return {'theme': 'dark', 'theme_mode': 'manual', 'theme_schedule_json': None}
+
+def save_theme_preferences(theme_mode: str, theme_schedule_json: str = None, user_id: str = None) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    if user_id:
+        cursor.execute('SELECT id FROM hub_timetable_settings WHERE user_id = ? LIMIT 1', (user_id,))
+    else:
+        cursor.execute('SELECT id FROM hub_timetable_settings ORDER BY id DESC LIMIT 1')
+    existing = cursor.fetchone()
+    if existing:
+        cursor.execute('''
+            UPDATE hub_timetable_settings
+            SET theme_mode = ?, theme_schedule_json = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ''', (theme_mode, theme_schedule_json, existing['id']))
+    else:
+        cursor.execute('''
+            INSERT INTO hub_timetable_settings (theme_mode, theme_schedule_json, user_id)
+            VALUES (?, ?, ?)
+        ''', (theme_mode, theme_schedule_json, user_id))
+    conn.commit()
+    conn.close()
+    return True
+
 def get_timetable_entries(day: int = None, week: str = None, user_id: str = None) -> List[Dict[str, Any]]:
 
     conn = get_connection()
@@ -2623,6 +2794,323 @@ def save_bundesland_setting(bundesland: str, holidays_imported_until: int = None
             VALUES (?, ?, ?)
         ''', (bundesland, holidays_imported_until, user_id))
 
+    conn.commit()
+    conn.close()
+    return True
+
+def get_birthday_setting(user_id: str = None) -> Optional[str]:
+    settings = get_timetable_settings(user_id)
+    if settings:
+        return settings.get('birthday')
+    return None
+
+def save_birthday_setting(birthday: str, user_id: str = None) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if user_id:
+        cursor.execute('SELECT id FROM hub_timetable_settings WHERE user_id = ? LIMIT 1', (user_id,))
+    else:
+        cursor.execute('SELECT id FROM hub_timetable_settings ORDER BY id DESC LIMIT 1')
+    existing = cursor.fetchone()
+
+    if existing:
+        cursor.execute('''
+            UPDATE hub_timetable_settings SET birthday = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+        ''', (birthday, existing['id']))
+    else:
+        cursor.execute('''
+            INSERT INTO hub_timetable_settings (birthday, user_id) VALUES (?, ?)
+        ''', (birthday, user_id))
+
+    conn.commit()
+    conn.close()
+    return True
+
+def get_location_setting(user_id: str = None) -> Optional[str]:
+    settings = get_timetable_settings(user_id)
+    if settings:
+        return settings.get('location_json')
+    return None
+
+def save_location_setting(location_json: str, user_id: str = None) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if user_id:
+        cursor.execute('SELECT id FROM hub_timetable_settings WHERE user_id = ? LIMIT 1', (user_id,))
+    else:
+        cursor.execute('SELECT id FROM hub_timetable_settings ORDER BY id DESC LIMIT 1')
+    existing = cursor.fetchone()
+
+    if existing:
+        cursor.execute('''
+            UPDATE hub_timetable_settings SET location_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+        ''', (location_json, existing['id']))
+    else:
+        cursor.execute('''
+            INSERT INTO hub_timetable_settings (location_json, user_id) VALUES (?, ?)
+        ''', (location_json, user_id))
+
+    conn.commit()
+    conn.close()
+    return True
+
+
+def get_timetable_periods() -> List[Dict[str, Any]]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    _execute(cursor, 'SELECT * FROM hub_timetable_periods ORDER BY period_number')
+    result = _fetchall_dict(cursor)
+    conn.close()
+    return result
+
+
+def replace_all_timetable_periods(periods: list) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM hub_timetable_periods')
+    for p in periods:
+        cursor.execute(
+            'INSERT INTO hub_timetable_periods (period_number, start_time, end_time) VALUES (?, ?, ?)',
+            (p['period_number'], p['start_time'], p['end_time'])
+        )
+    conn.commit()
+    conn.close()
+    return True
+
+
+def delete_timetable_period(period_number: int) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM hub_timetable_periods WHERE period_number = ?', (period_number,))
+    deleted = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return deleted
+
+
+def get_hub_bookmarks(category: str = None) -> List[Dict[str, Any]]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    if category and category != 'all':
+        _execute(cursor, 'SELECT * FROM hub_bookmarks WHERE category = ? ORDER BY created_at DESC', (category,))
+    else:
+        _execute(cursor, 'SELECT * FROM hub_bookmarks ORDER BY created_at DESC')
+    result = _fetchall_dict(cursor)
+    conn.close()
+    return result
+
+def get_hub_bookmark(bookmark_id: int) -> Optional[Dict[str, Any]]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    _execute(cursor, 'SELECT * FROM hub_bookmarks WHERE id = ?', (bookmark_id,))
+    result = _fetchone_dict(cursor)
+    conn.close()
+    return result
+
+def create_hub_bookmark(title: str, url: str, category: str = 'Other', favicon: str = None) -> int:
+    conn = get_connection()
+    cursor = conn.cursor()
+    now = datetime.now().isoformat()
+    _execute(cursor, '''
+        INSERT INTO hub_bookmarks (title, url, category, favicon, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (title, url, category, favicon, now, now))
+    bookmark_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return bookmark_id
+
+def update_hub_bookmark(bookmark_id: int, **kwargs) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    updates = []
+    params = []
+    for key in ('title', 'url', 'category', 'favicon'):
+        if key in kwargs and kwargs[key] is not None:
+            updates.append(f'{key} = ?')
+            params.append(kwargs[key])
+    if not updates:
+        conn.close()
+        return False
+    updates.append('updated_at = ?')
+    params.append(datetime.now().isoformat())
+    params.append(bookmark_id)
+    _execute(cursor, f'UPDATE hub_bookmarks SET {", ".join(updates)} WHERE id = ?', params)
+    conn.commit()
+    conn.close()
+    return True
+
+def delete_hub_bookmark(bookmark_id: int) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    _execute(cursor, 'DELETE FROM hub_bookmarks WHERE id = ?', (bookmark_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def get_hub_drawings() -> List[Dict[str, Any]]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    _execute(cursor, 'SELECT id, name, image_data, background_type, created_at, updated_at FROM hub_drawings ORDER BY updated_at DESC')
+    result = _fetchall_dict(cursor)
+    conn.close()
+    return result
+
+def get_hub_drawing(drawing_id: int) -> Optional[Dict[str, Any]]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    _execute(cursor, 'SELECT * FROM hub_drawings WHERE id = ?', (drawing_id,))
+    result = _fetchone_dict(cursor)
+    conn.close()
+    return result
+
+def create_hub_drawing(name: str, image_data: str, background_type: str = 'blank') -> int:
+    conn = get_connection()
+    cursor = conn.cursor()
+    now = datetime.now().isoformat()
+    _execute(cursor, '''
+        INSERT INTO hub_drawings (name, image_data, background_type, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (name, image_data, background_type, now, now))
+    drawing_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return drawing_id
+
+def update_hub_drawing(drawing_id: int, **kwargs) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    updates = []
+    params = []
+    for key in ('name', 'image_data', 'background_type'):
+        if key in kwargs and kwargs[key] is not None:
+            updates.append(f'{key} = ?')
+            params.append(kwargs[key])
+    if not updates:
+        conn.close()
+        return False
+    updates.append('updated_at = ?')
+    params.append(datetime.now().isoformat())
+    params.append(drawing_id)
+    _execute(cursor, f'UPDATE hub_drawings SET {", ".join(updates)} WHERE id = ?', params)
+    conn.commit()
+    conn.close()
+    return True
+
+def delete_hub_drawing(drawing_id: int) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    _execute(cursor, 'DELETE FROM hub_drawings WHERE id = ?', (drawing_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def get_user_tickets(user_id: str = None) -> List[Dict[str, Any]]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    if user_id:
+        _execute(cursor, 'SELECT * FROM hub_user_tickets WHERE user_id = ? AND is_active = 1 ORDER BY created_at DESC', (user_id,))
+    else:
+        _execute(cursor, 'SELECT * FROM hub_user_tickets WHERE is_active = 1 ORDER BY created_at DESC')
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def create_user_ticket(ticket_type: str, ticket_name: str, zone_coverage: str,
+                       valid_from: str = None, valid_until: str = None,
+                       auto_renews: bool = False, user_id: str = None) -> int:
+    conn = get_connection()
+    cursor = conn.cursor()
+    _execute(cursor, '''
+        INSERT INTO hub_user_tickets (ticket_type, ticket_name, zone_coverage, valid_from, valid_until, auto_renews, user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (ticket_type, ticket_name, zone_coverage, valid_from, valid_until, 1 if auto_renews else 0, user_id))
+    ticket_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return ticket_id
+
+def update_user_ticket(ticket_id: int, **kwargs) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    updates = []
+    params = []
+    for key in ('ticket_type', 'ticket_name', 'zone_coverage', 'valid_from', 'valid_until', 'auto_renews', 'is_active'):
+        if key in kwargs and kwargs[key] is not None:
+            updates.append(f'{key} = ?')
+            val = kwargs[key]
+            if key in ('auto_renews', 'is_active') and isinstance(val, bool):
+                val = 1 if val else 0
+            params.append(val)
+    if not updates:
+        conn.close()
+        return False
+    updates.append('updated_at = CURRENT_TIMESTAMP')
+    params.append(ticket_id)
+    _execute(cursor, f'UPDATE hub_user_tickets SET {", ".join(updates)} WHERE id = ?', params)
+    conn.commit()
+    conn.close()
+    return True
+
+def delete_user_ticket(ticket_id: int) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    _execute(cursor, 'DELETE FROM hub_user_tickets WHERE id = ?', (ticket_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def get_monitored_routes(user_id: str = None, status: str = 'active') -> List[Dict[str, Any]]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    if user_id:
+        _execute(cursor, 'SELECT * FROM hub_monitored_routes WHERE user_id = ? AND status = ? ORDER BY departure_time ASC', (user_id, status))
+    else:
+        _execute(cursor, 'SELECT * FROM hub_monitored_routes WHERE status = ? ORDER BY departure_time ASC', (status,))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def create_monitored_route(route_data: str, from_name: str, to_name: str,
+                           departure_time: str, user_id: str = None) -> int:
+    conn = get_connection()
+    cursor = conn.cursor()
+    _execute(cursor, '''
+        INSERT INTO hub_monitored_routes (route_data, from_name, to_name, departure_time, user_id)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (route_data, from_name, to_name, departure_time, user_id))
+    route_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return route_id
+
+def update_monitored_route(route_id: int, **kwargs) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    updates = []
+    params = []
+    for key in ('status', 'last_check', 'current_delays', 'notifications_sent'):
+        if key in kwargs and kwargs[key] is not None:
+            updates.append(f'{key} = ?')
+            params.append(kwargs[key])
+    if not updates:
+        conn.close()
+        return False
+    params.append(route_id)
+    _execute(cursor, f'UPDATE hub_monitored_routes SET {", ".join(updates)} WHERE id = ?', params)
+    conn.commit()
+    conn.close()
+    return True
+
+def delete_monitored_route(route_id: int) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    _execute(cursor, 'DELETE FROM hub_monitored_routes WHERE id = ?', (route_id,))
     conn.commit()
     conn.close()
     return True

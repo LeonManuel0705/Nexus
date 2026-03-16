@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
 import '../models/task.dart';
 
 import 'database_web.dart' if (dart.library.io) 'database_native.dart' as db_platform;
@@ -51,7 +50,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 5,
+      version: 11,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -70,6 +69,101 @@ class DatabaseService {
 
     if (oldVersion < 5) {
       await db.execute("ALTER TABLE lessons ADD COLUMN lesson_type TEXT");
+    }
+
+    if (oldVersion < 6) {
+
+      await db.execute("ALTER TABLE lessons ADD COLUMN week_type TEXT DEFAULT 'both'");
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS timetable_periods (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          period_number INTEGER NOT NULL UNIQUE,
+          name TEXT,
+          start_time TEXT NOT NULL,
+          end_time TEXT NOT NULL,
+          has_split INTEGER DEFAULT 0,
+          split_break_minutes INTEGER,
+          created_at TEXT NOT NULL
+        )
+      ''');
+    }
+
+    if (oldVersion < 7) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS daily_reviews (
+          id TEXT PRIMARY KEY,
+          date TEXT NOT NULL,
+          achieved TEXT NOT NULL DEFAULT '',
+          good TEXT NOT NULL DEFAULT '',
+          better TEXT NOT NULL DEFAULT '',
+          focus TEXT NOT NULL DEFAULT '',
+          grateful TEXT NOT NULL DEFAULT '',
+          energy INTEGER NOT NULL DEFAULT 5
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS weekly_reviews (
+          id TEXT PRIMARY KEY,
+          week_start TEXT NOT NULL,
+          week_number INTEGER NOT NULL,
+          highlights TEXT NOT NULL DEFAULT '',
+          progress TEXT NOT NULL DEFAULT '',
+          challenges TEXT NOT NULL DEFAULT '',
+          learnings TEXT NOT NULL DEFAULT '',
+          goals TEXT NOT NULL DEFAULT ''
+        )
+      ''');
+    }
+
+    if (oldVersion < 8) {
+      try {
+        await db.execute("ALTER TABLE tasks ADD COLUMN estimated_minutes INTEGER");
+      } catch (_) {
+        // Column may already exist if migration was partially applied
+      }
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS pomodoro_sessions (
+          id TEXT PRIMARY KEY,
+          task_id TEXT,
+          started_at TEXT NOT NULL,
+          duration_minutes INTEGER NOT NULL,
+          completed INTEGER DEFAULT 1
+        )
+      ''');
+    }
+
+    if (oldVersion < 9) {
+      await _createKnowledgeTable(db);
+    }
+
+    if (oldVersion < 10) {
+      try {
+        await db.execute("ALTER TABLE tasks ADD COLUMN repeat_type TEXT");
+      } catch (_) {}
+      try {
+        await db.execute("ALTER TABLE tasks ADD COLUMN repeat_weekdays TEXT");
+      } catch (_) {}
+      try {
+        await db.execute("ALTER TABLE tasks ADD COLUMN repeat_end_date TEXT");
+      } catch (_) {}
+    }
+
+    if (oldVersion < 11) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS vbb_tickets (
+          id TEXT PRIMARY KEY,
+          ticket_type TEXT NOT NULL DEFAULT 'custom',
+          ticket_name TEXT NOT NULL,
+          zone_coverage TEXT NOT NULL DEFAULT 'all',
+          valid_from TEXT,
+          valid_until TEXT,
+          auto_renews INTEGER DEFAULT 0,
+          created_at TEXT NOT NULL
+        )
+      ''');
     }
 
     await _createTrainingTables(db);
@@ -137,8 +231,22 @@ class DatabaseService {
         completed INTEGER DEFAULT 0,
         priority TEXT DEFAULT 'medium',
         category TEXT DEFAULT 'general',
+        estimated_minutes INTEGER,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        repeat_type TEXT,
+        repeat_weekdays TEXT,
+        repeat_end_date TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS pomodoro_sessions (
+        id TEXT PRIMARY KEY,
+        task_id TEXT,
+        started_at TEXT NOT NULL,
+        duration_minutes INTEGER NOT NULL,
+        completed INTEGER DEFAULT 1
       )
     ''');
 
@@ -170,8 +278,48 @@ class DatabaseService {
         lesson_number INTEGER NOT NULL,
         color TEXT,
         lesson_type TEXT,
+        week_type TEXT DEFAULT 'both',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS timetable_periods (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        period_number INTEGER NOT NULL UNIQUE,
+        name TEXT,
+        start_time TEXT NOT NULL,
+        end_time TEXT NOT NULL,
+        has_split INTEGER DEFAULT 0,
+        split_break_minutes INTEGER,
+        created_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS daily_reviews (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL,
+        achieved TEXT NOT NULL DEFAULT '',
+        good TEXT NOT NULL DEFAULT '',
+        better TEXT NOT NULL DEFAULT '',
+        focus TEXT NOT NULL DEFAULT '',
+        grateful TEXT NOT NULL DEFAULT '',
+        energy INTEGER NOT NULL DEFAULT 5
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS weekly_reviews (
+        id TEXT PRIMARY KEY,
+        week_start TEXT NOT NULL,
+        week_number INTEGER NOT NULL,
+        highlights TEXT NOT NULL DEFAULT '',
+        progress TEXT NOT NULL DEFAULT '',
+        challenges TEXT NOT NULL DEFAULT '',
+        learnings TEXT NOT NULL DEFAULT '',
+        goals TEXT NOT NULL DEFAULT ''
       )
     ''');
 
@@ -398,6 +546,19 @@ class DatabaseService {
     ''');
 
     await db.execute('''
+      CREATE TABLE IF NOT EXISTS vbb_tickets (
+        id TEXT PRIMARY KEY,
+        ticket_type TEXT NOT NULL DEFAULT 'custom',
+        ticket_name TEXT NOT NULL,
+        zone_coverage TEXT NOT NULL DEFAULT 'all',
+        valid_from TEXT,
+        valid_until TEXT,
+        auto_renews INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
       CREATE TABLE IF NOT EXISTS google_accounts (
         email TEXT PRIMARY KEY,
         token_key TEXT,
@@ -471,6 +632,8 @@ class DatabaseService {
     await db.execute('CREATE INDEX IF NOT EXISTS idx_cached_emails_date ON cached_emails(date DESC)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_google_events_calendar ON google_events(calendar_id)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_pending_operations_status ON pending_operations(status)');
+
+    await _createKnowledgeTable(db);
   }
 
   Future<List<Task>> getTasks() async {
@@ -641,6 +804,86 @@ class DatabaseService {
   Future<void> deleteLesson(String id) async {
     final db = await database;
     await db.delete('lessons', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<Map<String, dynamic>>> getTimetablePeriods() async {
+    final db = await database;
+    return await db.query('timetable_periods', orderBy: 'period_number ASC');
+  }
+
+  Future<void> insertTimetablePeriod({
+    required int periodNumber,
+    String? name,
+    required String startTime,
+    required String endTime,
+    bool hasSplit = false,
+    int? splitBreakMinutes,
+  }) async {
+    final db = await database;
+    await db.insert('timetable_periods', {
+      'period_number': periodNumber,
+      'name': name ?? '$periodNumber. Stunde',
+      'start_time': startTime,
+      'end_time': endTime,
+      'has_split': hasSplit ? 1 : 0,
+      'split_break_minutes': splitBreakMinutes,
+      'created_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateTimetablePeriod({
+    required int periodNumber,
+    String? name,
+    String? startTime,
+    String? endTime,
+    bool? hasSplit,
+    int? splitBreakMinutes,
+  }) async {
+    final db = await database;
+    final updates = <String, dynamic>{};
+    if (name != null) updates['name'] = name;
+    if (startTime != null) updates['start_time'] = startTime;
+    if (endTime != null) updates['end_time'] = endTime;
+    if (hasSplit != null) updates['has_split'] = hasSplit ? 1 : 0;
+    if (splitBreakMinutes != null) updates['split_break_minutes'] = splitBreakMinutes;
+    await db.update('timetable_periods', updates, where: 'period_number = ?', whereArgs: [periodNumber]);
+  }
+
+  Future<void> deleteTimetablePeriod(int periodNumber) async {
+    final db = await database;
+    await db.delete('timetable_periods', where: 'period_number = ?', whereArgs: [periodNumber]);
+  }
+
+  Future<void> clearTimetablePeriods() async {
+    final db = await database;
+    await db.delete('timetable_periods');
+  }
+
+  Future<void> seedDefaultTimetablePeriods() async {
+    final db = await database;
+    final existing = await db.query('timetable_periods');
+    if (existing.isNotEmpty) return;
+
+    final defaultPeriods = [
+      {'period': 1, 'start': '08:00', 'end': '08:45'},
+      {'period': 2, 'start': '08:50', 'end': '09:35'},
+      {'period': 3, 'start': '09:55', 'end': '10:40'},
+      {'period': 4, 'start': '10:45', 'end': '11:30'},
+      {'period': 5, 'start': '11:50', 'end': '12:35'},
+      {'period': 6, 'start': '12:40', 'end': '13:25'},
+      {'period': 7, 'start': '13:30', 'end': '14:15'},
+      {'period': 8, 'start': '14:20', 'end': '15:05'},
+      {'period': 9, 'start': '15:10', 'end': '15:55'},
+      {'period': 10, 'start': '16:00', 'end': '16:45'},
+    ];
+
+    for (final p in defaultPeriods) {
+      await insertTimetablePeriod(
+        periodNumber: p['period'] as int,
+        startTime: p['start'] as String,
+        endTime: p['end'] as String,
+      );
+    }
   }
 
   Future<int> getOpenTaskCount() async {
@@ -1076,7 +1319,7 @@ class DatabaseService {
     final db = await database;
     final maps = await db.query(
       'cached_emails',
-      where: 'account_id = ?' + (folderId.isNotEmpty ? ' AND folder = ?' : ''),
+      where: 'account_id = ?${folderId.isNotEmpty ? ' AND folder = ?' : ''}',
       whereArgs: folderId.isNotEmpty ? [accountId, folderId] : [accountId],
       orderBy: 'date DESC',
       limit: limit,
@@ -1214,7 +1457,8 @@ class DatabaseService {
       return [];
     }
 
-    return [];
+    final results = jsonDecode(cached['routes_json'] as String) as List;
+    return results.map((r) => VbbJourney.fromMap(r as Map<String, dynamic>)).toList();
   }
 
   Future<void> cacheVbbRoutes(String cacheKey, List<VbbJourney> journeys) async {
@@ -1228,7 +1472,7 @@ class DatabaseService {
         'cache_key': cacheKey,
         'from_json': from != null ? jsonEncode(from.toMap()) : '{}',
         'to_json': to != null ? jsonEncode(to.toMap()) : '{}',
-        'routes_json': '[]',
+        'routes_json': jsonEncode(journeys.map((j) => j.toMap()).toList()),
         'cached_at': DateTime.now().toIso8601String(),
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
@@ -1297,6 +1541,28 @@ class DatabaseService {
   Future<void> deleteVbbFavoriteRoute(String id) async {
     final db = await database;
     await db.delete('vbb_favorite_routes', where: 'id = ?', whereArgs: [int.parse(id)]);
+  }
+
+  // VBB Tickets
+  Future<List<VbbTicket>> getVbbTickets() async {
+    final db = await database;
+    final maps = await db.query('vbb_tickets', orderBy: 'created_at DESC');
+    return maps.map((map) => VbbTicket.fromMap(map.map((k, v) => MapEntry(k, v)))).toList();
+  }
+
+  Future<void> insertVbbTicket(VbbTicket ticket) async {
+    final db = await database;
+    await db.insert('vbb_tickets', ticket.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateVbbTicket(VbbTicket ticket) async {
+    final db = await database;
+    await db.update('vbb_tickets', ticket.toMap(), where: 'id = ?', whereArgs: [ticket.id]);
+  }
+
+  Future<void> deleteVbbTicket(String id) async {
+    final db = await database;
+    await db.delete('vbb_tickets', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> clearOldVbbCache() async {
@@ -1462,6 +1728,114 @@ class DatabaseService {
     );
     if (maps.isEmpty) return null;
     return maps.first['sync_token'] as String?;
+  }
+
+  Future<List<Map<String, dynamic>>> getDailyReviews() async {
+    final db = await database;
+    return db.query('daily_reviews', orderBy: 'date DESC');
+  }
+
+  Future<void> insertDailyReview(Map<String, dynamic> review) async {
+    final db = await database;
+    await db.insert('daily_reviews', review, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> deleteDailyReview(String id) async {
+    final db = await database;
+    await db.delete('daily_reviews', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<Map<String, dynamic>>> getWeeklyReviews() async {
+    final db = await database;
+    return db.query('weekly_reviews', orderBy: 'week_start DESC');
+  }
+
+  Future<void> insertWeeklyReview(Map<String, dynamic> review) async {
+    final db = await database;
+    await db.insert('weekly_reviews', review, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<void> deleteWeeklyReview(String id) async {
+    final db = await database;
+    await db.delete('weekly_reviews', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> insertPomodoroSession(Map<String, dynamic> session) async {
+    final db = await database;
+    await db.insert('pomodoro_sessions', session, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<Map<String, dynamic>>> getPomodoroSessions({String? since}) async {
+    final db = await database;
+    if (since != null) {
+      return db.query('pomodoro_sessions',
+        where: 'started_at >= ?', whereArgs: [since],
+        orderBy: 'started_at DESC');
+    }
+    return db.query('pomodoro_sessions', orderBy: 'started_at DESC');
+  }
+
+  Future<int> getPomodoroCountForTask(String taskId) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM pomodoro_sessions WHERE task_id = ? AND completed = 1',
+      [taskId],
+    );
+    return result.first['count'] as int? ?? 0;
+  }
+
+  Future<Map<String, dynamic>> getPomodoroStats({required String since}) async {
+    final db = await database;
+    final summary = await db.rawQuery(
+      "SELECT COUNT(*) as count, COALESCE(SUM(duration_minutes), 0) as total_minutes FROM pomodoro_sessions WHERE started_at >= ? AND completed = 1",
+      [since],
+    );
+    final byTask = await db.rawQuery(
+      "SELECT task_id, COUNT(*) as sessions, COALESCE(SUM(duration_minutes), 0) as minutes FROM pomodoro_sessions WHERE started_at >= ? AND completed = 1 GROUP BY task_id ORDER BY minutes DESC",
+      [since],
+    );
+    final byDay = await db.rawQuery(
+      "SELECT substr(started_at, 1, 10) as day, COUNT(*) as count FROM pomodoro_sessions WHERE started_at >= ? AND completed = 1 GROUP BY day ORDER BY day",
+      [since],
+    );
+    return {
+      'total_sessions': summary.first['count'] as int? ?? 0,
+      'total_minutes': summary.first['total_minutes'] as int? ?? 0,
+      'by_task': byTask,
+      'by_day': byDay,
+    };
+  }
+
+  Future<Map<String, dynamic>> getWeeklyStats() async {
+    final db = await database;
+    final now = DateTime.now();
+    final weekStart = now.subtract(Duration(days: now.weekday - 1));
+    final weekStartStr = DateTime(weekStart.year, weekStart.month, weekStart.day).toIso8601String();
+
+    final tasksCompleted = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM tasks WHERE completed = 1 AND updated_at >= ?",
+      [weekStartStr],
+    );
+    final totalTasks = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM tasks WHERE created_at >= ?",
+      [weekStartStr],
+    );
+    final pomodoroSessions = await db.rawQuery(
+      "SELECT COUNT(*) as count, COALESCE(SUM(duration_minutes), 0) as total_minutes FROM pomodoro_sessions WHERE started_at >= ? AND completed = 1",
+      [weekStartStr],
+    );
+    final pomodoroByDay = await db.rawQuery(
+      "SELECT substr(started_at, 1, 10) as day, COUNT(*) as count FROM pomodoro_sessions WHERE started_at >= ? AND completed = 1 GROUP BY day ORDER BY day",
+      [weekStartStr],
+    );
+
+    return {
+      'tasks_completed': tasksCompleted.first['count'] as int? ?? 0,
+      'tasks_total': totalTasks.first['count'] as int? ?? 0,
+      'pomodoro_sessions': pomodoroSessions.first['count'] as int? ?? 0,
+      'pomodoro_minutes': pomodoroSessions.first['total_minutes'] as int? ?? 0,
+      'pomodoro_by_day': pomodoroByDay,
+    };
   }
 
   Future<void> _createTrainingTables(Database db) async {
@@ -1647,7 +2021,6 @@ class DatabaseService {
     );
   }
 
-
   Future<void> _createProjectsTables(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS projects (
@@ -1711,10 +2084,8 @@ class DatabaseService {
     await db.delete('projects', where: 'id = ?', whereArgs: [id]);
   }
 
-
-  /// Cache a Vertretungsplan file (PDF or image) - new format for authenticated fetch
   Future<void> cacheVertretungsplanFile({
-    required String data,  // base64 encoded
+    required String data,
     required int page,
     required String contentType,
   }) async {
@@ -1728,7 +2099,6 @@ class DatabaseService {
     });
   }
 
-  /// Get all cached Vertretungsplan files
   Future<List<Map<String, dynamic>>> getAllCachedVertretungsplanFiles() async {
     final db = await database;
     final maps = await db.query(
@@ -1738,7 +2108,6 @@ class DatabaseService {
     return maps;
   }
 
-  /// Clear all Vertretungsplan cache (for fresh fetch)
   Future<void> clearVertretungsplanCache() async {
     final db = await database;
     await db.delete('vertretungsplan_cache');
@@ -1772,5 +2141,54 @@ class DatabaseService {
     final fetchedAt = cached['fetched_at'] as String?;
     if (fetchedAt == null) return null;
     return DateTime.tryParse(fetchedAt);
+  }
+
+  // ── Knowledge Base ──────────────────────────────────────────────────────────
+
+  Future<void> _createKnowledgeTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS knowledge_entries (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        content TEXT,
+        topic TEXT,
+        tags TEXT,
+        created_at TEXT,
+        updated_at TEXT
+      )
+    ''');
+  }
+
+  Future<List<Map<String, dynamic>>> getKnowledgeEntries() async {
+    final db = await database;
+    await _createKnowledgeTable(db);
+    return await db.query('knowledge_entries', orderBy: 'created_at DESC');
+  }
+
+  Future<void> insertKnowledgeEntry(Map<String, dynamic> entry) async {
+    final db = await database;
+    await _createKnowledgeTable(db);
+    await db.insert(
+      'knowledge_entries',
+      entry,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> updateKnowledgeEntry(String id, Map<String, dynamic> updates) async {
+    final db = await database;
+    await _createKnowledgeTable(db);
+    updates['updated_at'] = DateTime.now().toIso8601String();
+    await db.update(
+      'knowledge_entries',
+      updates,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> deleteKnowledgeEntry(String id) async {
+    final db = await database;
+    await db.delete('knowledge_entries', where: 'id = ?', whereArgs: [id]);
   }
 }

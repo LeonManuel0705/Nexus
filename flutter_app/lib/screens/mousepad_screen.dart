@@ -1,10 +1,11 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 import '../providers/drawing_provider.dart';
 import '../theme.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/page_fade_in.dart';
 
 class MousepadScreen extends StatefulWidget {
   const MousepadScreen({super.key});
@@ -28,6 +29,9 @@ class _MousepadScreenState extends State<MousepadScreen> {
     final boundary = _canvasKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (boundary == null) return;
 
+    final drawingProvider = context.read<DrawingProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
       final image = await boundary.toImage(pixelRatio: 2.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -39,17 +43,18 @@ class _MousepadScreenState extends State<MousepadScreen> {
 
       final name = await _showSaveDialog();
       if (name != null && name.isNotEmpty) {
-        await context.read<DrawingProvider>().saveDrawing(name, imageData);
+        await drawingProvider.saveDrawing(name, imageData);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          messenger.showSnackBar(
             const SnackBar(content: Text('Zeichnung gespeichert')),
           );
         }
       }
     } catch (e) {
+      debugPrint('Error saving drawing: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Fehler beim Speichern: $e')),
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Fehler beim Speichern. Bitte versuche es erneut.')),
         );
       }
     }
@@ -60,10 +65,11 @@ class _MousepadScreenState extends State<MousepadScreen> {
       text: 'Zeichnung ${DateTime.now().toString().substring(0, 16)}',
     );
 
+    final isDarkDialog = Theme.of(context).brightness == Brightness.dark;
     return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: NexusTheme.darkCard,
+        backgroundColor: isDarkDialog ? NexusTheme.darkCard : null,
         title: const Text('Zeichnung speichern'),
         content: TextField(
           controller: controller,
@@ -106,11 +112,12 @@ class _MousepadScreenState extends State<MousepadScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: NexusTheme.darkBackground,
+      backgroundColor: isDark ? NexusTheme.darkBackground : null,
       appBar: AppBar(
-        title: const Text('Zeichnen'),
-        backgroundColor: NexusTheme.darkSurface,
+        title: NexusTheme.gradientText('Zeichnen', fontSize: 36),
+        backgroundColor: isDark ? NexusTheme.darkSurface : null,
         actions: [
           IconButton(
             icon: const Icon(Icons.photo_library_outlined),
@@ -124,11 +131,12 @@ class _MousepadScreenState extends State<MousepadScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
+      body: PageFadeIn(
+        child: Column(
+          children: [
 
-          Expanded(
-            child: RepaintBoundary(
+            Expanded(
+              child: RepaintBoundary(
               key: _canvasKey,
               child: Consumer<DrawingProvider>(
                 builder: (context, provider, child) {
@@ -142,8 +150,10 @@ class _MousepadScreenState extends State<MousepadScreen> {
                     onPanEnd: (details) {
                       provider.endStroke();
                     },
-                    child: Container(
-                      color: Colors.black,
+                    child: GlassCard(
+                      borderRadius: 16,
+                      padding: EdgeInsets.zero,
+                      hasShadow: false,
                       child: CustomPaint(
                         painter: _DrawingPainter(
                           strokes: provider.getAllStrokes(),
@@ -158,8 +168,9 @@ class _MousepadScreenState extends State<MousepadScreen> {
             ),
           ),
 
-          _DrawingToolbar(),
-        ],
+            _DrawingToolbar(),
+          ],
+        ),
       ),
     );
   }
@@ -170,116 +181,107 @@ class _DrawingToolbar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<DrawingProvider>(
       builder: (context, provider, child) {
-        return Container(
+        return GlassCard(
+          borderRadius: 16,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: NexusTheme.darkSurface,
-            border: Border(
-              top: BorderSide(color: NexusTheme.darkBorder),
-            ),
-          ),
+          hasShadow: false,
           child: SafeArea(
             top: false,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    _ToolButton(
-                      icon: Icons.edit,
-                      label: 'Stift',
-                      isSelected: provider.currentTool == DrawingTool.pen,
-                      onTap: () => provider.setTool(DrawingTool.pen),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _ToolButton(
+                          icon: Icons.edit,
+                          label: 'Stift',
+                          isSelected: provider.currentTool == DrawingTool.pen,
+                          onTap: () => provider.setTool(DrawingTool.pen),
+                        ),
+                        _ToolButton(
+                          icon: Icons.format_color_fill,
+                          label: 'Marker',
+                          isSelected: provider.currentTool == DrawingTool.highlighter,
+                          onTap: () => provider.setTool(DrawingTool.highlighter),
+                        ),
+                        _ToolButton(
+                          icon: Icons.auto_fix_normal,
+                          label: 'Radierer',
+                          isSelected: provider.currentTool == DrawingTool.eraser,
+                          onTap: () => provider.setTool(DrawingTool.eraser),
+                        ),
+                        _ToolButton(
+                          icon: Icons.undo,
+                          label: 'Zurück',
+                          isSelected: false,
+                          enabled: provider.canUndo,
+                          onTap: provider.canUndo ? () => provider.undo() : null,
+                        ),
+                        _ToolButton(
+                          icon: Icons.delete_outline,
+                          label: 'Löschen',
+                          isSelected: false,
+                          onTap: () => _showClearDialog(context, provider),
+                        ),
+                      ],
                     ),
-                    _ToolButton(
-                      icon: Icons.format_color_fill,
-                      label: 'Marker',
-                      isSelected: provider.currentTool == DrawingTool.highlighter,
-                      onTap: () => provider.setTool(DrawingTool.highlighter),
-                    ),
-                    _ToolButton(
-                      icon: Icons.auto_fix_normal,
-                      label: 'Radierer',
-                      isSelected: provider.currentTool == DrawingTool.eraser,
-                      onTap: () => provider.setTool(DrawingTool.eraser),
-                    ),
-                    _ToolButton(
-                      icon: Icons.undo,
-                      label: 'Zurück',
-                      isSelected: false,
-                      enabled: provider.canUndo,
-                      onTap: provider.canUndo ? () => provider.undo() : null,
-                    ),
-                    _ToolButton(
-                      icon: Icons.delete_outline,
-                      label: 'Löschen',
-                      isSelected: false,
-                      onTap: () => _showClearDialog(context, provider),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 12),
-
-                if (provider.currentTool != DrawingTool.eraser)
-                  SizedBox(
-                    height: 36,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: DrawingProvider.availableColors.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (context, index) {
-                        final color = DrawingProvider.availableColors[index];
-                        final isSelected = provider.currentColor == color;
-                        return GestureDetector(
-                          onTap: () => provider.setColor(color),
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected
-                                    ? NexusTheme.primary
-                                    : Colors.white24,
-                                width: isSelected ? 3 : 1,
+                    const SizedBox(height: 12),
+                    if (provider.currentTool != DrawingTool.eraser)
+                      SizedBox(
+                        height: 36,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: DrawingProvider.availableColors.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 8),
+                          itemBuilder: (context, index) {
+                            final color = DrawingProvider.availableColors[index];
+                            final isSelected = provider.currentColor == color;
+                            return GestureDetector(
+                              onTap: () => provider.setColor(color),
+                              child: Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: color,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? NexusTheme.primary
+                                        : Colors.white24,
+                                    width: isSelected ? 3 : 1,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                const SizedBox(height: 12),
-
-                Row(
-                  children: [
-                    const Icon(Icons.line_weight, size: 20),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Slider(
-                        value: provider.strokeWidth,
-                        min: 1,
-                        max: 20,
-                        divisions: 19,
-                        activeColor: NexusTheme.primary,
-                        onChanged: (value) => provider.setStrokeWidth(value),
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                    Text(
-                      '${provider.strokeWidth.toInt()}',
-                      style: const TextStyle(fontSize: 12),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(Icons.line_weight, size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Slider(
+                            value: provider.strokeWidth,
+                            min: 1,
+                            max: 20,
+                            divisions: 19,
+                            activeColor: NexusTheme.primary,
+                            onChanged: (value) => provider.setStrokeWidth(value),
+                          ),
+                        ),
+                        Text(
+                          '${provider.strokeWidth.toInt()}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-        );
+              ),
+            );
       },
     );
   }
@@ -340,7 +342,7 @@ class _ToolButton extends StatelessWidget {
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? NexusTheme.primary.withOpacity(0.2)
+                    ? NexusTheme.primary.withValues(alpha: 0.2)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
@@ -387,7 +389,7 @@ class _DrawingPainter extends CustomPainter {
 
       final paint = Paint()
         ..color = stroke.tool == DrawingTool.highlighter
-            ? stroke.color.withOpacity(0.4)
+            ? stroke.color.withValues(alpha: 0.4)
             : stroke.color
         ..strokeWidth = stroke.strokeWidth
         ..strokeCap = StrokeCap.round
@@ -413,7 +415,7 @@ class _DrawingPainter extends CustomPainter {
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), paint);
 
     final linePaint = Paint()
-      ..color = Colors.white.withOpacity(0.1)
+      ..color = Colors.white.withValues(alpha: 0.1)
       ..strokeWidth = 1;
 
     switch (backgroundType) {
@@ -432,7 +434,7 @@ class _DrawingPainter extends CustomPainter {
         break;
       case 'dots':
         final dotPaint = Paint()
-          ..color = Colors.white.withOpacity(0.2)
+          ..color = Colors.white.withValues(alpha: 0.2)
           ..style = PaintingStyle.fill;
         for (double y = 20; y < size.height; y += 20) {
           for (double x = 20; x < size.width; x += 20) {
@@ -597,7 +599,7 @@ class _DrawingCard extends StatelessWidget {
       builder: (context) => AlertDialog(
         backgroundColor: NexusTheme.darkCard,
         title: const Text('Zeichnung löschen?'),
-        content: Text('\"${drawing.name}\" wird dauerhaft gelöscht.'),
+        content: Text('"${drawing.name}" wird dauerhaft gelöscht.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),

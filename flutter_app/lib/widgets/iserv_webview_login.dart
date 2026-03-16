@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
@@ -21,7 +22,6 @@ class _IServWebViewLoginState extends State<IServWebViewLogin> {
   InAppWebViewController? _webViewController;
   final CookieManager _cookieManager = CookieManager.instance();
   bool _isLoading = true;
-  String _currentUrl = '';
   double _progress = 0;
 
   String get _normalizedUrl {
@@ -74,7 +74,6 @@ class _IServWebViewLoginState extends State<IServWebViewLogin> {
 
       final List<Cookie> allCookies = [];
 
-
       final urlWithoutProtocol = _normalizedUrl.replaceAll('https://', '');
       final domain = urlWithoutProtocol.split('/').first;
 
@@ -99,7 +98,7 @@ class _IServWebViewLoginState extends State<IServWebViewLogin> {
             }
           }
         } catch (e) {
-          print('IServ WebView: Failed to get cookies from $path: $e');
+          if (kDebugMode) print('IServ WebView: Failed to get cookies from $path: $e');
         }
       }
 
@@ -111,7 +110,7 @@ class _IServWebViewLoginState extends State<IServWebViewLogin> {
           }
         }
       } catch (e) {
-        print('IServ WebView: Failed to get cookies for domain $domain: $e');
+        if (kDebugMode) print('IServ WebView: Failed to get cookies for domain $domain: $e');
       }
 
       if (_webViewController != null) {
@@ -134,13 +133,13 @@ class _IServWebViewLoginState extends State<IServWebViewLogin> {
             }
           }
         } catch (e) {
-          print('IServ WebView: Failed to get cookies via JavaScript: $e');
+          if (kDebugMode) print('IServ WebView: Failed to get cookies via JavaScript: $e');
         }
       }
 
-      print('IServ WebView: Extracted ${allCookies.length} cookies');
+      if (kDebugMode) print('IServ WebView: Extracted ${allCookies.length} cookies');
       for (final c in allCookies) {
-        print('  Cookie: ${c.name}');
+        if (kDebugMode) print('  Cookie: ${c.name}');
       }
 
       String username = '';
@@ -174,10 +173,18 @@ class _IServWebViewLoginState extends State<IServWebViewLogin> {
         username = result?.toString() ?? '';
       }
 
-      print('IServ WebView: Login complete with ${allCookies.length} cookies, username: $username');
+      if (kDebugMode) print('IServ WebView: Login complete with ${allCookies.length} cookies, username: $username');
+
+      if (_webViewController != null) {
+        try {
+          await InAppWebViewController.clearAllCache();
+          await WebStorageManager.instance().deleteAllData();
+        } catch (_) {}
+      }
+
       widget.onLoginSuccess(allCookies, username);
     } catch (e) {
-      print('IServ WebView: Cookie extraction failed: $e - proceeding with empty cookies');
+      if (kDebugMode) print('IServ WebView: Cookie extraction failed: $e - proceeding with empty cookies');
       widget.onLoginSuccess([], '');
     }
   }
@@ -218,12 +225,12 @@ class _IServWebViewLoginState extends State<IServWebViewLogin> {
                   useShouldOverrideUrlLoading: true,
                   mediaPlaybackRequiresUserGesture: false,
                   javaScriptEnabled: true,
-                  domStorageEnabled: true,
-                  databaseEnabled: true,
-                  clearCache: false,
-                  cacheEnabled: true,
-                  supportZoom: true,
-                  builtInZoomControls: true,
+                  domStorageEnabled: false,
+                  databaseEnabled: false,
+                  clearCache: true,
+                  cacheEnabled: false,
+                  supportZoom: false,
+                  builtInZoomControls: false,
                   displayZoomControls: false,
                   userAgent: 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
                 ),
@@ -233,13 +240,11 @@ class _IServWebViewLoginState extends State<IServWebViewLogin> {
                 onLoadStart: (controller, url) {
                   setState(() {
                     _isLoading = true;
-                    _currentUrl = url?.toString() ?? '';
                   });
                 },
                 onLoadStop: (controller, url) async {
                   setState(() {
                     _isLoading = false;
-                    _currentUrl = url?.toString() ?? '';
                   });
 
                   if (url != null) {
@@ -253,12 +258,18 @@ class _IServWebViewLoginState extends State<IServWebViewLogin> {
                 },
                 shouldOverrideUrlLoading: (controller, navigationAction) async {
                   final url = navigationAction.request.url?.toString() ?? '';
+                  final scheme = navigationAction.request.url?.scheme ?? '';
 
-                  if (url.contains(widget.iservUrl.replaceAll(RegExp(r'^https?://'), ''))) {
+                  if (scheme == 'javascript' || scheme == 'data' || scheme == 'blob') {
+                    return NavigationActionPolicy.CANCEL;
+                  }
+
+                  final iservDomain = widget.iservUrl.replaceAll(RegExp(r'^https?://'), '').split('/').first;
+                  if (url.contains(iservDomain)) {
                     return NavigationActionPolicy.ALLOW;
                   }
 
-                  return NavigationActionPolicy.ALLOW;
+                  return NavigationActionPolicy.CANCEL;
                 },
               ),
                 if (_isLoading && _progress < 0.1)

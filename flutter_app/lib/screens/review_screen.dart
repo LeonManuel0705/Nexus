@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../services/database_service.dart';
 import '../theme.dart';
+import '../widgets/animated_list_item.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/page_fade_in.dart';
 
 class ReviewScreen extends StatefulWidget {
   const ReviewScreen({super.key});
@@ -25,17 +29,20 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
   final _weeklyLearningsController = TextEditingController();
   final _weeklyGoalsController = TextEditingController();
 
-  List<ReviewEntry> _dailyReviews = [];
-  List<WeeklyReviewEntry> _weeklyReviews = [];
+  final List<ReviewEntry> _dailyReviews = [];
+  final List<WeeklyReviewEntry> _weeklyReviews = [];
 
   bool _isSaving = false;
+  Map<String, dynamic>? _weeklyStats;
+  late final DatabaseService _db;
 
   @override
   void initState() {
     super.initState();
+    _db = DatabaseService();
     _tabController = TabController(length: 3, vsync: this);
-    _checkTodayReview();
-    _checkThisWeekReview();
+    _loadReviews();
+    _loadWeeklyStats();
   }
 
   @override
@@ -69,6 +76,49 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
       _dailyGratefulController.text = todayReview.grateful;
       _dailyEnergy = todayReview.energy;
     }
+  }
+
+  Future<void> _loadReviews() async {
+    final dailyMaps = await _db.getDailyReviews();
+    final weeklyMaps = await _db.getWeeklyReviews();
+
+    setState(() {
+      _dailyReviews.clear();
+      _dailyReviews.addAll(dailyMaps.map((m) => ReviewEntry(
+        id: m['id'] as String,
+        date: DateTime.parse(m['date'] as String),
+        achieved: m['achieved'] as String? ?? '',
+        good: m['good'] as String? ?? '',
+        better: m['better'] as String? ?? '',
+        focus: m['focus'] as String? ?? '',
+        grateful: m['grateful'] as String? ?? '',
+        energy: m['energy'] as int? ?? 5,
+      )));
+
+      _weeklyReviews.clear();
+      _weeklyReviews.addAll(weeklyMaps.map((m) => WeeklyReviewEntry(
+        id: m['id'] as String,
+        weekStart: DateTime.parse(m['week_start'] as String),
+        weekNumber: m['week_number'] as int,
+        highlights: m['highlights'] as String? ?? '',
+        progress: m['progress'] as String? ?? '',
+        challenges: m['challenges'] as String? ?? '',
+        learnings: m['learnings'] as String? ?? '',
+        goals: m['goals'] as String? ?? '',
+      )));
+    });
+
+    _checkTodayReview();
+    _checkThisWeekReview();
+  }
+
+  Future<void> _loadWeeklyStats() async {
+    try {
+      final stats = await _db.getWeeklyStats();
+      if (mounted) {
+        setState(() => _weeklyStats = stats);
+      }
+    } catch (_) {}
   }
 
   void _checkThisWeekReview() {
@@ -106,7 +156,7 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
           r.date.day == today.day);
 
       final review = ReviewEntry(
-        id: existingIndex >= 0 ? _dailyReviews[existingIndex].id : DateTime.now().toString(),
+        id: existingIndex >= 0 ? _dailyReviews[existingIndex].id : DateTime.now().millisecondsSinceEpoch.toString(),
         date: today,
         achieved: _dailyAchievedController.text,
         good: _dailyGoodController.text,
@@ -122,12 +172,25 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
         _dailyReviews.insert(0, review);
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tages-Review gespeichert!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      await _db.insertDailyReview({
+        'id': review.id,
+        'date': review.date.toIso8601String(),
+        'achieved': review.achieved,
+        'good': review.good,
+        'better': review.better,
+        'focus': review.focus,
+        'grateful': review.grateful,
+        'energy': review.energy,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tages-Review gespeichert!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } finally {
       setState(() => _isSaving = false);
     }
@@ -154,7 +217,7 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
           r.weekStart.day == weekStart.day);
 
       final review = WeeklyReviewEntry(
-        id: existingIndex >= 0 ? _weeklyReviews[existingIndex].id : DateTime.now().toString(),
+        id: existingIndex >= 0 ? _weeklyReviews[existingIndex].id : DateTime.now().millisecondsSinceEpoch.toString(),
         weekStart: weekStart,
         weekNumber: weekNum,
         highlights: _weeklyHighlightsController.text,
@@ -170,12 +233,25 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
         _weeklyReviews.insert(0, review);
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Wochen-Review gespeichert!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      await _db.insertWeeklyReview({
+        'id': review.id,
+        'week_start': review.weekStart.toIso8601String(),
+        'week_number': review.weekNumber,
+        'highlights': review.highlights,
+        'progress': review.progress,
+        'challenges': review.challenges,
+        'learnings': review.learnings,
+        'goals': review.goals,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Wochen-Review gespeichert!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } finally {
       setState(() => _isSaving = false);
     }
@@ -191,44 +267,53 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Column(
-      children: [
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: TabBar(
-            controller: _tabController,
-            indicator: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: NexusTheme.primaryGradient,
-              ),
-              borderRadius: BorderRadius.circular(10),
+    return PageFadeIn(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: NexusTheme.gradientText('Review', fontSize: 36),
             ),
-            indicatorSize: TabBarIndicatorSize.tab,
-            labelColor: Colors.white,
-            unselectedLabelColor: isDark ? Colors.white60 : Colors.black54,
-            dividerColor: Colors.transparent,
-            tabs: const [
-              Tab(text: 'Tages-Review'),
-              Tab(text: 'Wochen-Review'),
-              Tab(text: 'Verlauf'),
-            ],
           ),
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              _buildDailyReview(isDark),
-              _buildWeeklyReview(isDark),
-              _buildHistory(isDark),
-            ],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: GlassCard(
+              padding: const EdgeInsets.all(4),
+              borderRadius: 100,
+              enableTapScale: false,
+              child: TabBar(
+                controller: _tabController,
+                indicator: BoxDecoration(
+                  color: const Color(0xFF4F46E5),
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                labelColor: Colors.white,
+                unselectedLabelColor: isDark ? Colors.white60 : Colors.black54,
+                dividerColor: Colors.transparent,
+                splashBorderRadius: BorderRadius.circular(100),
+                tabs: const [
+                  Tab(text: 'Heute'),
+                  Tab(text: 'W\u00f6chentlich'),
+                  Tab(text: 'Verlauf'),
+                ],
+              ),
+            ),
           ),
-        ),
-      ],
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildDailyReview(isDark),
+                _buildWeeklyReview(isDark),
+                _buildHistory(isDark),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -238,99 +323,140 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: NexusTheme.primaryGradient,
+          AnimatedListItem(
+            index: 0,
+            child: GlassCard(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: NexusTheme.primaryGradient,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.wb_sunny, color: Colors.white),
                   ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.wb_sunny, color: Colors.white),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Tages-Review',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : NexusTheme.lightText,
-                      ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Tages-Review',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : NexusTheme.lightText,
+                          ),
+                        ),
+                        Text(
+                          DateFormat('EEEE, d. MMMM yyyy', 'de_DE').format(DateTime.now()),
+                          style: TextStyle(
+                            color: isDark ? Colors.white60 : Colors.black54,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      DateFormat('EEEE, d. MMMM yyyy', 'de_DE').format(DateTime.now()),
-                      style: TextStyle(
-                        color: isDark ? Colors.white60 : Colors.black54,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          _buildQuestionField(
-            isDark: isDark,
-            icon: Icons.check_circle_outline,
-            question: 'Was hast du heute erreicht?',
-            hint: 'Deine Erfolge und erledigten Aufgaben...',
-            controller: _dailyAchievedController,
-            color: NexusTheme.success,
+            ),
           ),
           const SizedBox(height: 16),
 
-          _buildQuestionField(
-            isDark: isDark,
-            icon: Icons.thumb_up_outlined,
-            question: 'Was lief heute gut?',
-            hint: 'Positive Momente und Erfahrungen...',
-            controller: _dailyGoodController,
-            color: NexusTheme.info,
+          // Emerald section - achievements & good
+          AnimatedListItem(
+            index: 1,
+            child: GlassCard(
+              tint: const Color(0xFF10B981),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  _buildQuestionField(
+                    isDark: isDark,
+                    icon: Icons.check_circle_outline,
+                    question: 'Was hast du heute erreicht?',
+                    hint: 'Deine Erfolge und erledigten Aufgaben...',
+                    controller: _dailyAchievedController,
+                    color: const Color(0xFF10B981),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildQuestionField(
+                    isDark: isDark,
+                    icon: Icons.thumb_up_outlined,
+                    question: 'Was lief heute gut?',
+                    hint: 'Positive Momente und Erfahrungen...',
+                    controller: _dailyGoodController,
+                    color: const Color(0xFF10B981),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Rose section - improvements
+          AnimatedListItem(
+            index: 2,
+            child: GlassCard(
+              tint: const Color(0xFFF43F5E),
+              padding: const EdgeInsets.all(16),
+              child: _buildQuestionField(
+                isDark: isDark,
+                icon: Icons.trending_up,
+                question: 'Was kann morgen besser werden?',
+                hint: 'Verbesserungsm\u00f6glichkeiten...',
+                controller: _dailyBetterController,
+                color: const Color(0xFFF43F5E),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Indigo section - focus
+          AnimatedListItem(
+            index: 3,
+            child: GlassCard(
+              tint: const Color(0xFF6366F1),
+              padding: const EdgeInsets.all(16),
+              child: _buildQuestionField(
+                isDark: isDark,
+                icon: Icons.track_changes,
+                question: 'Worauf fokussierst du dich morgen?',
+                hint: 'Dein Hauptfokus f\u00fcr morgen...',
+                controller: _dailyFocusController,
+                color: const Color(0xFF6366F1),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Amber section - gratitude
+          AnimatedListItem(
+            index: 4,
+            child: GlassCard(
+              tint: const Color(0xFFF59E0B),
+              padding: const EdgeInsets.all(16),
+              child: _buildQuestionField(
+                isDark: isDark,
+                icon: Icons.favorite_outline,
+                question: 'Wof\u00fcr bist du heute dankbar?',
+                hint: 'Dinge, die du sch\u00e4tzt...',
+                controller: _dailyGratefulController,
+                color: const Color(0xFFF59E0B),
+              ),
+            ),
           ),
           const SizedBox(height: 16),
 
-          _buildQuestionField(
-            isDark: isDark,
-            icon: Icons.trending_up,
-            question: 'Was kann morgen besser werden?',
-            hint: 'Verbesserungsmöglichkeiten...',
-            controller: _dailyBetterController,
-            color: NexusTheme.warning,
-          ),
-          const SizedBox(height: 16),
-
-          _buildQuestionField(
-            isDark: isDark,
-            icon: Icons.track_changes,
-            question: 'Worauf fokussierst du dich morgen?',
-            hint: 'Dein Hauptfokus für morgen...',
-            controller: _dailyFocusController,
-            color: NexusTheme.primaryColor,
-          ),
-          const SizedBox(height: 16),
-
-          _buildQuestionField(
-            isDark: isDark,
-            icon: Icons.favorite_outline,
-            question: 'Wofür bist du heute dankbar?',
-            hint: 'Dinge, die du schätzt...',
-            controller: _dailyGratefulController,
-            color: NexusTheme.danger,
-          ),
-          const SizedBox(height: 24),
-
-          _buildEnergySlider(isDark),
+          AnimatedListItem(index: 5, child: _buildEnergySlider(isDark)),
           const SizedBox(height: 24),
 
           _buildSaveButton(_saveDailyReview),
-          const SizedBox(height: 100),
+          const SizedBox(height: 120),
         ],
       ),
     );
@@ -346,96 +472,141 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: NexusTheme.primaryGradient,
+          AnimatedListItem(
+            index: 0,
+            child: GlassCard(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: NexusTheme.primaryGradient,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.date_range, color: Colors.white),
                   ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.date_range, color: Colors.white),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Wochen-Review',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : NexusTheme.lightText,
-                      ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Wochen-Review',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : NexusTheme.lightText,
+                          ),
+                        ),
+                        Text(
+                          'KW ${_getWeekNumber(now)} (${DateFormat('d. MMM', 'de_DE').format(weekStart)} - ${DateFormat('d. MMM', 'de_DE').format(weekEnd)})',
+                          style: TextStyle(
+                            color: isDark ? Colors.white60 : Colors.black54,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      'KW ${_getWeekNumber(now)} (${DateFormat('d. MMM', 'de_DE').format(weekStart)} - ${DateFormat('d. MMM', 'de_DE').format(weekEnd)})',
-                      style: TextStyle(
-                        color: isDark ? Colors.white60 : Colors.black54,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          _buildQuestionField(
-            isDark: isDark,
-            icon: Icons.star_outline,
-            question: 'Was waren deine Highlights dieser Woche?',
-            hint: 'Die besten Momente...',
-            controller: _weeklyHighlightsController,
-            color: NexusTheme.warning,
+            ),
           ),
           const SizedBox(height: 16),
 
-          _buildQuestionField(
-            isDark: isDark,
-            icon: Icons.trending_up,
-            question: 'Welche Fortschritte hast du gemacht?',
-            hint: 'Deine Erfolge und Entwicklungen...',
-            controller: _weeklyProgressController,
-            color: NexusTheme.success,
-          ),
-          const SizedBox(height: 16),
+          if (_weeklyStats != null) AnimatedListItem(index: 1, child: _buildWeeklyStatsCard(isDark)),
 
-          _buildQuestionField(
-            isDark: isDark,
-            icon: Icons.warning_amber_outlined,
-            question: 'Was waren deine größten Herausforderungen?',
-            hint: 'Schwierigkeiten und Hindernisse...',
-            controller: _weeklyChallengesController,
-            color: NexusTheme.danger,
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          _buildQuestionField(
-            isDark: isDark,
-            icon: Icons.lightbulb_outline,
-            question: 'Was hast du diese Woche gelernt?',
-            hint: 'Neue Erkenntnisse und Einsichten...',
-            controller: _weeklyLearningsController,
-            color: NexusTheme.info,
+          // Amber section - highlights
+          AnimatedListItem(
+            index: 2,
+            child: GlassCard(
+              tint: const Color(0xFFF59E0B),
+              padding: const EdgeInsets.all(16),
+              child: _buildQuestionField(
+                isDark: isDark,
+                icon: Icons.star_outline,
+                question: 'Was waren deine Highlights dieser Woche?',
+                hint: 'Die besten Momente...',
+                controller: _weeklyHighlightsController,
+                color: const Color(0xFFF59E0B),
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          _buildQuestionField(
-            isDark: isDark,
-            icon: Icons.flag_outlined,
-            question: 'Was sind deine Ziele für nächste Woche?',
-            hint: 'Deine Vorhaben und Pläne...',
-            controller: _weeklyGoalsController,
-            color: NexusTheme.primaryColor,
+          // Emerald section - progress
+          AnimatedListItem(
+            index: 3,
+            child: GlassCard(
+              tint: const Color(0xFF10B981),
+              padding: const EdgeInsets.all(16),
+              child: _buildQuestionField(
+                isDark: isDark,
+                icon: Icons.trending_up,
+                question: 'Welche Fortschritte hast du gemacht?',
+                hint: 'Deine Erfolge und Entwicklungen...',
+                controller: _weeklyProgressController,
+                color: const Color(0xFF10B981),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Rose section - challenges
+          AnimatedListItem(
+            index: 4,
+            child: GlassCard(
+              tint: const Color(0xFFF43F5E),
+              padding: const EdgeInsets.all(16),
+              child: _buildQuestionField(
+                isDark: isDark,
+                icon: Icons.warning_amber_outlined,
+                question: 'Was waren deine gr\u00f6\u00dften Herausforderungen?',
+                hint: 'Schwierigkeiten und Hindernisse...',
+                controller: _weeklyChallengesController,
+                color: const Color(0xFFF43F5E),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Indigo section - learnings & goals
+          AnimatedListItem(
+            index: 5,
+            child: GlassCard(
+              tint: const Color(0xFF6366F1),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  _buildQuestionField(
+                    isDark: isDark,
+                    icon: Icons.lightbulb_outline,
+                    question: 'Was hast du diese Woche gelernt?',
+                    hint: 'Neue Erkenntnisse und Einsichten...',
+                    controller: _weeklyLearningsController,
+                    color: const Color(0xFF6366F1),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildQuestionField(
+                    isDark: isDark,
+                    icon: Icons.flag_outlined,
+                    question: 'Was sind deine Ziele f\u00fcr n\u00e4chste Woche?',
+                    hint: 'Deine Vorhaben und Pl\u00e4ne...',
+                    controller: _weeklyGoalsController,
+                    color: const Color(0xFF6366F1),
+                  ),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 24),
 
           _buildSaveButton(_saveWeeklyReview),
-          const SizedBox(height: 100),
+          const SizedBox(height: 120),
         ],
       ),
     );
@@ -481,144 +652,137 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
       itemCount: allReviews.length,
       itemBuilder: (context, index) {
         final review = allReviews[index];
-        if (review is ReviewEntry) {
-          return _buildDailyReviewCard(review, isDark);
-        } else {
-          return _buildWeeklyReviewCard(review as WeeklyReviewEntry, isDark);
-        }
+        return AnimatedListItem(
+          index: index,
+          child: review is ReviewEntry
+              ? _buildDailyReviewCard(review, isDark)
+              : _buildWeeklyReviewCard(review as WeeklyReviewEntry, isDark),
+        );
       },
     );
   }
 
   Widget _buildDailyReviewCard(ReviewEntry review, bool isDark) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GlassCard(
+        borderRadius: 16,
         onTap: () => _showDailyReviewDetails(review),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: NexusTheme.primaryGradient,
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: NexusTheme.primaryGradient,
+                ),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.wb_sunny, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _formatDate(review.date),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : NexusTheme.lightText,
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.wb_sunny, color: Colors.white, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _formatDate(review.date),
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : NexusTheme.lightText,
-                      ),
+                  Text(
+                    'Tages-Review',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.white60 : Colors.black54,
                     ),
-                    Text(
-                      'Tages-Review',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? Colors.white60 : Colors.black54,
-                      ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _getEnergyColor(review.energy).withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.bolt, size: 16, color: _getEnergyColor(review.energy)),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${review.energy}/10',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: _getEnergyColor(review.energy),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _getEnergyColor(review.energy).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.bolt, size: 16, color: _getEnergyColor(review.energy)),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${review.energy}/10',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: _getEnergyColor(review.energy),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right,
-                color: isDark ? Colors.white38 : Colors.black38,
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right,
+              color: isDark ? Colors.white38 : Colors.black38,
+            ),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildWeeklyReviewCard(WeeklyReviewEntry review, bool isDark) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GlassCard(
+        borderRadius: 16,
         onTap: () => _showWeeklyReviewDetails(review),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [NexusTheme.secondaryColor, NexusTheme.accentColor],
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [NexusTheme.secondaryColor, NexusTheme.accentColor],
+                ),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.date_range, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'KW ${review.weekNumber}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : NexusTheme.lightText,
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.date_range, color: Colors.white, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'KW ${review.weekNumber}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : NexusTheme.lightText,
-                      ),
+                  Text(
+                    'Wochen-Review',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? Colors.white60 : Colors.black54,
                     ),
-                    Text(
-                      'Wochen-Review',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? Colors.white60 : Colors.black54,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              Icon(
-                Icons.chevron_right,
-                color: isDark ? Colors.white38 : Colors.black38,
-              ),
-            ],
-          ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: isDark ? Colors.white38 : Colors.black38,
+            ),
+          ],
         ),
       ),
     );
@@ -658,7 +822,7 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
               color: isDark ? Colors.white38 : Colors.black38,
             ),
             filled: true,
-            fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+            fillColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -666,7 +830,7 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
+                color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.1),
               ),
             ),
             focusedBorder: OutlineInputBorder(
@@ -685,7 +849,7 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
       children: [
         Row(
           children: [
-            Icon(Icons.bolt, size: 20, color: NexusTheme.warning),
+            const Icon(Icons.bolt, size: 20, color: NexusTheme.warning),
             const SizedBox(width: 8),
             Text(
               'Energie-Level',
@@ -698,7 +862,7 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: _getEnergyColor(_dailyEnergy).withOpacity(0.2),
+                color: _getEnergyColor(_dailyEnergy).withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -712,23 +876,18 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
           ],
         ),
         const SizedBox(height: 12),
-        Container(
+        GlassCard(
+          borderRadius: 16,
+          enableTapScale: false,
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
-            ),
-          ),
           child: Column(
             children: [
               SliderTheme(
                 data: SliderTheme.of(context).copyWith(
                   activeTrackColor: _getEnergyColor(_dailyEnergy),
-                  inactiveTrackColor: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
+                  inactiveTrackColor: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.1),
                   thumbColor: _getEnergyColor(_dailyEnergy),
-                  overlayColor: _getEnergyColor(_dailyEnergy).withOpacity(0.2),
+                  overlayColor: _getEnergyColor(_dailyEnergy).withValues(alpha: 0.2),
                   trackHeight: 8,
                 ),
                 child: Slider(
@@ -743,7 +902,7 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Erschöpft',
+                    'Ersch\u00f6pft',
                     style: TextStyle(
                       fontSize: 12,
                       color: isDark ? Colors.white38 : Colors.black38,
@@ -765,6 +924,183 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
     );
   }
 
+  Widget _buildWeeklyStatsCard(bool isDark) {
+    final tasksCompleted = _weeklyStats!['tasks_completed'] as int;
+    final tasksTotal = _weeklyStats!['tasks_total'] as int;
+    final pomodoroSessions = _weeklyStats!['pomodoro_sessions'] as int;
+    final pomodoroMinutes = _weeklyStats!['pomodoro_minutes'] as int;
+    final pomodoroByDay = _weeklyStats!['pomodoro_by_day'] as List<Map<String, dynamic>>;
+
+    final pomodoroHours = pomodoroMinutes ~/ 60;
+    final pomodoroMins = pomodoroMinutes % 60;
+    final focusTimeStr = pomodoroHours > 0
+        ? '${pomodoroHours}h ${pomodoroMins}min'
+        : '${pomodoroMins}min';
+
+    final completionRate = tasksTotal > 0
+        ? '${(tasksCompleted / tasksTotal * 100).round()}%'
+        : '-';
+
+    String bestDay = '-';
+    if (pomodoroByDay.isNotEmpty) {
+      final best = pomodoroByDay.reduce((a, b) =>
+        (a['count'] as int) >= (b['count'] as int) ? a : b);
+      try {
+        final date = DateTime.parse(best['day'] as String);
+        bestDay = DateFormat('EEEE', 'de_DE').format(date);
+      } catch (_) {}
+    }
+
+    final now = DateTime.now();
+    final weekStart = now.subtract(Duration(days: now.weekday - 1));
+    final thisWeekDailyReviews = _dailyReviews.where((r) =>
+        r.date.isAfter(weekStart.subtract(const Duration(days: 1)))).toList();
+    final avgEnergy = thisWeekDailyReviews.isNotEmpty
+        ? (thisWeekDailyReviews.map((r) => r.energy).reduce((a, b) => a + b) / thisWeekDailyReviews.length).toStringAsFixed(1)
+        : '-';
+
+    return GlassCard(
+      borderRadius: 16,
+      tint: NexusTheme.primaryColor,
+      enableTapScale: false,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.insights, size: 20, color: NexusTheme.primaryColor),
+              const SizedBox(width: 8),
+              Text(
+                'Wochen-Statistik',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : NexusTheme.lightText,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 2x2 colored quadrant cards
+          Row(
+            children: [
+              Expanded(
+                child: GlassCard(
+                  borderRadius: 12,
+                  tint: NexusTheme.success,
+                  enableTapScale: false,
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                  child: _buildStatItem(
+                    Icons.check_circle_outline, '$tasksCompleted/$tasksTotal',
+                    'Aufgaben', NexusTheme.success, isDark,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: GlassCard(
+                  borderRadius: 12,
+                  tint: NexusTheme.warning,
+                  enableTapScale: false,
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                  child: _buildStatItem(
+                    Icons.percent, completionRate,
+                    'Quote', NexusTheme.warning, isDark,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: GlassCard(
+                  borderRadius: 12,
+                  tint: NexusTheme.pomodoroColor,
+                  enableTapScale: false,
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                  child: _buildStatItem(
+                    Icons.local_fire_department, '$pomodoroSessions',
+                    'Pomodoros', NexusTheme.pomodoroColor, isDark,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: GlassCard(
+                  borderRadius: 12,
+                  tint: NexusTheme.info,
+                  enableTapScale: false,
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                  child: _buildStatItem(
+                    Icons.timer, focusTimeStr,
+                    'Fokuszeit', NexusTheme.info, isDark,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: GlassCard(
+                  borderRadius: 12,
+                  tint: NexusTheme.warning,
+                  enableTapScale: false,
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                  child: _buildStatItem(
+                    Icons.bolt, avgEnergy,
+                    '\u00d8 Energie', NexusTheme.warning, isDark,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: GlassCard(
+                  borderRadius: 12,
+                  tint: NexusTheme.primaryColor,
+                  enableTapScale: false,
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                  child: _buildStatItem(
+                    Icons.star, bestDay,
+                    'Bester Tag', NexusTheme.primaryColor, isDark,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(IconData icon, String value, String label, Color color, bool isDark) {
+    return Column(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : NexusTheme.lightText,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: isDark ? Colors.white54 : Colors.black45,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSaveButton(VoidCallback onSave) {
     return SizedBox(
       width: double.infinity,
@@ -776,7 +1112,7 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: NexusTheme.primaryColor.withOpacity(0.3),
+              color: NexusTheme.primaryColor.withValues(alpha: 0.3),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -902,7 +1238,7 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: _getEnergyColor(review.energy).withOpacity(0.2),
+                    color: _getEnergyColor(review.energy).withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -934,12 +1270,32 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
               _buildDetailSection('Dankbar für', review.grateful, Icons.favorite_outline, NexusTheme.danger, isDark),
             const SizedBox(height: 24),
             OutlinedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                setState(() => _dailyReviews.remove(review));
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Review löschen'),
+                    content: const Text('Möchtest du dieses Tages-Review wirklich löschen?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Abbrechen'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Löschen', style: TextStyle(color: NexusTheme.danger)),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true && context.mounted) {
+                  Navigator.pop(context);
+                  _db.deleteDailyReview(review.id);
+                  setState(() => _dailyReviews.remove(review));
+                }
               },
-              icon: Icon(Icons.delete, color: NexusTheme.danger),
-              label: Text('Löschen', style: TextStyle(color: NexusTheme.danger)),
+              icon: const Icon(Icons.delete, color: NexusTheme.danger),
+              label: const Text('Löschen', style: TextStyle(color: NexusTheme.danger)),
             ),
           ],
         ),
@@ -1022,12 +1378,32 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
               _buildDetailSection('Ziele nächste Woche', review.goals, Icons.flag_outlined, NexusTheme.primaryColor, isDark),
             const SizedBox(height: 24),
             OutlinedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                setState(() => _weeklyReviews.remove(review));
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Review löschen'),
+                    content: const Text('Möchtest du dieses Wochen-Review wirklich löschen?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Abbrechen'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Löschen', style: TextStyle(color: NexusTheme.danger)),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true && context.mounted) {
+                  Navigator.pop(context);
+                  _db.deleteWeeklyReview(review.id);
+                  setState(() => _weeklyReviews.remove(review));
+                }
               },
-              icon: Icon(Icons.delete, color: NexusTheme.danger),
-              label: Text('Löschen', style: TextStyle(color: NexusTheme.danger)),
+              icon: const Icon(Icons.delete, color: NexusTheme.danger),
+              label: const Text('Löschen', style: TextStyle(color: NexusTheme.danger)),
             ),
           ],
         ),
@@ -1056,17 +1432,18 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
             ],
           ),
           const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
+          GlassCard(
+            borderRadius: 16,
+            tint: color,
+            enableTapScale: false,
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              content,
-              style: TextStyle(
-                color: isDark ? Colors.white70 : Colors.black87,
+            child: SizedBox(
+              width: double.infinity,
+              child: Text(
+                content,
+                style: TextStyle(
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
               ),
             ),
           ),

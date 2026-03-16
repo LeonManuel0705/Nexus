@@ -376,7 +376,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="{{ g.csp_nonce }}">
         const HubApp = {
             state: {
                 theme: localStorage.getItem('hub_theme') || 'light',

@@ -33,13 +33,13 @@
     </div>
 
     <div class="filter-tabs">
-        <button class="filter-tab active" onclick="showTab('stundenplan')">Stundenplan</button>
-        <button class="filter-tab" onclick="showTab('subjects')">Fächer</button>
-        <button class="filter-tab" onclick="showTab('homework')">Hausaufgaben</button>
-        <button class="filter-tab" onclick="showTab('tests')">Tests</button>
-        <button class="filter-tab" onclick="showTab('exams')">Klausuren</button>
-        <button class="filter-tab" onclick="showTab('grades')">Noten</button>
-        <button class="filter-tab" onclick="showTab('iserv')">IServ</button>
+        <button class="filter-tab active" onclick="showTab('stundenplan', this)">Stundenplan</button>
+        <button class="filter-tab" onclick="showTab('subjects', this)">Fächer</button>
+        <button class="filter-tab" onclick="showTab('homework', this)">Hausaufgaben</button>
+        <button class="filter-tab" onclick="showTab('tests', this)">Tests</button>
+        <button class="filter-tab" onclick="showTab('exams', this)">Klausuren</button>
+        <button class="filter-tab" onclick="showTab('grades', this)">Noten</button>
+        <button class="filter-tab" onclick="showTab('iserv', this)">IServ</button>
     </div>
 
     <div class="tab-content" id="stundenplanTab">
@@ -79,6 +79,15 @@
                 <span>Bearbeitungsmodus: Klicke auf eine Zelle, um Stunden hinzuzufügen oder zu bearbeiten</span>
             </div>
             <div class="edit-mode-actions">
+                <button class="btn-secondary small" onclick="openPeriodConfigModal()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                    </svg>
+                    Stundenraster
+                </button>
                 <button class="btn-secondary small" onclick="openModal('clearTimetableModal')">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="3 6 5 6 21 6"></polyline>
@@ -228,7 +237,7 @@
                     <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>
             </div>
-            <div class="calculator-content" id="calculatorContent" style="display: none;">
+            <div class="calculator-content" id="calculatorContent">
 
                 <div class="converter-section">
                     <div class="converter-row">
@@ -360,6 +369,34 @@
 
         <div id="iservContent" style="display: none;">
 
+            <div class="iserv-status-bar glass-card" style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: 1.5rem;">
+                <span class="iserv-status-dot" id="iservStatusDot" style="width: 10px; height: 10px; border-radius: 50%; background: #22c55e; flex-shrink: 0;"></span>
+                <span id="iservStatusText" style="flex: 1; font-size: 0.85rem; opacity: 0.8;">Verbunden</span>
+                <button class="btn-secondary small" onclick="syncIServ()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    Synchronisieren
+                </button>
+            </div>
+
+            <div class="iserv-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem;">
+                <div class="glass-card" style="padding: 1rem; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: 700;" id="iservNotifCount">0</div>
+                    <div style="font-size: 0.75rem; opacity: 0.6;">Benachrichtigungen</div>
+                </div>
+                <div class="glass-card" style="padding: 1rem; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: 700;" id="iservExerciseCount">0</div>
+                    <div style="font-size: 0.75rem; opacity: 0.6;">Aufgaben</div>
+                </div>
+                <div class="glass-card" style="padding: 1rem; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: 700;" id="iservEventCount">0</div>
+                    <div style="font-size: 0.75rem; opacity: 0.6;">Termine</div>
+                </div>
+            </div>
+
             <div class="section-header">
                 <h3 class="section-title">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -382,6 +419,49 @@
                     <p>Klicke auf "Laden" um den aktuellen Vertretungsplan abzurufen.</p>
                     <p class="text-muted">Zeigt Änderungen für die 11. und 12. Klasse an.</p>
                 </div>
+            </div>
+
+            <div class="section-header" style="margin-top: 2rem;">
+                <h3 class="section-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    Aufgaben
+                </h3>
+            </div>
+            <div id="iservExercises">
+                <div class="empty-state small"><span>Wird geladen...</span></div>
+            </div>
+
+            <div class="section-header" style="margin-top: 2rem;">
+                <h3 class="section-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    Benachrichtigungen
+                </h3>
+            </div>
+            <div id="iservNotifications">
+                <div class="empty-state small"><span>Wird geladen...</span></div>
+            </div>
+
+            <div class="section-header" style="margin-top: 2rem;">
+                <h3 class="section-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    Termine
+                </h3>
+            </div>
+            <div id="iservEvents">
+                <div class="empty-state small"><span>Wird geladen...</span></div>
             </div>
 
         </div>
@@ -845,6 +925,49 @@
     </div>
 </div>
 
+<!-- Period Config Modal -->
+<div class="modal" id="periodConfigModal">
+    <div class="modal-content" style="max-width: 520px;">
+        <div class="modal-header">
+            <h3>Stundenraster</h3>
+            <button class="modal-close" onclick="closeModal('periodConfigModal')">&times;</button>
+        </div>
+        <div class="modal-body" id="periodConfigBody">
+            <!-- Filled by JS -->
+        </div>
+        <div class="form-actions">
+            <button class="btn-secondary" onclick="showPeriodWizard()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                </svg>
+                Assistent
+            </button>
+            <button class="btn-primary" onclick="addPeriodToConfig()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Stunde hinzufügen
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Period Wizard Modal -->
+<div class="modal" id="periodWizardModal">
+    <div class="modal-content" style="max-width: 560px;">
+        <div class="modal-header">
+            <h3 id="wizardTitle">Stundenraster-Assistent</h3>
+            <button class="modal-close" onclick="closeModal('periodWizardModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="wizard-progress" id="wizardProgress"></div>
+            <div id="wizardContent"></div>
+        </div>
+        <div class="form-actions" id="wizardActions"></div>
+    </div>
+</div>
+
 <div class="modal" id="gradeModal">
     <div class="modal-content">
         <div class="modal-header">
@@ -901,7 +1024,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ g.csp_nonce }}">
 let subjects = [];
 let homework = [];
 let tests = [];
@@ -912,9 +1035,50 @@ let iservCalendarEvents = [];
 let currentCalendarDate = new Date();
 let iservConnected = false;
 let currentSemesterFilter = 'Q1'; // Current semester filter (Q1, Q2, Q3, Q4, or 'all' for combined)
+let gradeSystem = 'points'; // 'points' (Oberstufe) or 'marks' (Mittelstufe)
+let classLevel = 10;
 
+const MARK_OPTIONS = [
+    { label: '1+', value: 0.7 }, { label: '1', value: 1.0 }, { label: '1-', value: 1.3 },
+    { label: '2+', value: 1.7 }, { label: '2', value: 2.0 }, { label: '2-', value: 2.3 },
+    { label: '3+', value: 2.7 }, { label: '3', value: 3.0 }, { label: '3-', value: 3.3 },
+    { label: '4+', value: 3.7 }, { label: '4', value: 4.0 }, { label: '4-', value: 4.3 },
+    { label: '5+', value: 4.7 }, { label: '5', value: 5.0 }, { label: '5-', value: 5.3 },
+    { label: '6', value: 6.0 }
+];
 
-const BLOCK_TIMES = [
+function getMarkLabel(value) {
+    if (value == null) return '?';
+    const entry = MARK_OPTIONS.find(m => Math.abs(m.value - value) < 0.05);
+    return entry ? entry.label : value.toFixed(1);
+}
+
+function getMarkColorClass(value) {
+    if (value <= 1.3) return 'grade-excellent';
+    if (value <= 2.3) return 'grade-good';
+    if (value <= 3.3) return 'grade-satisfactory';
+    if (value <= 4.3) return 'grade-sufficient';
+    return 'grade-poor';
+}
+
+function getMarkColor(value) {
+    if (value <= 1.3) return '#10B981';
+    if (value <= 2.3) return '#84CC16';
+    if (value <= 3.3) return '#F59E0B';
+    if (value <= 4.3) return '#F97316';
+    return '#EF4444';
+}
+
+function getMarkRating(value) {
+    if (value <= 1.3) return 'Sehr gut';
+    if (value <= 2.3) return 'Gut';
+    if (value <= 3.3) return 'Befriedigend';
+    if (value <= 4.3) return 'Ausreichend';
+    if (value <= 5.3) return 'Mangelhaft';
+    return 'Ungenügend';
+}
+
+let BLOCK_TIMES = [
     { block: 1, start: '08:00', end: '09:30' },
     { block: 2, start: '09:50', end: '11:20' },
     { block: 3, start: '11:30', end: '13:00' },
@@ -944,20 +1108,20 @@ let viewingWeek = null; // null = current week, 'A' or 'B' = forced view
 let stundenplanInterval = null;
 let timetableLoaded = false;
 
-
 async function loadTimetableSettings() {
     try {
         const response = await fetch(buildApiUrl('/api/hub/school/timetable/settings'));
         if (response.ok) {
             const data = await response.json();
+            const s = data.settings || {};
             timetableSettings = {
-                has_ab_weeks: data.has_ab_weeks !== undefined ? Boolean(data.has_ab_weeks) : true,
-                setup_completed: Boolean(data.setup_completed),
-                reference_date: data.reference_date || null
+                has_ab_weeks: s.has_ab_weeks !== undefined ? Boolean(s.has_ab_weeks) : true,
+                setup_completed: Boolean(s.setup_completed),
+                reference_date: s.reference_date || null
             };
 
-            if (data.reference_date) {
-                REFERENCE_A_WEEK = new Date(data.reference_date);
+            if (s.reference_date) {
+                REFERENCE_A_WEEK = new Date(s.reference_date);
             }
 
             return timetableSettings;
@@ -966,6 +1130,24 @@ async function loadTimetableSettings() {
         console.error('Error loading timetable settings:', error);
     }
     return timetableSettings;
+}
+
+async function loadTimetablePeriods() {
+    try {
+        const response = await fetch(buildApiUrl('/api/hub/school/timetable/periods'));
+        if (response.ok) {
+            const data = await response.json();
+            if (data.periods && data.periods.length > 0) {
+                BLOCK_TIMES = data.periods.map(p => ({
+                    block: p.period_number,
+                    start: p.start_time,
+                    end: p.end_time
+                }));
+            }
+        }
+    } catch (error) {
+        console.error('Error loading timetable periods:', error);
+    }
 }
 
 async function loadTimetableEntries() {
@@ -986,13 +1168,15 @@ async function loadTimetableEntries() {
 function transformEntriesToTimetables() {
     console.log('[Timetable] Transforming entries:', timetableEntries.length);
 
-    TIMETABLE_A = { 1: [null, null, null, null], 2: [null, null, null, null], 3: [null, null, null, null], 4: [null, null, null, null], 5: [null, null, null, null] };
-    TIMETABLE_B = { 1: [null, null, null, null], 2: [null, null, null, null], 3: [null, null, null, null], 4: [null, null, null, null], 5: [null, null, null, null] };
+    const blockCount = BLOCK_TIMES.length;
+    const emptyDay = () => Array(blockCount).fill(null);
+    TIMETABLE_A = { 1: emptyDay(), 2: emptyDay(), 3: emptyDay(), 4: emptyDay(), 5: emptyDay() };
+    TIMETABLE_B = { 1: emptyDay(), 2: emptyDay(), 3: emptyDay(), 4: emptyDay(), 5: emptyDay() };
 
     for (const entry of timetableEntries) {
         const day = entry.day;
         const blockIndex = entry.block - 1;
-        if (day < 1 || day > 5 || blockIndex < 0 || blockIndex > 3) continue;
+        if (day < 1 || day > 5 || blockIndex < 0 || blockIndex >= blockCount) continue;
 
         const week = entry.week || 'both';
         if (week !== 'both') continue;
@@ -1014,7 +1198,7 @@ function transformEntriesToTimetables() {
     for (const entry of timetableEntries) {
         const day = entry.day;
         const blockIndex = entry.block - 1;
-        if (day < 1 || day > 5 || blockIndex < 0 || blockIndex > 3) continue;
+        if (day < 1 || day > 5 || blockIndex < 0 || blockIndex >= blockCount) continue;
 
         const week = entry.week || 'both';
         if (week === 'both') continue;
@@ -1046,6 +1230,7 @@ async function initTimetable() {
     if (loadingEl) loadingEl.style.display = 'flex';
 
     try {
+        await loadTimetablePeriods();
         await Promise.all([loadTimetableSettings(), loadTimetableEntries()]);
         timetableLoaded = true;
 
@@ -1062,6 +1247,15 @@ async function initTimetable() {
         initStundenplan();
 
         updateWeekGroupVisibility();
+
+        // Handle deep-link from settings
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('openPeriodConfig') === '1') {
+            isEditMode = true;
+            document.getElementById('editModeControls').style.display = 'flex';
+            document.body.classList.add('edit-mode-active');
+            setTimeout(() => openPeriodConfigModal(), 300);
+        }
     } catch (error) {
         console.error('Error initializing timetable:', error);
         if (loadingEl) loadingEl.style.display = 'none';
@@ -1182,7 +1376,6 @@ async function importDefaultTemplate() {
     return false;
 }
 
-
 let selectedBundesland = null;
 let bundeslaender = {};
 
@@ -1205,9 +1398,9 @@ function showBundeslandModal() {
     if (!grid) return;
 
     grid.innerHTML = Object.entries(bundeslaender).map(([code, name]) => `
-        <div class="bundesland-card" data-code="${code}" onclick="selectBundesland('${code}')">
-            <span class="bundesland-code">${code}</span>
-            <span class="bundesland-name">${name}</span>
+        <div class="bundesland-card" data-code="${escapeHtml(code)}" onclick="selectBundesland('${escapeHtml(code)}')">
+            <span class="bundesland-code">${escapeHtml(code)}</span>
+            <span class="bundesland-name">${escapeHtml(name)}</span>
         </div>
     `).join('');
 
@@ -1308,7 +1501,6 @@ function skipBundeslandSelection() {
     }
 }
 
-
 function showSetupWizard() {
     openModal('setupWizardModal');
 }
@@ -1388,7 +1580,6 @@ function updateWeekGroupVisibility() {
     }
 }
 
-
 function toggleEditMode() {
     isEditMode = !isEditMode;
 
@@ -1408,8 +1599,11 @@ function toggleEditMode() {
         document.body.classList.remove('edit-mode-active');
     }
 
-    const weekType = viewingWeek || getWeekType(new Date());
-    updateWeekOverview(weekType);
+    // Reset week view when exiting edit mode
+    if (!isEditMode) {
+        viewingWeek = null;
+    }
+    updateStundenplanDisplay();
 }
 
 function openLessonModal(day, block, weekType) {
@@ -1617,6 +1811,322 @@ async function confirmClearTimetable() {
     }
 }
 
+// ===== Period Config Modal =====
+
+function openPeriodConfigModal() {
+    renderPeriodConfigList();
+    openModal('periodConfigModal');
+}
+
+function renderPeriodConfigList() {
+    const body = document.getElementById('periodConfigBody');
+    if (BLOCK_TIMES.length === 0) {
+        body.innerHTML = '<p style="text-align:center; opacity:0.7;">Keine Stunden konfiguriert. Nutze den Assistenten, um ein Stundenraster zu erstellen.</p>';
+        return;
+    }
+
+    let html = '<div class="period-config-list">';
+    for (let i = 0; i < BLOCK_TIMES.length; i++) {
+        const p = BLOCK_TIMES[i];
+        html += `
+            <div class="period-config-item">
+                <span class="period-badge">${i + 1}</span>
+                <input type="time" class="period-time-input" value="${p.start}" onchange="updatePeriodTime(${i}, 'start', this.value)">
+                <span class="period-dash">–</span>
+                <input type="time" class="period-time-input" value="${p.end}" onchange="updatePeriodTime(${i}, 'end', this.value)">
+                <button class="btn-icon-small btn-danger-icon" onclick="removePeriodFromConfig(${i})" title="Stunde entfernen">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                </button>
+            </div>
+        `;
+    }
+    html += '</div>';
+    body.innerHTML = html;
+}
+
+function updatePeriodTime(index, field, value) {
+    if (!value) return;
+    BLOCK_TIMES[index][field === 'start' ? 'start' : 'end'] = value;
+    savePeriodConfig();
+}
+
+function removePeriodFromConfig(index) {
+    if (BLOCK_TIMES.length <= 1) {
+        showToast('Mindestens eine Stunde erforderlich', 'error');
+        return;
+    }
+    BLOCK_TIMES.splice(index, 1);
+    BLOCK_TIMES.forEach((p, i) => p.block = i + 1);
+    renderPeriodConfigList();
+    savePeriodConfig();
+}
+
+function addPeriodToConfig() {
+    if (BLOCK_TIMES.length >= 12) {
+        showToast('Maximal 12 Stunden möglich', 'error');
+        return;
+    }
+    const last = BLOCK_TIMES[BLOCK_TIMES.length - 1];
+    const [h, m] = last.end.split(':').map(Number);
+    const startMin = h * 60 + m + 10;
+    const endMin = startMin + 45;
+    const startStr = String(Math.floor(startMin / 60)).padStart(2, '0') + ':' + String(startMin % 60).padStart(2, '0');
+    const endStr = String(Math.floor(endMin / 60)).padStart(2, '0') + ':' + String(endMin % 60).padStart(2, '0');
+    BLOCK_TIMES.push({ block: BLOCK_TIMES.length + 1, start: startStr, end: endStr });
+    renderPeriodConfigList();
+    savePeriodConfig();
+}
+
+async function savePeriodConfig() {
+    const periods = BLOCK_TIMES.map((b, i) => ({
+        period_number: i + 1,
+        start_time: b.start,
+        end_time: b.end
+    }));
+    try {
+        await fetch(buildApiUrl('/api/hub/school/timetable/periods/replace-all'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ periods })
+        });
+        transformEntriesToTimetables();
+        updateStundenplanDisplay();
+    } catch (e) {
+        console.error('Error saving periods:', e);
+    }
+}
+
+// ===== Period Wizard =====
+
+let wizardStep = 1;
+let wizardTemplate = null;
+let wizardConfig = {
+    startTime: '08:00',
+    periodCount: 4,
+    lessonDuration: 90,
+    breaks: [10, 20, 10]
+};
+
+function showPeriodWizard() {
+    closeModal('periodConfigModal');
+    wizardStep = 1;
+    wizardTemplate = null;
+    renderWizardStep();
+    openModal('periodWizardModal');
+}
+
+function renderWizardStep() {
+    const progress = document.getElementById('wizardProgress');
+    const content = document.getElementById('wizardContent');
+    const actions = document.getElementById('wizardActions');
+
+    // Progress pills
+    progress.innerHTML = [1, 2, 3].map(s =>
+        `<span class="wizard-pill ${s === wizardStep ? 'active' : ''} ${s < wizardStep ? 'done' : ''}">${s}</span>`
+    ).join('<span class="wizard-pill-line"></span>');
+
+    if (wizardStep === 1) {
+        content.innerHTML = `
+            <p style="margin-bottom: 16px; opacity: 0.8;">Wähle eine Vorlage als Ausgangspunkt:</p>
+            <div class="wizard-templates">
+                <div class="wizard-template-card ${wizardTemplate === 'doppel' ? 'selected' : ''}" onclick="selectWizardTemplate('doppel')">
+                    <div class="template-icon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="3" y="3" width="8" height="8" rx="1"></rect>
+                            <rect x="13" y="3" width="8" height="8" rx="1"></rect>
+                            <rect x="3" y="13" width="8" height="8" rx="1"></rect>
+                            <rect x="13" y="13" width="8" height="8" rx="1"></rect>
+                        </svg>
+                    </div>
+                    <strong>Doppelstunden</strong>
+                    <span class="template-desc">4 Blöcke à 90 Min.</span>
+                </div>
+                <div class="wizard-template-card ${wizardTemplate === 'einzel' ? 'selected' : ''}" onclick="selectWizardTemplate('einzel')">
+                    <div class="template-icon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="3" y="2" width="18" height="4" rx="1"></rect>
+                            <rect x="3" y="8" width="18" height="4" rx="1"></rect>
+                            <rect x="3" y="14" width="18" height="4" rx="1"></rect>
+                            <rect x="3" y="20" width="18" height="2" rx="1"></rect>
+                        </svg>
+                    </div>
+                    <strong>Einzelstunden</strong>
+                    <span class="template-desc">8 Stunden à 45 Min.</span>
+                </div>
+                <div class="wizard-template-card ${wizardTemplate === 'custom' ? 'selected' : ''}" onclick="selectWizardTemplate('custom')">
+                    <div class="template-icon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                    </div>
+                    <strong>Benutzerdefiniert</strong>
+                    <span class="template-desc">Eigene Konfiguration</span>
+                </div>
+            </div>
+        `;
+        actions.innerHTML = `
+            <button class="btn-secondary" onclick="closeModal('periodWizardModal')">Abbrechen</button>
+            <button class="btn-primary" onclick="wizardNext()" ${!wizardTemplate ? 'disabled' : ''} id="wizardNextBtn">Weiter</button>
+        `;
+    } else if (wizardStep === 2) {
+        const generatedPeriods = generateWizardPeriods();
+        let breaksHtml = '';
+        for (let i = 0; i < wizardConfig.periodCount - 1; i++) {
+            const breakMin = wizardConfig.breaks[i] !== undefined ? wizardConfig.breaks[i] : 5;
+            breaksHtml += `
+                <div class="wizard-break-row">
+                    <span class="break-label">Pause nach Stunde ${i + 1}</span>
+                    <select class="wizard-break-select" onchange="updateWizardBreak(${i}, parseInt(this.value))">
+                        ${[0, 5, 10, 15, 20, 25, 30].map(v => `<option value="${v}" ${v === breakMin ? 'selected' : ''}>${v} Min.</option>`).join('')}
+                    </select>
+                </div>
+            `;
+        }
+        content.innerHTML = `
+            <div class="wizard-config-section">
+                <div class="wizard-config-row">
+                    <span>Schulbeginn</span>
+                    <input type="time" value="${wizardConfig.startTime}" onchange="wizardConfig.startTime = this.value; renderWizardStep();" class="period-time-input">
+                </div>
+                <div class="wizard-config-row">
+                    <span>Anzahl Stunden</span>
+                    <div class="wizard-counter">
+                        <button class="btn-icon-small" onclick="changeWizardPeriodCount(-1)">−</button>
+                        <span class="wizard-count-display">${wizardConfig.periodCount}</span>
+                        <button class="btn-icon-small" onclick="changeWizardPeriodCount(1)">+</button>
+                    </div>
+                </div>
+                <div class="wizard-config-row">
+                    <span>Stundenlänge</span>
+                    <span style="opacity: 0.7;">${wizardConfig.lessonDuration} Min.</span>
+                </div>
+            </div>
+            <div class="wizard-breaks-section">
+                <h4 style="margin: 16px 0 8px; font-size: 14px; opacity: 0.8;">Pausen</h4>
+                ${breaksHtml}
+            </div>
+            <div class="wizard-preview-section">
+                <h4 style="margin: 16px 0 8px; font-size: 14px; opacity: 0.8;">Vorschau</h4>
+                <div class="wizard-preview-list">
+                    ${generatedPeriods.map((p, i) => `
+                        <div class="wizard-preview-item">
+                            <span class="period-badge">${i + 1}</span>
+                            <span>${p.start_time} – ${p.end_time}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        actions.innerHTML = `
+            <button class="btn-secondary" onclick="wizardStep = 1; renderWizardStep();">Zurück</button>
+            <button class="btn-primary" onclick="wizardNext()">Weiter</button>
+        `;
+    } else if (wizardStep === 3) {
+        const generatedPeriods = generateWizardPeriods();
+        content.innerHTML = `
+            <p style="margin-bottom: 12px; opacity: 0.8;">Folgendes Stundenraster wird gespeichert:</p>
+            <div class="wizard-preview-list confirm-list">
+                ${generatedPeriods.map((p, i) => `
+                    <div class="wizard-preview-item">
+                        <span class="period-badge">${i + 1}</span>
+                        <span><strong>${p.start_time} – ${p.end_time}</strong></span>
+                        <span style="opacity:0.5; font-size:12px;">${wizardConfig.lessonDuration} Min.</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        actions.innerHTML = `
+            <button class="btn-secondary" onclick="wizardStep = 2; renderWizardStep();">Zurück</button>
+            <button class="btn-primary" onclick="saveWizardPeriods()">Speichern</button>
+        `;
+    }
+}
+
+function selectWizardTemplate(template) {
+    wizardTemplate = template;
+    if (template === 'doppel') {
+        wizardConfig = { startTime: '08:00', periodCount: 4, lessonDuration: 90, breaks: [10, 20, 10] };
+    } else if (template === 'einzel') {
+        wizardConfig = { startTime: '08:00', periodCount: 8, lessonDuration: 45, breaks: [5, 20, 5, 5, 20, 5, 5] };
+    } else {
+        wizardConfig = { startTime: '08:00', periodCount: 4, lessonDuration: 45, breaks: [5, 5, 5] };
+    }
+    renderWizardStep();
+}
+
+function wizardNext() {
+    if (wizardStep === 1 && !wizardTemplate) return;
+    wizardStep++;
+    renderWizardStep();
+}
+
+function changeWizardPeriodCount(delta) {
+    const newCount = wizardConfig.periodCount + delta;
+    if (newCount < 1 || newCount > 12) return;
+    wizardConfig.periodCount = newCount;
+    // Adjust breaks array
+    while (wizardConfig.breaks.length < newCount - 1) {
+        wizardConfig.breaks.push(5);
+    }
+    wizardConfig.breaks = wizardConfig.breaks.slice(0, newCount - 1);
+    renderWizardStep();
+}
+
+function updateWizardBreak(index, value) {
+    wizardConfig.breaks[index] = value;
+    renderWizardStep();
+}
+
+function generateWizardPeriods() {
+    const periods = [];
+    const [startH, startM] = wizardConfig.startTime.split(':').map(Number);
+    let currentMin = startH * 60 + startM;
+
+    for (let i = 0; i < wizardConfig.periodCount; i++) {
+        const endMin = currentMin + wizardConfig.lessonDuration;
+        periods.push({
+            period_number: i + 1,
+            start_time: String(Math.floor(currentMin / 60)).padStart(2, '0') + ':' + String(currentMin % 60).padStart(2, '0'),
+            end_time: String(Math.floor(endMin / 60)).padStart(2, '0') + ':' + String(endMin % 60).padStart(2, '0')
+        });
+        currentMin = endMin;
+        if (i < wizardConfig.periodCount - 1 && wizardConfig.breaks[i] !== undefined) {
+            currentMin += wizardConfig.breaks[i];
+        }
+    }
+    return periods;
+}
+
+async function saveWizardPeriods() {
+    const periods = generateWizardPeriods();
+    try {
+        const response = await fetch(buildApiUrl('/api/hub/school/timetable/periods/replace-all'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ periods })
+        });
+        if (response.ok) {
+            BLOCK_TIMES = periods.map(p => ({
+                block: p.period_number,
+                start: p.start_time,
+                end: p.end_time
+            }));
+            transformEntriesToTimetables();
+            updateStundenplanDisplay();
+            closeModal('periodWizardModal');
+            showToast(`Stundenraster mit ${periods.length} Stunden gespeichert!`, 'success');
+        } else {
+            showToast('Fehler beim Speichern', 'error');
+        }
+    } catch (e) {
+        console.error('Error saving wizard periods:', e);
+        showToast('Fehler beim Speichern', 'error');
+    }
+}
 
 function getWeekType(date) {
     if (!timetableSettings.has_ab_weeks) {
@@ -1699,6 +2209,10 @@ function initStundenplan() {
     updateStundenplanDisplay();
     if (stundenplanInterval) clearInterval(stundenplanInterval);
     stundenplanInterval = setInterval(updateCountdownOnly, 60000);
+
+    window.addEventListener('nexus-resume', () => {
+        updateStundenplanDisplay();
+    });
 }
 
 function updateCountdownOnly() {
@@ -1750,9 +2264,10 @@ function updateCountdownOnly() {
 
 function isSchoolOverForToday() {
     const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinutes = now.getMinutes();
-    return currentHour > 15 || (currentHour === 15 && currentMinutes > 0);
+    const lastBlock = BLOCK_TIMES[BLOCK_TIMES.length - 1];
+    const [endH, endM] = lastBlock.end.split(':').map(Number);
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    return currentMinutes >= (endH * 60 + endM);
 }
 
 function getNextSchoolDay(fromDate) {
@@ -1889,9 +2404,13 @@ function updateStundenplanDisplay() {
 
     if (timetableSettings.has_ab_weeks) {
         const otherWeek = displayWeekType === 'A' ? 'B' : 'A';
-        document.getElementById('toggleWeekText').textContent = viewingWeek
-            ? `${todayWeekType}-Woche zeigen`  // Return to the default displayed week
-            : `${otherWeek}-Woche zeigen`;      // Switch to the other week
+        if (isEditMode) {
+            document.getElementById('toggleWeekText').textContent = `Auf ${otherWeek}-Woche ändern`;
+        } else {
+            document.getElementById('toggleWeekText').textContent = viewingWeek
+                ? `${todayWeekType}-Woche zeigen`
+                : `${otherWeek}-Woche zeigen`;
+        }
     }
 
     updateCurrentLesson(actualWeekType);
@@ -1971,12 +2490,12 @@ function updateCurrentLesson(weekType) {
                 <div class="upcoming-lesson">
                     <span class="lesson-label">${firstLessonBlockIndex === 0 ? 'Erste Stunde' : `${firstLessonBlockIndex + 1}. Block (erste Stunde heute)`}:</span>
                     <div class="lesson-main">
-                        <span class="lesson-subject">${firstLesson.subject}</span>
-                        <span class="lesson-type type-${firstLesson.type.toLowerCase()}">${firstLesson.type}</span>
+                        <span class="lesson-subject">${escapeHtmlContent(firstLesson.subject)}</span>
+                        <span class="lesson-type type-${escapeHtmlContent(firstLesson.type.toLowerCase())}">${escapeHtmlContent(firstLesson.type)}</span>
                     </div>
                     <div class="lesson-details">
-                        <span class="lesson-room"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg> ${firstLesson.room}</span>
-                        <span class="lesson-teacher clickable" onclick="emailTeacher('${firstLesson.teacher}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> ${firstLesson.teacher}</span>
+                        <span class="lesson-room"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg> ${escapeHtmlContent(firstLesson.room)}</span>
+                        <span class="lesson-teacher clickable" onclick="emailTeacher('${escapeHtml(firstLesson.teacher)}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> ${escapeHtmlContent(firstLesson.teacher)}</span>
                     </div>
                     <span class="lesson-time">${BLOCK_TIMES[firstLessonBlockIndex].start} - ${BLOCK_TIMES[firstLessonBlockIndex].end}</span>
                 </div>
@@ -1999,12 +2518,12 @@ function updateCurrentLesson(weekType) {
                 <div class="upcoming-lesson">
                     <span class="lesson-label">Nächste Stunde:</span>
                     <div class="lesson-main">
-                        <span class="lesson-subject">${nextLesson.subject}</span>
-                        <span class="lesson-type type-${nextLesson.type.toLowerCase()}">${nextLesson.type}</span>
+                        <span class="lesson-subject">${escapeHtmlContent(nextLesson.subject)}</span>
+                        <span class="lesson-type type-${escapeHtmlContent(nextLesson.type.toLowerCase())}">${escapeHtmlContent(nextLesson.type)}</span>
                     </div>
                     <div class="lesson-details">
-                        <span class="lesson-room"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg> ${nextLesson.room}</span>
-                        <span class="lesson-teacher clickable" onclick="emailTeacher('${nextLesson.teacher}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> ${nextLesson.teacher}</span>
+                        <span class="lesson-room"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg> ${escapeHtmlContent(nextLesson.room)}</span>
+                        <span class="lesson-teacher clickable" onclick="emailTeacher('${escapeHtml(nextLesson.teacher)}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> ${escapeHtmlContent(nextLesson.teacher)}</span>
                     </div>
                     <span class="lesson-time">${blockInfo.block.start} - ${blockInfo.block.end}</span>
                 </div>
@@ -2033,12 +2552,12 @@ function updateCurrentLesson(weekType) {
         container.innerHTML = `
             <div class="current-lesson-display">
                 <div class="lesson-main">
-                    <span class="lesson-subject">${currentLesson.subject}</span>
-                    <span class="lesson-type type-${currentLesson.type.toLowerCase()}">${currentLesson.type}</span>
+                    <span class="lesson-subject">${escapeHtmlContent(currentLesson.subject)}</span>
+                    <span class="lesson-type type-${escapeHtmlContent(currentLesson.type.toLowerCase())}">${escapeHtmlContent(currentLesson.type)}</span>
                 </div>
                 <div class="lesson-details">
-                    <span class="lesson-room"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg> ${currentLesson.room}</span>
-                    <span class="lesson-teacher clickable" onclick="emailTeacher('${currentLesson.teacher}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> ${currentLesson.teacher}</span>
+                    <span class="lesson-room"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg> ${escapeHtmlContent(currentLesson.room)}</span>
+                    <span class="lesson-teacher clickable" onclick="emailTeacher('${escapeHtml(currentLesson.teacher)}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> ${escapeHtmlContent(currentLesson.teacher)}</span>
                 </div>
                 <span class="lesson-time">${blockInfo.block.start} - ${blockInfo.block.end}</span>
                 <div class="lesson-progress">
@@ -2074,7 +2593,7 @@ function updateCurrentLesson(weekType) {
                         <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                     </svg>
                     <span>Freistunde</span>
-                    <span class="next-hint">Nächste: ${nextLesson.subject} (${BLOCK_TIMES[nextBlockIndex].start})</span>
+                    <span class="next-hint">Nächste: ${escapeHtmlContent(nextLesson.subject)} (${BLOCK_TIMES[nextBlockIndex].start})</span>
                 </div>
             `;
         } else {
@@ -2163,12 +2682,12 @@ function updateDaySchedule(which, date, weekType, isNextDay = false) {
                 </div>
                 <div class="block-content">
                     <div class="block-subject">
-                        <span class="subject-name">${lesson.subject}</span>
-                        <span class="subject-type type-${lesson.type.toLowerCase()}">${lesson.type}</span>
+                        <span class="subject-name">${escapeHtmlContent(lesson.subject)}</span>
+                        <span class="subject-type type-${escapeHtmlContent(lesson.type.toLowerCase())}">${escapeHtmlContent(lesson.type)}</span>
                     </div>
                     <div class="block-details">
-                        <span class="detail-room">${lesson.room}</span>
-                        <span class="detail-teacher clickable" onclick="emailTeacher('${lesson.teacher}')">${lesson.teacher}</span>
+                        <span class="detail-room">${escapeHtmlContent(lesson.room)}</span>
+                        <span class="detail-teacher clickable" onclick="emailTeacher('${escapeHtml(lesson.teacher)}')">${escapeHtmlContent(lesson.teacher)}</span>
                     </div>
                 </div>
             </div>
@@ -2216,15 +2735,16 @@ function updateWeekOverview(weekType) {
             const editableClass = isEditMode ? 'editable' : '';
 
             if (lesson) {
-                const colorStyle = lesson.color ? `border-left: 3px solid ${lesson.color};` : '';
+                const safeColor = /^#[0-9a-fA-F]{3,8}$/.test(lesson.color) ? lesson.color : '';
+                const colorStyle = safeColor ? `border-left: 3px solid ${safeColor};` : '';
                 html += `
                     <div class="week-cell ${isToday ? 'today' : ''} ${isCurrent ? 'current' : ''} ${editableClass}"
-                         title="${lesson.subject} - ${lesson.room} - ${lesson.teacher}"
+                         title="${escapeHtml(lesson.subject)} - ${escapeHtml(lesson.room)} - ${escapeHtml(lesson.teacher)}"
                          style="${colorStyle}"
                          ${clickHandler}>
-                        <span class="cell-subject">${lesson.subject.substring(0, 8)}${lesson.subject.length > 8 ? '.' : ''}</span>
-                        <span class="cell-type type-${lesson.type.toLowerCase()}">${lesson.type}</span>
-                        <span class="cell-room">${lesson.room}</span>
+                        <span class="cell-subject">${escapeHtmlContent(lesson.subject.substring(0, 8))}${lesson.subject.length > 8 ? '.' : ''}</span>
+                        <span class="cell-type type-${escapeHtmlContent(lesson.type.toLowerCase())}">${escapeHtmlContent(lesson.type)}</span>
+                        <span class="cell-room">${escapeHtmlContent(lesson.room)}</span>
                         ${isEditMode ? '<span class="cell-edit-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></span>' : ''}
                     </div>
                 `;
@@ -2257,18 +2777,31 @@ function toggleWeekView() {
     }
 
     const displayedWeekType = getWeekType(displayedDate);
-    console.log('[Timetable] toggleWeekView: displayedWeekType =', displayedWeekType, ', viewingWeek before =', viewingWeek);
 
-    if (viewingWeek === null) {
-        viewingWeek = displayedWeekType === 'A' ? 'B' : 'A';
-    } else {
+    if (isEditMode) {
+        // In edit mode: permanently change which week is current
+        const targetWeek = displayedWeekType === 'A' ? 'B' : 'A';
+        const newRef = new Date(REFERENCE_A_WEEK);
+        newRef.setDate(newRef.getDate() + 7);
+        const newRefStr = newRef.toISOString().split('T')[0];
+
+        REFERENCE_A_WEEK = newRef;
+        timetableSettings.reference_date = newRefStr;
         viewingWeek = null;
+
+        saveTimetableSettings({ reference_date: newRefStr });
+        updateStundenplanDisplay();
+        showToast(`Woche auf ${targetWeek}-Woche geändert`, 'success');
+    } else {
+        // Normal mode: just preview the other week
+        if (viewingWeek === null) {
+            viewingWeek = displayedWeekType === 'A' ? 'B' : 'A';
+        } else {
+            viewingWeek = null;
+        }
+        updateStundenplanDisplay();
     }
-
-    console.log('[Timetable] toggleWeekView: viewingWeek after =', viewingWeek);
-    updateStundenplanDisplay();
 }
-
 
 function constructTeacherEmail(teacherName, domain) {
     if (!teacherName || !domain) return null;
@@ -2484,10 +3017,15 @@ let activeToasts = [];
 function showToast(message, type = 'info') {
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    toast.innerHTML = `
-        <span class="toast-message">${message}</span>
-        <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
-    `;
+    const msgSpan = document.createElement('span');
+    msgSpan.className = 'toast-message';
+    msgSpan.textContent = message;
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'toast-close';
+    closeBtn.textContent = '\u00d7';
+    closeBtn.onclick = () => toast.remove();
+    toast.appendChild(msgSpan);
+    toast.appendChild(closeBtn);
     document.body.appendChild(toast);
 
     setTimeout(() => toast.classList.add('visible'), 10);
@@ -2509,7 +3047,6 @@ function hideToast(toast) {
         setTimeout(() => toast.remove(), 300);
     }
 }
-
 
 function getSubjectsFromTimetable() {
     const subjectMap = new Map();
@@ -2639,19 +3176,27 @@ function updateImportBanner() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    await loadGradeSystem();
     loadSchoolData();
 
     initTimetable();
 
-    if (!NexusConnection.state.lastCheck) {
-        await NexusConnection.init();
-    }
-
-    if (NexusConnection.shouldCallIServ() || NexusConnection.isOnSchoolNetwork()) {
+    // Check IServ based on current known state (non-blocking)
+    if (NexusConnection.shouldCallIServ()) {
         checkIServConnection();
         preloadVertretungsplan();
     } else if (!NexusConnection.isOffline()) {
         checkIServConnection();
+    }
+
+    // If connectivity wasn't checked yet, retry IServ loads after check completes
+    if (!NexusConnection.state.lastCheck && navigator.onLine) {
+        window.addEventListener('nexus-connection-ready', () => {
+            if (NexusConnection.shouldCallIServ()) {
+                checkIServConnection();
+                preloadVertretungsplan();
+            }
+        }, { once: true });
     }
 
     const lessonSubjectInput = document.getElementById('lessonSubject');
@@ -2712,6 +3257,8 @@ function renderVertretungsplanData(data) {
         cacheInfo = '<span class="cache-info fresh">Aktuell</span>';
     }
 
+    const safeContentType = (ct) => /^(application\/pdf|image\/(png|jpeg|gif|webp|svg\+xml))$/.test(ct) ? ct : 'application/octet-stream';
+
     let pagesHtml = '';
     data.pdfs.forEach(pdf => {
         if (pdf.type === 'image' || (pdf.content_type && pdf.content_type.includes('image'))) {
@@ -2719,7 +3266,7 @@ function renderVertretungsplanData(data) {
                 <div class="vertretungsplan-page">
                     <div class="vertretungsplan-page-header">
                         <span class="page-title">Tag ${pdf.page}</span>
-                        <a href="data:${pdf.content_type};base64,${pdf.data}" download="${pdf.filename}" class="btn-secondary small">
+                        <a href="data:${safeContentType(pdf.content_type)};base64,${pdf.data}" download="${escapeHtml(pdf.filename)}" class="btn-secondary small">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
                                 <polyline points="7 10 12 15 17 10"></polyline>
@@ -2728,7 +3275,7 @@ function renderVertretungsplanData(data) {
                         </a>
                     </div>
                     <div class="vertretungsplan-image-wrapper">
-                        <img src="data:${pdf.content_type};base64,${pdf.data}" alt="Vertretungsplan Tag ${pdf.page}" class="vertretungsplan-image">
+                        <img src="data:${safeContentType(pdf.content_type)};base64,${pdf.data}" alt="Vertretungsplan Tag ${pdf.page}" class="vertretungsplan-image">
                     </div>
                 </div>
             `;
@@ -2737,7 +3284,7 @@ function renderVertretungsplanData(data) {
                 <div class="vertretungsplan-page">
                     <div class="vertretungsplan-page-header">
                         <span class="page-title">Tag ${pdf.page}</span>
-                        <a href="data:application/pdf;base64,${pdf.data}" download="${pdf.filename}" class="btn-secondary small">
+                        <a href="data:application/pdf;base64,${pdf.data}" download="${escapeHtml(pdf.filename)}" class="btn-secondary small">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
                                 <polyline points="7 10 12 15 17 10"></polyline>
@@ -2746,7 +3293,7 @@ function renderVertretungsplanData(data) {
                         </a>
                     </div>
                     <object data="data:application/pdf;base64,${pdf.data}" type="application/pdf" class="vertretungsplan-pdf">
-                        <p>PDF kann nicht angezeigt werden. <a href="data:application/pdf;base64,${pdf.data}" download="${pdf.filename}">Download</a></p>
+                        <p>PDF kann nicht angezeigt werden. <a href="data:application/pdf;base64,${pdf.data}" download="${escapeHtml(pdf.filename)}">Download</a></p>
                     </object>
                 </div>
             `;
@@ -2769,6 +3316,53 @@ function renderVertretungsplanData(data) {
             ${pagesHtml}
         </div>
     `;
+}
+
+async function loadGradeSystem() {
+    try {
+        const response = await fetch(buildApiUrl('/api/hub/school/class-level'));
+        if (response.ok) {
+            const data = await response.json();
+            classLevel = data.class_level || 10;
+            gradeSystem = classLevel <= 10 ? 'marks' : 'points';
+            updateSemesterTabs();
+        }
+    } catch (error) {
+        console.error('Error loading class level:', error);
+    }
+}
+
+function updateSemesterTabs() {
+    const container = document.querySelector('.semester-tab-buttons');
+    if (!container) return;
+
+    if (gradeSystem === 'marks') {
+        const hj1 = `${classLevel}/1`;
+        const hj2 = `${classLevel}/2`;
+        container.innerHTML = `
+            <button class="semester-tab active" data-semester="${hj1}" onclick="setSemesterFilter('${hj1}')">${hj1}</button>
+            <button class="semester-tab" data-semester="${hj2}" onclick="setSemesterFilter('${hj2}')">${hj2}</button>
+            <button class="semester-tab combined" data-semester="all" onclick="setSemesterFilter('all')">Alle (Übersicht)</button>
+        `;
+        if (![hj1, hj2, 'all'].includes(currentSemesterFilter)) {
+            currentSemesterFilter = hj1;
+        }
+    } else {
+        container.innerHTML = `
+            <button class="semester-tab${currentSemesterFilter === 'Q1' ? ' active' : ''}" data-semester="Q1" onclick="setSemesterFilter('Q1')">Q1</button>
+            <button class="semester-tab${currentSemesterFilter === 'Q2' ? ' active' : ''}" data-semester="Q2" onclick="setSemesterFilter('Q2')">Q2</button>
+            <button class="semester-tab${currentSemesterFilter === 'Q3' ? ' active' : ''}" data-semester="Q3" onclick="setSemesterFilter('Q3')">Q3</button>
+            <button class="semester-tab${currentSemesterFilter === 'Q4' ? ' active' : ''}" data-semester="Q4" onclick="setSemesterFilter('Q4')">Q4</button>
+            <button class="semester-tab combined${currentSemesterFilter === 'all' ? ' active' : ''}" data-semester="all" onclick="setSemesterFilter('all')">Alle (Übersicht)</button>
+        `;
+        if (!['Q1', 'Q2', 'Q3', 'Q4', 'all'].includes(currentSemesterFilter)) {
+            currentSemesterFilter = 'Q1';
+        }
+    }
+
+    document.querySelectorAll('.semester-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.semester === currentSemesterFilter);
+    });
 }
 
 async function loadSchoolData() {
@@ -2803,11 +3397,11 @@ async function loadSchoolData() {
     }
 }
 
-function showTab(tabName) {
+function showTab(tabName, btn) {
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
     document.querySelectorAll('.filter-tab').forEach(tab => tab.classList.remove('active'));
     document.getElementById(tabName + 'Tab').classList.remove('hidden');
-    event.target.classList.add('active');
+    if (btn) btn.classList.add('active');
 
     if (tabName === 'iserv') {
         const container = document.getElementById('vertretungsplanContainer');
@@ -2833,12 +3427,12 @@ function renderSubjects() {
         const subjectHomework = homework.filter(h => h.subject_id === s.id && !h.completed);
         const subjectExams = exams.filter(e => e.subject_id === s.id);
         return `
-            <div class="subject-card" style="border-left-color: ${s.color || '#667eea'}" onclick="openEditSubjectModal('${s.id}')">
+            <div class="subject-card" style="border-left-color: ${/^#[0-9a-fA-F]{3,8}$/.test(s.color) ? s.color : '#667eea'}" onclick="openEditSubjectModal('${escapeHtml(s.id)}')">
                 <div class="subject-header">
-                    <span class="subject-name">${s.name}</span>
-                    ${s.grade ? `<span class="subject-grade">${s.grade}</span>` : ''}
+                    <span class="subject-name">${escapeHtml(s.name)}</span>
+                    ${s.grade ? `<span class="subject-grade">${escapeHtml(String(s.grade))}</span>` : ''}
                 </div>
-                <div class="subject-info">${s.teacher || ''} ${s.room ? '• ' + s.room : ''}</div>
+                <div class="subject-info">${escapeHtml(s.teacher || '')} ${s.room ? '• ' + escapeHtml(s.room) : ''}</div>
                 <div class="subject-tasks">
                     ${subjectHomework.length ? `<span class="subject-task-tag homework">${subjectHomework.length} HA</span>` : ''}
                     ${subjectExams.length ? `<span class="subject-task-tag exam">${subjectExams.length} Klausur${subjectExams.length > 1 ? 'en' : ''}</span>` : ''}
@@ -2860,11 +3454,11 @@ function renderHomework() {
     container.innerHTML = openHomework.map(h => {
         const subject = subjects.find(s => s.id === h.subject_id);
         return `
-            <div class="homework-item" onclick="openEditHomeworkModal('${h.id}')">
-                <button class="task-checkbox" onclick="event.stopPropagation(); toggleHomework('${h.id}')"></button>
+            <div class="homework-item" onclick="openEditHomeworkModal('${escapeHtml(String(h.id))}')">
+                <button class="task-checkbox" onclick="event.stopPropagation(); toggleHomework('${escapeHtml(String(h.id))}')"></button>
                 <div class="homework-content">
-                    <span class="homework-subject">${subject?.name || 'Unbekannt'}</span>
-                    <span class="homework-title">${h.title}</span>
+                    <span class="homework-subject">${escapeHtml(subject?.name || 'Unbekannt')}</span>
+                    <span class="homework-title">${escapeHtml(h.title)}</span>
                     <span class="homework-due">${formatDate(h.due_date)}</span>
                 </div>
             </div>
@@ -2885,10 +3479,10 @@ function renderTests() {
         const subject = subjects.find(s => s.id === t.subject_id);
         const daysUntil = Math.ceil((new Date(t.date) - new Date()) / (1000 * 60 * 60 * 24));
         return `
-            <div class="test-item" onclick="openEditTestModal('${t.id}')">
+            <div class="test-item" onclick="openEditTestModal('${escapeHtml(String(t.id))}')">
                 <div class="test-content">
-                    <span class="test-subject">${subject?.name || 'Unbekannt'}</span>
-                    <span class="test-title">${t.title}</span>
+                    <span class="test-subject">${escapeHtml(subject?.name || 'Unbekannt')}</span>
+                    <span class="test-title">${escapeHtml(t.title)}</span>
                     <span class="test-date">${formatDate(t.date)} ${t.time || ''} - ${daysUntil === 0 ? 'Heute!' : daysUntil === 1 ? 'Morgen' : `in ${daysUntil} Tagen`}</span>
                 </div>
             </div>
@@ -2909,10 +3503,10 @@ function renderExams() {
         const subject = subjects.find(s => s.id === e.subject_id);
         const daysUntil = Math.ceil((new Date(e.date) - new Date()) / (1000 * 60 * 60 * 24));
         return `
-            <div class="exam-item" onclick="openEditExamModal('${e.id}')">
+            <div class="exam-item" onclick="openEditExamModal('${escapeHtml(String(e.id))}')">
                 <div class="exam-content">
-                    <span class="exam-subject">${subject?.name || 'Unbekannt'}</span>
-                    <span class="exam-title">${e.title}</span>
+                    <span class="exam-subject">${escapeHtml(subject?.name || 'Unbekannt')}</span>
+                    <span class="exam-title">${escapeHtml(e.title)}</span>
                     <span class="exam-date">${formatDate(e.date)} ${e.time || ''} - ${daysUntil === 0 ? 'Heute!' : daysUntil === 1 ? 'Morgen' : `in ${daysUntil} Tagen`}</span>
                 </div>
             </div>
@@ -2924,7 +3518,7 @@ function populateSubjectSelects() {
     const selects = [document.getElementById('homeworkSubject'), document.getElementById('testSubject'), document.getElementById('examSubject'), document.getElementById('gradeSubject')];
     selects.forEach(select => {
         if (select) {
-            select.innerHTML = '<option value="">Fach wählen...</option>' + subjects.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+            select.innerHTML = '<option value="">Fach wählen...</option>' + subjects.map(s => `<option value="${escapeHtml(String(s.id))}">${escapeHtml(s.name)}</option>`).join('');
         }
     });
 }
@@ -3149,7 +3743,6 @@ async function deleteExam() {
 function openModal(id) { document.getElementById(id).classList.add('active'); }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
-
 async function checkIServConnection() {
     const cachedStatus = sessionStorage.getItem('iserv_status');
     if (cachedStatus) {
@@ -3222,7 +3815,6 @@ async function syncIServ() {
 async function refreshIServData() {
     await loadIServData();
 }
-
 
 const MY_COURSES = [
     'Mathe LK', 'Englisch LK', 'Deutsch GK', 'Physik GK', 'Musik GK',
@@ -3308,7 +3900,7 @@ async function loadVertretungsplan() {
                 <div class="vertretungsplan-error">
                     ${errorIcon}
                     <span>${errorTitle}</span>
-                    <p style="font-size: 12px; margin-top: 8px; color: rgba(255,255,255,0.6);">${errorMessage}</p>
+                    <p style="font-size: 12px; margin-top: 8px; color: rgba(255,255,255,0.6);">${escapeHtml(errorMessage)}</p>
                     ${actionButton}
                     ${debugInfo}
                 </div>
@@ -3337,6 +3929,7 @@ async function loadVertretungsplan() {
                 </span>`;
             }
 
+            const safeContentType = (ct) => /^(application\/pdf|image\/(png|jpeg|gif|webp|svg\+xml))$/.test(ct) ? ct : 'application/octet-stream';
             let pagesHtml = '';
             data.pdfs.forEach((pdf, index) => {
                 if (pdf.type === 'pdf') {
@@ -3344,7 +3937,7 @@ async function loadVertretungsplan() {
                         <div class="vertretungsplan-page">
                             <div class="vertretungsplan-page-header">
                                 <span class="page-title">Tag ${pdf.page}</span>
-                                <a href="data:application/pdf;base64,${pdf.data}" download="${pdf.filename}" class="btn-secondary small">
+                                <a href="data:application/pdf;base64,${pdf.data}" download="${escapeHtml(pdf.filename)}" class="btn-secondary small">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
                                         <polyline points="7 10 12 15 17 10"></polyline>
@@ -3357,7 +3950,7 @@ async function loadVertretungsplan() {
                                 <iframe src="data:application/pdf;base64,${pdf.data}" type="application/pdf" class="pdf-embed"></iframe>
                                 <div class="pdf-fallback">
                                     <p>PDF-Vorschau nicht verfügbar</p>
-                                    <a href="data:application/pdf;base64,${pdf.data}" download="${pdf.filename}" class="btn-primary small">PDF herunterladen</a>
+                                    <a href="data:application/pdf;base64,${pdf.data}" download="${escapeHtml(pdf.filename)}" class="btn-primary small">PDF herunterladen</a>
                                 </div>
                             </div>
                         </div>
@@ -3367,7 +3960,7 @@ async function loadVertretungsplan() {
                         <div class="vertretungsplan-page">
                             <div class="vertretungsplan-page-header">
                                 <span class="page-title">Tag ${pdf.page}</span>
-                                <a href="data:${pdf.content_type};base64,${pdf.data}" download="${pdf.filename}" class="btn-secondary small">
+                                <a href="data:${safeContentType(pdf.content_type)};base64,${pdf.data}" download="${escapeHtml(pdf.filename)}" class="btn-secondary small">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
                                         <polyline points="7 10 12 15 17 10"></polyline>
@@ -3377,7 +3970,7 @@ async function loadVertretungsplan() {
                                 </a>
                             </div>
                             <div class="vertretungsplan-image-wrapper">
-                                <img src="data:${pdf.content_type};base64,${pdf.data}" alt="Vertretungsplan Tag ${pdf.page}" class="vertretungsplan-image">
+                                <img src="data:${safeContentType(pdf.content_type)};base64,${pdf.data}" alt="Vertretungsplan Tag ${pdf.page}" class="vertretungsplan-image">
                             </div>
                         </div>
                     `;
@@ -3406,7 +3999,7 @@ async function loadVertretungsplan() {
         if (data.type === 'image') {
             container.innerHTML = `
                 <div class="vertretungsplan-image-wrapper">
-                    <img src="data:${data.content_type};base64,${data.data}" alt="Vertretungsplan" class="vertretungsplan-image">
+                    <img src="data:${safeContentType(data.content_type)};base64,${data.data}" alt="Vertretungsplan" class="vertretungsplan-image">
                     <div class="vertretungsplan-note">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10"></circle>
@@ -3428,7 +4021,7 @@ async function loadVertretungsplan() {
             container.innerHTML = `
                 <div class="vertretungsplan-info">
                     <p>Vertretungsplan geladen, aber Format unbekannt.</p>
-                    <a href="${data.url}" target="_blank" class="btn-secondary small">In IServ öffnen</a>
+                    <a href="${data.url && (data.url.startsWith('https://') || data.url.startsWith('http://')) ? escapeHtml(data.url) : '#'}" target="_blank" rel="noopener noreferrer" class="btn-secondary small">In IServ öffnen</a>
                 </div>
             `;
         }
@@ -3437,7 +4030,7 @@ async function loadVertretungsplan() {
         container.innerHTML = `
             <div class="vertretungsplan-error">
                 <span>Fehler beim Laden des Vertretungsplans</span>
-                <p style="font-size: 12px; margin-top: 8px;">${err.message || ''}</p>
+                <p style="font-size: 12px; margin-top: 8px;">${escapeHtml(err.message || '')}</p>
             </div>
         `;
     }
@@ -3468,9 +4061,19 @@ async function loadIServData() {
     document.getElementById('iservNotConnectedMessage').style.display = 'none';
     document.getElementById('iservContent').style.display = 'block';
 
+    // Update status bar
+    const statusDot = document.getElementById('iservStatusDot');
+    const statusText = document.getElementById('iservStatusText');
+    if (statusDot) statusDot.style.background = '#22c55e';
+    if (statusText) statusText.textContent = 'Verbunden';
+
     try {
         const exercisesRes = await fetch('/api/iserv/exercises');
         const exercisesData = await exercisesRes.json();
+
+        const exerciseCount = exercisesData.success ? (exercisesData.exercises?.length || 0) : 0;
+        const countEl = document.getElementById('iservExerciseCount');
+        if (countEl) countEl.textContent = exerciseCount;
 
         if (exercisesData.success && exercisesData.exercises?.length) {
             document.getElementById('iservExercises').innerHTML = exercisesData.exercises.map(e => `
@@ -3479,7 +4082,7 @@ async function loadIServData() {
                         <span class="iserv-item-title">${escapeHtml(e.title || 'Aufgabe')}</span>
                         <div class="iserv-item-actions">
                             ${e.due ? `<span class="iserv-item-due">${formatDate(e.due)}</span>` : ''}
-                            <button class="btn-secondary small" onclick="importAsHomework('${escapeHtml(e.title || '')}', '${e.due || ''}', '${escapeHtml(e.description || '')}', '${escapeHtml(e.course || '')}')">
+                            <button class="btn-secondary small" onclick="importAsHomework('${escapeHtml(e.title || '')}', '${escapeHtml(e.due || '')}', '${escapeHtml(e.description || '')}', '${escapeHtml(e.course || '')}')">
                                 Als HA importieren
                             </button>
                         </div>
@@ -3507,14 +4110,18 @@ async function loadIServData() {
         const eventsRes = await fetch('/api/iserv/events');
         const eventsData = await eventsRes.json();
 
+        const eventCount = eventsData.success ? (eventsData.events?.length || 0) : 0;
+        const eventCountEl = document.getElementById('iservEventCount');
+        if (eventCountEl) eventCountEl.textContent = eventCount;
+
         if (eventsData.success && eventsData.events?.length) {
             document.getElementById('iservEvents').innerHTML = eventsData.events.slice(0, 10).map(e => `
                 <div class="iserv-item glass-card">
                     <div class="iserv-item-header">
-                        <span class="iserv-item-title">${e.title || 'Termin'}</span>
+                        <span class="iserv-item-title">${escapeHtml(e.title || 'Termin')}</span>
                         ${e.start ? `<span class="iserv-item-due">${formatDateTime(e.start)}</span>` : ''}
                     </div>
-                    ${e.location ? `<div class="iserv-item-desc">${e.location}</div>` : ''}
+                    ${e.location ? `<div class="iserv-item-desc">${escapeHtml(e.location)}</div>` : ''}
                 </div>
             `).join('');
         } else {
@@ -3528,14 +4135,18 @@ async function loadIServData() {
         const notifRes = await fetch('/api/iserv/notifications');
         const notifData = await notifRes.json();
 
+        const notifCount = notifData.success ? (notifData.notifications?.length || 0) : 0;
+        const notifCountEl = document.getElementById('iservNotifCount');
+        if (notifCountEl) notifCountEl.textContent = notifCount;
+
         if (notifData.success && notifData.notifications?.length) {
             document.getElementById('iservNotifications').innerHTML = notifData.notifications.slice(0, 10).map(n => `
                 <div class="iserv-item glass-card ${n.read ? '' : 'unread'}">
                     <div class="iserv-item-header">
-                        <span class="iserv-item-title">${n.title || 'Benachrichtigung'}</span>
+                        <span class="iserv-item-title">${escapeHtml(n.title || 'Benachrichtigung')}</span>
                         ${n.date ? `<span class="iserv-item-due">${formatDate(n.date)}</span>` : ''}
                     </div>
-                    ${n.message ? `<div class="iserv-item-desc">${n.message}</div>` : ''}
+                    ${n.message ? `<div class="iserv-item-desc">${escapeHtml(n.message)}</div>` : ''}
                 </div>
             `).join('');
         } else {
@@ -3548,7 +4159,7 @@ async function loadIServData() {
     await loadIServCalendarEvents();
 }
 
-function formatDate(dateStr) {
+function formatDateShort(dateStr) {
     if (!dateStr) return '';
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
@@ -3564,9 +4175,12 @@ function formatDateTime(dateStr) {
 
 function escapeHtml(str) {
     if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML.replace(/'/g, "\\'").replace(/"/g, '\\"');
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function escapeHtmlContent(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function importAsHomework(title, dueDate, description, course) {
@@ -3600,7 +4214,6 @@ function importAsHomework(title, dueDate, description, course) {
     document.getElementById('deleteHomeworkBtn').style.display = 'none';
     openModal('homeworkModal');
 }
-
 
 const MONTHS_DE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
@@ -3685,17 +4298,17 @@ function renderSchoolEventsList() {
         const dateStr = date.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
         const timeStr = event.time ? ` um ${event.time}` : '';
 
-        return `<div class="event-item glass-card ${event.category || 'school'}" onclick="openEditCalendarEventModal('${event.id}')">
+        return `<div class="event-item glass-card ${event.category || 'school'}" onclick="openEditCalendarEventModal('${escapeHtml(String(event.id))}')">
             <div class="event-date">
                 <span class="event-day">${date.getDate()}</span>
                 <span class="event-month">${MONTHS_DE[date.getMonth()].slice(0, 3)}</span>
             </div>
             <div class="event-info">
-                <div class="event-title">${event.title}</div>
+                <div class="event-title">${escapeHtml(event.title)}</div>
                 <div class="event-meta">${dateStr}${timeStr}</div>
-                ${event.description ? `<div class="event-description">${event.description}</div>` : ''}
+                ${event.description ? `<div class="event-description">${escapeHtml(event.description)}</div>` : ''}
             </div>
-            <span class="event-category-badge ${event.category || 'school'}">${getCategoryLabel(event.category)}</span>
+            <span class="event-category-badge ${escapeHtml(event.category || 'school')}">${escapeHtml(getCategoryLabel(event.category))}</span>
         </div>`;
     }).join('');
 }
@@ -3743,9 +4356,9 @@ function renderIServCalendarEvents() {
                 <span class="event-month">${MONTHS_DE[date.getMonth()].slice(0, 3)}</span>
             </div>
             <div class="event-info">
-                <div class="event-title">${event.title || event.summary || 'Termin'}</div>
+                <div class="event-title">${escapeHtml(event.title || event.summary || 'Termin')}</div>
                 <div class="event-meta">${dateStr}</div>
-                ${event.description ? `<div class="event-description">${event.description}</div>` : ''}
+                ${event.description ? `<div class="event-description">${escapeHtml(event.description)}</div>` : ''}
             </div>
             <span class="event-category-badge iserv">IServ</span>
         </div>`;
@@ -3842,7 +4455,6 @@ function refreshSchoolCalendar() {
     }
 }
 
-
 const POINTS_TO_GRADE = {
     15: '1+', 14: '1', 13: '1-',
     12: '2+', 11: '2', 10: '2-',
@@ -3864,12 +4476,13 @@ const GRADE_RATINGS = {
 function toggleGradeCalculator() {
     const content = document.getElementById('calculatorContent');
     const toggle = document.getElementById('calculatorToggle');
-    if (content.style.display === 'none') {
-        content.style.display = 'block';
-        toggle.style.transform = 'rotate(180deg)';
-    } else {
-        content.style.display = 'none';
+    const isOpen = content.classList.contains('open');
+    if (isOpen) {
+        content.classList.remove('open');
         toggle.style.transform = 'rotate(0deg)';
+    } else {
+        content.classList.add('open');
+        toggle.style.transform = 'rotate(180deg)';
     }
 }
 
@@ -3939,96 +4552,165 @@ function calculateNeededGrade() {
         return;
     }
 
+    const isMarks = gradeSystem === 'marks';
+
     const totalNeeded = targetAvg * (gradeCount + 1);
     const totalCurrent = currentAvg * gradeCount;
-    const neededPoints = totalNeeded - totalCurrent;
+    const neededValue = totalNeeded - totalCurrent;
 
-    if (neededPoints > 15) {
-        resultEl.innerHTML = `
-            <span class="grade-poor">
-                Du bräuchtest ${neededPoints.toFixed(1)} Punkte - das ist leider nicht möglich (max. 15).
-                <br>Selbst mit 15 Punkten erreichst du nur einen Schnitt von ${((totalCurrent + 15) / (gradeCount + 1)).toFixed(2)} Punkte.
-            </span>`;
-    } else if (neededPoints < 0) {
-        resultEl.innerHTML = `
-            <span class="grade-excellent">
-                Du hast dein Ziel bereits erreicht! Selbst mit 0 Punkten hättest du noch ${((totalCurrent) / (gradeCount + 1)).toFixed(2)} Punkte im Schnitt.
-            </span>`;
+    if (isMarks) {
+        // Marks mode: lower is better, range 0.7-6.0
+        if (neededValue < 0.7) {
+            resultEl.innerHTML = `
+                <span class="grade-excellent">
+                    Du hast dein Ziel bereits erreicht! Selbst mit einer 6 (6.0) hättest du noch einen Schnitt von ${((totalCurrent + 6.0) / (gradeCount + 1)).toFixed(2)}.
+                </span>`;
+        } else if (neededValue > 6.0) {
+            resultEl.innerHTML = `
+                <span class="grade-poor">
+                    Du bräuchtest ${neededValue.toFixed(1)} - das ist leider nicht möglich (schlechteste Note: 6.0).
+                    <br>Selbst mit einer 1+ (0.7) erreichst du nur einen Schnitt von ${((totalCurrent + 0.7) / (gradeCount + 1)).toFixed(2)}.
+                </span>`;
+        } else {
+            const closestMark = MARK_OPTIONS.reduce((prev, curr) =>
+                Math.abs(curr.value - neededValue) < Math.abs(prev.value - neededValue) ? curr : prev
+            );
+            // For marks, we want the mark that is at least as good (lower value)
+            const neededMark = MARK_OPTIONS.filter(m => m.value <= neededValue).pop() || closestMark;
+            const colorClass = getMarkColorClass(neededMark.value);
+
+            resultEl.innerHTML = `
+                <span class="${colorClass}">
+                    Du brauchst mindestens eine <strong>${neededMark.label} (${neededMark.value})</strong> in der nächsten Arbeit,
+                    um einen Schnitt von ${targetAvg} zu erreichen.
+                    <br><small>Exakt benötigt: ${neededValue.toFixed(2)}</small>
+                </span>`;
+        }
     } else {
-        const roundedPoints = Math.ceil(neededPoints);
-        const grade = POINTS_TO_GRADE[roundedPoints] || POINTS_TO_GRADE[Math.min(15, roundedPoints)];
-        const colorClass = getGradeColorClass(roundedPoints);
+        // Points mode: higher is better, range 0-15
+        if (neededValue > 15) {
+            resultEl.innerHTML = `
+                <span class="grade-poor">
+                    Du bräuchtest ${neededValue.toFixed(1)} Punkte - das ist leider nicht möglich (max. 15).
+                    <br>Selbst mit 15 Punkten erreichst du nur einen Schnitt von ${((totalCurrent + 15) / (gradeCount + 1)).toFixed(2)} Punkte.
+                </span>`;
+        } else if (neededValue < 0) {
+            resultEl.innerHTML = `
+                <span class="grade-excellent">
+                    Du hast dein Ziel bereits erreicht! Selbst mit 0 Punkten hättest du noch ${((totalCurrent) / (gradeCount + 1)).toFixed(2)} Punkte im Schnitt.
+                </span>`;
+        } else {
+            const roundedPoints = Math.ceil(neededValue);
+            const grade = POINTS_TO_GRADE[roundedPoints] || POINTS_TO_GRADE[Math.min(15, roundedPoints)];
+            const colorClass = getGradeColorClass(roundedPoints);
 
-        resultEl.innerHTML = `
-            <span class="${colorClass}">
-                Du brauchst mindestens <strong>${roundedPoints} Punkte (${grade})</strong> in der nächsten Arbeit,
-                um einen Schnitt von ${targetAvg} zu erreichen.
-                <br><small>Exakt benötigt: ${neededPoints.toFixed(2)} Punkte</small>
-            </span>`;
+            resultEl.innerHTML = `
+                <span class="${colorClass}">
+                    Du brauchst mindestens <strong>${roundedPoints} Punkte (${grade})</strong> in der nächsten Arbeit,
+                    um einen Schnitt von ${targetAvg} zu erreichen.
+                    <br><small>Exakt benötigt: ${neededValue.toFixed(2)} Punkte</small>
+                </span>`;
+        }
     }
 }
 
 function calculateSubjectGrade() {
     const resultEl = document.getElementById('klausurCalcResult');
+    const isMarks = gradeSystem === 'marks';
 
-    const klausurInputs = [
-        document.getElementById('klausur1').value,
-        document.getElementById('klausur2').value,
-        document.getElementById('klausur3').value,
-        document.getElementById('klausur4').value
-    ].filter(v => v !== '').map(v => parseFloat(v));
+    if (isMarks) {
+        // Marks mode: simple average of comma-separated marks
+        const input = document.getElementById('marksGradesInput');
+        if (!input) return;
+        const gradesStr = input.value.trim();
+        if (!gradesStr) {
+            resultEl.innerHTML = '<span class="error">Bitte Noten eingeben (kommagetrennt)</span>';
+            return;
+        }
 
-    let sonstigeAvg = parseFloat(document.getElementById('sonstigeAvgInput').value);
-    const sonstigeGradesStr = document.getElementById('sonstigeGrades').value.trim();
-
-    let sonstigeGrades = [];
-    if (sonstigeGradesStr) {
-        sonstigeGrades = sonstigeGradesStr.split(/[,;]\s*/)
+        const markValues = gradesStr.split(/[,;]\s*/)
             .map(v => parseFloat(v.trim()))
-            .filter(v => !isNaN(v) && v >= 0 && v <= 15);
-    }
+            .filter(v => !isNaN(v) && v >= 0.7 && v <= 6.0);
 
-    if (sonstigeGrades.length > 0) {
-        sonstigeAvg = sonstigeGrades.reduce((a, b) => a + b, 0) / sonstigeGrades.length;
-    }
+        if (markValues.length === 0) {
+            resultEl.innerHTML = '<span class="error">Keine gültigen Noten erkannt (0.7-6.0)</span>';
+            return;
+        }
 
-    if (klausurInputs.length === 0 && isNaN(sonstigeAvg)) {
-        resultEl.innerHTML = '<span class="error">Bitte mindestens eine Klausur oder sonstige Note eingeben</span>';
-        return;
-    }
+        const avg = markValues.reduce((a, b) => a + b, 0) / markValues.length;
+        const label = getMarkLabel(avg);
+        const colorClass = getMarkColorClass(avg);
+        const rating = getMarkRating(avg);
 
-    let klausurAvg = null;
-    if (klausurInputs.length > 0) {
-        klausurAvg = klausurInputs.reduce((a, b) => a + b, 0) / klausurInputs.length;
-    }
-
-    let finalGrade;
-    let breakdown = '';
-
-    if (klausurAvg !== null && !isNaN(sonstigeAvg)) {
-        finalGrade = (klausurAvg * (1/3)) + (sonstigeAvg * (2/3));
-        breakdown = `Klausur-Ø: ${klausurAvg.toFixed(1)}P × ⅓ = ${(klausurAvg / 3).toFixed(2)}P<br>
-                     Sonstige-Ø: ${sonstigeAvg.toFixed(1)}P × ⅔ = ${(sonstigeAvg * 2 / 3).toFixed(2)}P`;
-    } else if (klausurAvg !== null) {
-        finalGrade = klausurAvg;
-        breakdown = `Nur Klausuren: ${klausurAvg.toFixed(1)}P (keine sonstigen Noten)`;
+        resultEl.innerHTML = `
+            <div class="klausur-result-box ${colorClass}">
+                <div class="result-main">
+                    <span class="result-points">Ø ${avg.toFixed(2)}</span>
+                    <span class="result-grade">≈ ${label} (${rating})</span>
+                </div>
+                <div class="result-breakdown">${markValues.length} Noten: ${markValues.map(v => getMarkLabel(v)).join(', ')}</div>
+            </div>`;
     } else {
-        finalGrade = sonstigeAvg;
-        breakdown = `Nur sonstige Noten: ${sonstigeAvg.toFixed(1)}P (keine Klausuren)`;
+        // Points mode: 1/3 Klausur + 2/3 Sonstige
+        const klausurInputs = [
+            document.getElementById('klausur1').value,
+            document.getElementById('klausur2').value,
+            document.getElementById('klausur3').value,
+            document.getElementById('klausur4').value
+        ].filter(v => v !== '').map(v => parseFloat(v));
+
+        let sonstigeAvg = parseFloat(document.getElementById('sonstigeAvgInput').value);
+        const sonstigeGradesStr = document.getElementById('sonstigeGrades').value.trim();
+
+        let sonstigeGrades = [];
+        if (sonstigeGradesStr) {
+            sonstigeGrades = sonstigeGradesStr.split(/[,;]\s*/)
+                .map(v => parseFloat(v.trim()))
+                .filter(v => !isNaN(v) && v >= 0 && v <= 15);
+        }
+
+        if (sonstigeGrades.length > 0) {
+            sonstigeAvg = sonstigeGrades.reduce((a, b) => a + b, 0) / sonstigeGrades.length;
+        }
+
+        if (klausurInputs.length === 0 && isNaN(sonstigeAvg)) {
+            resultEl.innerHTML = '<span class="error">Bitte mindestens eine Klausur oder sonstige Note eingeben</span>';
+            return;
+        }
+
+        let klausurAvg = null;
+        if (klausurInputs.length > 0) {
+            klausurAvg = klausurInputs.reduce((a, b) => a + b, 0) / klausurInputs.length;
+        }
+
+        let finalGrade;
+        let breakdown = '';
+
+        if (klausurAvg !== null && !isNaN(sonstigeAvg)) {
+            finalGrade = (klausurAvg * (1/3)) + (sonstigeAvg * (2/3));
+            breakdown = `Klausur-Ø: ${klausurAvg.toFixed(1)}P × ⅓ = ${(klausurAvg / 3).toFixed(2)}P<br>
+                         Sonstige-Ø: ${sonstigeAvg.toFixed(1)}P × ⅔ = ${(sonstigeAvg * 2 / 3).toFixed(2)}P`;
+        } else if (klausurAvg !== null) {
+            finalGrade = klausurAvg;
+            breakdown = `Nur Klausuren: ${klausurAvg.toFixed(1)}P (keine sonstigen Noten)`;
+        } else {
+            finalGrade = sonstigeAvg;
+            breakdown = `Nur sonstige Noten: ${sonstigeAvg.toFixed(1)}P (keine Klausuren)`;
+        }
+
+        const roundedGrade = Math.round(finalGrade);
+        const gradeStr = POINTS_TO_GRADE[Math.min(15, Math.max(0, roundedGrade))];
+        const colorClass = getGradeColorClass(roundedGrade);
+
+        resultEl.innerHTML = `
+            <div class="klausur-result-box ${colorClass}">
+                <div class="result-main">
+                    <span class="result-points">${finalGrade.toFixed(2)}P</span>
+                    <span class="result-grade">≈ ${roundedGrade}P = ${gradeStr}</span>
+                </div>
+                <div class="result-breakdown">${breakdown}</div>
+            </div>`;
     }
-
-    const roundedGrade = Math.round(finalGrade);
-    const gradeStr = POINTS_TO_GRADE[Math.min(15, Math.max(0, roundedGrade))];
-    const colorClass = getGradeColorClass(roundedGrade);
-
-    resultEl.innerHTML = `
-        <div class="klausur-result-box ${colorClass}">
-            <div class="result-main">
-                <span class="result-points">${finalGrade.toFixed(2)}P</span>
-                <span class="result-grade">≈ ${roundedGrade}P = ${gradeStr}</span>
-            </div>
-            <div class="result-breakdown">${breakdown}</div>
-        </div>`;
 }
 
 function setSemesterFilter(semester) {
@@ -4045,24 +4727,47 @@ function renderGrades() {
     const container = document.getElementById('gradesBySubject');
     if (!container) return;
 
+    const isMarks = gradeSystem === 'marks';
+
+    // Separate current and archived grades
+    let currentGrades, archivedGrades;
+    if (isMarks) {
+        const currentSemesters = [`${classLevel}/1`, `${classLevel}/2`];
+        currentGrades = grades.filter(g => (g.grade_system || 'points') === 'marks' && currentSemesters.includes(g.semester));
+        archivedGrades = grades.filter(g => (g.grade_system || 'points') !== 'marks' || !currentSemesters.includes(g.semester));
+    } else {
+        currentGrades = grades.filter(g => (g.grade_system || 'points') === gradeSystem);
+        archivedGrades = grades.filter(g => (g.grade_system || 'points') !== gradeSystem);
+    }
+
     const filteredGrades = currentSemesterFilter === 'all'
-        ? grades
-        : grades.filter(g => (g.semester || 'Q1') === currentSemesterFilter);
+        ? currentGrades
+        : currentGrades.filter(g => {
+            const sem = g.semester || (isMarks ? `${classLevel}/1` : 'Q1');
+            return sem === currentSemesterFilter;
+        });
 
     const showCombined = currentSemesterFilter === 'all';
-    document.getElementById('klausurAvgDisplay').style.display = showCombined ? 'flex' : 'none';
-    document.getElementById('sonstigeAvgDisplay').style.display = showCombined ? 'flex' : 'none';
+
+    // Hide Klausur/Sonstige split in marks mode
+    document.getElementById('klausurAvgDisplay').style.display = (showCombined && !isMarks) ? 'flex' : 'none';
+    document.getElementById('sonstigeAvgDisplay').style.display = (showCombined && !isMarks) ? 'flex' : 'none';
+
+    // Update grade calculator visibility
+    updateGradeCalculatorForSystem();
 
     if (!filteredGrades.length) {
-        container.innerHTML = `<div class="empty-state">
+        let emptyHtml = `<div class="empty-state">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
             </svg>
-            <span>${currentSemesterFilter === 'all' ? 'Keine Noten eingetragen' : `Keine Noten in ${currentSemesterFilter}`}</span>
+            <span>${currentSemesterFilter === 'all' ? 'Keine Noten eingetragen' : `Keine Noten in ${escapeHtml(currentSemesterFilter)}`}</span>
             <button class="btn-primary small" onclick="openAddGradeModal()">Note hinzufügen</button>
         </div>`;
+        emptyHtml += renderArchiveSection(archivedGrades);
+        container.innerHTML = emptyHtml;
         document.getElementById('overallAverage').textContent = '--';
-        if (showCombined) {
+        if (showCombined && !isMarks) {
             document.getElementById('klausurAverage').textContent = '--';
             document.getElementById('sonstigeAverage').textContent = '--';
         }
@@ -4078,103 +4783,246 @@ function renderGrades() {
         gradesBySubject[subjectId].push(grade);
     });
 
-    function calculateSubjectAverage(subjectGrades) {
-        const klausuren = subjectGrades.filter(g => g.type === 'klausur');
-        const otherGrades = subjectGrades.filter(g => g.type !== 'klausur');
+    if (isMarks) {
+        // Marks mode: simple average, no weighting
+        let totalSum = 0;
+        let totalCount = 0;
 
-        if (klausuren.length === 0) {
-            if (subjectGrades.length === 0) return { avg: null, klausurAvg: null, otherAvg: null };
-            const total = subjectGrades.reduce((sum, g) => sum + g.points, 0);
-            const avg = total / subjectGrades.length;
-            return { avg, klausurAvg: null, otherAvg: avg };
+        Object.entries(gradesBySubject).forEach(([subjectId, subjectGrades]) => {
+            const withValue = subjectGrades.filter(g => g.value != null);
+            if (withValue.length > 0) {
+                const avg = withValue.reduce((sum, g) => sum + g.value, 0) / withValue.length;
+                totalSum += avg;
+                totalCount++;
+            }
+        });
+
+        const overallAvg = totalCount > 0 ? (totalSum / totalCount).toFixed(1) : '--';
+        document.getElementById('overallAverage').textContent = overallAvg !== '--' ? overallAvg : '--';
+    } else {
+        // Points mode: 1/3 Klausur + 2/3 Sonstige weighting with LK weight
+        let totalWeightedSum = 0;
+        let totalWeight = 0;
+        let totalKlausurSum = 0, totalKlausurCount = 0;
+        let totalOtherSum = 0, totalOtherCount = 0;
+
+        Object.entries(gradesBySubject).forEach(([subjectId, subjectGrades]) => {
+            const result = calculateSubjectAveragePoints(subjectGrades);
+            const subject = subjects.find(s => s.id === subjectId);
+            const courseType = subject?.course_type || 'GK';
+            const weight = courseType === 'LK' ? 2 : 1;
+
+            if (result.avg !== null) {
+                totalWeightedSum += result.avg * weight;
+                totalWeight += weight;
+            }
+            if (result.klausurAvg !== null) {
+                totalKlausurSum += result.klausurAvg;
+                totalKlausurCount++;
+            }
+            if (result.otherAvg !== null) {
+                totalOtherSum += result.otherAvg;
+                totalOtherCount++;
+            }
+        });
+
+        const overallAvg = totalWeight > 0
+            ? (totalWeightedSum / totalWeight).toFixed(1)
+            : '--';
+        document.getElementById('overallAverage').textContent = overallAvg !== '--' ? overallAvg + 'P' : '--';
+
+        if (showCombined) {
+            const klausurAvg = totalKlausurCount > 0
+                ? (totalKlausurSum / totalKlausurCount).toFixed(1) + 'P'
+                : '--';
+            const sonstigeAvg = totalOtherCount > 0
+                ? (totalOtherSum / totalOtherCount).toFixed(1) + 'P'
+                : '--';
+            document.getElementById('klausurAverage').textContent = klausurAvg;
+            document.getElementById('sonstigeAverage').textContent = sonstigeAvg;
         }
-
-        const klausurAvg = klausuren.reduce((sum, g) => sum + g.points, 0) / klausuren.length;
-
-        if (otherGrades.length === 0) {
-            return { avg: klausurAvg, klausurAvg, otherAvg: null };
-        }
-
-        const otherAvg = otherGrades.reduce((sum, g) => sum + g.points, 0) / otherGrades.length;
-
-        const avg = (klausurAvg * (1/3)) + (otherAvg * (2/3));
-        return { avg, klausurAvg, otherAvg };
     }
 
-    let totalWeightedSum = 0;
-    let totalWeight = 0;
-    let totalKlausurSum = 0, totalKlausurCount = 0;
-    let totalOtherSum = 0, totalOtherCount = 0;
+    let html = '';
 
-    Object.entries(gradesBySubject).forEach(([subjectId, subjectGrades]) => {
-        const result = calculateSubjectAverage(subjectGrades);
-        const subject = subjects.find(s => s.id === subjectId);
-        const courseType = subject?.course_type || 'GK';
-        const weight = courseType === 'LK' ? 2 : 1;
+    if (isMarks) {
+        html = Object.entries(gradesBySubject).map(([subjectId, subjectGrades]) => {
+            const subject = subjects.find(s => s.id === subjectId) || { name: 'Unbekannt', color: '#6366f1' };
+            const withValue = subjectGrades.filter(g => g.value != null);
+            const subjectAvg = withValue.length > 0
+                ? (withValue.reduce((sum, g) => sum + g.value, 0) / withValue.length).toFixed(1)
+                : '--';
 
-        if (result.avg !== null) {
-            totalWeightedSum += result.avg * weight;
-            totalWeight += weight;
+            subjectGrades.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            return `<div class="subject-grades glass-card">
+                <div class="subject-grades-header" style="border-left: 4px solid ${/^#[0-9a-fA-F]{3,8}$/.test(subject.color) ? subject.color : '#667eea'};">
+                    <div class="subject-info">
+                        <span class="subject-name">${escapeHtml(subject.name)}</span>
+                        <span class="subject-average">${subjectAvg !== '--' ? 'Ø ' + subjectAvg : '--'}</span>
+                    </div>
+                    <span class="grade-count">${subjectGrades.length} ${subjectGrades.length === 1 ? 'Note' : 'Noten'}</span>
+                </div>
+                <div class="grades-list">
+                    ${subjectGrades.map(grade => `
+                        <div class="grade-item" onclick="openEditGradeModal('${escapeHtml(String(grade.id))}')">
+                            <div class="grade-points ${grade.value != null ? getMarkColorClass(grade.value) : 'grade-satisfactory'}">${grade.value != null ? getMarkLabel(grade.value) : '?'}</div>
+                            <div class="grade-details">
+                                <span class="grade-type">${getGradeTypeLabel(grade.type)}</span>
+                                ${currentSemesterFilter === 'all' ? `<span class="grade-semester-badge">${escapeHtml(grade.semester || (isMarks ? `${classLevel}/1` : 'Q1'))}</span>` : ''}
+                                ${grade.description ? `<span class="grade-desc">${escapeHtml(grade.description)}</span>` : ''}
+                                <span class="grade-date">${formatDateShort(grade.date)}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>`;
+        }).join('');
+    } else {
+        html = Object.entries(gradesBySubject).map(([subjectId, subjectGrades]) => {
+            const subject = subjects.find(s => s.id === subjectId) || { name: 'Unbekannt', color: '#6366f1' };
+
+            const result = calculateSubjectAveragePoints(subjectGrades);
+            const subjectAvg = result.avg !== null ? result.avg.toFixed(1) : '--';
+
+            const hasKlausur = subjectGrades.some(g => g.type === 'klausur');
+
+            subjectGrades.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            return `<div class="subject-grades glass-card">
+                <div class="subject-grades-header" style="border-left: 4px solid ${/^#[0-9a-fA-F]{3,8}$/.test(subject.color) ? subject.color : '#667eea'};">
+                    <div class="subject-info">
+                        <span class="subject-name">${escapeHtml(subject.name)}</span>
+                        <span class="subject-average">${subjectAvg}P</span>
+                    </div>
+                    <span class="grade-count">${subjectGrades.length} ${subjectGrades.length === 1 ? 'Note' : 'Noten'}${hasKlausur ? ' (1/3 Klausur)' : ''}</span>
+                </div>
+                <div class="grades-list">
+                    ${subjectGrades.map(grade => `
+                        <div class="grade-item" onclick="openEditGradeModal('${escapeHtml(String(grade.id))}')">
+                            <div class="grade-points ${getGradeClass(grade.points)}">${grade.points}P</div>
+                            <div class="grade-details">
+                                <span class="grade-type">${getGradeTypeLabel(grade.type)}</span>
+                                ${currentSemesterFilter === 'all' ? `<span class="grade-semester-badge">${grade.semester || 'Q1'}</span>` : ''}
+                                ${grade.description ? `<span class="grade-desc">${escapeHtml(grade.description)}</span>` : ''}
+                                <span class="grade-date">${formatDateShort(grade.date)}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    html += renderArchiveSection(archivedGrades);
+    container.innerHTML = html;
+}
+
+function calculateSubjectAveragePoints(subjectGrades) {
+    const klausuren = subjectGrades.filter(g => g.type === 'klausur');
+    const otherGrades = subjectGrades.filter(g => g.type !== 'klausur');
+
+    if (klausuren.length === 0) {
+        if (subjectGrades.length === 0) return { avg: null, klausurAvg: null, otherAvg: null };
+        const total = subjectGrades.reduce((sum, g) => sum + g.points, 0);
+        const avg = total / subjectGrades.length;
+        return { avg, klausurAvg: null, otherAvg: avg };
+    }
+
+    const klausurAvg = klausuren.reduce((sum, g) => sum + g.points, 0) / klausuren.length;
+
+    if (otherGrades.length === 0) {
+        return { avg: klausurAvg, klausurAvg, otherAvg: null };
+    }
+
+    const otherAvg = otherGrades.reduce((sum, g) => sum + g.points, 0) / otherGrades.length;
+
+    const avg = (klausurAvg * (1/3)) + (otherAvg * (2/3));
+    return { avg, klausurAvg, otherAvg };
+}
+
+function renderArchiveSection(archivedGrades) {
+    if (!archivedGrades || archivedGrades.length === 0) return '';
+
+    const isCurrentMarks = gradeSystem === 'marks';
+    const archiveLabel = isCurrentMarks ? 'Archiv (Punkte/Oberstufe)' : 'Archiv (Noten/Mittelstufe)';
+
+    const archivedBySubject = {};
+    archivedGrades.forEach(grade => {
+        const subjectId = grade.subject_id;
+        if (!archivedBySubject[subjectId]) {
+            archivedBySubject[subjectId] = [];
         }
-        if (result.klausurAvg !== null) {
-            totalKlausurSum += result.klausurAvg;
-            totalKlausurCount++;
-        }
-        if (result.otherAvg !== null) {
-            totalOtherSum += result.otherAvg;
-            totalOtherCount++;
-        }
+        archivedBySubject[subjectId].push(grade);
     });
 
-    const overallAvg = totalWeight > 0
-        ? (totalWeightedSum / totalWeight).toFixed(1)
-        : '--';
-    document.getElementById('overallAverage').textContent = overallAvg !== '--' ? overallAvg + 'P' : '--';
+    const archivedIsMarks = !isCurrentMarks; // archived grades are the opposite system
 
-    if (showCombined) {
-        const klausurAvg = totalKlausurCount > 0
-            ? (totalKlausurSum / totalKlausurCount).toFixed(1) + 'P'
-            : '--';
-        const sonstigeAvg = totalOtherCount > 0
-            ? (totalOtherSum / totalOtherCount).toFixed(1) + 'P'
-            : '--';
-        document.getElementById('klausurAverage').textContent = klausurAvg;
-        document.getElementById('sonstigeAverage').textContent = sonstigeAvg;
-    }
-
-    container.innerHTML = Object.entries(gradesBySubject).map(([subjectId, subjectGrades]) => {
+    let innerHtml = Object.entries(archivedBySubject).map(([subjectId, subjectGrades]) => {
         const subject = subjects.find(s => s.id === subjectId) || { name: 'Unbekannt', color: '#6366f1' };
-
-        const result = calculateSubjectAverage(subjectGrades);
-        const subjectAvg = result.avg !== null ? result.avg.toFixed(1) : '--';
-
-        const hasKlausur = subjectGrades.some(g => g.type === 'klausur');
-
         subjectGrades.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-        return `<div class="subject-grades glass-card">
-            <div class="subject-grades-header" style="border-left: 4px solid ${subject.color};">
+        let avgDisplay = '--';
+        if (archivedIsMarks) {
+            const withValue = subjectGrades.filter(g => g.value != null);
+            if (withValue.length > 0) {
+                avgDisplay = 'Ø ' + (withValue.reduce((sum, g) => sum + g.value, 0) / withValue.length).toFixed(1);
+            }
+        } else {
+            if (subjectGrades.length > 0) {
+                const result = calculateSubjectAveragePoints(subjectGrades);
+                avgDisplay = result.avg !== null ? result.avg.toFixed(1) + 'P' : '--';
+            }
+        }
+
+        return `<div class="subject-grades glass-card archive-grade-card">
+            <div class="subject-grades-header" style="border-left: 4px solid ${/^#[0-9a-fA-F]{3,8}$/.test(subject.color) ? subject.color : '#667eea'}; opacity: 0.7;">
                 <div class="subject-info">
-                    <span class="subject-name">${subject.name}</span>
-                    <span class="subject-average">${subjectAvg}P</span>
+                    <span class="subject-name">${escapeHtml(subject.name)}</span>
+                    <span class="subject-average">${avgDisplay}</span>
                 </div>
-                <span class="grade-count">${subjectGrades.length} ${subjectGrades.length === 1 ? 'Note' : 'Noten'}${hasKlausur ? ' (1/3 Klausur)' : ''}</span>
+                <span class="grade-count">${subjectGrades.length} ${subjectGrades.length === 1 ? 'Note' : 'Noten'}</span>
             </div>
             <div class="grades-list">
                 ${subjectGrades.map(grade => `
-                    <div class="grade-item" onclick="openEditGradeModal('${grade.id}')">
-                        <div class="grade-points ${getGradeClass(grade.points)}">${grade.points}P</div>
+                    <div class="grade-item" onclick="openEditGradeModal('${escapeHtml(String(grade.id))}')">
+                        <div class="grade-points ${archivedIsMarks ? (grade.value != null ? getMarkColorClass(grade.value) : 'grade-satisfactory') : getGradeClass(grade.points)}">${archivedIsMarks ? (grade.value != null ? getMarkLabel(grade.value) : '?') : (grade.points + 'P')}</div>
                         <div class="grade-details">
                             <span class="grade-type">${getGradeTypeLabel(grade.type)}</span>
-                            ${currentSemesterFilter === 'all' ? `<span class="grade-semester-badge">${grade.semester || 'Q1'}</span>` : ''}
-                            ${grade.description ? `<span class="grade-desc">${grade.description}</span>` : ''}
-                            <span class="grade-date">${formatDate(grade.date)}</span>
+                            ${grade.description ? `<span class="grade-desc">${escapeHtml(grade.description)}</span>` : ''}
+                            <span class="grade-date">${formatDateShort(grade.date)}</span>
                         </div>
                     </div>
                 `).join('')}
             </div>
         </div>`;
     }).join('');
+
+    return `
+        <div class="archive-section">
+            <div class="archive-header" onclick="toggleArchiveSection()">
+                <h4>${escapeHtml(archiveLabel)}</h4>
+                <svg id="archiveToggle" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </div>
+            <div class="archive-content" id="archiveContent" style="display: none;">
+                ${innerHtml}
+            </div>
+        </div>`;
+}
+
+function toggleArchiveSection() {
+    const content = document.getElementById('archiveContent');
+    const toggle = document.getElementById('archiveToggle');
+    if (!content || !toggle) return;
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        toggle.style.transform = 'rotate(180deg)';
+    } else {
+        content.style.display = 'none';
+        toggle.style.transform = 'rotate(0deg)';
+    }
 }
 
 function getGradeClass(points) {
@@ -4199,10 +5047,14 @@ function openAddGradeModal() {
     document.getElementById('gradeForm').reset();
     document.getElementById('gradeId').value = '';
     document.getElementById('gradeDate').value = new Date().toISOString().split('T')[0];
-    document.getElementById('gradeSemester').value = currentSemesterFilter || 'Q1';
     document.getElementById('gradeModalTitle').textContent = 'Neue Note';
     document.getElementById('deleteGradeBtn').style.display = 'none';
     populateSubjectSelects();
+    updateGradeModalForSystem();
+    const defaultSemester = gradeSystem === 'marks'
+        ? ([`${classLevel}/1`, `${classLevel}/2`].includes(currentSemesterFilter) ? currentSemesterFilter : `${classLevel}/1`)
+        : (['Q1', 'Q2', 'Q3', 'Q4'].includes(currentSemesterFilter) ? currentSemesterFilter : 'Q1');
+    document.getElementById('gradeSemester').value = defaultSemester;
     openModal('gradeModal');
 }
 
@@ -4210,17 +5062,29 @@ function openEditGradeModal(id) {
     const grade = grades.find(g => g.id === id);
     if (!grade) return;
 
+    const gradeIsMarks = (grade.grade_system || 'points') === 'marks';
+
     document.getElementById('gradeId').value = grade.id;
-    document.getElementById('gradeSubject').value = grade.subject_id || '';
-    document.getElementById('gradePoints').value = grade.points;
-    document.getElementById('gradeType').value = grade.type || 'test';
     document.getElementById('gradeDate').value = grade.date || '';
     document.getElementById('gradeDescription').value = grade.description || '';
-    document.getElementById('gradeSemester').value = grade.semester || 'Q1';
     document.getElementById('gradeModalTitle').textContent = 'Note bearbeiten';
     document.getElementById('deleteGradeBtn').style.display = 'block';
     populateSubjectSelects();
+    // Update modal form for the grade's own system (not necessarily the current system)
+    updateGradeModalForSystem(grade.grade_system || 'points');
     document.getElementById('gradeSubject').value = grade.subject_id || '';
+    document.getElementById('gradeType').value = grade.type || 'test';
+    document.getElementById('gradeSemester').value = grade.semester || (gradeIsMarks ? `${classLevel}/1` : 'Q1');
+
+    if (gradeIsMarks) {
+        const markSelect = document.getElementById('gradeMarkValue');
+        if (markSelect && grade.value != null) {
+            markSelect.value = grade.value.toString();
+        }
+    } else {
+        document.getElementById('gradePoints').value = grade.points;
+    }
+
     openModal('gradeModal');
 }
 
@@ -4228,14 +5092,37 @@ async function saveGrade(e) {
     e.preventDefault();
 
     const id = document.getElementById('gradeId').value;
-    const data = {
-        subject_id: document.getElementById('gradeSubject').value,
-        points: parseInt(document.getElementById('gradePoints').value),
-        type: document.getElementById('gradeType').value,
-        date: document.getElementById('gradeDate').value,
-        description: document.getElementById('gradeDescription').value || null,
-        semester: document.getElementById('gradeSemester').value
-    };
+
+    // Determine which system this grade uses - check if modal is in marks mode
+    const markGroup = document.getElementById('gradeMarkGroup');
+    const markSelect = document.getElementById('gradeMarkValue');
+    const isMarkMode = markGroup && markGroup.style.display !== 'none' && markSelect;
+
+    let data;
+    if (isMarkMode) {
+        const markValue = parseFloat(markSelect.value);
+        data = {
+            subject_id: document.getElementById('gradeSubject').value,
+            points: 0, // not used in marks mode but required by schema
+            value: markValue,
+            type: document.getElementById('gradeType').value,
+            date: document.getElementById('gradeDate').value,
+            description: document.getElementById('gradeDescription').value || null,
+            semester: document.getElementById('gradeSemester').value,
+            grade_system: 'marks'
+        };
+    } else {
+        data = {
+            subject_id: document.getElementById('gradeSubject').value,
+            points: parseInt(document.getElementById('gradePoints').value),
+            value: null,
+            type: document.getElementById('gradeType').value,
+            date: document.getElementById('gradeDate').value,
+            description: document.getElementById('gradeDescription').value || null,
+            semester: document.getElementById('gradeSemester').value,
+            grade_system: 'points'
+        };
+    }
 
     try {
         const url = id ? `/api/hub/school/grades/${id}` : '/api/hub/school/grades';
@@ -4269,6 +5156,314 @@ async function deleteGrade() {
     } catch (err) {
         console.error('Error deleting grade:', err);
     }
+}
+
+function updateGradeModalForSystem(system) {
+    const isMarks = (system || gradeSystem) === 'marks';
+
+    // Points input vs mark dropdown
+    const pointsInput = document.getElementById('gradePoints');
+    const pointsGroup = pointsInput.closest('.form-group');
+    const semesterSelect = document.getElementById('gradeSemester');
+    const typeSelect = document.getElementById('gradeType');
+
+    // Create or find mark value select
+    let markGroup = document.getElementById('gradeMarkGroup');
+    if (!markGroup) {
+        markGroup = document.createElement('div');
+        markGroup.className = 'form-group';
+        markGroup.id = 'gradeMarkGroup';
+        markGroup.innerHTML = `
+            <label for="gradeMarkValue">Note</label>
+            <select id="gradeMarkValue" name="mark_value" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--glass-bg);color:var(--text-primary);font-size:14px;">
+                ${MARK_OPTIONS.map(m => `<option value="${m.value}">${m.label} (${m.value})</option>`).join('')}
+            </select>
+        `;
+        pointsGroup.parentNode.insertBefore(markGroup, pointsGroup.nextSibling);
+    }
+
+    // Weighting info element
+    let weightInfo = document.getElementById('gradeWeightInfo');
+
+    if (isMarks) {
+        pointsGroup.style.display = 'none';
+        pointsInput.removeAttribute('required');
+        markGroup.style.display = 'block';
+
+        // Update semester options
+        semesterSelect.innerHTML = `
+            <option value="${classLevel}/1">${classLevel}/1</option>
+            <option value="${classLevel}/2">${classLevel}/2</option>
+        `;
+
+        // Hide weighting info in type dropdown and simplify
+        typeSelect.innerHTML = `
+            <option value="test">Test</option>
+            <option value="muendlich">Mündlich</option>
+            <option value="sonstiges">Sonstiges</option>
+        `;
+
+        // Hide weighting info
+        if (weightInfo) weightInfo.style.display = 'none';
+    } else {
+        pointsGroup.style.display = 'block';
+        pointsInput.setAttribute('required', '');
+        markGroup.style.display = 'none';
+
+        // Restore semester options
+        semesterSelect.innerHTML = `
+            <option value="Q1">Q1</option>
+            <option value="Q2">Q2</option>
+            <option value="Q3">Q3</option>
+            <option value="Q4">Q4</option>
+        `;
+
+        // Restore type options with weighting
+        typeSelect.innerHTML = `
+            <option value="klausur">Klausur (1/3)</option>
+            <option value="test">Test/LK</option>
+            <option value="muendlich">Mündlich</option>
+            <option value="sonstiges">Sonstiges</option>
+        `;
+
+        // Show weighting info
+        if (weightInfo) weightInfo.style.display = 'block';
+    }
+
+    // Update subject dropdown to show/hide LK/GK badges
+    updateSubjectSelectForSystem(isMarks);
+}
+
+function updateSubjectSelectForSystem(isMarks) {
+    const select = document.getElementById('gradeSubject');
+    if (!select) return;
+
+    const currentValue = select.value;
+    if (isMarks) {
+        select.innerHTML = '<option value="">Fach wählen...</option>' +
+            subjects.map(s => `<option value="${escapeHtml(String(s.id))}">${escapeHtml(s.name)}</option>`).join('');
+    } else {
+        select.innerHTML = '<option value="">Fach wählen...</option>' +
+            subjects.map(s => {
+                const badge = s.course_type ? ` [${escapeHtml(s.course_type)}]` : '';
+                return `<option value="${escapeHtml(String(s.id))}">${escapeHtml(s.name)}${badge}</option>`;
+            }).join('');
+    }
+    select.value = currentValue;
+}
+
+function updateGradeCalculatorForSystem() {
+    const isMarks = gradeSystem === 'marks';
+
+    // Converter section
+    const converterSection = document.querySelector('.converter-section');
+    if (converterSection) {
+        if (isMarks) {
+            converterSection.innerHTML = `
+                <div class="converter-row">
+                    <div class="converter-input">
+                        <label>Note</label>
+                        <select id="markConverterInput" onchange="convertMarkToRating()" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--glass-bg);color:var(--text-primary);font-size:14px;">
+                            <option value="">--</option>
+                            ${MARK_OPTIONS.map(m => `<option value="${m.value}">${m.label} (${m.value})</option>`).join('')}
+                        </select>
+                    </div>
+                    <span class="converter-arrow">→</span>
+                    <div class="converter-input">
+                        <label>Bewertung</label>
+                        <div id="markConverterResult" style="padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--glass-bg);min-height:42px;display:flex;align-items:center;font-size:14px;">--</div>
+                    </div>
+                </div>
+            `;
+        } else {
+            converterSection.innerHTML = `
+                <div class="converter-row">
+                    <div class="converter-input">
+                        <label>Punkte (0-15)</label>
+                        <input type="number" id="pointsInput" min="0" max="15" placeholder="0-15" oninput="convertPointsToGrade()">
+                    </div>
+                    <span class="converter-arrow">⇄</span>
+                    <div class="converter-input">
+                        <label>Note</label>
+                        <select id="gradeInput" onchange="convertGradeToPoints()">
+                            <option value="">--</option>
+                            <option value="15">1+ (15P)</option>
+                            <option value="14">1 (14P)</option>
+                            <option value="13">1- (13P)</option>
+                            <option value="12">2+ (12P)</option>
+                            <option value="11">2 (11P)</option>
+                            <option value="10">2- (10P)</option>
+                            <option value="9">3+ (9P)</option>
+                            <option value="8">3 (8P)</option>
+                            <option value="7">3- (7P)</option>
+                            <option value="6">4+ (6P)</option>
+                            <option value="5">4 (5P)</option>
+                            <option value="4">4- (4P)</option>
+                            <option value="3">5+ (3P)</option>
+                            <option value="2">5 (2P)</option>
+                            <option value="1">5- (1P)</option>
+                            <option value="0">6 (0P)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="converter-result" id="converterResult"></div>
+            `;
+        }
+    }
+
+    // Target section ("Welche Note brauche ich?")
+    const targetSection = document.querySelector('.target-section');
+    if (targetSection) {
+        if (isMarks) {
+            targetSection.innerHTML = `
+                <h5>Welche Note brauche ich?</h5>
+                <div class="target-inputs">
+                    <div class="target-input">
+                        <label>Aktueller Schnitt</label>
+                        <input type="number" id="currentAvg" min="0.7" max="6.0" step="0.1" placeholder="z.B. 2.3">
+                    </div>
+                    <div class="target-input">
+                        <label>Anzahl Noten</label>
+                        <input type="number" id="gradeCount" min="1" max="50" placeholder="z.B. 5">
+                    </div>
+                    <div class="target-input">
+                        <label>Zielschnitt</label>
+                        <input type="number" id="targetAvg" min="0.7" max="6.0" step="0.1" placeholder="z.B. 2.0">
+                    </div>
+                </div>
+                <button class="btn-secondary small" onclick="calculateNeededGrade()">Berechnen</button>
+                <div class="target-result" id="targetResult"></div>
+            `;
+        } else {
+            targetSection.innerHTML = `
+                <h5>Welche Note brauche ich?</h5>
+                <div class="target-inputs">
+                    <div class="target-input">
+                        <label>Aktueller Schnitt</label>
+                        <input type="number" id="currentAvg" min="0" max="15" step="0.1" placeholder="z.B. 10.5">
+                    </div>
+                    <div class="target-input">
+                        <label>Anzahl Noten</label>
+                        <input type="number" id="gradeCount" min="1" max="50" placeholder="z.B. 5">
+                    </div>
+                    <div class="target-input">
+                        <label>Zielschnitt</label>
+                        <input type="number" id="targetAvg" min="0" max="15" step="0.1" placeholder="z.B. 12">
+                    </div>
+                </div>
+                <button class="btn-secondary small" onclick="calculateNeededGrade()">Berechnen</button>
+                <div class="target-result" id="targetResult"></div>
+            `;
+        }
+    }
+
+    // Subject calc section
+    const klausurCalcSection = document.querySelector('.klausur-calc-section');
+    if (klausurCalcSection) {
+        if (isMarks) {
+            klausurCalcSection.innerHTML = `
+                <h5>Fachnote berechnen (einfacher Durchschnitt)</h5>
+                <div class="klausur-calc-inputs">
+                    <div class="klausur-calc-group">
+                        <label>Noten (kommagetrennt)</label>
+                        <div class="sonstige-grades-row">
+                            <input type="text" id="marksGradesInput" placeholder="z.B. 2.3, 1.7, 3.0, 2.0">
+                        </div>
+                    </div>
+                </div>
+                <button class="btn-secondary small" onclick="calculateSubjectGrade()">Fachnote berechnen</button>
+                <div class="klausur-calc-result" id="klausurCalcResult"></div>
+            `;
+        } else {
+            klausurCalcSection.innerHTML = `
+                <h5>Fachnote berechnen (1/3 Klausur + 2/3 Sonstige)</h5>
+                <div class="klausur-calc-inputs">
+                    <div class="klausur-calc-group">
+                        <label>Klausuren (1/3)</label>
+                        <div class="klausur-input-row">
+                            <input type="number" id="klausur1" min="0" max="15" placeholder="K1">
+                            <input type="number" id="klausur2" min="0" max="15" placeholder="K2">
+                            <input type="number" id="klausur3" min="0" max="15" placeholder="K3">
+                            <input type="number" id="klausur4" min="0" max="15" placeholder="K4">
+                        </div>
+                    </div>
+                    <div class="klausur-calc-group">
+                        <label>Sonstige Leistungen (2/3)</label>
+                        <div class="sonstige-input-row">
+                            <input type="number" id="sonstigeAvgInput" min="0" max="15" step="0.1" placeholder="Ø Sonstige">
+                            <span class="input-hint">oder einzelne Noten:</span>
+                        </div>
+                        <div class="sonstige-grades-row">
+                            <input type="text" id="sonstigeGrades" placeholder="z.B. 12, 11, 13, 10, 9">
+                        </div>
+                    </div>
+                </div>
+                <button class="btn-secondary small" onclick="calculateSubjectGrade()">Fachnote berechnen</button>
+                <div class="klausur-calc-result" id="klausurCalcResult"></div>
+            `;
+        }
+    }
+
+    // Grade table section
+    const gradeTableSection = document.querySelector('.grade-table-section');
+    if (gradeTableSection) {
+        if (isMarks) {
+            gradeTableSection.innerHTML = `
+                <h5>Noten-Tabelle</h5>
+                <div class="grade-table">
+                    <div class="grade-row header">
+                        <span>Note</span><span>Wert</span><span>Bewertung</span>
+                    </div>
+                    ${MARK_OPTIONS.map(m => {
+                        const cls = m.value <= 1.3 ? 'excellent' : m.value <= 2.3 ? 'good' : m.value <= 3.3 ? 'satisfactory' : m.value <= 4.3 ? 'sufficient' : m.value <= 5.3 ? 'poor' : 'fail';
+                        return `<div class="grade-row ${cls}"><span>${m.label}</span><span>${m.value}</span><span>${getMarkRating(m.value)}</span></div>`;
+                    }).join('')}
+                </div>
+            `;
+        } else {
+            gradeTableSection.innerHTML = `
+                <h5>Punkte-Noten-Tabelle</h5>
+                <div class="grade-table">
+                    <div class="grade-row header">
+                        <span>Punkte</span><span>Note</span><span>Bewertung</span>
+                    </div>
+                    <div class="grade-row excellent"><span>15</span><span>1+</span><span>Sehr gut</span></div>
+                    <div class="grade-row excellent"><span>14</span><span>1</span><span>Sehr gut</span></div>
+                    <div class="grade-row excellent"><span>13</span><span>1-</span><span>Sehr gut</span></div>
+                    <div class="grade-row good"><span>12</span><span>2+</span><span>Gut</span></div>
+                    <div class="grade-row good"><span>11</span><span>2</span><span>Gut</span></div>
+                    <div class="grade-row good"><span>10</span><span>2-</span><span>Gut</span></div>
+                    <div class="grade-row satisfactory"><span>9</span><span>3+</span><span>Befriedigend</span></div>
+                    <div class="grade-row satisfactory"><span>8</span><span>3</span><span>Befriedigend</span></div>
+                    <div class="grade-row satisfactory"><span>7</span><span>3-</span><span>Befriedigend</span></div>
+                    <div class="grade-row sufficient"><span>6</span><span>4+</span><span>Ausreichend</span></div>
+                    <div class="grade-row sufficient"><span>5</span><span>4</span><span>Ausreichend</span></div>
+                    <div class="grade-row sufficient"><span>4</span><span>4-</span><span>Ausreichend</span></div>
+                    <div class="grade-row poor"><span>3</span><span>5+</span><span>Mangelhaft</span></div>
+                    <div class="grade-row poor"><span>2</span><span>5</span><span>Mangelhaft</span></div>
+                    <div class="grade-row poor"><span>1</span><span>5-</span><span>Mangelhaft</span></div>
+                    <div class="grade-row fail"><span>0</span><span>6</span><span>Ungenügend</span></div>
+                </div>
+            `;
+        }
+    }
+}
+
+function convertMarkToRating() {
+    const select = document.getElementById('markConverterInput');
+    const resultEl = document.getElementById('markConverterResult');
+    if (!select || !resultEl) return;
+
+    const value = parseFloat(select.value);
+    if (isNaN(value)) {
+        resultEl.textContent = '--';
+        return;
+    }
+
+    const rating = getMarkRating(value);
+    const label = getMarkLabel(value);
+    const color = getMarkColor(value);
+    resultEl.innerHTML = `<span style="color:${color};font-weight:600;">${label} = ${rating}</span>`;
 }
 </script>
 
@@ -5752,6 +6947,18 @@ async function deleteGrade() {
 }
 
 .calculator-content {
+    padding: 0 20px;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(.4,0,.2,1),
+                opacity 0.3s cubic-bezier(.4,0,.2,1),
+                padding 0.4s cubic-bezier(.4,0,.2,1);
+}
+
+.calculator-content.open {
+    max-height: 600px;
+    opacity: 1;
     padding: 0 20px 20px;
 }
 
@@ -6259,6 +7466,51 @@ async function deleteGrade() {
     color: var(--text-secondary);
 }
 
+/* Archive Section */
+.archive-section {
+    margin-top: 24px;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+}
+
+.archive-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-radius: var(--radius);
+}
+
+.archive-header:hover {
+    background: var(--glass-bg);
+}
+
+.archive-header h4 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.archive-header svg {
+    transition: transform 0.3s;
+    color: var(--text-secondary);
+}
+
+.archive-content {
+    padding-top: 8px;
+}
+
+.archive-grade-card {
+    opacity: 0.75;
+}
+
+.archive-grade-card:hover {
+    opacity: 1;
+}
+
 @media (max-width: 600px) {
     .calendar-day {
         min-height: 36px;
@@ -6294,6 +7546,250 @@ async function deleteGrade() {
     .event-day {
         font-size: 18px;
     }
+}
+
+/* Period Config Modal */
+.period-config-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.period-config-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
+}
+
+.period-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(66, 133, 244, 0.2);
+    color: #4285f4;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.period-time-input {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    color: var(--text-primary);
+    padding: 6px 8px;
+    font-size: 14px;
+    font-family: inherit;
+    width: 100px;
+}
+
+.period-time-input:focus {
+    outline: none;
+    border-color: #4285f4;
+}
+
+.period-dash {
+    opacity: 0.5;
+    font-size: 16px;
+}
+
+.btn-icon-small {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    border: none;
+    background: rgba(255,255,255,0.06);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-left: auto;
+}
+
+.btn-icon-small:hover {
+    background: rgba(255,255,255,0.12);
+}
+
+.btn-danger-icon:hover {
+    background: rgba(234, 67, 53, 0.2);
+    color: #ea4335;
+}
+
+/* Wizard */
+.wizard-progress {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 20px;
+}
+
+.wizard-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.wizard-pill.active {
+    background: #4285f4;
+    color: #fff;
+}
+
+.wizard-pill.done {
+    background: rgba(66, 133, 244, 0.2);
+    color: #4285f4;
+}
+
+.wizard-pill-line {
+    width: 32px;
+    height: 2px;
+    background: rgba(255,255,255,0.12);
+}
+
+.wizard-templates {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.wizard-template-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 8px;
+    border-radius: 12px;
+    border: 2px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.wizard-template-card:hover {
+    border-color: rgba(66, 133, 244, 0.3);
+    background: rgba(66, 133, 244, 0.06);
+}
+
+.wizard-template-card.selected {
+    border-color: #4285f4;
+    background: rgba(66, 133, 244, 0.1);
+}
+
+.template-icon {
+    opacity: 0.7;
+}
+
+.wizard-template-card.selected .template-icon {
+    opacity: 1;
+    color: #4285f4;
+}
+
+.template-desc {
+    font-size: 12px;
+    opacity: 0.6;
+}
+
+.wizard-config-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.wizard-config-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+}
+
+.wizard-counter {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.wizard-count-display {
+    font-size: 18px;
+    font-weight: 700;
+    min-width: 24px;
+    text-align: center;
+}
+
+.wizard-breaks-section {
+    border-top: 1px solid rgba(255,255,255,0.1);
+    margin-top: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.wizard-break-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+}
+
+.break-label {
+    font-size: 13px;
+    opacity: 0.7;
+}
+
+.wizard-break-select {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    color: var(--text-primary);
+    padding: 4px 8px;
+    font-size: 13px;
+    font-family: inherit;
+}
+
+.wizard-break-select:focus {
+    outline: none;
+    border-color: #4285f4;
+}
+
+.wizard-preview-section {
+    border-top: 1px solid rgba(255,255,255,0.1);
+    margin-top: 8px;
+}
+
+.wizard-preview-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.wizard-preview-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.confirm-list .wizard-preview-item {
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.06);
 }
 </style>
 {% endblock %}

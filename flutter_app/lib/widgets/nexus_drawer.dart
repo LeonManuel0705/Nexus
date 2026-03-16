@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../build_info.dart';
+import '../providers/app_provider.dart';
 import '../theme.dart';
 
 class NexusDrawer extends StatelessWidget {
@@ -17,142 +20,208 @@ class NexusDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Drawer(
-      backgroundColor: isDark
-          ? const Color(0xFF12121F)
-          : Colors.white,
-      child: SafeArea(
-        child: Column(
-          children: [
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: const BorderRadius.horizontal(right: Radius.circular(20)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? const [
+                  Color(0xF21A1A2E),
+                  Color(0xE616213E),
+                  Color(0xD90F3460),
+                ]
+              : const [
+                  Color(0xF2FFFFFF),
+                  Color(0xE6F5F7FA),
+                  Color(0xD9E8ECF4),
+                ],
+          stops: const [0.0, 0.5, 1.0],
+        ),
+        border: Border(
+          right: BorderSide(
+            color: isDark
+                ? const Color(0x4D667EEA)
+                : const Color(0x33667EEA),
+            width: 1.5,
+          ),
+        ),
+      ),
+      child: Drawer(
+        backgroundColor: Colors.transparent,
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(context, isDark),
+              const SizedBox(height: 8),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Dashboard — no section label (matches desktop)
+                      _NavItem(
+                        icon: Icons.dashboard_outlined,
+                        selectedIcon: Icons.dashboard,
+                        label: 'Dashboard',
+                        isSelected: currentIndex == 0,
+                        onTap: () => _navigate(context, 0),
+                        isDark: isDark,
+                      ),
+                      const SizedBox(height: 16),
 
-            _buildHeader(context, isDark),
-            const SizedBox(height: 16),
+                      // Alltag section (matches desktop)
+                      _SectionLabel(label: 'ALLTAG', isDark: isDark),
+                      _NavItem(
+                        icon: Icons.task_alt_outlined,
+                        selectedIcon: Icons.task_alt,
+                        label: 'Aufgaben',
+                        isSelected: currentIndex == 1,
+                        onTap: () => _navigate(context, 1),
+                        isDark: isDark,
+                      ),
+                      _NavItem(
+                        icon: Icons.timer_outlined,
+                        selectedIcon: Icons.timer,
+                        label: 'Pomodoro',
+                        isSelected: currentIndex == 5,
+                        onTap: () => _navigate(context, 5),
+                        isDark: isDark,
+                      ),
+                      _NavItem(
+                        icon: Icons.calendar_today_outlined,
+                        selectedIcon: Icons.calendar_today,
+                        label: 'Kalender',
+                        isSelected: currentIndex == 2,
+                        onTap: () => _navigate(context, 2),
+                        isDark: isDark,
+                      ),
+                      _NavItem(
+                        icon: Icons.directions_transit_outlined,
+                        selectedIcon: Icons.directions_transit,
+                        label: 'Fahrplan',
+                        isSelected: currentIndex == 15,
+                        onTap: () => _navigate(context, 15),
+                        isDark: isDark,
+                      ),
+                      const SizedBox(height: 16),
 
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _NavItem(
-                      icon: Icons.dashboard_outlined,
-                      selectedIcon: Icons.dashboard,
-                      label: 'Dashboard',
-                      isSelected: currentIndex == 0,
-                      onTap: () => _navigate(context, 0),
-                    ),
+                      // Bereiche section (matches desktop)
+                      _SectionLabel(label: 'BEREICHE', isDark: isDark),
+                      _NavItem(
+                        icon: Icons.school_outlined,
+                        selectedIcon: Icons.school,
+                        label: 'Schule',
+                        isSelected: currentIndex == 3,
+                        onTap: () => _navigate(context, 3),
+                        isDark: isDark,
+                      ),
+                      _NavItem(
+                        icon: Icons.fitness_center_outlined,
+                        selectedIcon: Icons.fitness_center,
+                        label: 'Training',
+                        isSelected: currentIndex == 6,
+                        onTap: () => _navigate(context, 6),
+                        isDark: isDark,
+                      ),
+                      _NavItem(
+                        icon: Icons.folder_outlined,
+                        selectedIcon: Icons.folder,
+                        label: 'Projekte',
+                        isSelected: currentIndex == 7,
+                        onTap: () => _navigate(context, 7),
+                        isDark: isDark,
+                      ),
+                      _NavItem(
+                        icon: Icons.menu_book_outlined,
+                        selectedIcon: Icons.menu_book,
+                        label: 'Wissen',
+                        isSelected: currentIndex == 8,
+                        onTap: () => _navigate(context, 8),
+                        isDark: isDark,
+                      ),
+                      _NavItem(
+                        icon: Icons.bookmark_outline,
+                        selectedIcon: Icons.bookmark,
+                        label: 'Lesezeichen',
+                        isSelected: currentIndex == 16,
+                        onTap: () => _navigate(context, 16),
+                        isDark: isDark,
+                      ),
+                      const SizedBox(height: 16),
 
-                    const SizedBox(height: 20),
-                    _SectionLabel(label: 'ALLTAG'),
+                      // System section (matches desktop)
+                      _SectionLabel(label: 'SYSTEM', isDark: isDark),
+                      _NavItem(
+                        icon: Icons.email_outlined,
+                        selectedIcon: Icons.email,
+                        label: 'E-Mail',
+                        isSelected: currentIndex == 9,
+                        onTap: () => _navigate(context, 9),
+                        isDark: isDark,
+                      ),
+                      _NavItem(
+                        icon: Icons.show_chart_outlined,
+                        selectedIcon: Icons.show_chart,
+                        label: 'Review',
+                        isSelected: currentIndex == 10,
+                        onTap: () => _navigate(context, 10),
+                        isDark: isDark,
+                      ),
+                      _NavItem(
+                        icon: Icons.draw_outlined,
+                        selectedIcon: Icons.draw,
+                        label: 'Mousepad',
+                        isSelected: currentIndex == 11,
+                        onTap: () => _navigate(context, 11),
+                        isDark: isDark,
+                      ),
+                      _NavItem(
+                        icon: Icons.smart_toy_outlined,
+                        selectedIcon: Icons.smart_toy,
+                        label: 'Assistent',
+                        isSelected: currentIndex == 12,
+                        onTap: () => _navigate(context, 12),
+                        isDark: isDark,
+                      ),
+                      _NavItem(
+                        icon: Icons.note_outlined,
+                        selectedIcon: Icons.note,
+                        label: 'Notizen',
+                        isSelected: currentIndex == 14,
+                        onTap: () => _navigate(context, 14),
+                        isDark: isDark,
+                      ),
+                      _NavItem(
+                        icon: Icons.dns_outlined,
+                        selectedIcon: Icons.dns,
+                        label: 'IServ',
+                        isSelected: currentIndex == 17,
+                        onTap: () => _navigate(context, 17),
+                        isDark: isDark,
+                      ),
+                      const SizedBox(height: 16),
 
-                    _NavItem(
-                      icon: Icons.task_alt_outlined,
-                      selectedIcon: Icons.task_alt,
-                      label: 'Aufgaben',
-                      isSelected: currentIndex == 1,
-                      onTap: () => _navigate(context, 1),
-                    ),
-                    _NavItem(
-                      icon: Icons.timer_outlined,
-                      selectedIcon: Icons.timer,
-                      label: 'Pomodoro',
-                      isSelected: currentIndex == 5,
-                      onTap: () => _navigate(context, 5),
-                    ),
-                    _NavItem(
-                      icon: Icons.calendar_today_outlined,
-                      selectedIcon: Icons.calendar_today,
-                      label: 'Kalender',
-                      isSelected: currentIndex == 2,
-                      onTap: () => _navigate(context, 2),
-                    ),
-
-                    const SizedBox(height: 20),
-                    _SectionLabel(label: 'BEREICHE'),
-
-                    _NavItem(
-                      icon: Icons.school_outlined,
-                      selectedIcon: Icons.school,
-                      label: 'Schule',
-                      isSelected: currentIndex == 3,
-                      onTap: () => _navigate(context, 3),
-                    ),
-                    _NavItem(
-                      icon: Icons.fitness_center_outlined,
-                      selectedIcon: Icons.fitness_center,
-                      label: 'Training',
-                      isSelected: currentIndex == 6,
-                      onTap: () => _navigate(context, 6),
-                    ),
-                    _NavItem(
-                      icon: Icons.folder_outlined,
-                      selectedIcon: Icons.folder,
-                      label: 'Projekte',
-                      isSelected: currentIndex == 7,
-                      onTap: () => _navigate(context, 7),
-                    ),
-                    _NavItem(
-                      icon: Icons.menu_book_outlined,
-                      selectedIcon: Icons.menu_book,
-                      label: 'Wissen',
-                      isSelected: currentIndex == 8,
-                      onTap: () => _navigate(context, 8),
-                    ),
-
-                    const SizedBox(height: 20),
-                    _SectionLabel(label: 'TOOLS'),
-
-                    _NavItem(
-                      icon: Icons.note_outlined,
-                      selectedIcon: Icons.note,
-                      label: 'Notizen',
-                      isSelected: currentIndex == 14,
-                      onTap: () => _navigate(context, 14),
-                    ),
-                    _NavItem(
-                      icon: Icons.email_outlined,
-                      selectedIcon: Icons.email,
-                      label: 'E-Mail',
-                      isSelected: currentIndex == 9,
-                      onTap: () => _navigate(context, 9),
-                    ),
-                    _NavItem(
-                      icon: Icons.show_chart_outlined,
-                      selectedIcon: Icons.show_chart,
-                      label: 'Review',
-                      isSelected: currentIndex == 10,
-                      onTap: () => _navigate(context, 10),
-                    ),
-                    _NavItem(
-                      icon: Icons.brush_outlined,
-                      selectedIcon: Icons.brush,
-                      label: 'Mousepad',
-                      isSelected: currentIndex == 11,
-                      onTap: () => _navigate(context, 11),
-                    ),
-                    _NavItem(
-                      icon: Icons.chat_outlined,
-                      selectedIcon: Icons.chat,
-                      label: 'Assistent',
-                      isSelected: currentIndex == 12,
-                      onTap: () => _navigate(context, 12),
-                    ),
-                    _NavItem(
-                      icon: Icons.settings_outlined,
-                      selectedIcon: Icons.settings,
-                      label: 'Einstellungen',
-                      isSelected: currentIndex == 13,
-                      onTap: () => _navigate(context, 13),
-                    ),
-
-                    const SizedBox(height: 24),
-                  ],
+                      // Settings at bottom of scroll
+                      _NavItem(
+                        icon: Icons.settings_outlined,
+                        selectedIcon: Icons.settings,
+                        label: 'Einstellungen',
+                        isSelected: currentIndex == 13,
+                        onTap: () => _navigate(context, 13),
+                        isDark: isDark,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
                 ),
               ),
-            ),
-
-            _buildFooter(context, isDark),
-          ],
+              _buildFooter(context, isDark),
+            ],
+          ),
         ),
       ),
     );
@@ -201,16 +270,16 @@ class NexusDrawer extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
+                  gradient: const LinearGradient(
                     colors: [
-                      NexusTheme.primaryColor.withOpacity(0.2),
-                      NexusTheme.secondaryColor.withOpacity(0.2),
+                      Color(0x33667EEA),
+                      Color(0x33764BA2),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '0.2 closed beta',
+                  '${BuildInfo.versionName} (Build ${BuildInfo.buildNumber})',
                   style: TextStyle(
                     color: isDark ? Colors.white70 : NexusTheme.primaryColor,
                     fontSize: 11,
@@ -227,17 +296,60 @@ class NexusDrawer extends StatelessWidget {
 
   Widget _buildFooter(BuildContext context, bool isDark) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         border: Border(
           top: BorderSide(
-            color: isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
+            color: isDark ? const Color(0x1AFFFFFF) : const Color(0x1A000000),
           ),
         ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Theme toggle button (matches desktop sidebar)
+          Consumer<AppProvider>(
+            builder: (context, provider, _) {
+              final isDarkMode = provider.themeMode == ThemeMode.dark;
+              return Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => provider.toggleTheme(),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.05)
+                          : Colors.black.withValues(alpha: 0.03),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          isDarkMode ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+                          size: 20,
+                          color: isDark ? Colors.white60 : Colors.black54,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          isDarkMode ? 'Dark Mode' : 'Light Mode',
+                          style: TextStyle(
+                            color: isDark ? Colors.white60 : Colors.black54,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -280,13 +392,12 @@ class NexusDrawer extends StatelessWidget {
 
 class _SectionLabel extends StatelessWidget {
   final String label;
+  final bool isDark;
 
-  const _SectionLabel({required this.label});
+  const _SectionLabel({required this.label, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Padding(
       padding: const EdgeInsets.only(left: 12, bottom: 8),
       child: Text(
@@ -308,7 +419,7 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
-  final int? badgeCount;
+  final bool isDark;
 
   const _NavItem({
     required this.icon,
@@ -316,13 +427,11 @@ class _NavItem extends StatelessWidget {
     required this.label,
     required this.isSelected,
     required this.onTap,
-    this.badgeCount,
+    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Material(
@@ -330,11 +439,9 @@ class _NavItem extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
+          child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-
               gradient: isSelected
                   ? const LinearGradient(
                       begin: Alignment.centerLeft,
@@ -348,11 +455,11 @@ class _NavItem extends StatelessWidget {
               color: isSelected ? null : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
               boxShadow: isSelected
-                  ? [
+                  ? const [
                       BoxShadow(
-                        color: NexusTheme.primaryColor.withOpacity(0.3),
+                        color: Color(0x4D667EEA),
                         blurRadius: 8,
-                        offset: const Offset(0, 2),
+                        offset: Offset(0, 2),
                       ),
                     ]
                   : null,
@@ -379,24 +486,6 @@ class _NavItem extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (badgeCount != null && badgeCount! > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? Colors.white.withOpacity(0.3)
-                          : NexusTheme.danger,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      badgeCount.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
               ],
             ),
           ),

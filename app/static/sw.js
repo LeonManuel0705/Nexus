@@ -1,7 +1,7 @@
 
-const CACHE_NAME = 'nexus-hub-v1';
-const STATIC_CACHE = 'nexus-static-v1';
-const DYNAMIC_CACHE = 'nexus-dynamic-v1';
+const CACHE_NAME = 'nexus-hub-v4';
+const STATIC_CACHE = 'nexus-static-v4';
+const DYNAMIC_CACHE = 'nexus-dynamic-v4';
 
 const STATIC_ASSETS = [
   '/',
@@ -20,6 +20,7 @@ const STATIC_ASSETS = [
   '/static/css/loading.css',
   '/static/js/hub.js',
   '/static/js/nexus-offline.js',
+  '/static/js/nexus-notifications.js',
   '/static/manifest.json',
 
   '/static/images/icons/icon-192.png',
@@ -125,26 +126,20 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      caches.match(request)
-        .then((cachedResponse) => {
-          if (cachedResponse) {
-
-            fetchAndCache(request, DYNAMIC_CACHE);
-            return cachedResponse;
-          }
-
-          return fetch(request)
-            .then((networkResponse) => {
-
-              const responseClone = networkResponse.clone();
-              caches.open(DYNAMIC_CACHE)
-                .then(cache => cache.put(request, responseClone));
-              return networkResponse;
-            })
-            .catch(() => {
-
-              return caches.match('/hub');
-            });
+      fetch(request)
+        .then((networkResponse) => {
+          const responseClone = networkResponse.clone();
+          caches.open(DYNAMIC_CACHE)
+            .then(cache => cache.put(request, responseClone));
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(request).then((cachedResponse) => {
+            if (cachedResponse) {
+              return cachedResponse;
+            }
+            return caches.match('/hub');
+          });
         })
     );
     return;
@@ -152,20 +147,14 @@ self.addEventListener('fetch', (event) => {
 
   if (isStaticAsset(url.pathname)) {
     event.respondWith(
-      caches.match(request)
-        .then((cachedResponse) => {
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-
-          return fetch(request)
-            .then((networkResponse) => {
-              const responseClone = networkResponse.clone();
-              caches.open(STATIC_CACHE)
-                .then(cache => cache.put(request, responseClone));
-              return networkResponse;
-            });
+      fetch(request)
+        .then((networkResponse) => {
+          const responseClone = networkResponse.clone();
+          caches.open(STATIC_CACHE)
+            .then(cache => cache.put(request, responseClone));
+          return networkResponse;
         })
+        .catch(() => caches.match(request))
     );
     return;
   }
@@ -215,7 +204,12 @@ self.addEventListener('message', (event) => {
   }
 
   if (event.data && event.data.type === 'CACHE_URLS') {
-    const urls = event.data.urls;
+    const urls = (event.data.urls || []).filter(url => {
+      try {
+        const parsed = new URL(url, location.origin);
+        return parsed.origin === location.origin;
+      } catch { return false; }
+    });
     event.waitUntil(
       caches.open(DYNAMIC_CACHE)
         .then(cache => cache.addAll(urls))
@@ -250,26 +244,43 @@ self.addEventListener('sync', (event) => {
 
 self.addEventListener('push', (event) => {
   if (event.data) {
-    const data = event.data.json();
-    const options = {
-      body: data.body || 'New notification from Nexus Hub',
-      icon: '/static/images/icons/icon-192.png',
-      badge: '/static/images/icons/icon-72.png',
-      vibrate: [100, 50, 100],
-      data: data.data || {},
-      actions: data.actions || []
-    };
-
-    event.waitUntil(
-      self.registration.showNotification(data.title || 'Nexus Hub', options)
-    );
+    try {
+      const data = event.data.json();
+      const title = typeof data.title === 'string' ? data.title.slice(0, 200) : 'Nexus Hub';
+      const body = typeof data.body === 'string' ? data.body.slice(0, 500) : 'New notification from Nexus Hub';
+      const ALLOWED_ACTIONS = ['open', 'dismiss', 'view'];
+      const actions = Array.isArray(data.actions)
+        ? data.actions.filter(a => ALLOWED_ACTIONS.includes(a.action)).slice(0, 3)
+        : [];
+      const options = {
+        body,
+        icon: '/static/images/icons/icon-192.png',
+        badge: '/static/images/icons/icon-72.png',
+        vibrate: [100, 50, 100],
+        data: { url: (typeof data.data?.url === 'string' && data.data.url.startsWith('/') && !data.data.url.startsWith('//')) ? data.data.url : '/hub' },
+        actions
+      };
+      event.waitUntil(
+        self.registration.showNotification(title, options)
+      );
+    } catch (e) {
+      console.error('[SW] Invalid push data', e);
+    }
   }
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  const urlToOpen = event.notification.data?.url || '/hub';
+  let urlToOpen = event.notification.data?.url || '/hub';
+  try {
+    if (urlToOpen.startsWith('//') || !urlToOpen.startsWith('/')) {
+      const parsed = new URL(urlToOpen, location.origin);
+      if (parsed.origin !== location.origin) {
+        urlToOpen = '/hub';
+      }
+    }
+  } catch { urlToOpen = '/hub'; }
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true })

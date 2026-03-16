@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/page_fade_in.dart';
 
 class AssistantScreen extends StatelessWidget {
   const AssistantScreen({super.key});
@@ -8,148 +10,83 @@ class AssistantScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Stack(
-      children: [
-        Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white.withOpacity(0.05)
-                    : Colors.white.withOpacity(0.7),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withOpacity(0.1)
-                      : Colors.black.withOpacity(0.05),
+    return PageFadeIn(
+      child: Column(
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: NexusTheme.gradientText('Assistent', fontSize: 36),
+          ),
+          const SizedBox(height: 4),
+
+          // "In Development" wall
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            NexusTheme.primaryColor.withValues(alpha: 0.15),
+                            NexusTheme.secondary.withValues(alpha: 0.15),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: const Icon(
+                        Icons.construction_rounded,
+                        size: 48,
+                        color: NexusTheme.primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'In Entwicklung',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : const Color(0xFF18181B),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Der KI-Assistent wird aktuell überarbeitet und ist bald mit neuen Funktionen verfügbar.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        height: 1.5,
+                        color: isDark ? Colors.white54 : Colors.black54,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    GlassCard(
+                      padding: const EdgeInsets.all(16),
+                      borderRadius: 16,
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline, size: 20, color: isDark ? Colors.white38 : Colors.black38),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Diese Funktion ist noch nicht verfügbar.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark ? Colors.white54 : Colors.black54,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          NexusTheme.primary.withOpacity(0.2),
-                          NexusTheme.secondary.withOpacity(0.2),
-                        ],
-                      ),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.smart_toy_outlined,
-                      size: 64,
-                      color: NexusTheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'KI Assistent',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          NexusTheme.primary.withOpacity(0.2),
-                          NexusTheme.secondary.withOpacity(0.2),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: NexusTheme.primary.withOpacity(0.3),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.rocket_launch,
-                          size: 18,
-                          color: NexusTheme.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Coming Soon',
-                          style: TextStyle(
-                            color: NexusTheme.primary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Der KI Assistent wird bald verfügbar sein.\nBleib gespannt auf coole Features!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isDark ? Colors.white60 : Colors.black54,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildFeatureChip('Mathe-Hilfe', Icons.calculate, isDark),
-                      const SizedBox(width: 8),
-                      _buildFeatureChip('Aufsätze', Icons.edit_note, isDark),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildFeatureChip('Zusammenfassen', Icons.compress, isDark),
-                      const SizedBox(width: 8),
-                      _buildFeatureChip('Offline', Icons.cloud_off, isDark),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFeatureChip(String label, IconData icon, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withOpacity(0.05)
-            : Colors.black.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 14,
-            color: isDark ? Colors.white38 : Colors.black38,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark ? Colors.white38 : Colors.black38,
             ),
           ),
         ],

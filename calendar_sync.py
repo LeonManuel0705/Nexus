@@ -10,6 +10,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import logging
 
+sys.path.insert(0, str(Path(__file__).parent))
+from app.crypto_utils import encrypt_file, decrypt_file
+
 LOG_FILE = Path(__file__).parent / 'data' / 'calendar_sync.log'
 LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
@@ -332,23 +335,20 @@ class MacOSCalendarSync:
             'events': events
         }
 
-        CALENDAR_DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(CALENDAR_DATA_FILE, 'w') as f:
-            json.dump(data, f, indent=2, ensure_ascii=False, default=str)
+        encrypt_file(data, CALENDAR_DATA_FILE)
 
         logger.info(f"Synced {len(events)} events to {CALENDAR_DATA_FILE}")
         return events
 
     def get_status(self):
 
-        if CALENDAR_DATA_FILE.exists():
-            with open(CALENDAR_DATA_FILE, 'r') as f:
-                data = json.load(f)
-                return {
-                    'last_sync': data.get('last_sync'),
-                    'event_count': data.get('event_count', 0),
-                    'file_path': str(CALENDAR_DATA_FILE)
-                }
+        data = decrypt_file(CALENDAR_DATA_FILE)
+        if data:
+            return {
+                'last_sync': data.get('last_sync'),
+                'event_count': data.get('event_count', 0),
+                'file_path': str(CALENDAR_DATA_FILE)
+            }
         return {
             'last_sync': None,
             'event_count': 0,
