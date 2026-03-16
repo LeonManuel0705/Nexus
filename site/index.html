@@ -1606,8 +1606,10 @@
       "btn_macos": "ZIP herunterladen",
       "req_macos": "macOS 11 Big Sur+",
       "desc_macos": "Native Desktop App für Mac.",
+      "btn_macos_zip": "ZIP herunterladen",
+      "macos_zip_hint": "Entpacken → Nexus.app in Programme ziehen → Rechtsklick → Öffnen",
       "macos_copy": "Kopieren",
-      "macos_install_hint": "In Terminal einfügen — installiert automatisch nach /Applications.",
+      "macos_install_hint": "Oder: In Terminal einfügen — installiert automatisch.",
       "btn_windows": "Web App öffnen",
       "req_windows": "Windows 10+",
       "desc_windows": "Web App für Windows. Kann als App installiert werden.",
@@ -1911,8 +1913,10 @@
       "btn_macos": "Download ZIP",
       "req_macos": "macOS 11 Big Sur+",
       "desc_macos": "Native Desktop App for Mac.",
+      "btn_macos_zip": "Download ZIP",
+      "macos_zip_hint": "Extract → Drag Nexus.app to Applications → Right-click → Open",
       "macos_copy": "Copy",
-      "macos_install_hint": "Paste into Terminal — auto-installs to /Applications.",
+      "macos_install_hint": "Or: Paste into Terminal — auto-installs.",
       "btn_windows": "Open Web App",
       "req_windows": "Windows 10+",
       "desc_windows": "Web App for Windows. Can be installed as an app.",
@@ -3348,6 +3352,8 @@ const data = JSON.parse(document.getElementById('content').textContent);
                     <h3 class="font-bold text-lg">macOS</h3>
                   </div>
                   <p class="text-sm text-nexus-muted mb-4">${t('download.desc_macos')}</p>
+                  <a href="/downloads/Nexus-macOS.zip" class="block w-full py-3 rounded-xl border-2 border-nexus-text text-nexus-text font-bold text-center hover:bg-gray-50 transition-colors mb-3">${t('download.btn_macos_zip')}</a>
+                  <p class="text-center text-xs text-nexus-muted mb-4">${t('download.macos_zip_hint')}</p>
                   <div class="relative mb-3">
                     <code id="macos-install-cmd" class="block w-full py-3 px-4 rounded-xl bg-gray-900 text-green-400 text-xs font-mono text-center select-all cursor-pointer hover:bg-gray-800 transition-colors" onclick="navigator.clipboard.writeText(this.textContent.trim());this.dataset.copied='true';setTimeout(()=>delete this.dataset.copied,2000)">curl -sL nexus-lifehub.netlify.app/install-macos.sh | bash</code>
                     <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 pointer-events-none" id="macos-copy-hint">${t('download.macos_copy')}</span>
