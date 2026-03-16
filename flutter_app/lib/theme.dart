@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 
 class NexusTheme {
-  // Primary colors - indigo system from TSX design
-  static const Color primaryColor = Color(0xFF4F46E5); // indigo-600
-  static const Color primaryLight = Color(0xFF6366F1); // indigo-500
-  static const Color primaryDark = Color(0xFF4338CA); // indigo-700
-  static const Color secondaryColor = Color(0xFF9333EA); // purple-600
+  static const Color primaryColor = Color(0xFF4F46E5);
+  static const Color primaryLight = Color(0xFF6366F1);
+  static const Color primaryDark = Color(0xFF4338CA);
+  static const Color secondaryColor = Color(0xFF9333EA);
   static const Color accentColor = Color(0xFFF093FB);
 
   static const List<Color> primaryGradient = [
-    Color(0xFF6366F1), // indigo-500
-    Color(0xFF9333EA), // purple-600
+    Color(0xFF6366F1),
+    Color(0xFF9333EA),
     Color(0xFFF093FB),
   ];
 
@@ -18,30 +17,27 @@ class NexusTheme {
   static const Color accent2 = Color(0xFF9333EA);
   static const Color accent3 = Color(0xFFF093FB);
 
-  // Dark mode - zinc scale
-  static const Color darkBackground = Color(0xFF09090B); // zinc-950
-  static const Color darkSurface = Color(0xFF18181B); // zinc-900
-  static const Color darkCard = Color(0xFF18181B); // zinc-900
-  static const Color darkCardHover = Color(0xFF27272A); // zinc-800
-  static const Color darkText = Color(0xFFFAFAFA); // zinc-50
-  static const Color darkTextSecondary = Color(0xFFA1A1AA); // zinc-400
-  static const Color darkTextMuted = Color(0xFF71717A); // zinc-500
-  static const Color darkBorder = Color(0xFF27272A); // zinc-800
+  static const Color darkBackground = Color(0xFF09090B);
+  static const Color darkSurface = Color(0xFF18181B);
+  static const Color darkCard = Color(0xFF18181B);
+  static const Color darkCardHover = Color(0xFF27272A);
+  static const Color darkText = Color(0xFFFAFAFA);
+  static const Color darkTextSecondary = Color(0xFFA1A1AA);
+  static const Color darkTextMuted = Color(0xFF71717A);
+  static const Color darkBorder = Color(0xFF27272A);
 
-  // Light mode - zinc scale
-  static const Color lightBackground = Color(0xFFFAFAFA); // zinc-50
-  static const Color lightSurface = Color(0xFFFFFFFF); // white
+  static const Color lightBackground = Color(0xFFFAFAFA);
+  static const Color lightSurface = Color(0xFFFFFFFF);
   static const Color lightCard = Color(0xFFFFFFFF);
-  static const Color lightText = Color(0xFF18181B); // zinc-900
-  static const Color lightTextSecondary = Color(0xFF52525B); // zinc-600
-  static const Color lightTextMuted = Color(0xFF71717A); // zinc-500
-  static const Color lightBorder = Color(0xFFE4E4E7); // zinc-200
+  static const Color lightText = Color(0xFF18181B);
+  static const Color lightTextSecondary = Color(0xFF52525B);
+  static const Color lightTextMuted = Color(0xFF71717A);
+  static const Color lightBorder = Color(0xFFE4E4E7);
 
-  // Semantic colors
-  static const Color success = Color(0xFF10B981); // emerald-500
-  static const Color warning = Color(0xFFF59E0B); // amber-500
-  static const Color danger = Color(0xFFF43F5E); // rose-500
-  static const Color info = Color(0xFF3B82F6); // blue-500
+  static const Color success = Color(0xFF10B981);
+  static const Color warning = Color(0xFFF59E0B);
+  static const Color danger = Color(0xFFF43F5E);
+  static const Color info = Color(0xFF3B82F6);
 
   static const Color primary = primaryColor;
   static const Color secondary = secondaryColor;
@@ -60,7 +56,6 @@ class NexusTheme {
   static const Color emerald = Color(0xFF10B981);
   static const Color indigo = Color(0xFF4F46E5);
 
-  // Feature colors
   static const Color trainingColor = Color(0xFFEC4899);
   static const Color projectsColor = Color(0xFF8B5CF6);
   static const Color knowledgeColor = Color(0xFF06B6D4);
@@ -71,11 +66,10 @@ class NexusTheme {
   static const Color calendarColor = Color(0xFF6366F1);
   static const Color notesColor = Color(0xFFFACC15);
 
-  // Glass morphism
-  static const Color glassLight = Color(0x66FFFFFF); // white/40
-  static const Color glassDark = Color(0x66000000); // black/40
-  static const Color glassBorderLight = Color(0x33FFFFFF); // white/20
-  static const Color glassBorderDark = Color(0x1AFFFFFF); // white/10
+  static const Color glassLight = Color(0x66FFFFFF);
+  static const Color glassDark = Color(0x66000000);
+  static const Color glassBorderLight = Color(0x33FFFFFF);
+  static const Color glassBorderDark = Color(0x1AFFFFFF);
   static const Color glassShadowLight = Color(0x1A000000);
   static const Color glassShadowDark = Color(0x4D000000);
 
@@ -83,15 +77,14 @@ class NexusTheme {
   static const double glassBlurMedium = 12.0;
   static const double glassBlurStrong = 20.0;
 
-  // Helper for gradient text
   static Widget gradientText(String text, {double fontSize = 36, FontWeight fontWeight = FontWeight.w900, TextAlign? textAlign}) {
     return Builder(builder: (context) {
       final isDark = Theme.of(context).brightness == Brightness.dark;
       return ShaderMask(
         shaderCallback: (bounds) => LinearGradient(
           colors: isDark
-              ? [Colors.white, const Color(0xFFA1A1AA)] // white to zinc-400
-              : [const Color(0xFF18181B), const Color(0xFF71717A)], // zinc-900 to zinc-500
+              ? [Colors.white, const Color(0xFFA1A1AA)]
+              : [const Color(0xFF18181B), const Color(0xFF71717A)],
         ).createShader(bounds),
         child: Text(
           text,
@@ -108,7 +101,6 @@ class NexusTheme {
     });
   }
 
-  // Helper for styled input decoration
   static InputDecoration styledInput({
     String? hint,
     String? label,
@@ -123,8 +115,8 @@ class NexusTheme {
       suffixIcon: suffixIcon,
       filled: true,
       fillColor: isDark
-          ? const Color(0xFF27272A).withValues(alpha: 0.5) // zinc-800/50
-          : const Color(0xFFF4F4F5).withValues(alpha: 0.5), // zinc-100/50
+          ? const Color(0xFF27272A).withValues(alpha: 0.5)
+          : const Color(0xFFF4F4F5).withValues(alpha: 0.5),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
@@ -152,7 +144,6 @@ class NexusTheme {
     );
   }
 
-  // Helper for section label style
   static TextStyle sectionLabel(bool isDark) {
     return TextStyle(
       fontSize: 11,

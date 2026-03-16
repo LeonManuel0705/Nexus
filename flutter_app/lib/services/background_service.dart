@@ -124,14 +124,11 @@ Future<void> _syncIServWithNotifications() async {
     final connected = await iservService.autoReconnect();
     if (!connected) return;
 
-    // Snapshot cached notification IDs before sync
     final cachedBefore = await iservService.getCachedNotifications();
     final previousIds = cachedBefore.map((n) => n.id).toSet();
 
-    // Sync all IServ data (caches new notifications to DB)
     await iservService.syncAll();
 
-    // Load fresh notifications and find new unread ones
     final fresh = await iservService.getCachedNotifications();
     final newUnread = fresh.where(
       (n) => !n.read && !previousIds.contains(n.id),
@@ -139,7 +136,6 @@ Future<void> _syncIServWithNotifications() async {
 
     if (newUnread.isEmpty) return;
 
-    // Initialize notifications plugin in background isolate and show alerts
     final plugin = await _initBackgroundNotifications();
     for (final n in newUnread) {
       await _showBackgroundNotification(
@@ -172,7 +168,6 @@ Future<void> _checkForUpdateInBackground() async {
     final skippedVersion = prefs.getString('update_skipped_version');
     final currentVersion = prefs.getString('current_app_version') ?? '';
 
-    // Don't notify if already notified, skipped, or same version
     if (remoteVersion == lastNotifiedVersion) return;
     if (remoteVersion == skippedVersion) return;
     if (remoteVersion == currentVersion) return;

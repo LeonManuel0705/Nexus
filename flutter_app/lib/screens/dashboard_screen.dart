@@ -86,7 +86,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadData() async {
     if (_isLoading) {
-      // Only show loading spinner on first load
     } else {
       setState(() => _error = null);
     }
@@ -415,7 +414,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         e.startTime.month == DateTime.now().month &&
         e.startTime.day == DateTime.now().day);
 
-    // Determine status colors
     Color taskColor;
     String taskLabel;
     if (openTasks == 0 && completedTasks > 0) {

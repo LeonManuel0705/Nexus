@@ -96,7 +96,6 @@ class _VbbScreenState extends State<VbbScreen> with SingleTickerProviderStateMix
       body: PageFadeIn(
         child: Consumer<VbbProvider>(
           builder: (context, provider, child) {
-            // Handle pending destination from calendar "Route planen"
             if (provider.pendingDestination != null && !provider.isLoading && !provider.needsSetup) {
               final dest = provider.pendingDestination!;
               provider.clearPendingDestination();
@@ -403,7 +402,7 @@ class _RoutePlannerTab extends StatelessWidget {
 
   Widget _buildMobileLayout(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bottomPadding = MediaQuery.of(context).padding.bottom + 80; // pill nav + safe area
+    final bottomPadding = MediaQuery.of(context).padding.bottom + 80;
 
     return CustomScrollView(
       slivers: [
@@ -696,7 +695,6 @@ class _RoutePlannerTab extends StatelessWidget {
 
   Widget _buildRouteResults(BuildContext context, VbbProvider provider) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    // Filter out past connections
     final now = DateTime.now();
     final futureJourneys = provider.journeys
         .where((j) => j.departure.isAfter(now.subtract(const Duration(minutes: 1))))
@@ -1400,7 +1398,6 @@ class _DeparturesTab extends StatelessWidget {
       );
     }
 
-    // Filter out past departures
     final now = DateTime.now();
     final futureDepartures = provider.departures
         .where((d) => d.when.isAfter(now.subtract(const Duration(minutes: 1))))
@@ -2544,7 +2541,6 @@ class _AddTicketSheetState extends State<_AddTicketSheet> {
           ),
           const SizedBox(height: 20),
 
-          // Quick ticket selection
           Text(
             'Schnellauswahl',
             style: TextStyle(
@@ -2599,7 +2595,6 @@ class _AddTicketSheetState extends State<_AddTicketSheet> {
           ),
           const SizedBox(height: 20),
 
-          // Ticket name
           TextField(
             controller: _nameController,
             decoration: InputDecoration(
@@ -2615,7 +2610,6 @@ class _AddTicketSheetState extends State<_AddTicketSheet> {
           ),
           const SizedBox(height: 16),
 
-          // Zone selection
           DropdownButtonFormField<String>(
             value: _selectedZone,
             decoration: InputDecoration(
@@ -2642,7 +2636,6 @@ class _AddTicketSheetState extends State<_AddTicketSheet> {
           ),
           const SizedBox(height: 16),
 
-          // Date pickers
           Row(
             children: [
               Expanded(
@@ -2664,7 +2657,6 @@ class _AddTicketSheetState extends State<_AddTicketSheet> {
           ),
           const SizedBox(height: 16),
 
-          // Auto renew toggle
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: BackdropFilter(
@@ -2688,7 +2680,6 @@ class _AddTicketSheetState extends State<_AddTicketSheet> {
           ),
           const SizedBox(height: 24),
 
-          // Save button
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(

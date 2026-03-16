@@ -630,7 +630,6 @@ class _NoAccountView extends StatelessWidget {
           ),
         ),
 
-        // Email quick links (matching desktop)
         const SizedBox(height: 24),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),

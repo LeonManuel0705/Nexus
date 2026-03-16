@@ -72,11 +72,9 @@ class _DesktopWebViewScreenState extends State<DesktopWebViewScreen>
   }
 
   void _startPeriodicUpdateCheck() {
-    // Initial check after 5 seconds
     Future.delayed(const Duration(seconds: 5), () {
       if (mounted) _checkForUpdates();
     });
-    // Then check every 2 hours while the app runs in the background
     _updateCheckTimer = Timer.periodic(const Duration(hours: 2), (_) {
       _checkForUpdates();
     });
@@ -375,8 +373,6 @@ class _DesktopWebViewScreenState extends State<DesktopWebViewScreen>
                 if (_flask.isPythonMissing) ...[
                   ElevatedButton.icon(
                     onPressed: () async {
-                      // setupPython() sets isSettingUp = true synchronously
-                      // before any await, so we call it first then rebuild.
                       final future = _flask.setupPython();
                       setState(() {});
                       await future;
@@ -449,8 +445,6 @@ class _DesktopWebViewScreenState extends State<DesktopWebViewScreen>
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F1A),
       body: InAppWebView(
-          // Don't use initialUrlRequest — we load the URL manually AFTER
-          // clearing the cache in onWebViewCreated to avoid a race condition.
           initialSettings: InAppWebViewSettings(
             javaScriptEnabled: true,
             domStorageEnabled: true,
@@ -465,13 +459,11 @@ class _DesktopWebViewScreenState extends State<DesktopWebViewScreen>
             allowsBackForwardNavigationGestures: false,
           ),
           onWebViewCreated: (controller) async {
-            // Clear all caches BEFORE loading the page to ensure fresh content
             try {
               await InAppWebViewController.clearAllCache();
               await WebStorageManager.instance().deleteAllData();
             } catch (_) {}
 
-            // Now load the page after cache is cleared
             await controller.loadUrl(
               urlRequest: URLRequest(
                 url: WebUri('${_flask.url}/hub'),
@@ -479,7 +471,6 @@ class _DesktopWebViewScreenState extends State<DesktopWebViewScreen>
               ),
             );
 
-            // Bridge: JS in the WebView calls this to show a native macOS notification
             controller.addJavaScriptHandler(
               handlerName: 'showNativeNotification',
               callback: (args) async {
@@ -516,8 +507,6 @@ class _DesktopWebViewScreenState extends State<DesktopWebViewScreen>
             return NavigationActionPolicy.CANCEL;
           },
           onLoadStop: (controller, url) async {
-            // Ensure .main-content is visible in case the inline fade-in script
-            // hasn't run yet (e.g. very fast local page loads)
             await controller.evaluateJavascript(source: '''
               (function() {
                 var mc = document.querySelector('.main-content');

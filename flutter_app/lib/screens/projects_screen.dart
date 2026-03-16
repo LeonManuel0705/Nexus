@@ -342,7 +342,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> with SingleTickerProvid
             ? NexusTheme.projectsColor
             : NexusTheme.warning;
 
-    // Gradient colors for the progress bar
     final progressGradient = project.progress >= 100
         ? [NexusTheme.success, NexusTheme.success.withValues(alpha: 0.7)]
         : project.progress >= 50

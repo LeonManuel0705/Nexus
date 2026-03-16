@@ -36,7 +36,6 @@ class ConnectivityService {
     _isInitialized = true;
 
     if (_isDesktop) {
-      // Don't block startup — run first check in background
       _httpReachabilityCheck();
       _desktopPollTimer = Timer.periodic(
         const Duration(seconds: 30),

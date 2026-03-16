@@ -1,0 +1,45 @@
+{
+  "name": "nexus",
+  "version": "0.3.0",
+  "description": "Nexus — Your personal Life Hub",
+  "main": "main.js",
+  "author": "Leon Manuel",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux",
+    "build:all": "electron-builder --win --linux"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "app.nexus.desktop",
+    "productName": "Nexus",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "web/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "Nexus",
+      "artifactName": "Nexus-Setup-${version}.exe"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "resources/icon.png",
+      "category": "Utility",
+      "artifactName": "Nexus-${version}.AppImage"
+    }
+  }
+}

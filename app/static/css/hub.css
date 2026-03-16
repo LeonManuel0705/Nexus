@@ -2477,7 +2477,6 @@ body {
     margin-left: 240px;
     padding: 24px;
     min-height: 100vh;
-    /* animation handled by inline JS in base.html */
 }
 
 @keyframes pageSlideIn {
@@ -5245,7 +5244,6 @@ button:active, .btn:active, .filter-tab:active,
 }
 
 .main-content {
-    /* animation handled by inline JS in base.html */
 }
 
 #themeToggle {

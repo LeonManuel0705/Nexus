@@ -344,9 +344,9 @@ class _CategoryChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF4F46E5) // indigo-600
+              ? const Color(0xFF4F46E5)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(9999), // rounded-full
+          borderRadius: BorderRadius.circular(9999),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -356,7 +356,7 @@ class _CategoryChip extends StatelessWidget {
               style: TextStyle(
                 color: isSelected
                     ? Colors.white
-                    : const Color(0xFF71717A), // zinc-500
+                    : const Color(0xFF71717A),
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                 fontSize: 13,
               ),

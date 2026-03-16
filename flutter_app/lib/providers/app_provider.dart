@@ -22,7 +22,6 @@ class AppProvider extends ChangeNotifier {
   bool _isLoading = true;
   String? _error;
   ThemeMode _themeMode = ThemeMode.dark;
-  // Theme switching mode: 'manual', 'system', 'schedule'
   String _themeSwitchMode = 'manual';
   TimeOfDay _scheduleLightTime = const TimeOfDay(hour: 7, minute: 0);
   TimeOfDay _scheduleDarkTime = const TimeOfDay(hour: 20, minute: 0);
@@ -79,7 +78,6 @@ class AppProvider extends ChangeNotifier {
 
       _timetableSetupCompleted = prefs.getBool('timetable_setup_completed') ?? false;
 
-      // Migration: if user already has periods from auto-seed, don't force wizard
       if (!_timetableSetupCompleted) {
         final existingPeriods = await _db.getTimetablePeriods();
         if (existingPeriods.isNotEmpty) {
