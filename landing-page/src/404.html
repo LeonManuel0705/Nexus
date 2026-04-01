@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>404 - Page Not Found | Nexus</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inclusive+Sans:ital@0;1&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Radio+Canada+Big:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet" />
+
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+
+      body {
+        font-family: 'Inclusive Sans', system-ui, sans-serif;
+        color: #1A202C;
+        background: linear-gradient(to bottom, #F3F0FF, #FFFFFF 50%, #FDF2F8);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        overflow: hidden;
+      }
+
+      h1, h2, h3 { font-family: 'Radio Canada Big', sans-serif; }
+
+      .wrapper {
+        max-width: 520px;
+        width: 100%;
+        text-align: center;
+      }
+
+      /* Floating dots */
+      .dots { position: relative; margin-bottom: 2rem; }
+
+      .dot {
+        position: absolute;
+        border-radius: 50%;
+        animation: bounce 2s ease-in-out infinite;
+      }
+
+      .dot-1 {
+        width: 12px; height: 12px;
+        background: #B794F4;
+        top: -16px; left: 25%;
+        animation-duration: 2s;
+      }
+
+      .dot-2 {
+        width: 8px; height: 8px;
+        background: #F093FB;
+        top: 32px; right: 25%;
+        animation-delay: 0.5s;
+        animation-duration: 2.5s;
+      }
+
+      .dot-3 {
+        width: 16px; height: 16px;
+        background: #A3BFFA;
+        top: -8px; right: 33%;
+        animation-delay: 1s;
+        animation-duration: 3s;
+      }
+
+      @keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-12px); }
+      }
+
+      /* 404 number */
+      .code-container {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .code {
+        font-family: 'Radio Canada Big', sans-serif;
+        font-size: clamp(8rem, 25vw, 12rem);
+        font-weight: 700;
+        line-height: 1;
+        background: linear-gradient(to bottom right, #667EEA, #764BA2, #F093FB);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        user-select: none;
+      }
+
+      /* The zero character wraps the compass */
+      .zero-wrap {
+        position: relative;
+        display: inline-block;
+      }
+
+      /* Spinning compass — sized to fit inside the 0 counter */
+      .compass {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+      }
+
+      .compass svg {
+        width: 43%;
+        height: auto;
+        color: rgba(118, 75, 162, 0.25);
+        animation: spin 8s linear infinite;
+      }
+
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+
+      /* Text */
+      .message {
+        margin-top: 2rem;
+        margin-bottom: 2.5rem;
+      }
+
+      .message h2 {
+        font-size: clamp(1.4rem, 4vw, 1.75rem);
+        font-weight: 600;
+        color: #334155;
+        margin-bottom: 1rem;
+        text-wrap: balance;
+      }
+
+      .message p {
+        font-size: 1.05rem;
+        color: #64748B;
+        line-height: 1.7;
+        max-width: 420px;
+        margin: 0 auto;
+        text-wrap: pretty;
+      }
+
+      .message .hint {
+        font-size: 0.875rem;
+        color: #94A3B8;
+        margin-top: 0.75rem;
+      }
+
+      /* Buttons */
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        justify-content: center;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.75rem;
+        font-family: 'Radio Canada Big', sans-serif;
+        font-size: 0.9rem;
+        font-weight: 600;
+        border-radius: 10px;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s;
+      }
+
+      .btn svg { width: 20px; height: 20px; }
+
+      .btn-primary {
+        background: linear-gradient(135deg, #667EEA 0%, #764BA2 100%);
+        color: #fff;
+        border: none;
+        box-shadow: 0 4px 14px rgba(102, 126, 234, 0.3);
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+      }
+
+      .btn-secondary {
+        background: transparent;
+        color: #475569;
+        border: 1.5px solid #E2E8F0;
+      }
+
+      .btn-secondary:hover {
+        border-color: #764BA2;
+        color: #764BA2;
+        background: rgba(118, 75, 162, 0.04);
+      }
+
+      /* Footer link */
+      .footer {
+        margin-top: 3rem;
+        font-size: 0.85rem;
+        color: #94A3B8;
+      }
+
+      .footer a {
+        color: #764BA2;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        transition: color 0.2s;
+      }
+
+      .footer a:hover { color: #667EEA; }
+
+      @media (max-width: 480px) {
+        .actions { flex-direction: column; align-items: center; }
+        .btn { width: 100%; max-width: 260px; justify-content: center; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <div class="dots">
+        <div class="dot dot-1"></div>
+        <div class="dot dot-2"></div>
+        <div class="dot dot-3"></div>
+
+        <div class="code-container">
+          <span class="code">4</span><span class="code zero-wrap">0<span class="compass">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <circle cx="12" cy="12" r="10" />
+              <polygon fill="currentColor" stroke="none" points="16.24,7.76 14.12,14.12 7.76,16.24 9.88,9.88" />
+            </svg>
+          </span></span><span class="code">4</span>
+        </div>
+      </div>
+
+      <div class="message">
+        <h2>Oops! This page took a detour</h2>
+        <p>No worries — even the best explorers get lost sometimes. The page you're looking for doesn't exist or has been moved.</p>
+        <p class="hint">But hey, your productivity journey isn't over!</p>
+      </div>
+
+      <div class="actions">
+        <a href="/" class="btn btn-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>
+          Back to Home
+        </a>
+        <a href="javascript:history.back()" class="btn btn-secondary">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
+          Go Back
+        </a>
+      </div>
+
+      <p class="footer">
+        Need help? Visit
+        <a href="/">nexus-lifehub.netlify.app</a>
+      </p>
+    </div>
+  </body>
+</html>

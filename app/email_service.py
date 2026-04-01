@@ -46,7 +46,6 @@ PROVIDER_SETTINGS = {
 }
 
 def _validate_email_host(hostname: str) -> str:
-    """Validate an email hostname to prevent SSRF. Returns error message or None if valid."""
     import ipaddress as _ipaddress
     if not hostname:
         return "Invalid hostname"
@@ -183,7 +182,7 @@ def decode_email_header(header: str) -> str:
         if isinstance(part, bytes):
             try:
                 decoded_parts.append(part.decode(charset or 'utf-8', errors='replace'))
-            except:
+            except (UnicodeDecodeError, LookupError):
                 decoded_parts.append(part.decode('utf-8', errors='replace'))
         else:
             decoded_parts.append(part)
@@ -213,7 +212,7 @@ def get_email_body(msg) -> str:
                     charset = part.get_content_charset() or 'utf-8'
                     body = payload.decode(charset, errors='replace')
                     break
-                except:
+                except Exception:
                     pass
             elif content_type == "text/html" and "attachment" not in content_disposition and not body:
                 try:
@@ -222,20 +221,19 @@ def get_email_body(msg) -> str:
                     html = payload.decode(charset, errors='replace')
                     body = re.sub(r'<[^>]+>', '', html)
                     body = re.sub(r'\s+', ' ', body).strip()
-                except:
+                except Exception:
                     pass
     else:
         try:
             payload = msg.get_payload(decode=True)
             charset = msg.get_content_charset() or 'utf-8'
             body = payload.decode(charset, errors='replace')
-        except:
+        except Exception:
             body = str(msg.get_payload())
 
     return body[:5000]
 
 def _validate_folder(folder: str) -> str:
-    """Validate IMAP folder name to prevent injection."""
     if not folder or not re.match(r'^[a-zA-Z0-9_./\-\s\[\]äöüÄÖÜß]+$', folder):
         raise ValueError('Invalid folder name')
     if len(folder) > 200:
@@ -290,7 +288,7 @@ def fetch_emails(email: str, folder: str = "INBOX", limit: int = 20) -> Dict:
             try:
                 date_obj = parsedate_to_datetime(date_str)
                 date_formatted = date_obj.strftime("%Y-%m-%d %H:%M")
-            except:
+            except (ValueError, TypeError):
                 date_formatted = date_str[:20]
 
             from_header = decode_email_header(msg.get("From", ""))
@@ -353,7 +351,7 @@ def get_email_detail(email_addr: str, msg_id: str, folder: str = "INBOX") -> Dic
         try:
             date_obj = parsedate_to_datetime(date_str)
             date_formatted = date_obj.strftime("%Y-%m-%d %H:%M")
-        except:
+        except (ValueError, TypeError):
             date_formatted = date_str
 
         from_header = decode_email_header(msg.get("From", ""))
@@ -381,7 +379,6 @@ def get_email_detail(email_addr: str, msg_id: str, folder: str = "INBOX") -> Dic
         return {"success": False, "error": "An error occurred"}
 
 def _sanitize_header(value: str) -> str:
-    """Strip CRLF characters to prevent email header injection."""
     return value.replace('\r', '').replace('\n', '')
 
 def send_email(from_email: str, to_email: str, subject: str, body: str, reply_to_id: Optional[str] = None) -> Dict:
@@ -455,7 +452,7 @@ def delete_email(email: str, msg_id: str, folder: str = "INBOX") -> Dict:
                 if status == "OK":
                     moved = True
                     break
-            except:
+            except Exception:
                 continue
 
         imap.store(msg_id.encode(), '+FLAGS', '\\Deleted')

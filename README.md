@@ -1,38 +1,63 @@
 # Nexus
 
-A personal productivity system that brings together your calendar, tasks, email, school schedule, and more in one unified interface. Available as a native mobile app and web dashboard.
+**A unified productivity system that replaces five apps with one.** Nexus brings together calendar, tasks, email, school management, transit routing, and more — all running locally on your device with zero cloud dependency.
 
-## Apps
+I built Nexus because I was tired of switching between separate apps for school, calendar, transit, and tasks. Instead of stitching together tools that don't talk to each other, I wanted one system that understands how these things connect: a cancelled class means a changed commute, a new homework assignment becomes a task with a deadline, and a calendar event shows the route to get there.
 
-### Mobile App (Flutter)
-Native Android app with offline-first architecture.
+![Flutter](https://img.shields.io/badge/Flutter-02569B?style=flat&logo=flutter&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-000000?style=flat&logo=flask&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat&logo=sqlite&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-0175C2?style=flat&logo=dart&logoColor=white)
 
-**Features:**
-- Dashboard with personalized overview
-- Task management with deadlines and priorities
-- Calendar with Google Calendar sync
-- IServ integration (timetable, substitutions, homework)
-- Training tracker with workout plans
-- Email integration
-- Notes with markdown support
-- Bookmarks collection
-- Review system for spaced repetition
+---
 
-### Web Dashboard (Flask)
-Browser-based dashboard for desktop use.
+## What it does
 
-**Features:**
-- All mobile features accessible via browser
-- Google OAuth authentication
-- Progressive Web App (PWA) support
-- Real-time updates via WebSocket
+Nexus is a full-stack productivity system spanning three platforms:
 
-### Landing Page (Next.js)
-Modern marketing website at [nexus website].
+**Mobile App** (Flutter) — Native Android/iOS app with offline-first architecture. 22 screens covering dashboard, tasks, calendar, email, school timetable, transit routing, training tracker, notes, bookmarks, spaced repetition, and a Pomodoro timer. State management via Provider, local storage with SQLite and Hive, background sync via WorkManager.
 
-## Quick Start
+**Web Dashboard** (Flask) — Browser-based interface with real-time WebSocket updates, Google OAuth, and Progressive Web App support. Serves 80+ API endpoints across 27 database tables. Handles Google Calendar sync, Gmail integration, IServ school system connectivity, CalDAV, and VBB transit routing with personalized recommendations.
 
-### Mobile App
+**Landing Page** (Vite + Tailwind CSS v4) — Marketing site with multi-language support (EN/DE), screenshot gallery, smooth scroll animations, and static export for Netlify.
+
+**Desktop App** (Electron) — Bundles the Flask backend with a local HTTP server for Windows and Linux distribution.
+
+## Architecture decisions
+
+- **Privacy-first**: All data stays on-device. Credentials are encrypted at rest using Fernet with PBKDF2 (600k iterations, per-file salts). No telemetry, no accounts required.
+- **Offline-first**: The Flutter app works fully without network access. SQLite for structured data, Hive for encrypted key-value storage. Background sync picks up when connectivity returns.
+- **Security hardened**: OAuth CSRF protection, CSP headers, SSRF validation on CalDAV/email hosts, CRLF header injection prevention, rate limiting, input sanitization across all 80+ endpoints.
+- **Transparent migration**: `decrypt_file()` auto-detects plaintext JSON and legacy encryption schemes, re-encrypting in place without user intervention.
+
+## Project structure
+
+```
+Nexus/
+  flutter_app/          Flutter mobile/desktop app
+    lib/
+      screens/          22 app screens
+      providers/        9 state management providers
+      services/         17+ services (sync, notifications, database, ...)
+      widgets/          Reusable UI components
+  app/                  Flask backend
+    app.py              Main application (242 route handlers)
+    database.py         SQLite/PostgreSQL models (27 tables)
+    crypto_utils.py     Fernet encryption with auto-migration
+    calendar_service.py CalDAV + macOS EventKit integration
+    email_service.py    IMAP/SMTP email client
+    iserv_service.py    German school system integration
+    vbb_service.py      Berlin transit routing
+    google_oauth.py     Google Calendar + Gmail OAuth
+  landing-page/         Vite + Tailwind CSS marketing site
+  nexus-desktop/        Electron wrapper for Windows/Linux
+  tests/                Backend test suite
+```
+
+## Getting started
+
+### Mobile app
 
 ```bash
 cd flutter_app
@@ -40,86 +65,25 @@ flutter pub get
 flutter run
 ```
 
-### Web Dashboard
+### Web dashboard
 
 ```bash
-./setup.sh  # First time only
-./start.sh
-# Open http://localhost:5050
+./setup.sh        # first-time setup
+./start.sh         # starts on http://localhost:5050
 ```
 
-### Landing Page Development
+### Landing page
 
 ```bash
 cd landing-page
 npm install
-npm run dev
-# Open http://localhost:3000
+npm run dev        # http://localhost:3000
+npm run build      # exports to ../site/
 ```
 
-Build for production:
-```bash
-npm run build
-# Output exported to ../site/
-```
+### Environment variables
 
-## Project Structure
-
-```
-Nexus/
-├── flutter_app/           # Flutter mobile app
-│   ├── lib/
-│   │   ├── screens/       # App screens
-│   │   ├── providers/     # State management
-│   │   ├── services/      # API & database services
-│   │   └── widgets/       # Reusable components
-│   └── pubspec.yaml
-├── app/                   # Flask web backend
-│   ├── app.py             # Main Flask application
-│   ├── static/            # CSS, JS, images
-│   └── templates/         # HTML templates
-├── landing-page/          # Next.js marketing site
-│   ├── app/               # Next.js app router pages
-│   ├── components/        # React components
-│   └── next.config.mjs
-├── site/                  # Static export for Netlify
-├── setup.sh               # Backend setup script
-├── start.sh               # Backend start script
-└── requirements.txt       # Python dependencies
-```
-
-## Tech Stack
-
-**Mobile App:**
-- Flutter / Dart
-- SQLite (local database)
-- Provider (state management)
-
-**Web Backend:**
-- Flask, Flask-SocketIO
-- SQLite (local) / PostgreSQL (production)
-- Google Calendar & Gmail APIs
-- IServ API
-
-**Landing Page:**
-- Next.js 16 with App Router
-- Tailwind CSS v4
-- Framer Motion
-- Static export for Netlify
-
-## Deployment
-
-**Landing Page (Netlify):**
-- Publish directory: `site/`
-- No build command needed (pre-built)
-
-**Web Backend (Render):**
-- Uses `render.yaml` blueprint
-- PostgreSQL database included
-
-## Environment Variables
-
-Copy `.env.example` to `.env`:
+Copy `.env.example` to `.env` and fill in:
 
 ```
 SECRET_KEY=your-secret-key
@@ -128,15 +92,29 @@ GOOGLE_CLIENT_SECRET=your-client-secret
 GOOGLE_PROJECT_ID=your-project-id
 ```
 
-## Roadmap
+## Tech stack
 
-See the [Roadmap](/landing-page/app/roadmap/page.tsx) for planned features including:
-- Widget customization
-- Public transit integration
-- Focus mode
-- AI assistant
-- Cloud sync (opt-in)
-- Habit tracking
+| Layer | Technology |
+|-------|-----------|
+| Mobile | Flutter, Dart, SQLite, Hive, Provider, WorkManager |
+| Backend | Flask, Flask-SocketIO, SQLite/PostgreSQL, Fernet |
+| Integrations | Google Calendar API, Gmail API, IServ, CalDAV, VBB |
+| Frontend | Vite, Tailwind CSS v4, DOMPurify |
+| Desktop | Electron, electron-builder |
+| CI | GitHub Actions (pytest, flutter analyze) |
+
+## Deployment
+
+**Landing page** deploys to Netlify as a static site (publish directory: `site/`).
+
+**Backend** deploys to Render using the included `render.yaml` blueprint with PostgreSQL.
+
+## Tests
+
+```bash
+pip install pytest
+python -m pytest tests/ -v
+```
 
 ## License
 

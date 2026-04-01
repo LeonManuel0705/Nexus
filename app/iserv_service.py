@@ -23,7 +23,6 @@ from IServAPI import IServAPI
 CREDENTIALS_FILE = Path(__file__).parent.parent / 'data' / 'iserv_credentials.json'
 
 def _validate_hostname_ssrf(hostname: str) -> str:
-    """Validate a hostname to prevent SSRF. Returns error message or None if valid."""
     import ipaddress as _ipaddress
     if not hostname:
         return "Invalid hostname"
@@ -436,14 +435,14 @@ class IServService:
                 if events:
                     all_events.extend(events if isinstance(events, list) else [events])
             except Exception as e:
-                print(f"get_events failed: {e}")
+                logging.debug("get_events failed: %s", e)
 
             try:
                 upcoming = self.api.get_upcoming_events()
                 if upcoming:
                     all_events.extend(upcoming if isinstance(upcoming, list) else [upcoming])
             except Exception as e:
-                print(f"get_upcoming_events failed: {e}")
+                logging.debug("get_upcoming_events failed: %s", e)
 
             try:
                 if hasattr(self.api, 'get_calendar_plugin_events'):
@@ -451,7 +450,7 @@ class IServService:
                     if plugin_events:
                         all_events.extend(plugin_events if isinstance(plugin_events, list) else [plugin_events])
             except Exception as e:
-                print(f"get_calendar_plugin_events failed: {e}")
+                logging.debug("get_calendar_plugin_events failed: %s", e)
 
             exercise_keywords = [
                 'aufgabe', 'exercise', 'hausaufgabe', 'abgabe', 'task', 'homework',
@@ -480,7 +479,7 @@ class IServService:
                     })
 
         except Exception as e:
-            print(f"calendar exercise filter failed: {e}")
+            logging.debug("calendar exercise filter failed: %s", e)
 
         seen = set()
         unique_exercises = []
