@@ -32,7 +32,7 @@ postprocessor_logs/
 error_reports/
 feedback_logs/
 learning_data/
-models/
+/models/
 
 archive/
 
