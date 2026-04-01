@@ -54,7 +54,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    await Hive.initFlutter();
+    await Hive.initFlutter().timeout(const Duration(seconds: 5));
   } catch (_) {
   }
 
@@ -163,7 +163,6 @@ class MainScreen extends StatefulWidget {
 
   static final _globalKey = GlobalKey<_MainScreenState>();
 
-  /// Navigate to a screen by index from anywhere in the widget tree.
   static void navigateTo(int screenIndex) {
     _globalKey.currentState?._navigateToScreen(screenIndex);
   }
@@ -1887,7 +1886,11 @@ class _AppInitializerState extends State<_AppInitializer>
     await appProvider.initialize();
     if (!mounted) return;
 
-    iservProvider.initialize();
+    try {
+      await iservProvider.initialize().timeout(const Duration(seconds: 10));
+    } catch (_) {
+      // Don't block app startup if IServ init fails or times out
+    }
 
     if (mounted) {
       await _fadeOutController.forward();

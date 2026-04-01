@@ -8,7 +8,7 @@
     <meta property="og:title" content="Nexus - The All-in-One Productivity System" />
     <meta property="og:description" content="Nexus combines school, transit, training, and life management in one private, offline-first app. No account, no cloud, no cost." />
     
-        <meta property="og:url" content="{DOMAIN_URL}" />
+        <meta property="og:url" content="https://nexus-app.netlify.app" />
 		<meta property="og:image" content="https://res.cloudinary.com/du5fldub3/image/upload/c_fill,w_1200,h_630,g_north/app/c8a21bc7-048b-4475-81e4-39cf5f64b93c/screenshots/preview-image.png" />
 		<meta property="og:image:width" content="1200" />
 		<meta property="og:image:height" content="630" />
@@ -645,7 +645,6 @@
         .reveal { opacity: 1; transform: none; transition: none; }
         .hero-scroll-hint { display: none; }
       }
-
 
       .faq-item {
         overflow: hidden;
@@ -1379,7 +1378,7 @@ const data = JSON.parse(document.getElementById('content').textContent);
           }
 
           window.addEventListener('scroll', onScroll, { passive: true });
-          onScroll(); // Run once on init to set correct initial state
+          onScroll();
         }
 
         items.forEach((item, i) => {
@@ -1441,7 +1440,7 @@ const data = JSON.parse(document.getElementById('content').textContent);
 
         let currentSlide = 0;
         const totalSlides = slides.length;
-        const interval = 7000; // 7 seconds
+        const interval = 7000;
 
         function nextSlide() {
           slides[currentSlide].classList.remove('active');
@@ -1463,7 +1462,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
         const isTouchDevice = ('ontouchstart' in window) ||
           (navigator.maxTouchPoints > 0) ||
           window.matchMedia('(hover: none) and (pointer: coarse)').matches;
-
 
         function updateBgVisibility() {
           if (isTouchDevice) {
@@ -1517,10 +1515,8 @@ const data = JSON.parse(document.getElementById('content').textContent);
 
         window.addEventListener('scroll', onScroll, { passive: true });
 
-        // Recalculate on resize
         window.addEventListener('resize', onResize, { passive: true });
 
-        // Also recalculate after images load (they can change section height)
         wrapper.querySelectorAll('img').forEach(img => {
           if (!img.complete) {
             img.addEventListener('load', () => {
@@ -1532,7 +1528,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
           }
         });
 
-        // Recalculate after fonts load
         if (document.fonts && document.fonts.ready) {
           document.fonts.ready.then(() => {
             if (isTouchDevice) {
@@ -1600,7 +1595,7 @@ const data = JSON.parse(document.getElementById('content').textContent);
           }
 
           window.addEventListener('scroll', onScroll, { passive: true });
-          onScroll(); // Run once on init to set correct initial state
+          onScroll();
         }
 
         items.forEach((item, i) => {
@@ -1662,7 +1657,7 @@ const data = JSON.parse(document.getElementById('content').textContent);
 
         let currentSlide = 0;
         const totalSlides = slides.length;
-        const interval = 7000; // 7 seconds
+        const interval = 7000;
 
         function nextSlide() {
           slides[currentSlide].classList.remove('active');
@@ -1684,7 +1679,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
         const isTouchDevice = ('ontouchstart' in window) ||
           (navigator.maxTouchPoints > 0) ||
           window.matchMedia('(hover: none) and (pointer: coarse)').matches;
-
 
         function updateBgVisibility() {
           if (isTouchDevice) {
@@ -1738,10 +1732,8 @@ const data = JSON.parse(document.getElementById('content').textContent);
 
         window.addEventListener('scroll', onScroll, { passive: true });
 
-        // Recalculate on resize
         window.addEventListener('resize', onResize, { passive: true });
 
-        // Also recalculate after images load (they can change section height)
         wrapper.querySelectorAll('img').forEach(img => {
           if (!img.complete) {
             img.addEventListener('load', () => {
@@ -1753,7 +1745,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
           }
         });
 
-        // Recalculate after fonts load
         if (document.fonts && document.fonts.ready) {
           document.fonts.ready.then(() => {
             if (isTouchDevice) {
@@ -1764,7 +1755,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
         }
       }
 
-      // FAQ smooth accordion animation
       function initFaqAccordion() {
         document.querySelectorAll('.faq-item').forEach(details => {
           const summary = details.querySelector('summary');
@@ -1775,7 +1765,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
             e.preventDefault();
 
             if (details.open) {
-              // Closing: animate first, then remove open
               answer.style.gridTemplateRows = '0fr';
               answer.style.opacity = '0';
               setTimeout(() => {
@@ -1784,14 +1773,12 @@ const data = JSON.parse(document.getElementById('content').textContent);
                 answer.style.opacity = '';
               }, 400);
             } else {
-              // Opening: set open, then animate
               details.open = true;
             }
           });
         });
       }
 
-      // Mobile Menu
       const mobileMenuBtn = document.getElementById('mobile-menu-btn');
       const closeMobileMenuBtn = document.getElementById('close-mobile-menu');
       const mobileMenu = document.getElementById('mobile-menu');
@@ -1803,17 +1790,13 @@ const data = JSON.parse(document.getElementById('content').textContent);
         mobileMenu.classList.add('translate-x-full');
       });
 
-      // ─── PAGE CLEANUP ─────────────────────────────────────────
       let _homeCleanups = [];
 
       function cleanupCurrentPage() {
         _homeCleanups.forEach(fn => { try { fn(); } catch(e) {} });
         _homeCleanups = [];
-        // Remove progress bar if present
-        // day-story removed — scrollytelling uses _homeCleanups
       }
 
-      // ─── ANIMATION HELPERS ─────────────────────────────────────
       function splitWords(text) {
         return text.split(/\s+/).map((word, i) =>
           `<span class="word"><span class="word-inner" style="transition-delay:${i * 80}ms">${word}</span></span>`
@@ -1824,7 +1807,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
         const start = performance.now();
         function step(now) {
           const progress = Math.min((now - start) / duration, 1);
-          // easeOutExpo
           const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
           el.textContent = Math.round(target * eased);
           if (progress < 1) requestAnimationFrame(step);
@@ -1835,7 +1817,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
       function initHomeAnimations() {
         var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-        // ── Lenis smooth scroll ──
         var lenis = null;
         if (!reducedMotion && typeof Lenis !== 'undefined') {
           lenis = new Lenis({ duration: 1.2, easing: function(t) { return Math.min(1, 1.001 - Math.pow(2, -10 * t)); }, smoothWheel: true });
@@ -1845,14 +1826,11 @@ const data = JSON.parse(document.getElementById('content').textContent);
           _homeCleanups.push(function() { cancelAnimationFrame(lenisRafId); if (lenis) { lenis.destroy(); lenis = null; } });
         }
 
-        // ── Hero video autoplay ──
         var heroVideo = document.getElementById('hero-video');
         if (heroVideo) {
           heroVideo.play().catch(function() {});
         }
 
-
-        // ── Below-fold reveal animations ──
         var revealEls = document.querySelectorAll('.reveal');
         if (revealEls.length > 0 && !reducedMotion) {
           var revealObs = new IntersectionObserver(function(entries) {
@@ -1866,7 +1844,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
           _homeCleanups.push(function() { revealObs.disconnect(); });
         }
 
-        // ── Counter / check-draw animation on scroll ──
         var counterSection = document.getElementById('privacy-counters');
         if (counterSection) {
           var counterDone = false;
@@ -1884,8 +1861,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
           _homeCleanups.push(function() { counterObs.disconnect(); });
         }
       }
-
-      // ─── PAGE RENDERERS ───────────────────────────────────────
 
       function renderHome() {
         app.innerHTML = `
@@ -2430,7 +2405,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
           </section>
         `;
 
-        // Scroll to platform anchor if hash present (safe ID lookup to prevent CSS selector injection)
         if (window.location.hash) {
           const hash = window.location.hash;
           if (/^#[a-zA-Z][a-zA-Z0-9_-]*$/.test(hash)) {
@@ -2645,7 +2619,6 @@ const data = JSON.parse(document.getElementById('content').textContent);
         `;
       }
 
-      // ─── INIT ─────────────────────────────────────────────────
       render(location.pathname);
       updateStaticText();
     </script>

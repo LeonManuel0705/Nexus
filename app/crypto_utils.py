@@ -2,6 +2,7 @@ import os
 import json
 import base64
 import hashlib
+import logging
 from pathlib import Path
 from cryptography.fernet import Fernet
 
@@ -20,7 +21,7 @@ def _get_secret_key() -> str:
     fd = os.open(str(key_file), os.O_CREAT | os.O_WRONLY, 0o600)
     os.write(fd, key.encode())
     os.close(fd)
-    print("WARNING: No SECRET_KEY env var set. Generated a local key at data/.secret_key")
+    logging.warning("No SECRET_KEY env var set. Generated a local key at data/.secret_key")
     return key
 
 
@@ -40,12 +41,10 @@ def _get_fernet_with_salt(salt: bytes, iterations: int = _PBKDF2_ITERATIONS) -> 
 
 
 def get_fernet(iterations: int = _PBKDF2_ITERATIONS) -> Fernet:
-    """Legacy: get Fernet with static salt. Used for backward-compatible decryption."""
     return _get_fernet_with_salt(_STATIC_SALT, iterations)
 
 
 def encrypt_json(data: dict) -> str:
-    """Encrypt JSON data with a random per-encryption salt."""
     salt = os.urandom(16)
     fernet = _get_fernet_with_salt(salt)
     plaintext = json.dumps(data).encode('utf-8')
@@ -55,7 +54,6 @@ def encrypt_json(data: dict) -> str:
 
 
 def decrypt_json(token: str) -> dict:
-    """Decrypt with per-file salt (new) or static salt (legacy); auto-migrates."""
     if token.startswith(_SALT_PREFIX):
         rest = token[len(_SALT_PREFIX):]
         salt_b64, ciphertext = rest.split(':', 1)
@@ -79,7 +77,7 @@ def encrypt_file(data: dict, filepath: Path):
         with os.fdopen(fd, 'w') as f:
             f.write(encrypted)
         os.rename(str(tmp_path), str(filepath))
-    except:
+    except Exception:
         try:
             os.unlink(str(tmp_path))
         except OSError:

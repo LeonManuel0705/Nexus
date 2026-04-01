@@ -4,7 +4,7 @@
   "description": "Nexus — Your personal Life Hub",
   "main": "main.js",
   "author": "Leon Manuel",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "scripts": {
     "start": "electron .",
     "build:win": "electron-builder --win",
@@ -23,7 +23,7 @@
     },
     "files": [
       "main.js",
-      "web/**/*"
+      "resources/**/*"
     ],
     "win": {
       "target": "nsis",

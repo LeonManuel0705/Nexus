@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import logging
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
@@ -16,7 +17,7 @@ if DATABASE_URL:
         import psycopg2.extras
         _use_postgres = True
     except ImportError:
-        print("Warning: DATABASE_URL set but psycopg2 not installed. Using SQLite.")
+        logging.warning("DATABASE_URL set but psycopg2 not installed. Using SQLite.")
         _use_postgres = False
 
 def get_connection():
@@ -424,13 +425,13 @@ def init_db():
     try:
         cursor.execute('ALTER TABLE hub_timetable_settings ADD COLUMN grade_system TEXT DEFAULT \'points\'')
         conn.commit()
-    except:
+    except Exception:
         pass
 
     try:
         cursor.execute("ALTER TABLE hub_timetable_settings ADD COLUMN class_level INTEGER DEFAULT 10")
         conn.commit()
-    except:
+    except Exception:
         pass
 
     cursor.execute(f'''

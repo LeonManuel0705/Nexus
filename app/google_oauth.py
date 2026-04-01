@@ -286,7 +286,7 @@ def fetch_gmail_messages(email: str, max_results: int = 20) -> Dict:
                     from email.utils import parsedate_to_datetime
                     date_obj = parsedate_to_datetime(date_str)
                     date_formatted = date_obj.strftime("%Y-%m-%d %H:%M")
-                except:
+                except (ValueError, TypeError):
                     date_formatted = date_str[:20]
 
                 preview = msg_data.get('snippet', '')[:200]
@@ -337,7 +337,7 @@ def get_gmail_message_detail(email: str, msg_id: str) -> Dict:
             from email.utils import parsedate_to_datetime
             date_obj = parsedate_to_datetime(date_str)
             date_formatted = date_obj.strftime("%Y-%m-%d %H:%M")
-        except:
+        except (ValueError, TypeError):
             date_formatted = date_str
 
         body = ""
@@ -366,7 +366,7 @@ def get_gmail_message_detail(email: str, msg_id: str) -> Dict:
                 id=msg_id,
                 body={'removeLabelIds': ['UNREAD']}
             ).execute()
-        except:
+        except Exception:
             pass
 
         return {

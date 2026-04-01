@@ -30,7 +30,6 @@ CALDAV_ACCOUNTS_FILE = Path(__file__).parent.parent / 'data' / 'caldav_accounts.
 CALDAV_TIMEOUT = 15
 
 def _validate_caldav_url(url: str) -> Optional[str]:
-    """Validate CalDAV URL to prevent SSRF. Returns error message or None if valid."""
     import ipaddress as _ipaddress
     try:
         parsed = urlparse(url)
@@ -70,7 +69,6 @@ if _OLD_CALDAV_FILE.exists() and not CALDAV_ACCOUNTS_FILE.exists():
     shutil.move(str(_OLD_CALDAV_FILE), str(CALDAV_ACCOUNTS_FILE))
 
 def _escape_ical_value(value: str) -> str:
-    """Escape special characters in iCalendar property values per RFC 5545."""
     if not value:
         return ''
     value = str(value)
@@ -369,7 +367,7 @@ def get_macos_calendar_events_eventkit(days_ahead: int = 14) -> Dict:
             try:
 
                 store.requestFullAccessToEventsWithCompletion_(lambda granted, error: None)
-            except:
+            except Exception:
 
                 store.requestAccessToEntityType_completion_(
                     EventKit.EKEntityTypeEvent,

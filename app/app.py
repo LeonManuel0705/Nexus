@@ -91,7 +91,7 @@ def _get_api_token() -> str:
         pass
     token = secrets.token_hex(32)
     encrypt_file({'token': token}, API_TOKEN_FILE)
-    logging.info("New API token generated. Retrieve with: python -c \"from app.crypto_utils import decrypt_file; from pathlib import Path; print(decrypt_file(Path('data/.api_token'))['token'])\"")
+    logging.debug("New API token generated")
     return token
 
 API_TOKEN = _get_api_token()
@@ -128,7 +128,6 @@ def set_security_headers(response):
     return response
 
 def _bounded_str(value, max_len=500):
-    """Truncate string query parameters to prevent DoS via oversized inputs."""
     return value[:max_len] if value else value
 
 @app.errorhandler(Exception)
@@ -1773,7 +1772,7 @@ def check_holiday_mode():
 
         try:
             return start <= today_str <= (end or start)
-        except:
+        except (TypeError, ValueError):
             return False
 
     is_holiday = False
@@ -3089,7 +3088,6 @@ _active_monitors = {}
 _MAX_MONITORS = 20
 
 def _start_route_monitor(route_id):
-    """Start background monitoring for a route."""
     if len(_active_monitors) >= _MAX_MONITORS:
         logging.warning(f"Monitor cap reached ({_MAX_MONITORS}), rejecting monitor for route {route_id}")
         return False
@@ -3152,7 +3150,6 @@ def _start_route_monitor(route_id):
     socketio.start_background_task(monitor_loop)
 
 def _check_monitored_route(route_id):
-    """Force-check a monitored route."""
     from .database import get_monitored_routes, update_monitored_route
     from .vbb_service import get_vbb_service
 
@@ -3333,7 +3330,7 @@ def get_weather():
                         'cached_at': cached_data.get('timestamp'),
                         **cached_data
                     })
-            except:
+            except Exception:
                 pass
 
         logging.error(f"Weather API error: {e}")
@@ -3657,7 +3654,7 @@ if __name__ == '__main__':
             ip = s.getsockname()[0]
             s.close()
             return ip
-        except:
+        except OSError:
             return None
 
     host = os.environ.get('NEXUS_HOST', '127.0.0.1')
