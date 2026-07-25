@@ -1847,7 +1847,7 @@ const HubApp = {
         if (modal) modal.classList.remove('active');
 
         try {
-            const response = await fetch(`https:
+            const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=de`);
             const data = await response.json();
             if (!data.results?.length) throw new Error('City not found');
             const result = data.results[0];

@@ -121,7 +121,7 @@ class DatabaseService {
       try {
         await db.execute("ALTER TABLE tasks ADD COLUMN estimated_minutes INTEGER");
       } catch (_) {
-        // Column may already exist if migration was partially applied
+
       }
 
       await db.execute('''
@@ -1543,7 +1543,7 @@ class DatabaseService {
     await db.delete('vbb_favorite_routes', where: 'id = ?', whereArgs: [int.parse(id)]);
   }
 
-  // VBB Tickets
+
   Future<List<VbbTicket>> getVbbTickets() async {
     final db = await database;
     final maps = await db.query('vbb_tickets', orderBy: 'created_at DESC');
@@ -1638,7 +1638,7 @@ class DatabaseService {
 
     if (from != null) {
       where += ' AND (start_time >= ? OR start_date >= ?)';
-      whereArgs.addAll([from.toIso8601String(), from.toIso8601String()]);
+      whereArgs.addAll([from.toIso8601String(), from.toIso8601String().split('T')[0]]);
     }
     if (to != null) {
       where += ' AND (start_time <= ? OR start_date <= ?)';
@@ -1659,7 +1659,7 @@ class DatabaseService {
       whereArgs = [];
       if (from != null) {
         parts.add('(start_time >= ? OR start_date >= ?)');
-        whereArgs.addAll([from.toIso8601String(), from.toIso8601String()]);
+        whereArgs.addAll([from.toIso8601String(), from.toIso8601String().split('T')[0]]);
       }
       if (to != null) {
         parts.add('(start_time <= ? OR start_date <= ?)');
@@ -2143,7 +2143,6 @@ class DatabaseService {
     return DateTime.tryParse(fetchedAt);
   }
 
-  // ── Knowledge Base ──────────────────────────────────────────────────────────
 
   Future<void> _createKnowledgeTable(Database db) async {
     await db.execute('''

@@ -10,6 +10,8 @@ import 'sync_manager.dart';
 import 'offline_queue.dart';
 import 'database_service.dart' if (dart.library.html) 'database_service_web.dart';
 import 'iserv_service.dart';
+import 'calendar_sync_service.dart';
+import 'email_service.dart';
 
 bool get _isBackgroundSupported {
   if (kIsWeb) return false;
@@ -21,6 +23,9 @@ bool get _isDesktop {
   return Platform.isMacOS || Platform.isWindows || Platform.isLinux;
 }
 
+// Android delivers the taskName (2nd arg of registerPeriodicTask) to
+// executeTask; iOS delivers the BGTask identifier, which is the uniqueName
+// (1st arg). The callbackDispatcher therefore matches BOTH.
 const String kEmailSyncTask = 'emailSync';
 const String kCalendarSyncTask = 'calendarSync';
 const String kIServSyncTask = 'iservSync';
@@ -28,7 +33,17 @@ const String kCacheCleanupTask = 'cacheCleanup';
 const String kOfflineQueueTask = 'offlineQueue';
 const String kUpdateCheckTask = 'updateCheck';
 
-/// Initialize flutter_local_notifications for the background isolate.
+// uniqueNames — also the iOS BGTaskScheduler identifiers (see Info.plist &
+// AppDelegate.swift, which must list these verbatim).
+const String kEmailSyncPeriodic = 'email_sync_periodic';
+const String kCalendarSyncPeriodic = 'calendar_sync_periodic';
+const String kIServSyncPeriodic = 'iserv_sync_periodic';
+const String kUpdateCheckPeriodic = 'update_check_periodic';
+const String kCacheCleanupPeriodic = 'cache_cleanup_periodic';
+const String kOfflineQueuePeriodic = 'offline_queue_periodic';
+const String kImmediateSync = 'immediate_sync';
+
+
 Future<FlutterLocalNotificationsPlugin> _initBackgroundNotifications() async {
   final plugin = FlutterLocalNotificationsPlugin();
   const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -45,7 +60,7 @@ Future<FlutterLocalNotificationsPlugin> _initBackgroundNotifications() async {
   return plugin;
 }
 
-/// Show a notification from the background isolate.
+
 Future<void> _showBackgroundNotification(
   FlutterLocalNotificationsPlugin plugin, {
   required int id,
@@ -75,21 +90,29 @@ void callbackDispatcher() {
     try {
       switch (task) {
         case kEmailSyncTask:
+        case kEmailSyncPeriodic:
+        case kImmediateSync:
           await _syncEmail();
           break;
         case kCalendarSyncTask:
+        case kCalendarSyncPeriodic:
           await _syncCalendar();
           break;
         case kIServSyncTask:
+        case kIServSyncPeriodic:
+        case Workmanager.iOSBackgroundTask:
           await _syncIServWithNotifications();
           break;
         case kCacheCleanupTask:
+        case kCacheCleanupPeriodic:
           await _cleanupCache();
           break;
         case kOfflineQueueTask:
+        case kOfflineQueuePeriodic:
           await _processOfflineQueue();
           break;
         case kUpdateCheckTask:
+        case kUpdateCheckPeriodic:
           await _checkForUpdateInBackground();
           break;
       }
@@ -111,9 +134,7 @@ Future<void> _syncCalendar() async {
   await syncManager.syncCalendar();
 }
 
-/// IServ sync with background notification support.
-/// Compares cached notification IDs before/after sync and shows
-/// system notifications for new unread items.
+
 Future<void> _syncIServWithNotifications() async {
   final now = DateTime.now();
   if (now.hour < 6 || now.hour >= 20) return;
@@ -150,7 +171,7 @@ Future<void> _syncIServWithNotifications() async {
   } catch (_) {}
 }
 
-/// Check for app updates in the background and notify the user.
+
 Future<void> _checkForUpdateInBackground() async {
   try {
     final response = await http.get(
@@ -254,7 +275,7 @@ class BackgroundService {
     await initialize();
 
     await Workmanager().registerPeriodicTask(
-      'email_sync_periodic',
+      kEmailSyncPeriodic,
       kEmailSyncTask,
       frequency: const Duration(minutes: 15),
       constraints: Constraints(
@@ -265,7 +286,7 @@ class BackgroundService {
     );
 
     await Workmanager().registerPeriodicTask(
-      'calendar_sync_periodic',
+      kCalendarSyncPeriodic,
       kCalendarSyncTask,
       frequency: const Duration(minutes: 30),
       constraints: Constraints(
@@ -276,7 +297,7 @@ class BackgroundService {
     );
 
     await Workmanager().registerPeriodicTask(
-      'iserv_sync_periodic',
+      kIServSyncPeriodic,
       kIServSyncTask,
       frequency: const Duration(minutes: 15),
       constraints: Constraints(
@@ -287,7 +308,7 @@ class BackgroundService {
     );
 
     await Workmanager().registerPeriodicTask(
-      'update_check_periodic',
+      kUpdateCheckPeriodic,
       kUpdateCheckTask,
       frequency: const Duration(hours: 2),
       constraints: Constraints(
@@ -297,7 +318,7 @@ class BackgroundService {
     );
 
     await Workmanager().registerPeriodicTask(
-      'cache_cleanup_periodic',
+      kCacheCleanupPeriodic,
       kCacheCleanupTask,
       frequency: const Duration(hours: 24),
       initialDelay: _getDelayUntil3AM(),
@@ -310,7 +331,7 @@ class BackgroundService {
     );
 
     await Workmanager().registerPeriodicTask(
-      'offline_queue_periodic',
+      kOfflineQueuePeriodic,
       kOfflineQueueTask,
       frequency: const Duration(minutes: 5),
       constraints: Constraints(
@@ -344,7 +365,7 @@ class BackgroundService {
     await initialize();
 
     await Workmanager().registerOneOffTask(
-      'immediate_sync',
+      kImmediateSync,
       kEmailSyncTask,
       constraints: Constraints(
         networkType: NetworkType.connected,
@@ -378,11 +399,26 @@ class BackgroundService {
 
 extension SyncManagerBackground on SyncManager {
   Future<void> syncEmail() async {
-
+    try {
+      final emailService = EmailService();
+      final accounts = await emailService.getAccounts();
+      for (final account in accounts) {
+        await emailService.syncAccount(account.id);
+      }
+    } catch (e) {
+      if (kDebugMode) print('BackgroundService: syncEmail error: $e');
+    }
   }
 
   Future<void> syncCalendar() async {
-
+    try {
+      final calendarService = CalendarSyncService();
+      if (await calendarService.hasValidCredentials()) {
+        await calendarService.syncAllCalendars();
+      }
+    } catch (e) {
+      if (kDebugMode) print('BackgroundService: syncCalendar error: $e');
+    }
   }
 
   Future<void> syncIServ() async {
@@ -402,6 +438,19 @@ extension SyncManagerBackground on SyncManager {
 
 extension DatabaseServiceCleanup on DatabaseService {
   Future<void> cleanupOldCache() async {
-
+    try {
+      final db = await database;
+      final cutoff = DateTime.now()
+          .subtract(const Duration(days: 30))
+          .toIso8601String();
+      // Only prune transient, regenerable caches — never user data or offline
+      // email / IServ content.
+      await db.delete('vbb_location_cache',
+          where: 'cached_at < ?', whereArgs: [cutoff]);
+      await db.delete('vertretungsplan_cache',
+          where: 'fetched_at < ?', whereArgs: [cutoff]);
+    } catch (e) {
+      if (kDebugMode) print('BackgroundService: cleanupOldCache error: $e');
+    }
   }
 }

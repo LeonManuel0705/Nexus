@@ -22,12 +22,11 @@ class UpdateService {
   ];
 
   static const List<String> _trustedGitHubPaths = [
-    '/Leon-Byte/nexus/releases/',
-    '/Leon-Byte/Nexus/releases/',
+    '/leonmanuel0705/nexus/releases/',
+    '/LeonManuel0705/Nexus/releases/',
   ];
 
-  /// Check for update. Returns null if no update or if user skipped this version.
-  /// Set [ignoreSkipped] to true to check even for skipped versions (e.g. manual check).
+
   static Future<UpdateInfo?> checkForUpdate({bool ignoreSkipped = false}) async {
     try {
       final response = await http.get(Uri.parse(_versionUrl))
@@ -66,13 +65,13 @@ class UpdateService {
     return null;
   }
 
-  /// Mark a version as skipped so the user won't be notified again.
+
   static Future<void> skipVersion(String version) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_skippedVersionKey, version);
   }
 
-  /// Send a system notification about the available update.
+
   static Future<void> sendUpdateNotification(UpdateInfo updateInfo) async {
     try {
       final notificationService = NotificationService();
@@ -230,7 +229,7 @@ class UpdateDialog extends StatelessWidget {
                   end: Alignment.bottomRight,
                   colors: [
                     NexusTheme.primaryColor.withValues(alpha: 0.1),
-                    NexusTheme.secondaryColor.withValues(alpha: 0.05),
+                    NexusTheme.primaryLight.withValues(alpha: 0.05),
                   ],
                 ),
               ),
@@ -277,7 +276,7 @@ class UpdateDialog extends StatelessWidget {
                       gradient: LinearGradient(
                         colors: [
                           NexusTheme.primaryColor.withValues(alpha: 0.2),
-                          NexusTheme.secondaryColor.withValues(alpha: 0.2),
+                          NexusTheme.primaryLight.withValues(alpha: 0.2),
                         ],
                       ),
                       border: Border.all(
@@ -500,13 +499,19 @@ class UpdateDialog extends StatelessWidget {
   }
 
   Future<void> _openUpdateUrl(String url) async {
+    final uri = Uri.parse(url);
     try {
-      final uri = Uri.parse(url);
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        debugPrint('Could not launch URL: $url');
+        return;
       }
+    } catch (e) {
+      debugPrint('canLaunchUrl error: $e');
+    }
+    // canLaunchUrl can be over-conservative (Android package-visibility, some
+    // desktop setups); attempt the launch directly rather than silently failing.
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
       debugPrint('Error opening URL: $e');
     }

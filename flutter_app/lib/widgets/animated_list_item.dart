@@ -38,7 +38,7 @@ class _AnimatedListItemState extends State<AnimatedListItem>
       CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
     );
 
-    // Cap stagger delay at 5 items (250ms max)
+
     final delayMs = widget.delay?.inMilliseconds ??
         (widget.index.clamp(0, 5) * 50);
     Future.delayed(Duration(milliseconds: delayMs), () {

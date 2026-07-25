@@ -1,11 +1,11 @@
 import logging
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 
 from .crypto_utils import encrypt_file, decrypt_file
+from .paths import DATA_DIR
 
-PREFERENCES_FILE = Path(__file__).parent.parent / 'data' / 'vbb_user_preferences.json'
+PREFERENCES_FILE = DATA_DIR / 'vbb_user_preferences.json'
 
 MIN_SORT_USES = 15
 SORT_DOMINANCE_THRESHOLD = 0.50
@@ -63,7 +63,7 @@ class VBBPersonalization:
 
 
     def track_sort(self, sort_type: str, from_id: str = None, to_id: str = None):
-        VALID_SORTS = {'departure', 'arrival', 'duration', 'transfers', 'price', 'recommendation'}
+        VALID_SORTS = {'recommended', 'next_departure', 'fastest', 'cheapest', 'fewest_transfers'}
         if sort_type not in VALID_SORTS:
             return
 
@@ -126,7 +126,7 @@ class VBBPersonalization:
                 'avg_departure_hour': dep_hour,
             })
 
-        for loc, ctx in [(from_loc, 'from'), (to_loc, 'to')]:
+        for loc, _ctx in [(from_loc, 'from'), (to_loc, 'to')]:
             lid = loc.get('id', '')
             if not lid:
                 continue

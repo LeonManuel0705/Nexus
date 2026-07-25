@@ -1,4 +1,3 @@
-import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -515,54 +514,65 @@ class _CalendarScreenState extends State<CalendarScreen> with TickerProviderStat
           ),
           const SizedBox(height: 8),
 
-          AnimatedBuilder(
-            animation: _monthTransitionController,
-            builder: (context, child) {
-              final progress = Curves.easeOutCubic.transform(_monthTransitionController.value);
-              return Opacity(
-                opacity: progress.clamp(0.0, 1.0),
-                child: child,
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-              child: GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 7,
-                  childAspectRatio: 0.7,
-                  mainAxisSpacing: 4,
-                  crossAxisSpacing: 4,
+          AnimatedSize(
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOutBack,
+            alignment: Alignment.topCenter,
+            child: AnimatedBuilder(
+              animation: _monthTransitionController,
+              builder: (context, child) {
+                final progress = Curves.easeOutCubic.transform(_monthTransitionController.value);
+                return Opacity(
+                  opacity: progress.clamp(0.0, 1.0),
+                  child: child,
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                child: Builder(
+                  builder: (context) {
+                    final weeksNeeded = ((startingWeekday - 1 + daysInMonth + 6) ~/ 7);
+                    final cellCount = weeksNeeded * 7;
+                    return GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 7,
+                        childAspectRatio: 0.7,
+                        mainAxisSpacing: 4,
+                        crossAxisSpacing: 4,
+                      ),
+                      itemCount: cellCount,
+                      itemBuilder: (context, index) {
+                        final dayOffset = index - startingWeekday + 2;
+                        if (dayOffset < 1 || dayOffset > daysInMonth) {
+                          return const SizedBox();
+                        }
+
+                        final date = DateTime(_focusedMonth.year, _focusedMonth.month, dayOffset);
+                        final dayEvents = eventsByDay[dayOffset] ?? const [];
+                        final isToday = _isToday(date);
+                        final isSelected = _isSameDay(date, _selectedDate);
+                        final isWeekend = date.weekday == 6 || date.weekday == 7;
+
+                        return _CalendarDay(
+                          day: dayOffset,
+                          events: dayEvents,
+                          isToday: isToday,
+                          isSelected: isSelected,
+                          isWeekend: isWeekend,
+                          isDark: isDark,
+                          onTap: () => _selectDate(date),
+                          onDoubleTap: () {
+                            _selectDate(date);
+                            showAddEventDialog(context, initialDate: date);
+                          },
+                          getCategoryColor: _getCategoryColor,
+                        );
+                      },
+                    );
+                  },
                 ),
-                itemCount: 42,
-                itemBuilder: (context, index) {
-                  final dayOffset = index - startingWeekday + 2;
-                  if (dayOffset < 1 || dayOffset > daysInMonth) {
-                    return const SizedBox();
-                  }
-
-                  final date = DateTime(_focusedMonth.year, _focusedMonth.month, dayOffset);
-                  final dayEvents = eventsByDay[dayOffset] ?? const [];
-                  final isToday = _isToday(date);
-                  final isSelected = _isSameDay(date, _selectedDate);
-                  final isWeekend = date.weekday == 6 || date.weekday == 7;
-
-                  return _CalendarDay(
-                    day: dayOffset,
-                    events: dayEvents,
-                    isToday: isToday,
-                    isSelected: isSelected,
-                    isWeekend: isWeekend,
-                    isDark: isDark,
-                    onTap: () => _selectDate(date),
-                    onDoubleTap: () {
-                      _selectDate(date);
-                      showAddEventDialog(context, initialDate: date);
-                    },
-                    getCategoryColor: _getCategoryColor,
-                  );
-                },
               ),
             ),
           ),
@@ -630,7 +640,7 @@ class _CalendarScreenState extends State<CalendarScreen> with TickerProviderStat
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? const Color(0xFF4F46E5)
+                          ? const Color(0xFF0057FF)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(9999),
                     ),
@@ -913,14 +923,14 @@ class _CalendarDayState extends State<_CalendarDay> with SingleTickerProviderSta
                 duration: const Duration(milliseconds: 150),
                 decoration: BoxDecoration(
                   color: widget.isSelected
-                      ? const Color(0xFF4F46E5)
+                      ? const Color(0xFF0057FF)
                       : null,
                   borderRadius: BorderRadius.circular(12),
                   border: widget.isToday && !widget.isSelected
-                      ? Border.all(color: const Color(0xFF4F46E5), width: 2)
+                      ? Border.all(color: const Color(0xFF0057FF), width: 2)
                       : null,
                   boxShadow: widget.isToday
-                      ? [BoxShadow(color: const Color(0xFF4F46E5).withValues(alpha: 0.4), blurRadius: 10, spreadRadius: -2)]
+                      ? [BoxShadow(color: const Color(0xFF0057FF).withValues(alpha: 0.4), blurRadius: 10, spreadRadius: -2)]
                       : null,
                 ),
                 child: Center(

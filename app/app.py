@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session, g
 from flask_cors import CORS
 from flask_socketio import SocketIO
+from werkzeug.exceptions import HTTPException
 from functools import wraps
 import os
 import uuid
@@ -79,7 +80,7 @@ def inject_globals():
         cache_bust = int(time.time())
     return {'app_version': _get_app_version(), 'user_theme': theme, 'cache_bust': cache_bust}
 
-DATA_DIR = Path(__file__).parent.parent / 'data'
+from .paths import DATA_DIR
 API_TOKEN_FILE = DATA_DIR / '.api_token'
 
 def _get_api_token() -> str:
@@ -91,7 +92,7 @@ def _get_api_token() -> str:
         pass
     token = secrets.token_hex(32)
     encrypt_file({'token': token}, API_TOKEN_FILE)
-    logging.debug("New API token generated")
+    logging.info("New API token generated. Retrieve with: python -c \"from app.crypto_utils import decrypt_file; from pathlib import Path; print(decrypt_file(Path('data/.api_token'))['token'])\"")
     return token
 
 API_TOKEN = _get_api_token()
@@ -110,7 +111,6 @@ def set_security_headers(response):
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-    nonce = getattr(g, 'csp_nonce', '')
     response.headers['Content-Security-Policy'] = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline'; "
@@ -128,10 +128,13 @@ def set_security_headers(response):
     return response
 
 def _bounded_str(value, max_len=500):
+    """Truncate string query parameters to prevent DoS via oversized inputs."""
     return value[:max_len] if value else value
 
 @app.errorhandler(Exception)
 def handle_exception(e):
+    if isinstance(e, HTTPException):
+        return e
     logging.exception("Unhandled exception")
     return jsonify({'error': 'Internal server error'}), 500
 
@@ -150,8 +153,11 @@ def check_api_auth():
         return
     if request.path in AUTH_EXEMPT_PATHS:
         return
-    if os.environ.get('NEXUS_HOST') == '127.0.0.1' and request.remote_addr in ('127.0.0.1', '::1'):
-        return
+    # NOTE: No blanket loopback bypass. In desktop/Electron mode the web UI is
+    # authenticated by the signed `web_auth` session cookie set on the first
+    # /hub visit, and the Flutter client uses the Bearer token. A loopback
+    # carve-out would let ANY local process — or a browser page issuing CSRF
+    # requests to http://localhost:5050/api/... — act as authenticated.
     auth = request.headers.get('Authorization', '')
     if secrets.compare_digest(auth, f'Bearer {API_TOKEN}'):
         return
@@ -213,6 +219,10 @@ def hub_mousepad():
 @app.route('/hub/assistant')
 def hub_assistant():
     return render_template('hub/assistant.html', active_tab='assistant')
+
+@app.route('/hub/analytics')
+def hub_analytics():
+    return render_template('hub/analytics.html', active_tab='analytics')
 
 @app.route('/hub/settings')
 def hub_settings():
@@ -640,12 +650,42 @@ def delete_drawing(drawing_id):
     db.delete_hub_drawing(drawing_id)
     return jsonify({'success': True})
 
-SCHOOL_SUBJECTS_FILE = Path(__file__).parent.parent / 'data' / 'school_subjects.json'
-SCHOOL_HOMEWORK_FILE = Path(__file__).parent.parent / 'data' / 'school_homework.json'
-SCHOOL_TESTS_FILE = Path(__file__).parent.parent / 'data' / 'school_tests.json'
-SCHOOL_EXAMS_FILE = Path(__file__).parent.parent / 'data' / 'school_exams.json'
-SCHOOL_GRADES_FILE = Path(__file__).parent.parent / 'data' / 'school_grades.json'
-SCHOOL_CALENDAR_FILE = Path(__file__).parent.parent / 'data' / 'school_calendar.json'
+SCHOOL_SUBJECTS_FILE = DATA_DIR / 'school_subjects.json'
+SCHOOL_HOMEWORK_FILE = DATA_DIR / 'school_homework.json'
+SCHOOL_TESTS_FILE = DATA_DIR / 'school_tests.json'
+SCHOOL_EXAMS_FILE = DATA_DIR / 'school_exams.json'
+SCHOOL_GRADES_FILE = DATA_DIR / 'school_grades.json'
+SCHOOL_CALENDAR_FILE = DATA_DIR / 'school_calendar.json'
+ASSISTANT_CHAT_FILE = DATA_DIR / 'assistant_chat_history.json'
+ASSISTANT_CHAT_CAP = 200
+ASSISTANT_LLM_CONTEXT_TURNS = 12
+
+
+def load_assistant_history():
+    try:
+        data = decrypt_file(ASSISTANT_CHAT_FILE)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def save_assistant_history(history):
+    if not isinstance(history, list):
+        history = []
+    if len(history) > ASSISTANT_CHAT_CAP:
+        history = history[-ASSISTANT_CHAT_CAP:]
+    encrypt_file(history, ASSISTANT_CHAT_FILE)
+
+
+def append_assistant_history(role, content):
+    if role not in ('user', 'assistant') or not isinstance(content, str):
+        return
+    content = content.strip()
+    if not content:
+        return
+    history = load_assistant_history()
+    history.append({'role': role, 'content': content[:10000], 'ts': int(time.time())})
+    save_assistant_history(history)
 
 def load_school_subjects():
     try:
@@ -992,7 +1032,9 @@ def get_grade_system():
 
 @app.route('/api/hub/school/grade-system', methods=['POST'])
 def set_grade_system():
-    data = request.get_json()
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
     system = data.get('grade_system', 'points')
     if system not in ('points', 'marks'):
         return jsonify({'error': 'Invalid grade system'}), 400
@@ -1014,7 +1056,9 @@ def get_class_level():
 
 @app.route('/api/hub/school/class-level', methods=['POST'])
 def set_class_level():
-    data = request.get_json()
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
     level = data.get('class_level')
     if not isinstance(level, int) or level < 5 or level > 13:
         return jsonify({'error': 'Invalid class level (5-13)'}), 400
@@ -1454,6 +1498,7 @@ def replace_all_timetable_periods():
 
     db.replace_all_timetable_periods(validated)
 
+    # Update block_count in timetable settings
     conn = db.get_connection()
     existing = conn.execute('SELECT id FROM hub_timetable_settings LIMIT 1').fetchone()
     if existing:
@@ -1473,7 +1518,7 @@ def delete_timetable_period(period_number):
         return jsonify({'error': 'Period not found'}), 404
     return jsonify({'success': True})
 
-QUICK_NOTES_FILE = Path(__file__).parent.parent / 'data' / 'quick_notes.json'
+QUICK_NOTES_FILE = DATA_DIR / 'quick_notes.json'
 
 def load_quick_notes():
     try:
@@ -1725,7 +1770,7 @@ def delete_training_goal(goal_id):
 
 @app.route('/api/hub/training/holiday-check', methods=['GET'])
 def check_holiday_mode():
-    from datetime import datetime, timedelta
+    from datetime import datetime
 
     today = datetime.now().date()
     today_str = today.strftime('%Y-%m-%d')
@@ -1772,7 +1817,7 @@ def check_holiday_mode():
 
         try:
             return start <= today_str <= (end or start)
-        except (TypeError, ValueError):
+        except Exception:
             return False
 
     is_holiday = False
@@ -1786,7 +1831,7 @@ def check_holiday_mode():
                 source = 'school_calendar'
                 break
     except Exception as e:
-        logging.warning("School calendar check failed")
+        logging.warning("School calendar check failed: %s", e)
 
     if not is_holiday:
         try:
@@ -1808,7 +1853,7 @@ def check_holiday_mode():
                             source = 'google_calendar'
                             break
         except Exception as e:
-            logging.warning("Google Calendar check failed")
+            logging.warning("Google Calendar check failed: %s", e)
 
     return jsonify({
         'is_holiday': is_holiday,
@@ -1828,7 +1873,9 @@ def get_training_schedule_settings_route():
 @app.route('/api/hub/training/schedule/settings', methods=['POST'])
 def save_training_schedule_settings_route():
 
-    data = request.get_json()
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
     settings_id = db.save_training_schedule_settings(
         schedule_mode=data.get('schedule_mode', 'regular'),
         auto_detect_holiday=data.get('auto_detect_holiday', True),
@@ -1849,7 +1896,9 @@ def get_training_schedule_entries_route():
 @app.route('/api/hub/training/schedule/entries', methods=['POST'])
 def create_training_schedule_entry_route():
 
-    data = request.get_json()
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
     if data.get('day') is None or not data.get('training_type') or not data.get('title'):
         return jsonify({'success': False, 'error': 'day, training_type, and title are required'}), 400
 
@@ -1879,7 +1928,9 @@ def get_training_schedule_entry_route(entry_id):
 
 @app.route('/api/hub/training/schedule/entries/<int:entry_id>', methods=['PUT'])
 def update_training_schedule_entry_route(entry_id):
-    data = request.get_json()
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
     success = db.update_training_schedule_entry(
         entry_id=entry_id,
         day=data.get('day'),
@@ -1943,7 +1994,6 @@ def get_email_accounts_route():
     status = iserv_service.get_status()
     if status.get('connected') or status.get('has_credentials'):
         username = status.get('username', 'IServ')
-        iserv_url = status.get('iserv_url', '')
         iserv_accounts = [{
             'email': f'{username}@iserv',
             'provider': 'iserv',
@@ -2633,8 +2683,6 @@ def iserv_get_vertretungsplan():
 def iserv_analyze_vertretungsplan():
 
     from .iserv_service import get_iserv_service
-    import base64
-    import io
 
     service = get_iserv_service()
     display_id = min(max(request.args.get('display_id', 3, type=int), 1), 100)
@@ -2741,12 +2789,16 @@ def vbb_get_route():
         except ValueError:
             pass
 
+    try:
+        num_results = min(max(int(data.get('results', 6)), 1), 20)
+    except (TypeError, ValueError):
+        num_results = 6
     result = service.get_route(
         from_location=from_location,
         to_location=to_location,
         arrival_time=arrival_time,
         departure_time=departure_time,
-        num_results=min(max(int(data.get('results', 6)), 1), 20)
+        num_results=num_results
     )
 
     if result.get('success'):
@@ -2903,7 +2955,7 @@ def vbb_check_ticket_coverage():
     service = get_vbb_service()
     data = request.get_json() or {}
     route = data.get('route')
-    if not route:
+    if not isinstance(route, dict):
         return jsonify({'success': False, 'error': 'Route erforderlich'}), 400
     tickets = get_user_tickets()
     result = service.check_ticket_coverage(route, tickets, data.get('travel_date'))
@@ -2991,14 +3043,15 @@ def vbb_start_monitoring():
     from .database import create_monitored_route
     data = request.get_json() or {}
     route = data.get('route')
-    if not route:
+    if not isinstance(route, dict):
         return jsonify({'success': False, 'error': 'Route erforderlich'}), 400
 
     from_name = ''
     to_name = ''
     legs = route.get('legs', [])
-    if legs:
+    if legs and isinstance(legs[0], dict):
         from_name = legs[0].get('departure', {}).get('station', '')
+    if legs and isinstance(legs[-1], dict):
         to_name = legs[-1].get('arrival', {}).get('station', '')
 
     route_id = create_monitored_route(
@@ -3088,6 +3141,7 @@ _active_monitors = {}
 _MAX_MONITORS = 20
 
 def _start_route_monitor(route_id):
+    """Start background monitoring for a route."""
     if len(_active_monitors) >= _MAX_MONITORS:
         logging.warning(f"Monitor cap reached ({_MAX_MONITORS}), rejecting monitor for route {route_id}")
         return False
@@ -3150,6 +3204,7 @@ def _start_route_monitor(route_id):
     socketio.start_background_task(monitor_loop)
 
 def _check_monitored_route(route_id):
+    """Force-check a monitored route."""
     from .database import get_monitored_routes, update_monitored_route
     from .vbb_service import get_vbb_service
 
@@ -3170,7 +3225,7 @@ def _check_monitored_route(route_id):
 
     return {'success': True, **check_result}
 
-SYNCED_CALENDAR_FILE = Path(__file__).parent.parent / 'data' / 'synced_calendar.json'
+SYNCED_CALENDAR_FILE = DATA_DIR / 'synced_calendar.json'
 
 @app.route('/api/calendar/local', methods=['GET'])
 def get_local_calendar_events():
@@ -3226,11 +3281,9 @@ def trigger_local_calendar_sync():
 @app.route('/api/calendar/local/status', methods=['GET'])
 def get_local_calendar_status():
 
-    import subprocess
 
     try:
-        script_path = Path(__file__).parent.parent / 'calendar_sync.py'
-        pid_file = Path(__file__).parent.parent / 'data' / 'calendar_sync.pid'
+        pid_file = DATA_DIR / 'calendar_sync.pid'
 
         daemon_running = False
         daemon_pid = None
@@ -3266,7 +3319,7 @@ def get_local_calendar_status():
         logging.error(f"Failed to get calendar sync status: {e}")
         return jsonify({'success': False, 'error': 'Failed to retrieve calendar status'}), 500
 
-WEATHER_CACHE_FILE = Path(__file__).parent.parent / 'data' / 'weather_cache.json'
+WEATHER_CACHE_FILE = DATA_DIR / 'weather_cache.json'
 
 @app.route('/api/hub/weather', methods=['GET'])
 def get_weather():
@@ -3371,18 +3424,8 @@ def get_bundesland():
         'bundeslaender': BUNDESLAENDER
     })
 
-@app.route('/api/hub/bundesland', methods=['POST'])
-def save_bundesland():
-
+def _import_holidays_for_bundesland(bundesland):
     try:
-        data = request.get_json()
-        if not data or 'bundesland' not in data:
-            return jsonify({'success': False, 'error': 'Bundesland is required'}), 400
-
-        bundesland = data['bundesland']
-        if bundesland not in BUNDESLAENDER:
-            return jsonify({'success': False, 'error': 'Invalid Bundesland code'}), 400
-
         current_year = datetime.now().year
         years_to_import = [current_year, current_year + 1, current_year + 2]
 
@@ -3439,7 +3482,7 @@ def save_bundesland():
                     logging.debug("Imported Schulferien for %d from primary API", year)
                     schulferien_success = True
             except Exception as e:
-                logging.warning("Primary Schulferien API error for %d", year)
+                logging.warning("Primary Schulferien API error for %d: %s", year, e)
 
             if not schulferien_success:
                 try:
@@ -3481,6 +3524,17 @@ def save_bundesland():
         logging.error(f"Failed to import holidays for Bundesland: {e}")
         return jsonify({'success': False, 'error': 'Failed to import holidays'}), 500
 
+
+@app.route('/api/hub/bundesland', methods=['POST'])
+def save_bundesland():
+    data = request.get_json(silent=True)
+    if not data or 'bundesland' not in data:
+        return jsonify({'success': False, 'error': 'Bundesland is required'}), 400
+    bundesland = data['bundesland']
+    if bundesland not in BUNDESLAENDER:
+        return jsonify({'success': False, 'error': 'Invalid Bundesland code'}), 400
+    return _import_holidays_for_bundesland(bundesland)
+
 @app.route('/api/hub/holidays', methods=['GET'])
 def get_hub_holidays():
 
@@ -3509,7 +3563,7 @@ def refresh_holidays():
     if not bundesland:
         return jsonify({'success': False, 'error': 'No Bundesland set'}), 400
 
-    return save_bundesland()
+    return _import_holidays_for_bundesland(bundesland)
 
 @app.route('/api/calendar/holidays', methods=['GET'])
 def get_calendar_holidays():
@@ -3523,7 +3577,6 @@ def get_calendar_holidays():
                 'needs_bundesland': True
             })
 
-        current_year = datetime.now().year
         holidays = db.get_holidays(bundesland=bundesland)
 
         formatted_holidays = []
@@ -3572,6 +3625,283 @@ def get_pomodoro_sessions():
     limit = min(max(request.args.get('limit', 50, type=int), 1), 200)
     sessions = db.get_pomodoro_sessions(limit=limit)
     return jsonify({'sessions': sessions})
+
+# ---- Analytics API ----
+
+@app.route('/api/hub/analytics', methods=['GET'])
+def get_analytics():
+    from . import analytics_service as analytics
+
+    range_days = min(max(request.args.get('range', 30, type=int), 7), 3650)
+    section = request.args.get('section', 'all')
+
+    subjects = load_school_subjects()
+    grades = load_school_grades()
+
+    result = {}
+    try:
+        if section in ('all', 'productivity'):
+            result['productivity'] = analytics.get_productivity_trends(range_days)
+            result['task_stats'] = analytics.get_task_stats(range_days)
+        if section in ('all', 'grades'):
+            settings = db.get_timetable_settings()
+            grade_system = settings.get('grade_system', 'points') if settings else 'points'
+            grade_data = analytics.get_grade_trends(subjects, grades)
+            grade_data['grade_system'] = grade_system
+            result['grades'] = grade_data
+        if section in ('all', 'health'):
+            result['correlations'] = analytics.get_health_correlations(range_days)
+        if section in ('all', 'training'):
+            result['training'] = analytics.get_training_trends(range_days)
+        if section in ('all', 'study'):
+            result['study'] = analytics.get_study_analytics(range_days, subjects)
+        if section in ('all', 'digest'):
+            result['digest'] = analytics.get_digest(range_days)
+        if section in ('all', 'fun_facts'):
+            result['fun_facts'] = analytics.get_fun_facts(range_days)
+    except Exception as e:
+        logging.error(f'Analytics error: {type(e).__name__}')
+        return jsonify({'error': 'Analytics computation failed'}), 500
+
+    return jsonify(result)
+
+# ---- AI Assistant API ----
+
+def _load_school_data_for_assistant():
+    return (load_school_subjects(), load_school_homework(),
+            load_school_exams(), load_school_tests(), load_school_grades())
+
+def _load_school_item(item_type):
+    if item_type == 'homework':
+        return load_school_homework()
+    if item_type == 'exams':
+        return load_school_exams()
+    if item_type == 'tests':
+        return load_school_tests()
+    return []
+
+def _save_school_item(item_type, data):
+    if item_type == 'homework':
+        save_school_homework(data)
+    elif item_type == 'exams':
+        save_school_exams(data)
+    elif item_type == 'tests':
+        save_school_tests(data)
+
+@app.route('/api/hub/assistant/status', methods=['GET'])
+def assistant_status():
+    from . import assistant_service as ai
+    return jsonify(ai.get_status())
+
+@app.route('/api/hub/assistant/models', methods=['GET'])
+def assistant_models():
+    from . import assistant_service as ai
+    models = ai.get_ollama_models()
+    return jsonify({'models': [{'name': m} for m in models]})
+
+def _llm_history_for_context():
+    full = load_assistant_history()
+    trimmed = full[-ASSISTANT_LLM_CONTEXT_TURNS:]
+    return [{'role': m['role'], 'content': m['content']} for m in trimmed if m.get('role') in ('user', 'assistant')]
+
+
+@app.route('/api/hub/assistant/history', methods=['GET', 'DELETE'])
+def assistant_history_route():
+    if request.method == 'DELETE':
+        save_assistant_history([])
+        return jsonify({'success': True})
+    return jsonify({'history': load_assistant_history()})
+
+
+@app.route('/api/hub/assistant/chat', methods=['POST'])
+def assistant_chat():
+    from . import assistant_service as ai
+
+    data = request.get_json(silent=True)
+    message = data.get('message') if data else None
+    if not isinstance(message, str) or not message.strip():
+        return jsonify({'error': 'Message required'}), 400
+
+    message = message.strip()[:10000]
+    history = _llm_history_for_context()
+
+    context = ai.build_nexus_context(lambda: _load_school_data_for_assistant(), message)
+    from . import research_service
+    research_block = research_service.research_for_message(message)
+    if research_block:
+        context = f'{context}\n\n{research_block}'
+    system_prompt = ai.build_system_prompt(context)
+    backend = ai.get_active_backend()
+
+    actions_executed = []
+
+    try:
+        if backend == 'ollama':
+            config = ai.load_config()
+            model = data.get('model', config.get('ollama_model', 'llama3.2'))
+            response_text = ai.chat_ollama(message, system_prompt, model, history)
+            response_text, ollama_actions = ai.extract_ollama_actions(response_text)
+            for action in ollama_actions:
+                result = ai.execute_action(action, _load_school_item, _save_school_item)
+                actions_executed.append(result)
+
+        elif backend == 'claude':
+            response_text, tool_uses = ai.chat_claude(
+                message, system_prompt, history, tools=ai.TOOL_SCHEMAS
+            )
+            for tu in tool_uses:
+                result = ai.execute_action(tu, _load_school_item, _save_school_item)
+                actions_executed.append(result)
+
+        elif backend == 'local':
+            offline_result = ai.offline_response(message, lambda: _load_school_data_for_assistant())
+            is_data_query = ai.is_data_query(message)
+
+            if is_data_query:
+                response_text = offline_result
+            else:
+                response_text = ai.chat_local(message, system_prompt, history)
+                if response_text:
+                    response_text, local_actions = ai.extract_ollama_actions(response_text)
+                    for action in local_actions:
+                        result = ai.execute_action(action, _load_school_item, _save_school_item)
+                        actions_executed.append(result)
+                else:
+                    response_text = offline_result
+
+        else:
+            response_text = ai.offline_response(message, lambda: _load_school_data_for_assistant())
+
+    except Exception as e:
+        logging.error(f'Assistant chat error: {type(e).__name__}')
+        response_text = ai.offline_response(message, lambda: _load_school_data_for_assistant())
+        backend = 'offline'
+
+    append_assistant_history('user', message)
+    if response_text and response_text.strip():
+        append_assistant_history('assistant', response_text)
+
+    return jsonify({
+        'response': response_text,
+        'backend': backend,
+        'actions_executed': actions_executed,
+    })
+
+@app.route('/api/hub/assistant/stream', methods=['POST'])
+def assistant_stream():
+    from . import assistant_service as ai
+    from flask import Response
+
+    data = request.get_json(silent=True)
+    message = data.get('message') if data else None
+    if not isinstance(message, str) or not message.strip():
+        return jsonify({'error': 'Message required'}), 400
+
+    message = message.strip()[:10000]
+    history = _llm_history_for_context()
+
+    context = ai.build_nexus_context(lambda: _load_school_data_for_assistant(), message)
+    from . import research_service
+    research_block = research_service.research_for_message(message)
+    if research_block:
+        context = f'{context}\n\n{research_block}'
+    system_prompt = ai.build_system_prompt(context)
+    backend = ai.get_active_backend()
+
+    def generate():
+        buffer_parts = []
+        try:
+            if backend == 'ollama':
+                config = ai.load_config()
+                model = data.get('model', config.get('ollama_model', 'llama3.2'))
+                for chunk in ai.stream_ollama(message, system_prompt, model, history):
+                    buffer_parts.append(chunk)
+                    yield f"data: {json.dumps({'token': chunk})}\n\n"
+            elif backend == 'claude':
+                for chunk in ai.stream_claude(message, system_prompt, history):
+                    buffer_parts.append(chunk)
+                    yield f"data: {json.dumps({'token': chunk})}\n\n"
+            elif backend == 'local':
+                if ai.is_data_query(message):
+                    response = ai.offline_response(message, lambda: _load_school_data_for_assistant())
+                    buffer_parts.append(response)
+                    yield f"data: {json.dumps({'token': response})}\n\n"
+                else:
+                    for chunk in ai.stream_local(message, system_prompt, history):
+                        buffer_parts.append(chunk)
+                        yield f"data: {json.dumps({'token': chunk})}\n\n"
+            else:
+                response = ai.offline_response(message, lambda: _load_school_data_for_assistant())
+                buffer_parts.append(response)
+                yield f"data: {json.dumps({'token': response})}\n\n"
+        except Exception as e:
+            logging.error(f'Stream error: {type(e).__name__}')
+            fallback = ai.offline_response(message, lambda: _load_school_data_for_assistant())
+            buffer_parts = [fallback]
+            yield f"data: {json.dumps({'token': fallback})}\n\n"
+
+        raw = ''.join(buffer_parts)
+        cleaned, actions = ai.extract_ollama_actions(raw)
+        actions_executed = []
+        for action in actions:
+            try:
+                actions_executed.append(ai.execute_action(action, _load_school_item, _save_school_item))
+            except Exception as e:
+                logging.error(f'Stream action error: {type(e).__name__}')
+                actions_executed.append({'success': False, 'message': 'Aktion fehlgeschlagen'})
+
+        append_assistant_history('user', message)
+        if cleaned.strip():
+            append_assistant_history('assistant', cleaned)
+
+        yield f"data: {json.dumps({'done': True, 'backend': backend, 'cleaned': cleaned, 'actions_executed': actions_executed})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream',
+                    headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+@app.route('/api/hub/assistant/config', methods=['GET', 'POST'])
+def assistant_config():
+    from . import assistant_service as ai
+
+    if request.method == 'GET':
+        config = ai.load_config()
+        key = config.get('claude_api_key', '')
+        masked = ''
+        if key:
+            masked = key[:7] + '...' + key[-4:] if len(key) > 15 else '***'
+        return jsonify({
+            'claude_api_key_set': bool(key),
+            'claude_api_key_masked': masked,
+            'preferred_backend': config.get('preferred_backend', 'auto'),
+            'ollama_model': config.get('ollama_model', 'llama3.2:1b'),
+            'claude_model': config.get('claude_model', 'claude-sonnet-4-20250514'),
+        })
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data'}), 400
+
+    config = ai.load_config()
+    if 'claude_api_key' in data:
+        config['claude_api_key'] = data['claude_api_key']
+    if 'preferred_backend' in data:
+        if data['preferred_backend'] in ('auto', 'ollama', 'local', 'claude', 'offline'):
+            config['preferred_backend'] = data['preferred_backend']
+    if 'ollama_model' in data:
+        config['ollama_model'] = data['ollama_model']
+    if 'claude_model' in data:
+        config['claude_model'] = data['claude_model']
+
+    ai.save_config(config)
+    return jsonify({'success': True})
+
+@app.route('/api/mlx/status', methods=['GET'])
+def mlx_status():
+    return jsonify({'available': False})
+
+@app.route('/api/mlx/generate', methods=['POST'])
+def mlx_generate():
+    return jsonify({'error': 'MLX not available'}), 503
 
 @app.route('/api/deadlines', methods=['GET'])
 def get_all_deadlines():
@@ -3654,7 +3984,7 @@ if __name__ == '__main__':
             ip = s.getsockname()[0]
             s.close()
             return ip
-        except OSError:
+        except Exception:
             return None
 
     host = os.environ.get('NEXUS_HOST', '127.0.0.1')

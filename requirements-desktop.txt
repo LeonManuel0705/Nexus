@@ -1,0 +1,33 @@
+# Runtime dependencies for the FROZEN desktop backend (PyInstaller).
+#
+# This is a lean subset of requirements.txt: it omits deps the desktop server
+# never imports in threading async mode and which the .spec also excludes —
+# gunicorn / gevent / gevent-websocket (production WSGI, unused), psycopg2-binary
+# (only loaded when DATABASE_URL is set, never on desktop), llama-cpp-python
+# (optional local LLM, lazily imported and huge), and pytest (tests only).
+# Keeping them out makes the freeze fast and small and avoids native builds.
+
+# Web framework
+flask>=3.0.0
+flask-cors>=4.0.0
+flask-socketio>=5.3.0
+flask-login>=0.6.0
+
+# Google APIs
+google-api-python-client>=2.100.0
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.1.0
+
+# IServ integration
+IServAPI>=1.0.0
+beautifulsoup4>=4.12.0
+
+# Utilities
+python-dotenv>=1.0.0
+requests>=2.32.0
+cryptography>=42.0.4
+flask-limiter>=3.5.0
+
+# AI assistant (cloud; local llama-cpp is intentionally excluded)
+anthropic>=0.40.0

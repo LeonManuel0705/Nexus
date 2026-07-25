@@ -777,7 +777,7 @@ class DatabaseService {
     await box.delete(id);
   }
 
-  // VBB Tickets
+
   Future<List<VbbTicket>> getVbbTickets() async {
     final box = await _box('vbb_tickets');
     return box.values.map((v) => VbbTicket.fromMap(_cast(v))).toList();
@@ -1001,8 +1001,6 @@ class DatabaseService {
   }
 
 
-  // ── Knowledge Base ──────────────────────────────────────────────────────────
-
   Future<List<Map<String, dynamic>>> getKnowledgeEntries() async {
     final box = await _box('knowledge_entries');
     final entries = box.values.map((v) => _cast(v)).toList();
@@ -1036,6 +1034,151 @@ class DatabaseService {
   Future<void> deleteKnowledgeEntry(String id) async {
     final box = await _box('knowledge_entries');
     await box.delete(id);
+  }
+
+
+  // --- Daily / weekly reviews (Hive parity with native sqflite) ---
+
+  Future<List<Map<String, dynamic>>> getDailyReviews() async {
+    final box = await _box('daily_reviews');
+    final entries = box.values.map((v) => _cast(v)).toList();
+    entries.sort((a, b) =>
+        ((b['date'] as String?) ?? '').compareTo((a['date'] as String?) ?? ''));
+    return entries;
+  }
+
+  Future<void> insertDailyReview(Map<String, dynamic> review) async {
+    final box = await _box('daily_reviews');
+    final id = review['id'] as String?;
+    if (id != null) await box.put(id, review);
+  }
+
+  Future<void> deleteDailyReview(String id) async {
+    final box = await _box('daily_reviews');
+    await box.delete(id);
+  }
+
+  Future<List<Map<String, dynamic>>> getWeeklyReviews() async {
+    final box = await _box('weekly_reviews');
+    final entries = box.values.map((v) => _cast(v)).toList();
+    entries.sort((a, b) => ((b['week_start'] as String?) ?? '')
+        .compareTo((a['week_start'] as String?) ?? ''));
+    return entries;
+  }
+
+  Future<void> insertWeeklyReview(Map<String, dynamic> review) async {
+    final box = await _box('weekly_reviews');
+    final id = review['id'] as String?;
+    if (id != null) await box.put(id, review);
+  }
+
+  Future<void> deleteWeeklyReview(String id) async {
+    final box = await _box('weekly_reviews');
+    await box.delete(id);
+  }
+
+
+  // --- Pomodoro sessions & stats ---
+
+  Future<void> insertPomodoroSession(Map<String, dynamic> session) async {
+    final box = await _box('pomodoro_sessions');
+    final id = session['id'] as String?;
+    if (id != null) await box.put(id, session);
+  }
+
+  Future<List<Map<String, dynamic>>> getPomodoroSessions({String? since}) async {
+    final box = await _box('pomodoro_sessions');
+    var sessions = box.values.map((v) => _cast(v)).toList();
+    if (since != null) {
+      sessions = sessions
+          .where((s) => ((s['started_at'] as String?) ?? '').compareTo(since) >= 0)
+          .toList();
+    }
+    sessions.sort((a, b) => ((b['started_at'] as String?) ?? '')
+        .compareTo((a['started_at'] as String?) ?? ''));
+    return sessions;
+  }
+
+  bool _isCompleted(dynamic v) => v == 1 || v == true;
+
+  Future<Map<String, dynamic>> getPomodoroStats({required String since}) async {
+    final sessions = (await getPomodoroSessions(since: since))
+        .where((s) => _isCompleted(s['completed']))
+        .toList();
+
+    var totalMinutes = 0;
+    final byTaskAgg = <String?, Map<String, int>>{};
+    final byDayAgg = <String, int>{};
+    for (final s in sessions) {
+      final minutes = (s['duration_minutes'] as int?) ?? 0;
+      totalMinutes += minutes;
+      final taskId = s['task_id'] as String?;
+      final agg = byTaskAgg.putIfAbsent(taskId, () => {'sessions': 0, 'minutes': 0});
+      agg['sessions'] = agg['sessions']! + 1;
+      agg['minutes'] = agg['minutes']! + minutes;
+      final day = ((s['started_at'] as String?) ?? '').padRight(10).substring(0, 10);
+      byDayAgg[day] = (byDayAgg[day] ?? 0) + 1;
+    }
+
+    final byTask = byTaskAgg.entries
+        .map((e) => {
+              'task_id': e.key,
+              'sessions': e.value['sessions'],
+              'minutes': e.value['minutes'],
+            })
+        .toList()
+      ..sort((a, b) => (b['minutes'] as int).compareTo(a['minutes'] as int));
+
+    final byDay = (byDayAgg.entries.toList()
+          ..sort((a, b) => a.key.compareTo(b.key)))
+        .map((e) => {'day': e.key, 'count': e.value})
+        .toList();
+
+    return {
+      'total_sessions': sessions.length,
+      'total_minutes': totalMinutes,
+      'by_task': byTask,
+      'by_day': byDay,
+    };
+  }
+
+  Future<Map<String, dynamic>> getWeeklyStats() async {
+    final now = DateTime.now();
+    final weekStart = now.subtract(Duration(days: now.weekday - 1));
+    final weekStartStr =
+        DateTime(weekStart.year, weekStart.month, weekStart.day).toIso8601String();
+
+    final tasks = await getTasks();
+    final tasksCompleted = tasks
+        .where((t) =>
+            t.completed && t.updatedAt.toIso8601String().compareTo(weekStartStr) >= 0)
+        .length;
+    final tasksTotal = tasks
+        .where((t) => t.createdAt.toIso8601String().compareTo(weekStartStr) >= 0)
+        .length;
+
+    final sessions = (await getPomodoroSessions(since: weekStartStr))
+        .where((s) => _isCompleted(s['completed']))
+        .toList();
+    var pomodoroMinutes = 0;
+    final byDayAgg = <String, int>{};
+    for (final s in sessions) {
+      pomodoroMinutes += (s['duration_minutes'] as int?) ?? 0;
+      final day = ((s['started_at'] as String?) ?? '').padRight(10).substring(0, 10);
+      byDayAgg[day] = (byDayAgg[day] ?? 0) + 1;
+    }
+    final pomodoroByDay = (byDayAgg.entries.toList()
+          ..sort((a, b) => a.key.compareTo(b.key)))
+        .map((e) => {'day': e.key, 'count': e.value})
+        .toList();
+
+    return {
+      'tasks_completed': tasksCompleted,
+      'tasks_total': tasksTotal,
+      'pomodoro_sessions': sessions.length,
+      'pomodoro_minutes': pomodoroMinutes,
+      'pomodoro_by_day': pomodoroByDay,
+    };
   }
 
   Future<dynamic> get database async => throw Exception('Database not available on web - using Hive/IndexedDB');

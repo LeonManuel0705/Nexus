@@ -5,7 +5,6 @@ import time
 import subprocess
 import argparse
 import signal
-import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 import logging
@@ -143,7 +142,6 @@ class MacOSCalendarSync:
                 return self.get_calendar_events_applescript(days_ahead)
 
             end_date = datetime.now() + timedelta(days=days_ahead)
-            date_range = f"today+{days_ahead}d"
 
             cmd = [
                 'icalBuddy',

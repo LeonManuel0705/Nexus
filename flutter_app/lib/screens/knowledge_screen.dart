@@ -3,7 +3,8 @@ import '../theme.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/animated_list_item.dart';
 import '../widgets/page_fade_in.dart';
-import '../services/database_service.dart';
+import '../services/database_service.dart'
+    if (dart.library.html) '../services/database_service_web.dart';
 
 class KnowledgeScreen extends StatefulWidget {
   const KnowledgeScreen({super.key});
@@ -272,7 +273,7 @@ class _KnowledgeScreenState extends State<KnowledgeScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
             color: isSelected
-                ? const Color(0xFF4F46E5)
+                ? const Color(0xFF0057FF)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(9999),
           ),

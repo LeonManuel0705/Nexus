@@ -1,5 +1,4 @@
 import os
-import json
 import base64
 import imaplib
 import logging
@@ -17,9 +16,10 @@ from pathlib import Path
 from .crypto_utils import encrypt_file, decrypt_file
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+DATA_DIR = os.environ.get("NEXUS_DATA_DIR") or os.path.join(PROJECT_ROOT, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 EMAIL_CONFIG_PATH = Path(DATA_DIR) / "email_config.json"
+EMAIL_TIMEOUT = 30
 
 PROVIDER_SETTINGS = {
     "gmail": {
@@ -45,7 +45,24 @@ PROVIDER_SETTINGS = {
     }
 }
 
+_METADATA_IPS = {'169.254.169.254', 'fd00:ec2::254'}
+
+
+def _check_blocked_ip(addr) -> str:
+    if addr.is_loopback or addr.is_unspecified:
+        return "Connection to loopback address is not allowed"
+    if str(addr) in _METADATA_IPS:
+        return "Connection to cloud metadata endpoint is not allowed"
+    return None
+
+
 def _validate_email_host(hostname: str) -> str:
+    """Validate an email hostname to prevent SSRF. Returns error message or None if valid.
+
+    Blocks loopback, unspecified (0.0.0.0), and cloud metadata endpoints.
+    Allows RFC 1918 / link-local so self-hosted mail servers on a LAN
+    (e.g. IServ mail on a school network) remain reachable.
+    """
     import ipaddress as _ipaddress
     if not hostname:
         return "Invalid hostname"
@@ -53,19 +70,19 @@ def _validate_email_host(hostname: str) -> str:
     if hostname in blocked_hosts:
         return "Connection to localhost or metadata endpoints is not allowed"
     try:
-        addr = _ipaddress.ip_address(hostname)
-        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
-            return "Connection to internal addresses is not allowed"
+        err = _check_blocked_ip(_ipaddress.ip_address(hostname))
+        if err:
+            return err
     except ValueError:
         pass
     try:
         resolved = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
-        for family, _type, _proto, _canonname, sockaddr in resolved:
-            ip_str = sockaddr[0]
+        for _family, _type, _proto, _canonname, sockaddr in resolved:
+            ip_str = sockaddr[0].split('%', 1)[0]
             try:
-                addr = _ipaddress.ip_address(ip_str)
-                if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
-                    return "Connection to internal addresses is not allowed"
+                err = _check_blocked_ip(_ipaddress.ip_address(ip_str))
+                if err:
+                    return err
             except ValueError:
                 pass
     except socket.gaierror:
@@ -134,7 +151,7 @@ def add_email_account(email: str, password: str, provider: str) -> Dict:
         settings = PROVIDER_SETTINGS[provider]
 
     try:
-        imap = imaplib.IMAP4_SSL(settings["imap_host"], settings["imap_port"])
+        imap = imaplib.IMAP4_SSL(settings["imap_host"], settings["imap_port"], timeout=EMAIL_TIMEOUT)
         imap.login(email, password)
         imap.logout()
     except imaplib.IMAP4.error as e:
@@ -182,7 +199,7 @@ def decode_email_header(header: str) -> str:
         if isinstance(part, bytes):
             try:
                 decoded_parts.append(part.decode(charset or 'utf-8', errors='replace'))
-            except (UnicodeDecodeError, LookupError):
+            except Exception:
                 decoded_parts.append(part.decode('utf-8', errors='replace'))
         else:
             decoded_parts.append(part)
@@ -234,6 +251,7 @@ def get_email_body(msg) -> str:
     return body[:5000]
 
 def _validate_folder(folder: str) -> str:
+    """Validate IMAP folder name to prevent injection."""
     if not folder or not re.match(r'^[a-zA-Z0-9_./\-\s\[\]äöüÄÖÜß]+$', folder):
         raise ValueError('Invalid folder name')
     if len(folder) > 200:
@@ -253,7 +271,7 @@ def fetch_emails(email: str, folder: str = "INBOX", limit: int = 20) -> Dict:
 
     try:
         password = account["password"]
-        imap = imaplib.IMAP4_SSL(settings["imap_host"], settings["imap_port"])
+        imap = imaplib.IMAP4_SSL(settings["imap_host"], settings["imap_port"], timeout=EMAIL_TIMEOUT)
         imap.login(email, password)
 
         _validate_folder(folder)
@@ -288,7 +306,7 @@ def fetch_emails(email: str, folder: str = "INBOX", limit: int = 20) -> Dict:
             try:
                 date_obj = parsedate_to_datetime(date_str)
                 date_formatted = date_obj.strftime("%Y-%m-%d %H:%M")
-            except (ValueError, TypeError):
+            except Exception:
                 date_formatted = date_str[:20]
 
             from_header = decode_email_header(msg.get("From", ""))
@@ -331,7 +349,7 @@ def get_email_detail(email_addr: str, msg_id: str, folder: str = "INBOX") -> Dic
 
     try:
         password = account["password"]
-        imap = imaplib.IMAP4_SSL(settings["imap_host"], settings["imap_port"])
+        imap = imaplib.IMAP4_SSL(settings["imap_host"], settings["imap_port"], timeout=EMAIL_TIMEOUT)
         imap.login(email_addr, password)
         _validate_folder(folder)
         imap.select(folder)
@@ -351,7 +369,7 @@ def get_email_detail(email_addr: str, msg_id: str, folder: str = "INBOX") -> Dic
         try:
             date_obj = parsedate_to_datetime(date_str)
             date_formatted = date_obj.strftime("%Y-%m-%d %H:%M")
-        except (ValueError, TypeError):
+        except Exception:
             date_formatted = date_str
 
         from_header = decode_email_header(msg.get("From", ""))
@@ -379,6 +397,7 @@ def get_email_detail(email_addr: str, msg_id: str, folder: str = "INBOX") -> Dic
         return {"success": False, "error": "An error occurred"}
 
 def _sanitize_header(value: str) -> str:
+    """Strip CRLF characters to prevent email header injection."""
     return value.replace('\r', '').replace('\n', '')
 
 def send_email(from_email: str, to_email: str, subject: str, body: str, reply_to_id: Optional[str] = None) -> Dict:
@@ -406,7 +425,7 @@ def send_email(from_email: str, to_email: str, subject: str, body: str, reply_to
         msg['Date'] = formatdate(localtime=True)
         msg.attach(MIMEText(body, 'plain', 'utf-8'))
 
-        server = smtplib.SMTP(settings["smtp_host"], settings["smtp_port"])
+        server = smtplib.SMTP(settings["smtp_host"], settings["smtp_port"], timeout=EMAIL_TIMEOUT)
         server.starttls()
         server.login(from_email, password)
         server.sendmail(from_email, to_email.split(','), msg.as_string())
@@ -438,19 +457,17 @@ def delete_email(email: str, msg_id: str, folder: str = "INBOX") -> Dict:
 
     try:
         password = account["password"]
-        imap = imaplib.IMAP4_SSL(settings["imap_host"], settings["imap_port"])
+        imap = imaplib.IMAP4_SSL(settings["imap_host"], settings["imap_port"], timeout=EMAIL_TIMEOUT)
         imap.login(email, password)
         _validate_folder(folder)
         imap.select(folder)
 
         trash_folders = ['[Gmail]/Trash', 'Trash', 'Deleted', 'Deleted Items']
 
-        moved = False
         for trash in trash_folders:
             try:
                 status, _ = imap.copy(msg_id.encode(), trash)
                 if status == "OK":
-                    moved = True
                     break
             except Exception:
                 continue
@@ -479,7 +496,7 @@ def get_folders(email: str) -> Dict:
 
     try:
         password = account["password"]
-        imap = imaplib.IMAP4_SSL(settings["imap_host"], settings["imap_port"])
+        imap = imaplib.IMAP4_SSL(settings["imap_host"], settings["imap_port"], timeout=EMAIL_TIMEOUT)
         imap.login(email, password)
 
         status, folders = imap.list()

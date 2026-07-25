@@ -4,27 +4,37 @@ import workmanager
 import UserNotifications
 
 @main
-@objc class AppDelegate: FlutterAppDelegate, UNUserNotificationCenterDelegate {
+@objc class AppDelegate: FlutterAppDelegate {
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
 
-    // Allow notifications to show as banners even when the app is in the foreground
     UNUserNotificationCenter.current().delegate = self
 
-    // Register background task identifiers for WorkManager
-    WorkmanagerPlugin.registerTask(withIdentifier: "be.tramckrijte.workmanagerExample.iOSBackgroundAppRefresh")
-    WorkmanagerPlugin.registerBGProcessingTask(withIdentifier: "be.tramckrijte.workmanagerExample.iOSBackgroundProcessing")
-
-    // Enable background fetch
-    application.setMinimumBackgroundFetchInterval(UIApplication.backgroundFetchIntervalMinimum)
+    // Register each BGAppRefresh task identifier the Dart code schedules. These
+    // MUST match the uniqueNames in background_service.dart AND the
+    // BGTaskSchedulerPermittedIdentifiers in Info.plist, otherwise
+    // BGTaskScheduler rejects the submissions and no background task ever runs.
+    // registerPeriodicTask installs a BGAppRefreshTask handler (the correct
+    // type) — unlike the old registerTask, which wrongly installed a
+    // BGProcessingTask handler.
+    let refreshIdentifiers = [
+      "email_sync_periodic",
+      "calendar_sync_periodic",
+      "iserv_sync_periodic",
+      "update_check_periodic",
+      "cache_cleanup_periodic",
+      "offline_queue_periodic",
+    ]
+    for identifier in refreshIdentifiers {
+      WorkmanagerPlugin.registerPeriodicTask(withIdentifier: identifier, frequency: NSNumber(value: 15 * 60))
+    }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
-  // Show banner + sound when notification arrives while app is in foreground
   override func userNotificationCenter(
     _ center: UNUserNotificationCenter,
     willPresent notification: UNNotification,

@@ -98,9 +98,9 @@ class _VbbScreenState extends State<VbbScreen> with SingleTickerProviderStateMix
           builder: (context, provider, child) {
             if (provider.pendingDestination != null && !provider.isLoading && !provider.needsSetup) {
               final dest = provider.pendingDestination!;
-              provider.clearPendingDestination();
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted) {
+                  provider.clearPendingDestination();
                   _tabController.animateTo(0);
                   if (provider.hasHome && provider.fromLocation == null) {
                     provider.setHomeAsFrom();
@@ -552,7 +552,7 @@ class _RoutePlannerTab extends StatelessWidget {
             gradient: LinearGradient(
               colors: [
                 NexusTheme.primaryColor.withValues(alpha: 0.2),
-                NexusTheme.secondaryColor.withValues(alpha: 0.15),
+                NexusTheme.primaryLight.withValues(alpha: 0.15),
               ],
             ),
             borderRadius: BorderRadius.circular(20),
@@ -1284,7 +1284,7 @@ class _LegDetailCard extends StatelessWidget {
       ),
       child: Text(
         leg.line ?? '',
-        style: TextStyle(
+        style: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.bold,
           fontSize: 12,
@@ -1493,7 +1493,7 @@ class _DepartureCard extends StatelessWidget {
                     child: Text(
                       departure.line,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1600,7 +1600,7 @@ class _SetupWizardState extends State<_SetupWizard> {
           'Fahrplan Einrichtung',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Color(0xFF18181B),
+            color: isDark ? Colors.white : const Color(0xFF18181B),
           ),
           textAlign: TextAlign.center,
         ),
@@ -1608,7 +1608,7 @@ class _SetupWizardState extends State<_SetupWizard> {
         Text(
           'Richte deine Orte ein, um schnell Verbindungen zu finden.',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: isDark ? Colors.white70 : Color(0xFF71717A),
+            color: isDark ? Colors.white70 : const Color(0xFF71717A),
           ),
           textAlign: TextAlign.center,
         ),
@@ -1659,7 +1659,7 @@ class _SetupWizardState extends State<_SetupWizard> {
             : step == 0
                 ? Icons.home
                 : Icons.school,
-        color: isDark ? Colors.white : Color(0xFF18181B),
+        color: isDark ? Colors.white : const Color(0xFF18181B),
         size: 18,
       ),
     );
@@ -1694,14 +1694,14 @@ class _SetupWizardState extends State<_SetupWizard> {
                 'Wo wohnst du?',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Color(0xFF18181B),
+                  color: isDark ? Colors.white : const Color(0xFF18181B),
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Suche nach deiner nächsten Haltestelle für den ÖPNV.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDark ? Colors.white70 : Color(0xFF71717A),
+                  color: isDark ? Colors.white70 : const Color(0xFF71717A),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -1760,14 +1760,14 @@ class _SetupWizardState extends State<_SetupWizard> {
                 'Wo ist deine Schule?',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Color(0xFF18181B),
+                  color: isDark ? Colors.white : const Color(0xFF18181B),
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Suche nach der nächsten ÖPNV-Haltestelle bei deiner Schule.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDark ? Colors.white70 : Color(0xFF71717A),
+                  color: isDark ? Colors.white70 : const Color(0xFF71717A),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -1951,14 +1951,14 @@ class _SetupWizardState extends State<_SetupWizard> {
                 'Alles eingerichtet!',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Color(0xFF18181B),
+                  color: isDark ? Colors.white : const Color(0xFF18181B),
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Du kannst jetzt schnell Verbindungen zwischen Zuhause und Schule finden.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDark ? Colors.white70 : Color(0xFF71717A),
+                  color: isDark ? Colors.white70 : const Color(0xFF71717A),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -2176,7 +2176,7 @@ class _TicketsTab extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : Color(0xFF18181B),
+                          color: isDark ? Colors.white : const Color(0xFF18181B),
                         ),
                       ),
                       Text(
@@ -2219,10 +2219,10 @@ class _TicketsTab extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: NexusTheme.warning.withValues(alpha: 0.3)),
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
-                      const Icon(Icons.warning_amber, color: NexusTheme.warning, size: 18),
-                      const SizedBox(width: 8),
+                      Icon(Icons.warning_amber, color: NexusTheme.warning, size: 18),
+                      SizedBox(width: 8),
                       Text(
                         'Ticket laeuft bald ab!',
                         style: TextStyle(color: NexusTheme.warning, fontSize: 13),
@@ -2445,7 +2445,7 @@ class _TicketCard extends StatelessWidget {
                         ),
                       )
                     else
-                      Icon(
+                      const Icon(
                         Icons.check_circle,
                         color: NexusTheme.success,
                         size: 20,
@@ -2536,7 +2536,7 @@ class _AddTicketSheetState extends State<_AddTicketSheet> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : Color(0xFF18181B),
+              color: isDark ? Colors.white : const Color(0xFF18181B),
             ),
           ),
           const SizedBox(height: 20),
@@ -2546,7 +2546,7 @@ class _AddTicketSheetState extends State<_AddTicketSheet> {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white70 : Color(0xFF71717A),
+              color: isDark ? Colors.white70 : const Color(0xFF71717A),
             ),
           ),
           const SizedBox(height: 8),
@@ -2611,7 +2611,7 @@ class _AddTicketSheetState extends State<_AddTicketSheet> {
           const SizedBox(height: 16),
 
           DropdownButtonFormField<String>(
-            value: _selectedZone,
+            initialValue: _selectedZone,
             decoration: InputDecoration(
               labelText: 'Tarifzone',
               prefixIcon: const Icon(Icons.map_outlined),
@@ -2672,7 +2672,7 @@ class _AddTicketSheetState extends State<_AddTicketSheet> {
                   title: const Text('Abo (verlaengert sich automatisch)', style: TextStyle(fontSize: 14)),
                   value: _autoRenews,
                   onChanged: (value) => setState(() => _autoRenews = value),
-                  activeColor: NexusTheme.primaryColor,
+                  activeThumbColor: NexusTheme.primaryColor,
                   contentPadding: EdgeInsets.zero,
                 ),
               ),

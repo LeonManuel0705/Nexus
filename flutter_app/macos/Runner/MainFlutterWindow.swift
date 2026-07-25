@@ -12,21 +12,16 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     self.center()
     self.title = "Nexus"
 
-    // Transparent title bar — content extends behind it
     self.titlebarAppearsTransparent = true
     self.titleVisibility = .hidden
     self.styleMask.insert(.fullSizeContentView)
 
-    // Match Nexus dark background to prevent flash on launch
     self.backgroundColor = NSColor(red: 15.0/255, green: 15.0/255, blue: 26.0/255, alpha: 1.0)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
-    // Hide window on close instead of destroying it,
-    // so the Flutter engine and background tasks keep running
     self.delegate = self
 
-    // Native notification method channel
     let channel = FlutterMethodChannel(
       name: "com.leon.nexus/notifications",
       binaryMessenger: flutterViewController.engine.binaryMessenger
@@ -54,8 +49,10 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
             let content = UNMutableNotificationContent()
             content.title = title
             content.body = body
+            if let payload = args["payload"] as? String {
+              content.userInfo = ["url": payload]
+            }
 
-            // Use a 1-second delay so macOS shows the banner even in foreground
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
             let request = UNNotificationRequest(
               identifier: "nexus-\(id)-\(Date().timeIntervalSince1970)",
@@ -67,7 +64,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
                 if let error = error {
                   result(FlutterError(code: "DELIVERY_ERROR", message: error.localizedDescription, details: nil))
                 } else {
-                  result(nil)  // success
+                  result(nil)
                 }
               }
             }
@@ -104,8 +101,6 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     super.awakeFromNib()
   }
 
-  // Hide the window instead of closing it — keeps the Flutter engine alive
-  // so background timers, sync, and notifications continue working
   func windowShouldClose(_ sender: NSWindow) -> Bool {
     self.orderOut(nil)
     return false

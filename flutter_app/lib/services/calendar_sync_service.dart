@@ -63,8 +63,8 @@ class CalendarSyncService {
   }
 
   Future<String?> _refreshAccessToken(String refreshToken) async {
-    // Token refresh requires server-side client_secret.
-    // Return null to signal re-authentication is needed.
+
+
     _accessToken = null;
     _tokenExpiry = null;
     return null;
@@ -143,80 +143,90 @@ class CalendarSyncService {
     }
 
     try {
-      final params = <String, String>{
+      final baseParams = <String, String>{
         'singleEvents': 'true',
-        'orderBy': 'startTime',
         'maxResults': '250',
       };
 
       if (syncToken != null) {
-        params['syncToken'] = syncToken;
+        baseParams['syncToken'] = syncToken;
       } else {
-
-        params['timeMin'] = DateTime.now().subtract(const Duration(days: 30)).toUtc().toIso8601String();
-        params['timeMax'] = DateTime.now().add(const Duration(days: 365)).toUtc().toIso8601String();
+        baseParams['orderBy'] = 'startTime';
+        baseParams['timeMin'] = DateTime.now().subtract(const Duration(days: 30)).toUtc().toIso8601String();
+        baseParams['timeMax'] = DateTime.now().add(const Duration(days: 365)).toUtc().toIso8601String();
       }
 
-      final uri = Uri.parse('$_calendarApiBase/calendars/${Uri.encodeComponent(calendarId)}/events')
-          .replace(queryParameters: params);
+      int added = 0;
+      int updated = 0;
+      int deleted = 0;
+      String? nextSyncToken;
+      String? pageToken;
 
-      final response = await http.get(
-        uri,
-        headers: {'Authorization': 'Bearer $accessToken'},
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final items = data['items'] as List? ?? [];
-        final nextSyncToken = data['nextSyncToken'] as String?;
-
-        int added = 0;
-        int updated = 0;
-        int deleted = 0;
-
-        for (final item in items) {
-          final eventId = item['id'] as String;
-          final status = item['status'] as String?;
-
-          if (status == 'cancelled') {
-            await _db.deleteGoogleEvent(eventId);
-            deleted++;
-            continue;
-          }
-
-          final event = GoogleEvent.fromApiResponse(item as Map<String, dynamic>, calendarId);
-          final existing = await _db.getGoogleEvent(eventId);
-
-          if (existing != null) {
-            await _db.updateGoogleEvent(event);
-            updated++;
-          } else {
-            await _db.insertGoogleEvent(event);
-            added++;
-          }
+      do {
+        final params = Map<String, String>.from(baseParams);
+        if (pageToken != null) {
+          params['pageToken'] = pageToken;
         }
 
-        if (nextSyncToken != null) {
-          await _db.saveSyncToken(calendarId, nextSyncToken);
-        }
+        final uri = Uri.parse('$_calendarApiBase/calendars/${Uri.encodeComponent(calendarId)}/events')
+            .replace(queryParameters: params);
 
-        return SyncResult(
-          success: true,
-          added: added,
-          updated: updated,
-          deleted: deleted,
-          nextSyncToken: nextSyncToken,
+        final response = await http.get(
+          uri,
+          headers: {'Authorization': 'Bearer $accessToken'},
         );
-      } else if (response.statusCode == 410) {
 
-        return syncCalendar(calendarId, syncToken: null);
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          final items = data['items'] as List? ?? [];
+
+          for (final item in items) {
+            final eventId = item['id'] as String;
+            final status = item['status'] as String?;
+
+            if (status == 'cancelled') {
+              await _db.deleteGoogleEvent(eventId);
+              deleted++;
+              continue;
+            }
+
+            final event = GoogleEvent.fromApiResponse(item as Map<String, dynamic>, calendarId);
+            final existing = await _db.getGoogleEvent(eventId);
+
+            if (existing != null) {
+              await _db.updateGoogleEvent(event);
+              updated++;
+            } else {
+              await _db.insertGoogleEvent(event);
+              added++;
+            }
+          }
+
+          nextSyncToken = data['nextSyncToken'] as String?;
+          pageToken = data['nextPageToken'] as String?;
+        } else if (response.statusCode == 410 ||
+            (response.statusCode == 400 && syncToken != null)) {
+          return syncCalendar(calendarId, syncToken: null);
+        } else {
+          return SyncResult(success: false, error: 'Unbekannter Fehler');
+        }
+      } while (pageToken != null);
+
+      if (nextSyncToken != null) {
+        await _db.saveSyncToken(calendarId, nextSyncToken);
       }
+
+      return SyncResult(
+        success: true,
+        added: added,
+        updated: updated,
+        deleted: deleted,
+        nextSyncToken: nextSyncToken,
+      );
     } catch (e) {
       debugPrint('Calendar sync error: $e');
       return SyncResult(success: false, error: 'Kalender-Sync fehlgeschlagen');
     }
-
-    return SyncResult(success: false, error: 'Unbekannter Fehler');
   }
 
   Future<List<GoogleEvent>> getEvents(String calendarId, {DateTime? from, DateTime? to}) async {
@@ -453,6 +463,7 @@ class CalendarSyncService {
                 success = true;
               }
             } catch (e) {
+              if (kDebugMode) debugPrint('CalendarSync: create op failed: $e');
             }
           }
           break;
@@ -478,6 +489,7 @@ class CalendarSyncService {
                 success = true;
               }
             } catch (e) {
+              if (kDebugMode) debugPrint('CalendarSync: update op failed: $e');
             }
           }
           break;
@@ -492,6 +504,7 @@ class CalendarSyncService {
               );
               success = response.statusCode == 204 || response.statusCode == 200 || response.statusCode == 410;
             } catch (e) {
+              if (kDebugMode) debugPrint('CalendarSync: delete op failed: $e');
             }
           }
           break;

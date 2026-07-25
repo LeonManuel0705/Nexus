@@ -1,5 +1,6 @@
 import 'dart:math' as math;
-import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
 class NexusBackground extends StatefulWidget {
@@ -23,16 +24,16 @@ class _NexusBackgroundState extends State<NexusBackground>
   late AnimationController _controller3;
   late AnimationController _dotGridController;
 
-  // TSX design colors: blue, purple, emerald
+
   static const Color _blue = Color(0xFF3B82F6);
   static const Color _blueLight = Color(0xFF60A5FA);
-  static const Color _purple = Color(0xFF9333EA);
+  static const Color _purple = Color(0xFF3D7BFF);
   static const Color _purpleLight = Color(0xFFC084FC);
   static const Color _emerald = Color(0xFF10B981);
   static const Color _emeraldLight = Color(0xFF34D399);
 
-  static const Color _darkBg = Color(0xFF09090B); // zinc-950
-  static const Color _lightBg = Color(0xFFFAFAFA); // zinc-50
+  static const Color _darkBg = Color(0xFF101720); // Midnight Blue
+  static const Color _lightBg = Color(0xFFF0F8FF); // AliceBlue
 
   @override
   void initState() {
@@ -53,11 +54,11 @@ class _NexusBackgroundState extends State<NexusBackground>
       vsync: this,
     )..repeat();
 
-    // Dot grid: paint once, no animation (massive perf win — no 1000s of dots per frame)
+
     _dotGridController = AnimationController(
       duration: const Duration(seconds: 15),
       vsync: this,
-      value: 0, // static
+      value: 0,
     );
   }
 
@@ -77,10 +78,10 @@ class _NexusBackgroundState extends State<NexusBackground>
 
     return Stack(
       children: [
-        // Base background
+
         Container(color: isDark ? _darkBg : _lightBg),
 
-        // Animated orbs (isolated repaint boundary)
+
         RepaintBoundary(
           child: AnimatedBuilder(
           animation: Listenable.merge([_controller1, _controller2, _controller3]),
@@ -89,7 +90,7 @@ class _NexusBackgroundState extends State<NexusBackground>
             return CustomPaint(
               painter: _OrbsPainter(
                 orbs: [
-                  // Blue orb - top left
+
                   _OrbData(
                     size: clear ? 500 : 650,
                     anchorTopRight: false,
@@ -103,7 +104,7 @@ class _NexusBackgroundState extends State<NexusBackground>
                     motionScale: clear ? 0.4 : 1.0,
                     sizeRatio: 0.4,
                   ),
-                  // Purple orb - top right
+
                   _OrbData(
                     size: clear ? 550 : 700,
                     anchorTopRight: true,
@@ -114,7 +115,7 @@ class _NexusBackgroundState extends State<NexusBackground>
                     motionScale: clear ? 0.4 : 1.0,
                     sizeRatio: 0.5,
                   ),
-                  // Emerald orb - bottom center
+
                   _OrbData(
                     size: clear ? 400 : 550,
                     anchorCenter: !clear,
@@ -135,7 +136,7 @@ class _NexusBackgroundState extends State<NexusBackground>
           ),
         ),
 
-        // Dot grid overlay (static, no animation)
+
         AnimatedBuilder(
           animation: _dotGridController,
           builder: (context, child) {
@@ -149,7 +150,7 @@ class _NexusBackgroundState extends State<NexusBackground>
           },
         ),
 
-        // Vignette overlay
+
         Container(
           decoration: BoxDecoration(
             gradient: RadialGradient(
@@ -244,7 +245,7 @@ class _OrbsPainter extends CustomPainter {
           size.height / 2 + dy,
         );
       } else {
-        // Top-left default
+
         center = Offset(
           size.width * orb.sizeRatio * 0.3 + orb.baseOffset.dx + dx,
           size.height * orb.sizeRatio * 0.3 + orb.baseOffset.dy + dy,
@@ -265,7 +266,8 @@ class _OrbsPainter extends CustomPainter {
         ..shader = gradient.createShader(
           Rect.fromCircle(center: center, radius: radius),
         )
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, Platform.isAndroid ? 20 : 50);
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal,
+            (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ? 20 : 50);
 
       canvas.drawCircle(center, radius, paint);
     }
@@ -273,7 +275,7 @@ class _OrbsPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_OrbsPainter oldDelegate) {
-    // Only repaint when orb positions changed noticeably (reduce GPU work)
+
     for (int i = 0; i < orbs.length; i++) {
       if ((orbs[i].t - oldDelegate.orbs[i].t).abs() > 0.005) return true;
     }

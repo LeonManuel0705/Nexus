@@ -4,13 +4,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// Trusted domains for notification URL payloads.
+
 const _trustedNotificationDomains = [
   'nexus-lifehub.netlify.app',
   'github.com',
 ];
 
-/// Callback for when a notification is tapped (must be top-level for Android).
+
 @pragma('vm:entry-point')
 void _onNotificationTapped(NotificationResponse response) {
   final payload = response.payload;
@@ -39,7 +39,12 @@ class NotificationService {
   bool _permissionGranted = false;
 
   bool get _isMacOS => !kIsWeb && Platform.isMacOS;
-  bool get _useFLN => !kIsWeb && (Platform.isAndroid || Platform.isIOS || Platform.isWindows || Platform.isLinux);
+  // flutter_local_notifications has no Windows implementation, so Windows is
+  // deliberately excluded — otherwise init/show silently throw and are swallowed,
+  // making it look supported when it is not. (Desktop update prompts are shown
+  // via the in-app update dialog instead.)
+  bool get _useFLN =>
+      !kIsWeb && (Platform.isAndroid || Platform.isIOS || Platform.isLinux);
   bool get isInitialized => _initialized;
   bool get permissionGranted => _permissionGranted;
 
@@ -99,7 +104,7 @@ class NotificationService {
     }
   }
 
-  /// Show a notification. [payload] is opened as URL when tapped (optional).
+
   Future<bool> showNotification({
     required int id,
     required String title,
@@ -112,7 +117,7 @@ class NotificationService {
     }
 
     if (_isMacOS) {
-      return _showMacNotification(id: id, title: title, body: body);
+      return _showMacNotification(id: id, title: title, body: body, payload: payload);
     } else if (_useFLN) {
       return _showFLNNotification(id: id, title: title, body: body, payload: payload);
     }
@@ -120,12 +125,13 @@ class NotificationService {
     return false;
   }
 
-  Future<bool> _showMacNotification({required int id, required String title, required String body}) async {
+  Future<bool> _showMacNotification({required int id, required String title, required String body, String? payload}) async {
     try {
       await _macChannel.invokeMethod('showNotification', {
         'id': id,
         'title': title,
         'body': body,
+        if (payload != null) 'payload': payload,
       });
       if (kDebugMode) print('NotificationService: macOS notification sent — id=$id');
       return true;
@@ -164,7 +170,7 @@ class NotificationService {
     }
   }
 
-  /// Re-requests permissions. Returns true if granted.
+
   Future<bool> requestPermissions() async {
     if (_isMacOS) {
       try {
@@ -192,7 +198,7 @@ class NotificationService {
     return false;
   }
 
-  /// Returns a map with keys: status, alertStyle, alertSetting, notificationCenter (macOS only)
+
   Future<Map<String, int>> getAuthorizationStatus() async {
     if (!_isMacOS) return {};
     try {

@@ -7,7 +7,7 @@
 
     <link rel="manifest" href="/static/manifest.json">
     <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon.png">
-    <meta name="theme-color" content="#667eea">
+    <meta name="theme-color" content="#0057ff">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Nexus">
@@ -18,7 +18,7 @@
 
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="application-name" content="Nexus Hub">
-    <meta name="msapplication-TileColor" content="#667eea">
+    <meta name="msapplication-TileColor" content="#0057ff">
     <meta name="msapplication-TileImage" content="/static/images/icons/icon-144.png">
 
     <link rel="stylesheet" href="/static/css/hub.css?v={{ cache_bust }}">
@@ -44,7 +44,7 @@
         backdrop-filter: blur(24px);
         -webkit-backdrop-filter: blur(24px);
         border: 1px solid rgba(0, 0, 0, 0.06);
-        border-radius: 16px;
+        border-radius: 22px;
     }
     [data-theme="dark"] .sidebar {
         background: rgba(26, 26, 46, 0.85);
@@ -61,7 +61,7 @@
     .sidebar-logo {
         width: 56px;
         height: 56px;
-        border-radius: 14px;
+        border-radius: 18px;
         object-fit: contain;
     }
     @media (max-width: 768px) {
@@ -405,6 +405,197 @@
         </svg>
     </button>
 
+    <div class="nexus-loader" id="nexusLoader" aria-hidden="true">
+        <div class="nexus-loader-anim" id="nexusLoaderLottie"></div>
+        <div class="nexus-loader-text">Loading...</div>
+    </div>
+
+    <style>
+    .nexus-loader {
+        position: fixed;
+        bottom: 28px;
+        right: 96px;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        z-index: 999;
+        pointer-events: none;
+        opacity: 0;
+    }
+    .nexus-loader-anim {
+        width: 48px;
+        height: 48px;
+    }
+    .nexus-loader-text {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        letter-spacing: 0.2px;
+    }
+    @media (max-width: 768px) {
+        .nexus-loader { right: 88px; bottom: 24px; }
+        .nexus-loader-anim { width: 40px; height: 40px; }
+    }
+    </style>
+
+    <script nonce="{{ g.csp_nonce }}">
+    (function() {
+        const DISCONNECT_FRAMES = [14, 30, 45];
+        const FADE_FRAMES = 3;
+        const SPINNER_PATH = '/static/lottie/loading_spinner.json?v=1';
+
+        let anim = null;
+        let container = null;
+        let activeCount = 0;
+        let fading = false;
+        let pendingTimers = [];
+
+        function init() {
+            if (anim) return;
+            container = document.getElementById('nexusLoader');
+            const host = document.getElementById('nexusLoaderLottie');
+            if (!container || !host || typeof lottie === 'undefined') return;
+            anim = lottie.loadAnimation({
+                container: host,
+                renderer: 'svg',
+                loop: true,
+                autoplay: false,
+                path: SPINNER_PATH,
+            });
+        }
+
+        function clearPending() {
+            pendingTimers.forEach(clearTimeout);
+            pendingTimers = [];
+        }
+
+        function show() {
+            activeCount++;
+            init();
+            if (!container || !anim) return;
+
+            // Already visible (or mid-intro): just bump the counter, don't re-play the intro.
+            if (fading) {
+                // A hide() was scheduled. Cancel it and stay put at opacity 1.
+                clearPending();
+                fading = false;
+                container.style.transition = 'opacity 0.18s ease-out, transform 0.18s ease-out';
+                container.style.opacity = '1';
+                container.style.transform = 'translateY(0) scale(1)';
+                anim.loop = true;
+                anim.play();
+                return;
+            }
+            if (activeCount > 1) return;
+
+            // First activation: play the intro.
+            container.style.transition = 'none';
+            container.style.display = 'flex';
+            container.style.opacity = '0';
+            container.style.transform = 'translateY(10px) scale(0.9)';
+            void container.offsetHeight;
+            container.style.transition = 'opacity 0.28s ease-out, transform 0.36s cubic-bezier(0.34, 1.56, 0.64, 1)';
+            container.style.opacity = '1';
+            container.style.transform = 'translateY(0) scale(1)';
+            anim.loop = true;
+            anim.play();
+        }
+
+        function hide() {
+            activeCount = Math.max(0, activeCount - 1);
+            if (activeCount > 0) return;
+            if (!anim || !container || fading) return;
+            fading = true;
+
+            const fps = anim.frameRate || 30;
+            const frameMs = 1000 / fps;
+            const total = anim.totalFrames || 45;
+            const cur = anim.currentFrame || 0;
+
+            // Find the nearest upcoming disconnect frame that is at least FADE_FRAMES away
+            let bestDelta = Infinity;
+            let target = DISCONNECT_FRAMES[0];
+            for (const d of DISCONNECT_FRAMES) {
+                let delta = ((d - cur) % total + total) % total;
+                if (delta === 0) delta = total; // wait a full cycle rather than stop instantly
+                if (delta >= FADE_FRAMES && delta < bestDelta) {
+                    bestDelta = delta;
+                    target = d;
+                }
+            }
+            if (bestDelta === Infinity) {
+                // Every disconnect is too close — go one full cycle forward
+                bestDelta = total + FADE_FRAMES;
+                target = DISCONNECT_FRAMES[0];
+            }
+
+            const msToFadeStart = (bestDelta - FADE_FRAMES) * frameMs;
+            const fadeMs = FADE_FRAMES * frameMs;
+
+            pendingTimers.push(setTimeout(function() {
+                if (!fading) return;
+                container.style.transition = 'opacity ' + fadeMs + 'ms linear, transform ' + fadeMs + 'ms ease-in';
+                container.style.opacity = '0';
+                container.style.transform = 'translateY(6px) scale(0.94)';
+            }, msToFadeStart));
+
+            pendingTimers.push(setTimeout(function() {
+                if (!fading) return;
+                anim.goToAndStop(target, true);
+                container.style.display = 'none';
+                fading = false;
+            }, msToFadeStart + fadeMs));
+        }
+
+        window.NexusLoader = { show: show, hide: hide };
+    })();
+
+    (function() {
+        // Global fetch interceptor: show the spinner while any /api/ request is in flight.
+        // Non-blocking (pointer-events: none on the loader). Only arms after a short delay so
+        // fast, cached responses never flash the loader.
+        if (!window.fetch || !window.NexusLoader) return;
+        const origFetch = window.fetch.bind(window);
+        const SHOW_DELAY_MS = 180;
+        // Skip background/polling endpoints so the loader isn't permanently up.
+        const EXCLUDE = /\/api\/iserv\/ping|\/ping(\?|$)|\/heartbeat(\?|$)|\/health(\?|$)|\/api\/hub\/theme/i;
+
+        function urlOf(input) {
+            if (typeof input === 'string') return input;
+            if (input && typeof input.url === 'string') return input.url;
+            try { return String(input); } catch (_) { return ''; }
+        }
+        function headerSaysSkip(init) {
+            if (!init || !init.headers) return false;
+            const h = init.headers;
+            if (typeof h.get === 'function') return !!h.get('X-No-Loader');
+            return !!(h['X-No-Loader'] || h['x-no-loader']);
+        }
+
+        window.fetch = function(input, init) {
+            const url = urlOf(input);
+            const isApi = url.indexOf('/api/') !== -1;
+            if (!isApi || EXCLUDE.test(url) || headerSaysSkip(init)) {
+                return origFetch(input, init);
+            }
+            let shown = false;
+            const timer = setTimeout(function() {
+                window.NexusLoader.show();
+                shown = true;
+            }, SHOW_DELAY_MS);
+            function done() {
+                clearTimeout(timer);
+                if (shown) window.NexusLoader.hide();
+            }
+            return origFetch(input, init).then(
+                function(res) { done(); return res; },
+                function(err) { done(); throw err; }
+            );
+        };
+    })();
+    </script>
+
     <div class="modal" id="quickNoteModal">
         <div class="modal-content quick-note-modal">
             <div class="modal-header">
@@ -484,6 +675,7 @@
         </div>
     </div>
 
+    <script nonce="{{ g.csp_nonce }}" src="/static/js/lottie_light.min.js?v=1"></script>
     <script nonce="{{ g.csp_nonce }}" src="/static/js/hub.js?v=5"></script>
     <script nonce="{{ g.csp_nonce }}" src="/static/js/nexus-offline.js?v=4"></script>
     <script nonce="{{ g.csp_nonce }}" src="/static/js/connection-manager.js?v=4"></script>
@@ -840,31 +1032,45 @@
         const targetTop = activeRect.top - navRect.top;
         const targetHeight = activeRect.height;
 
-        // Check if we're navigating from a different section
+        // Fixed sizing — we only animate transform (GPU-composited, no layout)
+        highlight.style.top = '0px';
+        highlight.style.height = targetHeight + 'px';
+        highlight.style.willChange = 'transform';
+
         const prevIndex = sessionStorage.getItem('nexus-prev-nav');
         sessionStorage.removeItem('nexus-prev-nav');
 
         if (prevIndex !== null && parseInt(prevIndex) !== activeIndex) {
-            // Start highlight at the PREVIOUS item's position (no transition)
             const prevItem = navItems[parseInt(prevIndex)];
             if (prevItem) {
                 const prevRect = prevItem.getBoundingClientRect();
-                highlight.style.transition = 'none';
-                highlight.style.top = (prevRect.top - navRect.top) + 'px';
-                highlight.style.height = prevRect.height + 'px';
+                const startY = prevRect.top - navRect.top;
+                highlight.style.transform = 'translate3d(0,' + startY + 'px,0)';
                 highlight.style.opacity = '1';
-
-                // Force reflow, then animate to the active item (0.3s)
                 void highlight.offsetHeight;
-                highlight.style.transition = 'top 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), height 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
-                highlight.style.top = targetTop + 'px';
-                highlight.style.height = targetHeight + 'px';
+
+                // Transform-origin picks the "leading edge" so scaleY extends toward the destination
+                const goingDown = targetTop > startY;
+                highlight.style.transformOrigin = goingDown ? '50% 0%' : '50% 100%';
+
+                // Keyframe sequence modeled on the Lottie: stretch 1→1.25 during travel,
+                // damped oscillation 0.94 → 1.03 → 1 on arrival.
+                highlight.animate([
+                    { transform: 'translate3d(0,' + startY + 'px,0) scaleY(1)',    offset: 0.00 },
+                    { transform: 'translate3d(0,' + ((startY+targetTop)/2) + 'px,0) scaleY(1.22)', offset: 0.30 },
+                    { transform: 'translate3d(0,' + targetTop + 'px,0) scaleY(1)', offset: 0.55 },
+                    { transform: 'translate3d(0,' + targetTop + 'px,0) scaleY(0.94)', offset: 0.70 },
+                    { transform: 'translate3d(0,' + targetTop + 'px,0) scaleY(1.03)', offset: 0.85 },
+                    { transform: 'translate3d(0,' + targetTop + 'px,0) scaleY(1)',    offset: 1.00 },
+                ], {
+                    duration: 900,
+                    easing: 'cubic-bezier(0.45, 0, 0.15, 1)',
+                    fill: 'forwards',
+                });
+                highlight.style.transform = 'translate3d(0,' + targetTop + 'px,0)';
             }
         } else {
-            // First load or same section — snap to active item
-            highlight.style.transition = 'none';
-            highlight.style.top = targetTop + 'px';
-            highlight.style.height = targetHeight + 'px';
+            highlight.style.transform = 'translate3d(0,' + targetTop + 'px,0)';
             highlight.style.opacity = '1';
         }
 
@@ -898,18 +1104,26 @@
     .sidebar-nav .nav-item.active-no-bg {
         background: transparent !important;
         box-shadow: none !important;
-        color: white;
+        border-color: transparent !important;
+        color: #1E3A8A;
+    }
+    [data-theme="dark"] .sidebar-nav .nav-item.active-no-bg {
+        color: #1E3A8A;
+    }
+    .sidebar-nav .nav-item.active-no-bg svg {
+        color: #1E3A8A;
     }
     .sidebar-highlight {
         position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
         pointer-events: none;
         z-index: 0;
-        border-radius: 8px;
-        background: linear-gradient(135deg, rgba(102, 126, 234, 0.32), rgba(118, 75, 162, 0.22));
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+        border-radius: 22px;
+        background: linear-gradient(135deg, #E1EEF1 0%, #C9DAF8 50%, #B2C6FE 100%);
+        border: 1px solid rgba(178, 198, 254, 0.5);
+        box-shadow: 0 4px 12px rgba(178, 198, 254, 0.25);
     }
     </style>
 

@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
 
 class NexusTheme {
-  static const Color primaryColor = Color(0xFF4F46E5);
-  static const Color primaryLight = Color(0xFF6366F1);
-  static const Color primaryDark = Color(0xFF4338CA);
-  static const Color secondaryColor = Color(0xFF9333EA);
-  static const Color accentColor = Color(0xFFF093FB);
+  // Brand: Signal Blue (primary) + Porcelain (secondary/neutral)
+  static const Color primaryColor = Color(0xFF0057FF);
+  static const Color primaryLight = Color(0xFF3D7BFF);
+  static const Color primaryDark = Color(0xFF0044CC);
+  static const Color secondaryColor = Color(0xFFF8F7F4); // Porcelain
+  static const Color accentColor = Color(0xFF6BA1FF);
 
   static const List<Color> primaryGradient = [
-    Color(0xFF6366F1),
-    Color(0xFF9333EA),
-    Color(0xFFF093FB),
+    Color(0xFF0057FF),
+    Color(0xFF3D7BFF),
+    Color(0xFF6BA1FF),
   ];
 
-  static const Color accent1 = Color(0xFF6366F1);
-  static const Color accent2 = Color(0xFF9333EA);
-  static const Color accent3 = Color(0xFFF093FB);
+  static const Color accent1 = Color(0xFF0057FF);
+  static const Color accent2 = Color(0xFF3D7BFF);
+  static const Color accent3 = Color(0xFF6BA1FF);
 
-  static const Color darkBackground = Color(0xFF09090B);
+  static const Color darkBackground = Color(0xFF101720); // Midnight Blue
   static const Color darkSurface = Color(0xFF18181B);
   static const Color darkCard = Color(0xFF18181B);
   static const Color darkCardHover = Color(0xFF27272A);
@@ -26,7 +27,7 @@ class NexusTheme {
   static const Color darkTextMuted = Color(0xFF71717A);
   static const Color darkBorder = Color(0xFF27272A);
 
-  static const Color lightBackground = Color(0xFFFAFAFA);
+  static const Color lightBackground = Color(0xFFF0F8FF); // AliceBlue
   static const Color lightSurface = Color(0xFFFFFFFF);
   static const Color lightCard = Color(0xFFFFFFFF);
   static const Color lightText = Color(0xFF18181B);
@@ -161,7 +162,7 @@ class NexusTheme {
     fontFamily: 'Inter',
     colorScheme: const ColorScheme.dark(
       primary: primaryColor,
-      secondary: secondaryColor,
+      secondary: primaryLight,
       tertiary: accentColor,
       surface: darkSurface,
       onSurface: darkText,
@@ -302,7 +303,7 @@ class NexusTheme {
     fontFamily: 'Inter',
     colorScheme: const ColorScheme.light(
       primary: primaryColor,
-      secondary: secondaryColor,
+      secondary: primaryLight,
       tertiary: accentColor,
       surface: lightSurface,
       onSurface: lightText,

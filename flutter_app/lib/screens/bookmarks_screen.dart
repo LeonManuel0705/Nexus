@@ -344,7 +344,7 @@ class _CategoryChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF4F46E5)
+              ? const Color(0xFF0057FF)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(9999),
         ),

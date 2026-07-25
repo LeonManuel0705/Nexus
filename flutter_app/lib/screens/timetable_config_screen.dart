@@ -299,7 +299,7 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen>
                 height: 40,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [NexusTheme.primaryColor, NexusTheme.secondaryColor],
+                    colors: [NexusTheme.primaryColor, NexusTheme.primaryLight],
                   ),
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -334,14 +334,14 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen>
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: NexusTheme.secondaryColor.withValues(alpha: 0.1),
+                        color: NexusTheme.primaryLight.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         'Geteilte Stunde (${period.splitBreakMinutes ?? 5} Min. Pause)',
                         style: const TextStyle(
                           fontSize: 11,
-                          color: NexusTheme.secondaryColor,
+                          color: NexusTheme.primaryLight,
                         ),
                       ),
                     ),
@@ -792,7 +792,7 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen>
                   gradient: LinearGradient(
                     colors: [
                       NexusTheme.primaryColor.withValues(alpha: 0.1),
-                      NexusTheme.secondaryColor.withValues(alpha: 0.1),
+                      NexusTheme.primaryLight.withValues(alpha: 0.1),
                     ],
                   ),
                 ),

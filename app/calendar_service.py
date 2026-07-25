@@ -1,7 +1,5 @@
 import subprocess
-import json
 import logging
-import os
 import shutil
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
@@ -18,18 +16,35 @@ except ImportError:
 
 try:
     import caldav
-    from icalendar import Calendar as ICalendar
     CALDAV_AVAILABLE = True
 except ImportError:
     CALDAV_AVAILABLE = False
 
 import socket
 from urllib.parse import urlparse
+from .paths import DATA_DIR
 
-CALDAV_ACCOUNTS_FILE = Path(__file__).parent.parent / 'data' / 'caldav_accounts.json'
+CALDAV_ACCOUNTS_FILE = DATA_DIR / 'caldav_accounts.json'
 CALDAV_TIMEOUT = 15
 
+_METADATA_IPS = {'169.254.169.254', 'fd00:ec2::254'}
+
+
+def _check_blocked_ip(addr) -> Optional[str]:
+    if addr.is_loopback or addr.is_unspecified:
+        return "Connection to loopback address is not allowed"
+    if str(addr) in _METADATA_IPS:
+        return "Connection to cloud metadata endpoint is not allowed"
+    return None
+
+
 def _validate_caldav_url(url: str) -> Optional[str]:
+    """Validate CalDAV URL to prevent SSRF. Returns error message or None if valid.
+
+    Blocks loopback, unspecified (0.0.0.0), and cloud metadata endpoints.
+    Allows RFC 1918 / link-local so self-hosted CalDAV servers on a LAN
+    (Synology, Nextcloud, school IServ) remain reachable.
+    """
     import ipaddress as _ipaddress
     try:
         parsed = urlparse(url)
@@ -44,19 +59,19 @@ def _validate_caldav_url(url: str) -> Optional[str]:
     if hostname in blocked_hosts:
         return "Connection to localhost or metadata endpoints is not allowed"
     try:
-        addr = _ipaddress.ip_address(hostname)
-        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
-            return "Connection to internal addresses is not allowed"
+        err = _check_blocked_ip(_ipaddress.ip_address(hostname))
+        if err:
+            return err
     except ValueError:
         pass
     try:
         resolved = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
-        for family, _type, _proto, _canonname, sockaddr in resolved:
-            ip_str = sockaddr[0]
+        for _family, _type, _proto, _canonname, sockaddr in resolved:
+            ip_str = sockaddr[0].split('%', 1)[0]
             try:
-                addr = _ipaddress.ip_address(ip_str)
-                if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
-                    return "Connection to internal addresses is not allowed"
+                err = _check_blocked_ip(_ipaddress.ip_address(ip_str))
+                if err:
+                    return err
             except ValueError:
                 pass
     except socket.gaierror:
@@ -69,6 +84,7 @@ if _OLD_CALDAV_FILE.exists() and not CALDAV_ACCOUNTS_FILE.exists():
     shutil.move(str(_OLD_CALDAV_FILE), str(CALDAV_ACCOUNTS_FILE))
 
 def _escape_ical_value(value: str) -> str:
+    """Escape special characters in iCalendar property values per RFC 5545."""
     if not value:
         return ''
     value = str(value)
@@ -185,8 +201,11 @@ def fetch_caldav_events(account_id: str = None, days_ahead: int = 30,
         return {"success": True, "events": [], "message": "No CalDAV accounts configured"}
 
     if start_date and end_date:
-        start = datetime.strptime(start_date, '%Y-%m-%d')
-        end = datetime.strptime(end_date, '%Y-%m-%d')
+        try:
+            start = datetime.strptime(start_date, '%Y-%m-%d')
+            end = datetime.strptime(end_date, '%Y-%m-%d')
+        except ValueError:
+            return {"success": False, "error": "Invalid date format", "events": []}
     else:
         start = datetime.now()
         end = start + timedelta(days=days_ahead)
@@ -265,11 +284,11 @@ def fetch_caldav_events(account_id: str = None, days_ahead: int = 30,
                                 "source": account.get('provider', 'caldav'),
                                 "account_id": account.get('id')
                             })
-                        except Exception as e:
+                        except Exception:
                             continue
-                except Exception as e:
+                except Exception:
                     continue
-        except Exception as e:
+        except Exception:
             continue
 
     all_events.sort(key=lambda e: (e.get('start_date', ''), e.get('start_time', '00:00')))
@@ -320,9 +339,9 @@ def create_caldav_event(account_id: str, calendar_url: str, title: str,
             dtstart_str = dtstart.strftime('%Y%m%dT%H%M%S')
             dtend_str = dtend.strftime('%Y%m%dT%H%M%S')
         else:
-            dtstart_str = start_date.replace('-', '')
+            dtstart_str = datetime.strptime(start_date, '%Y-%m-%d').strftime('%Y%m%d')
             if end_date:
-                dtend_str = end_date.replace('-', '')
+                dtend_str = datetime.strptime(end_date, '%Y-%m-%d').strftime('%Y%m%d')
             else:
                 dtend_str = dtstart_str
 
@@ -433,7 +452,7 @@ def get_macos_calendar_events_eventkit(days_ahead: int = 14) -> Dict:
                     "calendar": str(ek_event.calendar().title()) if ek_event.calendar() else ""
                 }
                 events.append(event)
-            except Exception as e:
+            except Exception:
 
                 continue
 
@@ -582,7 +601,7 @@ def get_calendars() -> Dict:
                 })
 
             return {"success": True, "calendars": cal_list}
-        except Exception as e:
+        except Exception:
             pass
 
     try:

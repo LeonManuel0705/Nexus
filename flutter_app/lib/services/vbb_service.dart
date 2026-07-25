@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../models/vbb.dart';
@@ -74,12 +75,18 @@ class VbbService {
     DateTime? departure,
     bool isDeparture = true,
   }) async {
+    final debugSteps = <String>[];
+    debugSteps.add('searchRoutes: from=$fromId, to=$toId, departure=$departure, isDeparture=$isDeparture');
+
     final cacheKey = '${fromId}_${toId}_${departure?.toIso8601String() ?? 'now'}';
 
     final cached = await _db.getCachedVbbRoutes(cacheKey);
     if (cached.isNotEmpty) {
+      debugSteps.add('Returning ${cached.length} cached routes');
+      developer.log(debugSteps.join(' | '), name: 'VBB');
       return cached;
     }
+    debugSteps.add('No cache hit');
 
     final params = {
       'from': fromId,
@@ -94,26 +101,50 @@ class VbbService {
     }
 
     final uri = Uri.parse('$_baseUrl/journeys').replace(queryParameters: params);
+    debugSteps.add('URL: $uri');
+
     final http.Response response;
     try {
       response = await http.get(uri).timeout(const Duration(seconds: 15));
+      debugSteps.add('HTTP ${response.statusCode}, body=${response.body.length} bytes');
     } catch (e) {
-      throw Exception('Netzwerkfehler: Server nicht erreichbar ($e)');
+      debugSteps.add('FAIL network: ${e.runtimeType}: $e');
+      developer.log(debugSteps.join(' | '), name: 'VBB');
+      throw Exception('Netzwerkfehler: Server nicht erreichbar (${e.runtimeType}: $e)');
     }
 
     if (response.statusCode != 200) {
-      throw Exception('Server-Fehler (HTTP ${response.statusCode})');
+      String detail = '';
+      try {
+        final errBody = jsonDecode(response.body);
+        detail = errBody['msg'] ?? errBody['error'] ?? response.body.substring(0, 200);
+      } catch (_) {
+        detail = response.body.length > 200 ? response.body.substring(0, 200) : response.body;
+      }
+      debugSteps.add('FAIL HTTP ${response.statusCode}: $detail');
+      developer.log(debugSteps.join(' | '), name: 'VBB');
+      throw Exception('Server-Fehler (HTTP ${response.statusCode}): $detail');
     }
 
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    final journeysJson = data['journeys'] as List;
-    final journeys = journeysJson
-        .map((json) => VbbJourney.fromApiResponse(json as Map<String, dynamic>))
-        .toList();
+    try {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final journeysJson = data['journeys'] as List? ?? [];
+      debugSteps.add('Parsed ${journeysJson.length} journeys');
 
-    await _db.cacheVbbRoutes(cacheKey, journeys);
+      final journeys = journeysJson
+          .map((json) => VbbJourney.fromApiResponse(json as Map<String, dynamic>))
+          .toList();
 
-    return journeys;
+      debugSteps.add('Mapped ${journeys.length} VbbJourney objects');
+      developer.log(debugSteps.join(' | '), name: 'VBB');
+
+      await _db.cacheVbbRoutes(cacheKey, journeys);
+      return journeys;
+    } catch (e) {
+      debugSteps.add('FAIL parse: ${e.runtimeType}: $e');
+      developer.log(debugSteps.join(' | '), name: 'VBB');
+      throw Exception('Daten-Fehler: Antwort konnte nicht verarbeitet werden (${e.runtimeType}: $e)');
+    }
   }
 
   Future<List<VbbDeparture>> getDepartures(String stationId, {int duration = 30}) async {
@@ -228,7 +259,7 @@ class VbbService {
     await _db.clearOldVbbCache();
   }
 
-  // Ticket management
+
   Future<List<VbbTicket>> getTickets() async {
     return await _db.getVbbTickets();
   }

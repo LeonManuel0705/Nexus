@@ -2,8 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../utils/platform_utils.dart';
 
-/// Liquid Glass style card — visible refraction, specular highlights,
-/// edge lighting, and depth. Distinct from standard glassmorphism.
+
 class LiquidGlassCard extends StatefulWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
@@ -59,19 +58,19 @@ class _LiquidGlassCardState extends State<LiquidGlassCard>
     final hasTap = widget.onTap != null || widget.onLongPress != null;
     final shouldAnimate = widget.enableTapScale && hasTap;
 
-    // Outer glow shadow for the "floating glass" look
+
     Widget content = Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(widget.borderRadius),
         boxShadow: [
-          // Colored ambient glow
+
           BoxShadow(
             color: (widget.tint ?? const Color(0xFF6366F1)).withValues(alpha: isDark ? 0.15 : 0.08),
             blurRadius: 24,
             spreadRadius: -2,
             offset: const Offset(0, 4),
           ),
-          // Dark depth shadow
+
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.1),
             blurRadius: 20,
@@ -165,15 +164,14 @@ class _LiquidGlassPainter extends CustomPainter {
     final rect = Offset.zero & size;
     final rrect = RRect.fromRectAndRadius(rect, Radius.circular(borderRadius));
 
-    // 1) Base fill — elevated surface with slight color
+
     final baseFill = Paint()
       ..color = isDark
           ? (tint ?? const Color(0xFF1e1e2e)).withValues(alpha: 0.7)
           : (tint ?? const Color(0xFFf8f8ff)).withValues(alpha: 0.65);
     canvas.drawRRect(rrect, baseFill);
 
-    // 2) Gradient overlay — the "liquid" refraction look
-    //    Top-left is lighter (light entering), bottom-right is darker (shadow side)
+
     final liquidGradient = Paint()
       ..shader = LinearGradient(
         begin: const Alignment(-1.0, -1.0),
@@ -195,7 +193,7 @@ class _LiquidGlassPainter extends CustomPainter {
       ).createShader(rect);
     canvas.drawRRect(rrect, liquidGradient);
 
-    // 3) Specular highlight — bright spot top-left, like light hitting curved glass
+
     canvas.save();
     canvas.clipRRect(rrect);
     final specular = Paint()
@@ -217,7 +215,7 @@ class _LiquidGlassPainter extends CustomPainter {
       ).createShader(rect);
     canvas.drawRect(rect, specular);
 
-    // 4) Secondary specular — subtle bottom-right reflection (caustic)
+
     final caustic = Paint()
       ..shader = RadialGradient(
         center: const Alignment(0.8, 0.9),
@@ -236,7 +234,7 @@ class _LiquidGlassPainter extends CustomPainter {
     canvas.drawRect(rect, caustic);
     canvas.restore();
 
-    // 5) Edge highlight border — gradient stroke, bright top-left to dim bottom-right
+
     final borderPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5
@@ -260,7 +258,7 @@ class _LiquidGlassPainter extends CustomPainter {
       ).createShader(rect);
     canvas.drawRRect(rrect, borderPaint);
 
-    // 6) Inner border line — very subtle secondary edge for glass thickness
+
     final innerRRect = RRect.fromRectAndRadius(
       rect.deflate(1.5),
       Radius.circular(borderRadius - 1.5),
