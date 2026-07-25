@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
 class NexusTheme {
-  // Brand: Signal Blue (primary) + Porcelain (secondary/neutral)
   static const Color primaryColor = Color(0xFF0057FF);
   static const Color primaryLight = Color(0xFF3D7BFF);
   static const Color primaryDark = Color(0xFF0044CC);
-  static const Color secondaryColor = Color(0xFFF8F7F4); // Porcelain
+  static const Color secondaryColor = Color(0xFFF8F7F4);
   static const Color accentColor = Color(0xFF6BA1FF);
 
   static const List<Color> primaryGradient = [
@@ -18,7 +17,7 @@ class NexusTheme {
   static const Color accent2 = Color(0xFF3D7BFF);
   static const Color accent3 = Color(0xFF6BA1FF);
 
-  static const Color darkBackground = Color(0xFF101720); // Midnight Blue
+  static const Color darkBackground = Color(0xFF101720);
   static const Color darkSurface = Color(0xFF18181B);
   static const Color darkCard = Color(0xFF18181B);
   static const Color darkCardHover = Color(0xFF27272A);
@@ -27,7 +26,7 @@ class NexusTheme {
   static const Color darkTextMuted = Color(0xFF71717A);
   static const Color darkBorder = Color(0xFF27272A);
 
-  static const Color lightBackground = Color(0xFFF0F8FF); // AliceBlue
+  static const Color lightBackground = Color(0xFFF0F8FF);
   static const Color lightSurface = Color(0xFFFFFFFF);
   static const Color lightCard = Color(0xFFFFFFFF);
   static const Color lightText = Color(0xFF18181B);
