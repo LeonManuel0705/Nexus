@@ -32,8 +32,8 @@ class _NexusBackgroundState extends State<NexusBackground>
   static const Color _emerald = Color(0xFF10B981);
   static const Color _emeraldLight = Color(0xFF34D399);
 
-  static const Color _darkBg = Color(0xFF101720); // Midnight Blue
-  static const Color _lightBg = Color(0xFFF0F8FF); // AliceBlue
+  static const Color _darkBg = Color(0xFF101720);
+  static const Color _lightBg = Color(0xFFF0F8FF);
 
   @override
   void initState() {

@@ -92,9 +92,6 @@ jobs:
         working-directory: flutter_app
       - run: flutter build windows
         working-directory: flutter_app
-        # flutter_inappwebview_windows uses deprecated <experimental/coroutine>;
-        # newer MSVC turns STL1011 into a hard error unless silenced. The CL env
-        # var is prepended to every cl.exe invocation, incl. plugin vcxproj builds.
         env:
           CL: /D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS
 

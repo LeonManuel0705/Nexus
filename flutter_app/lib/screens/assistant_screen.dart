@@ -207,9 +207,6 @@ class _Bubble extends StatelessWidget {
   }
 }
 
-/// Renders lightweight inline Markdown: **bold** segments become bold, the rest
-/// stays in [base]. Keeps the assistant answers readable instead of showing the
-/// literal `**...**` markers the engine emits.
 TextSpan _markdownSpan(String text, TextStyle base) {
   final spans = <TextSpan>[];
   final pattern = RegExp(r'\*\*(.+?)\*\*', dotAll: true);
