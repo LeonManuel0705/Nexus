@@ -1,0 +1,1019 @@
+{
+  "klasse_1": {
+    "deutsch": [
+      "Buchstaben und Schreibschrift erlernen",
+      "Anlaute, Silben, Reime",
+      "Erste Wörter und kurze Sätze lesen",
+      "Großbuchstaben am Satzanfang, Punkt am Ende",
+      "Eigenen Namen und einfache Wörter schreiben"
+    ],
+    "mathe": [
+      "Zahlenraum bis 20",
+      "Plus und Minus bis 20",
+      "Formen erkennen (Kreis, Quadrat, Dreieck, Rechteck)",
+      "Größenvergleich (mehr/weniger, größer/kleiner)",
+      "Uhr lesen (volle Stunden)",
+      "Geld kennen (Cent und Euro)",
+      "Ordnungszahlen (1., 2., 3. …)"
+    ],
+    "sachunterricht": [
+      "Jahreszeiten und Wetter",
+      "Familie, Freunde, Schule",
+      "Mein Körper (Körperteile, Sinne)",
+      "Tiere im Wald und auf dem Bauernhof",
+      "Verkehrserziehung (Schulweg, Ampel, Zebrastreifen)",
+      "Pflanzen kennenlernen"
+    ],
+    "religion": [
+      "Eigene Gefühle und die anderer",
+      "Freundschaft und Streit",
+      "Erste biblische Geschichten (Schöpfung, Noah)",
+      "Feste im Kirchenjahr (Weihnachten, Ostern)"
+    ],
+    "ethik": [
+      "Was ist gerecht?",
+      "Regeln in Familie und Klasse",
+      "Gefühle benennen und verstehen"
+    ],
+    "kunst": [
+      "Grundfarben und Mischfarben",
+      "Schneiden, Kleben, Falten",
+      "Malen mit Wasserfarben",
+      "Einfache Drucke (Kartoffeldruck)"
+    ],
+    "musik": [
+      "Lieder singen",
+      "Rhythmus klatschen",
+      "Erste Instrumente (Trommel, Klanghölzer)"
+    ],
+    "sport": [
+      "Bewegungsspiele",
+      "Koordination und Gleichgewicht",
+      "Werfen und Fangen"
+    ]
+  },
+  "klasse_2": {
+    "deutsch": [
+      "Lesen längerer Texte und Bilderbücher",
+      "Erste Aufsätze (Erzählung)",
+      "Rechtschreibung: erste Regeln (ie/ei, ck/tz)",
+      "Wortarten: Substantiv, Verb, Adjektiv",
+      "Alphabetische Reihenfolge / Wörterbuch nutzen"
+    ],
+    "mathe": [
+      "Zahlenraum bis 100",
+      "Kleines Einmaleins",
+      "Plus und Minus bis 100 (auch mit Zehnerübergang)",
+      "Längen messen (cm, m)",
+      "Geometrische Formen und ihre Eigenschaften",
+      "Uhr (Viertel-, halbe Stunden)",
+      "Sachaufgaben"
+    ],
+    "sachunterricht": [
+      "Pflanzen (Aufbau einer Blume)",
+      "Tiere (Haustiere, Wildtiere)",
+      "Wasser und Wasserkreislauf",
+      "Gesunde Ernährung",
+      "Fahrradprüfung-Vorbereitung",
+      "Mein Heimatort"
+    ],
+    "religion": [
+      "Werte und Regeln in der Gemeinschaft",
+      "Geschichten von Jesus / Heiligen",
+      "Andere Religionen kennenlernen"
+    ],
+    "ethik": [
+      "Konflikte friedlich lösen",
+      "Verantwortung übernehmen",
+      "Gemeinschaft und Vielfalt"
+    ],
+    "kunst": [
+      "Druckverfahren",
+      "Collagen aus Papier und Stoff",
+      "Plastisches Arbeiten mit Ton"
+    ],
+    "musik": [
+      "Notensystem kennenlernen",
+      "Rhythmen klatschen und trommeln",
+      "Lieder mit Bewegung"
+    ],
+    "sport": [
+      "Ballspiele",
+      "Geräteturnen (Bock, Kasten)",
+      "Schwimmen (in vielen Bundesländern)"
+    ]
+  },
+  "klasse_3": {
+    "deutsch": [
+      "Aufsatzformen: Erlebnis-, Reizwortgeschichte, Bericht",
+      "Rechtschreibregeln (Doppellaute, Endungen)",
+      "Wortfamilien und Wortbausteine",
+      "Satzarten (Aussage-, Frage-, Aufforderungssatz)",
+      "Adjektive steigern",
+      "Erste Gedichte verstehen"
+    ],
+    "mathe": [
+      "Zahlenraum bis 1000",
+      "Schriftliche Addition und Subtraktion",
+      "Großes Einmaleins, schriftliche Multiplikation (Einführung)",
+      "Geometrie: Symmetrie, Kreis mit Zirkel",
+      "Gewichte (g, kg)",
+      "Geld umrechnen, Geldbeträge addieren",
+      "Erste einfache Brüche (Halbe, Viertel)"
+    ],
+    "englisch": [
+      "Erste englische Wörter (Farben, Zahlen, Tiere)",
+      "Sich vorstellen (My name is …)",
+      "Familienmitglieder",
+      "Einfache Befehle (Stand up, Sit down)",
+      "Lieder und Reime auf Englisch"
+    ],
+    "sachunterricht": [
+      "Eigenes Bundesland (Hauptstadt, Wappen, Landschaften)",
+      "Karten lesen (Maßstab, Himmelsrichtungen)",
+      "Wasserkreislauf",
+      "Magnetismus, einfacher Stromkreis",
+      "Mittelalter-Einführung (Ritter, Burgen)",
+      "Pflanzen detaillierter (Aufbau, Bestäubung)"
+    ],
+    "religion": [
+      "Religionsvielfalt (Judentum, Christentum, Islam)",
+      "Feste in den Religionen",
+      "Toleranz und Respekt"
+    ],
+    "ethik": [
+      "Gerechtigkeit, Menschenrechte (kindgerecht)",
+      "Naturschutz und Verantwortung"
+    ],
+    "kunst": [
+      "Perspektive (einfach)",
+      "Künstler kennenlernen (Picasso, Klee)",
+      "Mischtechniken (Wasserfarbe + Filzstift)"
+    ],
+    "musik": [
+      "Notenlesen (Stammtöne)",
+      "Volkslieder",
+      "Klanggeschichten gestalten"
+    ],
+    "sport": [
+      "Mannschaftsspiele (Brennball, Völkerball)",
+      "Geräteturnen vertieft",
+      "Leichtathletik (Sprint, Weitsprung)"
+    ]
+  },
+  "klasse_4": {
+    "deutsch": [
+      "Bericht, Beschreibung, Brief, Erzählung verfassen",
+      "Gedichte und Fabeln interpretieren",
+      "Vier Fälle (Nominativ, Genitiv, Dativ, Akkusativ)",
+      "Zeitformen: Präsens, Präteritum, Perfekt, Futur",
+      "Direkte und indirekte Rede (Einführung)",
+      "Texte überarbeiten und verbessern"
+    ],
+    "mathe": [
+      "Zahlenraum bis 1.000.000",
+      "Schriftliche Multiplikation und Division",
+      "Brüche (Einführung)",
+      "Diagramme und Tabellen lesen und erstellen",
+      "Maßstab, Pläne und Karten",
+      "Größen umrechnen (km↔m, kg↔g, l↔ml)",
+      "Sachaufgaben in mehreren Schritten"
+    ],
+    "englisch": [
+      "Past tense (einfach)",
+      "Schulalltag, Hobbys, Wochentage",
+      "Einfache Texte verstehen",
+      "Wegbeschreibungen geben (turn left/right)"
+    ],
+    "sachunterricht": [
+      "Deutschland: Bundesländer, Hauptstädte, Flüsse, Gebirge",
+      "Europa-Einführung",
+      "Demokratie und Wahlen (kindgerecht)",
+      "Menschlicher Körper detailliert (Organe, Verdauung, Atmung)",
+      "Zeit und Geschichte: Steinzeit bis Antike",
+      "Strom und Energie (Stromkreise, Sicherheit)"
+    ],
+    "religion": [
+      "Weltreligionen-Überblick",
+      "Schöpfungsgeschichten verschiedener Kulturen",
+      "Verantwortung für die Schöpfung"
+    ],
+    "ethik": [
+      "Glück und Sinn",
+      "Tier- und Naturschutz",
+      "Konflikte und Zivilcourage"
+    ],
+    "kunst": [
+      "Künstler und Stilrichtungen kennenlernen",
+      "Plastik aus verschiedenen Materialien",
+      "Räumliches Zeichnen (Schräge, Schatten)"
+    ],
+    "musik": [
+      "Komponisten (Mozart, Beethoven – Einführung)",
+      "Musikepochen-Überblick",
+      "Eigene kleine Lieder und Rhythmen schreiben"
+    ],
+    "sport": [
+      "Schwimmunterricht (Pflicht in vielen Ländern)",
+      "Leichtathletik (Bundesjugendspiele)",
+      "Mannschaftsspiele weiter vertieft"
+    ]
+  },
+  "klasse_5": {
+    "deutsch": [
+      "Rechtschreibung und Grammatik (Wortarten, Satzglieder)",
+      "Textsorten: Bericht, Beschreibung, Erzählung",
+      "Lesetechniken und Leseverstehen",
+      "Erste Lektüren (Jugendbücher)",
+      "Wortschatzarbeit, Synonyme und Antonyme"
+    ],
+    "mathe": [
+      "Natürliche Zahlen, Zahlenraum bis 1 Mio.",
+      "Grundrechenarten und schriftliche Verfahren",
+      "Geometrie: Flächen, Umfang, einfache Körper",
+      "Brüche (Einführung)",
+      "Sachaufgaben und Größen"
+    ],
+    "englisch": [
+      "Present Simple und Present Continuous",
+      "Basisvokabular (Familie, Schule, Freizeit)",
+      "Einfache Dialoge und Rollenspiele",
+      "Alltagssituationen (im Café, in der Stadt)",
+      "Personalpronomen, possessive Determinatoren"
+    ],
+    "biologie": [
+      "Wirbeltiere und Wirbellose",
+      "Säugetiere, Vögel, Reptilien, Amphibien, Fische",
+      "Pflanzenkunde (Blütenpflanzen, Bäume)",
+      "Der menschliche Körper: Grundlagen"
+    ],
+    "erdkunde": [
+      "Deutschland: Bundesländer, Landschaften, Großstädte",
+      "Kartenkunde (Maßstab, Legende, Höhenlinien)",
+      "Klimazonen (Einführung)"
+    ],
+    "geschichte": [
+      "Ur- und Frühgeschichte",
+      "Ägypten: Pharaonen, Pyramiden, Hieroglyphen",
+      "Antikes Griechenland: Polis, Demokratie, Olympia",
+      "Römisches Reich: Aufstieg, Republik, Kaiserzeit"
+    ],
+    "religion": [
+      "Bibel als Buch (Aufbau, Entstehung)",
+      "Weltreligionen vertiefen (Judentum, Christentum, Islam)",
+      "Glaube und Werte"
+    ],
+    "ethik": [
+      "Werte und Normen",
+      "Identität und Selbstwahrnehmung",
+      "Glück, Freundschaft, Gerechtigkeit"
+    ],
+    "kunst": [
+      "Farblehre (Komplementärfarben, Farbkreis)",
+      "Zeichentechniken (Bleistift, Schraffur)",
+      "Naturstudien"
+    ],
+    "musik": [
+      "Notenwerte und Pausen",
+      "Klassische Komponisten (erste Werke)",
+      "Singen im Klassenchor"
+    ],
+    "sport": [
+      "Leichtathletik (Sprint, Weitsprung, Wurf)",
+      "Geräteturnen, Bodenkür",
+      "Mannschaftssportarten"
+    ],
+    "informatik": [
+      "Computer-Grundlagen (Hardware, Software)",
+      "Sicherer Umgang mit dem Internet",
+      "Erste Algorithmen (Scratch, Tafel-Spiele)"
+    ]
+  },
+  "klasse_6": {
+    "deutsch": [
+      "Textsorten vertiefen, Inhaltsangabe",
+      "Lyrik: erste Stilmittel, Metrum",
+      "Rechtschreibung: Groß-/Kleinschreibung, das/dass",
+      "Sagen, Märchen, Fabeln",
+      "Adverbiale Bestimmungen, Konjunktionen"
+    ],
+    "mathe": [
+      "Brüche und Dezimalzahlen, Rechnen damit",
+      "Prozentrechnung (Einführung)",
+      "Winkel, Dreiecke, Vierecke",
+      "Erste statistische Auswertungen",
+      "Negative Zahlen (Einführung)"
+    ],
+    "englisch": [
+      "Past Simple, Future with will/going to",
+      "Erweitertes Vokabular (Schule, Freizeit, Reisen)",
+      "Possessivpronomen, einfache Adverbien",
+      "Texte verstehen und schreiben"
+    ],
+    "franzoesisch": [
+      "Aussprache, erste Vokabeln (Familie, Schule)",
+      "Présent (regelmäßige Verben)",
+      "Bonjour, Au revoir – einfache Dialoge",
+      "Articles (le, la, les, un, une)"
+    ],
+    "latein": [
+      "Lateinische Aussprache",
+      "a-Deklination, e-Deklination",
+      "Erste Verben (esse, amare)",
+      "Römisches Alltagsleben"
+    ],
+    "biologie": [
+      "Samen- und Blütenpflanzen vertieft",
+      "Insekten und ihre Bedeutung",
+      "Ernährung und Verdauung beim Menschen",
+      "Wirbeltiere im Vergleich"
+    ],
+    "erdkunde": [
+      "Europa: Länder, Hauptstädte, Klima",
+      "EU als politische Gemeinschaft",
+      "Wirtschaftsräume in Europa"
+    ],
+    "geschichte": [
+      "Mittelalter: Feudalismus, Stände",
+      "Kirche und Glaube im Mittelalter",
+      "Kreuzzüge und Burgen",
+      "Hanse und Handel"
+    ],
+    "religion": [
+      "Jesus von Nazareth: Leben und Wirken",
+      "Gleichnisse und Bergpredigt",
+      "Frühe Kirchengeschichte"
+    ],
+    "ethik": [
+      "Gewissen und Verantwortung",
+      "Vorbilder",
+      "Medien und Wahrheit"
+    ],
+    "kunst": [
+      "Perspektive (Zentralperspektive)",
+      "Plastik und Skulptur",
+      "Kunstbetrachtung erster Werke"
+    ],
+    "musik": [
+      "Tonleitern (Dur und Moll Einführung)",
+      "Notenschrift vertiefen",
+      "Volksmusik weltweit"
+    ],
+    "sport": [
+      "Schwimmen vertieft",
+      "Volleyball, Basketball Einführung",
+      "Fitness-Grundlagen"
+    ],
+    "informatik": [
+      "Blockprogrammierung (Scratch, Snap!)",
+      "Tabellenkalkulation Einführung",
+      "Datenschutz und Privatsphäre"
+    ]
+  },
+  "klasse_7": {
+    "deutsch": [
+      "Berichte, Inhaltsangaben, Argumentation (Stellungnahme)",
+      "Kurzgeschichten und Novellen",
+      "Lyrik: Reim, Metrum, Stilmittel",
+      "Konjunktiv I (indirekte Rede)",
+      "Aktiv und Passiv"
+    ],
+    "mathe": [
+      "Terme und lineare Gleichungen",
+      "Prozent- und Zinsrechnung",
+      "Zuordnungen (proportional, antiproportional)",
+      "Dreiecke, Kongruenz, Kongruenzsätze",
+      "Wahrscheinlichkeit (Einführung, Laplace)"
+    ],
+    "englisch": [
+      "Conditional Sentences (Type 1)",
+      "Modal Verbs (must, can, should)",
+      "Past Continuous, Present Perfect Einführung",
+      "Englischsprachige Länder kennenlernen"
+    ],
+    "franzoesisch": [
+      "Passé composé",
+      "Verneinung (ne … pas)",
+      "Stadt, Restaurant, Wegbeschreibung"
+    ],
+    "physik": [
+      "Stromkreise, einfache Schaltungen",
+      "Magnetismus und Magnetfelder",
+      "Optik: Reflexion und Brechung",
+      "Schall (Entstehung, Ausbreitung)"
+    ],
+    "biologie": [
+      "Sexualkunde",
+      "Pubertät und psychische Veränderungen",
+      "Wirbeltiere im Detail",
+      "Atmung und Blutkreislauf"
+    ],
+    "geschichte": [
+      "Frühe Neuzeit: Renaissance und Humanismus",
+      "Reformation (Luther)",
+      "Entdeckung Amerikas und Folgen",
+      "Absolutismus (Ludwig XIV.)"
+    ],
+    "erdkunde": [
+      "Asien: Bevölkerung, Klima, Wirtschaft",
+      "Klimadiagramme lesen und auswerten"
+    ],
+    "religion": [
+      "Reformation und Konfessionen",
+      "Kirche heute"
+    ],
+    "ethik": [
+      "Lebensentwürfe und Identität",
+      "Konfliktlösung in Gesellschaft"
+    ],
+    "kunst": [
+      "Renaissance-Malerei",
+      "Komposition und Bildaufbau"
+    ],
+    "musik": [
+      "Pop und Rock kennenlernen",
+      "Bandinstrumente, einfache Bandprojekte"
+    ],
+    "sport": [
+      "Fußball, Handball, Basketball vertiefen",
+      "Leichtathletik (Sprung, Wurf)"
+    ],
+    "politik": [
+      "Demokratie in der Schule (SV)",
+      "Grundgesetz (Einführung)",
+      "Medien und Meinungsbildung"
+    ],
+    "informatik": [
+      "Textverarbeitung professionell",
+      "Internet-Recherche und Quellenkritik",
+      "Erste textbasierte Programmierung (Python-Einführung)"
+    ]
+  },
+  "klasse_8": {
+    "deutsch": [
+      "Inhaltsangabe und Charakterisierung",
+      "Kurzdrama, Novelle (z.B. Andreas Gryphius oder Storm)",
+      "Aktiv/Passiv, Konjunktiv I (indirekte Rede)",
+      "Argumentative Texte schreiben"
+    ],
+    "mathe": [
+      "Lineare Funktionen, Geradengleichung",
+      "Potenzen und Wurzeln (Grundlagen)",
+      "Satz des Pythagoras",
+      "Quadratwurzeln rechnen",
+      "Statistik vertieft (Diagramme, Mittelwerte)"
+    ],
+    "englisch": [
+      "Reported Speech",
+      "Conditional Type 2 und 3",
+      "Passiv (Passive Voice)",
+      "Englische Literatur (kurze Texte)"
+    ],
+    "franzoesisch": [
+      "Imparfait und Plus-que-parfait",
+      "Reflexive Verben",
+      "Frankreich und Frankophonie"
+    ],
+    "physik": [
+      "Mechanik: Kräfte, Hebel, einfache Maschinen",
+      "Energie qualitativ",
+      "Wärmelehre Einführung"
+    ],
+    "chemie": [
+      "Atome, Moleküle, Stoffe und Stoffgemische",
+      "Erste chemische Reaktionen",
+      "Aggregatzustände, Trennverfahren",
+      "Säuren und Basen (Einführung)"
+    ],
+    "biologie": [
+      "Immunsystem",
+      "Blutkreislauf vertieft",
+      "Drogen und Suchtprävention"
+    ],
+    "geschichte": [
+      "Französische Revolution",
+      "Industrialisierung in Deutschland",
+      "Soziale Frage und Arbeiterbewegung",
+      "Imperialismus (Einführung)"
+    ],
+    "erdkunde": [
+      "Afrika: Räume, Klima, Entwicklungsländer",
+      "Globalisierung Einführung"
+    ],
+    "politik": [
+      "Wahlen und Parteien in Deutschland",
+      "EU vertiefen",
+      "Verbraucherschutz"
+    ],
+    "religion": [
+      "Christentum vs. Islam: Vergleich",
+      "Ethik der Weltreligionen"
+    ],
+    "ethik": [
+      "Glück und Sinn (Aristoteles, Kant Einführung)",
+      "Moralisches Handeln"
+    ],
+    "kunst": [
+      "Barock und Rokoko",
+      "Plastik und Skulptur"
+    ],
+    "musik": [
+      "Klassik und Romantik (Beethoven, Schubert)",
+      "Musiktheorie (Akkorde)"
+    ],
+    "sport": [
+      "Fitness und Krafttraining",
+      "Tanz und Gymnastik"
+    ],
+    "informatik": [
+      "Python-Grundlagen (Variablen, Schleifen, Funktionen)",
+      "HTML/CSS Basics",
+      "Algorithmisches Denken"
+    ]
+  },
+  "klasse_9": {
+    "deutsch": [
+      "Erörterung (linear und dialektisch)",
+      "Gedichtanalyse vertieft (Stilmittel, Form)",
+      "Kurzgeschichten interpretieren (Borchert, Böll)",
+      "Sachtexte analysieren",
+      "Bewerbung schreiben"
+    ],
+    "mathe": [
+      "Quadratische Funktionen und Gleichungen",
+      "Mitternachtsformel / pq-Formel",
+      "Binomische Formeln",
+      "Volumen und Oberfläche von Körpern",
+      "Strahlensätze",
+      "Trigonometrie (sin, cos, tan im rechtwinkligen Dreieck)"
+    ],
+    "englisch": [
+      "Gerund vs Infinitive",
+      "Mediation (Sprachmittlung)",
+      "Englische Literatur (Kurzgeschichte, Auszüge aus Romanen)",
+      "Argumentative writing"
+    ],
+    "physik": [
+      "Ohmsches Gesetz",
+      "Mechanische Arbeit und Energie quantitativ",
+      "Schall vertieft (Frequenz, Amplitude)",
+      "Wärmelehre vertieft"
+    ],
+    "chemie": [
+      "Periodensystem der Elemente",
+      "Bohrsches Atommodell",
+      "Ionen, Salze, Säure-Base-Reaktionen Einführung",
+      "Chemische Formeln und Gleichungen"
+    ],
+    "biologie": [
+      "Genetik (Mendel-Regeln)",
+      "Evolution (Einführung, Darwin)",
+      "Ökologie Grundlagen"
+    ],
+    "geschichte": [
+      "Erster Weltkrieg",
+      "Weimarer Republik",
+      "Aufstieg des Nationalsozialismus",
+      "Holocaust und Vernichtungskrieg"
+    ],
+    "erdkunde": [
+      "Klimawandel und Klimaschutz",
+      "Wirtschaftsräume USA, Russland, China"
+    ],
+    "politik": [
+      "Verfassungsorgane Deutschlands",
+      "Föderalismus, Bund und Länder",
+      "Internationale Beziehungen Einführung"
+    ],
+    "religion": [
+      "Theodizee-Frage",
+      "Religion und Wissenschaft",
+      "Sterben und Tod"
+    ],
+    "ethik": [
+      "Moralphilosophie (Kant, Utilitarismus Einführung)",
+      "Bioethik (Gentechnik, Sterbehilfe)"
+    ],
+    "kunst": [
+      "Klassizismus, Romantik in der Kunst",
+      "Fotografie als Kunstform"
+    ],
+    "musik": [
+      "Musik und Politik",
+      "20. Jahrhundert: Jazz, Pop, Rock"
+    ],
+    "sport": [
+      "Sportbiologie (Muskeln, Energiebereitstellung)",
+      "Trainingsmethoden"
+    ],
+    "informatik": [
+      "Python: Listen, Dictionaries, OOP-Einführung",
+      "Datenbanken Grundlagen",
+      "Datenschutz, Verschlüsselung Einführung"
+    ]
+  },
+  "klasse_10": {
+    "deutsch": [
+      "Literaturgeschichte: Aufklärung bis Romantik",
+      "Lessings Dramen (Nathan der Weise, Emilia Galotti)",
+      "Klassiker (Goethe: Werther, Schiller: Räuber)",
+      "Textanalyse vertieft",
+      "Gedichtinterpretation"
+    ],
+    "mathe": [
+      "Exponentialfunktionen und Logarithmus",
+      "Wachstums- und Zerfallsprozesse",
+      "Potenzgesetze und Wurzelgesetze",
+      "Stochastik: Baumdiagramme, Vierfeldertafel",
+      "Sinus- und Kosinussatz"
+    ],
+    "englisch": [
+      "MSA-Vorbereitung",
+      "Mediation und Listening Comprehension",
+      "Englische und amerikanische Geschichte (Civil Rights)",
+      "Globale Themen (climate change, migration)"
+    ],
+    "physik": [
+      "Elektrizität: Widerstand, Leistung, Energie",
+      "Kondensator (Einführung)",
+      "Kernphysik: Aufbau des Atoms, Radioaktivität"
+    ],
+    "chemie": [
+      "Redox-Reaktionen",
+      "Elektrochemie Einführung",
+      "Organische Chemie: Alkane, Alkene, Alkine",
+      "Funktionelle Gruppen"
+    ],
+    "biologie": [
+      "Ökologie und Ökosysteme",
+      "Stoffkreisläufe",
+      "Evolution vertieft (Synthetische Evolutionstheorie)"
+    ],
+    "geschichte": [
+      "Zweiter Weltkrieg",
+      "Holocaust",
+      "Nachkriegsdeutschland (BRD und DDR)",
+      "Kalter Krieg"
+    ],
+    "erdkunde": [
+      "Tropischer Regenwald",
+      "Stadtentwicklung und Stadtgeographie",
+      "Ressourcen und Nachhaltigkeit"
+    ],
+    "politik": [
+      "Internationale Politik",
+      "UNO und NATO",
+      "Wirtschaftssysteme"
+    ],
+    "religion": [
+      "Schöpfung und Evolution",
+      "Kirche im Nationalsozialismus"
+    ],
+    "ethik": [
+      "Existenzphilosophie Einführung",
+      "Verantwortungsethik (Hans Jonas)"
+    ],
+    "kunst": [
+      "Moderne Kunst (Impressionismus, Expressionismus)",
+      "Eigene künstlerische Projekte"
+    ],
+    "musik": [
+      "Musikepochen-Überblick",
+      "Komponieren und Arrangieren (Grundlagen)"
+    ],
+    "sport": [
+      "Trainingsplanung",
+      "Sportgeschichte",
+      "Fairness und Doping"
+    ],
+    "informatik": [
+      "Python OOP",
+      "Datenstrukturen (Listen, Bäume)",
+      "Künstliche Intelligenz Einführung",
+      "Web-Entwicklung Grundlagen"
+    ]
+  },
+  "klasse_11": {
+    "mathe": [
+      "Analysis: Grenzwerte, Stetigkeit, Ableitung",
+      "Ableitungsregeln (Potenz-, Produkt-, Quotienten-, Kettenregel)",
+      "Kurvendiskussion (Nullstellen, Extrema, Wendepunkte)",
+      "Exponentialfunktionen und e-Funktion",
+      "Trigonometrische Funktionen"
+    ],
+    "deutsch": [
+      "Epochen Aufklärung bis Vormärz vertieft",
+      "Dramentheorie (geschlossen/offen, aristotelisch/episch)",
+      "Lektüren: Faust I, Emilia Galotti, Die Räuber",
+      "Lyrik der Romantik",
+      "Wissenschaftliches Arbeiten (Zitieren, Quellen)"
+    ],
+    "englisch": [
+      "Globalization, Identity, Media",
+      "Advanced grammar (Cleft sentences, Inversion)",
+      "Essay writing (argumentative, comparative)",
+      "Literarische Texte (American Dream, post-colonial literature)"
+    ],
+    "franzoesisch": [
+      "Subjonctif",
+      "Histoire de France (XX. Jahrhundert)",
+      "Filme und Romane (z.B. Le Petit Prince)",
+      "Frankophonie"
+    ],
+    "spanisch": [
+      "Lateinamerika kennenlernen",
+      "Subjuntivo Einführung",
+      "Literatur (Lorca, Allende)"
+    ],
+    "physik": [
+      "Elektrisches Feld, Kondensator",
+      "Magnetisches Feld, Induktion",
+      "Wechselstrom",
+      "Mechanische Schwingungen"
+    ],
+    "chemie": [
+      "Organische Chemie: Alkohole, Aldehyde, Ketone, Ester",
+      "Reaktionsmechanismen (SN1, SN2, Eliminierung)",
+      "Säuren und Basen vertieft",
+      "Ionengleichgewichte"
+    ],
+    "biologie": [
+      "Cytologie (Zelle, Zellorganellen)",
+      "Stoffwechsel (Photosynthese, Zellatmung)",
+      "Enzyme und Enzymaktivität"
+    ],
+    "geschichte": [
+      "Imperialismus",
+      "Erster Weltkrieg vertieft",
+      "Weimarer Republik",
+      "Nationalsozialismus vertieft"
+    ],
+    "erdkunde": [
+      "Wirtschaftsräume Europas",
+      "Globalisierung",
+      "Klimawandel und Folgen"
+    ],
+    "politik": [
+      "Verfassung und Grundrechte",
+      "Politische Theorien (Locke, Rousseau, Hobbes)"
+    ],
+    "religion": [
+      "Christologie",
+      "Religion in der modernen Gesellschaft"
+    ],
+    "ethik": [
+      "Klassische Tugendethik (Aristoteles)",
+      "Pflichtethik (Kant)",
+      "Utilitarismus (Mill, Bentham)"
+    ],
+    "philosophie": [
+      "Erkenntnistheorie (Platon, Descartes)",
+      "Anthropologie (Was ist der Mensch?)",
+      "Antike Philosophie"
+    ],
+    "psychologie": [
+      "Was ist Psychologie? Geschichte und Strömungen",
+      "Wahrnehmung und Gedächtnis",
+      "Entwicklungspsychologie"
+    ],
+    "kunst": [
+      "Renaissance bis Klassizismus vertieft",
+      "Bildanalyse formal und inhaltlich"
+    ],
+    "musik": [
+      "Klassik (Haydn, Mozart, Beethoven)",
+      "Werkanalyse"
+    ],
+    "sport": [
+      "Sportarten in Theorie und Praxis",
+      "Bewegungslehre"
+    ],
+    "informatik": [
+      "Datenstrukturen vertieft",
+      "Algorithmen (Sortieren, Suchen, Komplexität)",
+      "Objektorientierte Programmierung",
+      "Datenbanken (SQL Grundlagen)"
+    ],
+    "wirtschaft": [
+      "Markt und Preisbildung",
+      "Unternehmensformen",
+      "Wirtschaftskreislauf"
+    ]
+  },
+  "klasse_12": {
+    "mathe": [
+      "Integralrechnung (bestimmtes/unbestimmtes Integral)",
+      "Stammfunktionen, Hauptsatz der Differential- und Integralrechnung",
+      "Flächenberechnung, Rotationskörper",
+      "Lineare Algebra: Vektoren, Geraden, Ebenen",
+      "Stochastik: Binomialverteilung, Normalverteilung, Hypothesentests"
+    ],
+    "deutsch": [
+      "Realismus, Naturalismus, Expressionismus",
+      "Nachkriegsliteratur und Trümmerliteratur",
+      "Lektüren: Die Verwandlung, Der Prozess, Der Besuch der alten Dame, Homo faber",
+      "Sachtextanalyse",
+      "Materialgestütztes Schreiben"
+    ],
+    "englisch": [
+      "Literary analysis (Shakespeare-Auszüge, moderne Romane)",
+      "Current affairs, debate skills",
+      "Mediation auf hohem Niveau",
+      "Komplexe Argumentationen"
+    ],
+    "franzoesisch": [
+      "Existentialismus (Sartre, Camus)",
+      "Frankreich heute (Politik, Gesellschaft)",
+      "Film, Theater, Roman im Vergleich"
+    ],
+    "spanisch": [
+      "Lateinamerikanische Literatur (Marquez, Borges)",
+      "Spanische Diktatur und Demokratisierung"
+    ],
+    "physik": [
+      "Schwingungen und Wellen",
+      "Quantenphysik: Photoeffekt, Welle-Teilchen-Dualismus",
+      "De-Broglie-Wellenlänge",
+      "Atommodell (Bohr, Schrödinger Einführung)"
+    ],
+    "chemie": [
+      "Chemisches Gleichgewicht (Massenwirkungsgesetz)",
+      "Säure-Base-Gleichgewichte (Titration, Puffer)",
+      "Elektrochemie (Galvanische Zellen, Nernst-Gleichung)",
+      "Aromaten"
+    ],
+    "biologie": [
+      "Molekulargenetik (DNA, Replikation, Transkription, Translation)",
+      "Gentechnik und CRISPR",
+      "Neurobiologie (Nervenzelle, Aktionspotenzial)",
+      "Synapsen und Neurotransmitter"
+    ],
+    "geschichte": [
+      "Deutschland nach 1945",
+      "Kalter Krieg vertieft",
+      "Deutsche Einheit",
+      "Europäische Einigung"
+    ],
+    "erdkunde": [
+      "Raumanalyse",
+      "Entwicklungsländer und nachhaltige Entwicklung",
+      "Stadtgeographie (Modelle)"
+    ],
+    "politik": [
+      "Internationale Beziehungen",
+      "Wirtschaftspolitik",
+      "EU vertieft"
+    ],
+    "religion": [
+      "Religionsphilosophie",
+      "Bioethik (Embryonenforschung, Sterbehilfe)"
+    ],
+    "ethik": [
+      "Diskursethik (Habermas)",
+      "Verantwortung in der Technik"
+    ],
+    "philosophie": [
+      "Metaphysik",
+      "Sprachphilosophie",
+      "Ethik vertieft"
+    ],
+    "psychologie": [
+      "Klinische Psychologie (Störungen)",
+      "Sozialpsychologie",
+      "Persönlichkeitspsychologie"
+    ],
+    "paedagogik": [
+      "Erziehungsstile",
+      "Lerntheorien (Behaviorismus, Konstruktivismus)",
+      "Identitätsentwicklung (Erikson)"
+    ],
+    "kunst": [
+      "Moderne (Klassische Moderne, Bauhaus)",
+      "Zeitgenössische Kunst und neue Medien",
+      "Eigene Projekte"
+    ],
+    "musik": [
+      "Romantik bis 20. Jahrhundert",
+      "Komposition und Analyse"
+    ],
+    "sport": [
+      "Trainings- und Bewegungswissenschaft",
+      "Sportgeschichte und Sportsoziologie"
+    ],
+    "informatik": [
+      "Komplexe Algorithmen (Dynamische Programmierung)",
+      "Künstliche Intelligenz und Machine Learning Grundlagen",
+      "Netzwerke und Kommunikationsprotokolle",
+      "Datenschutz und IT-Sicherheit"
+    ],
+    "wirtschaft": [
+      "Mikroökonomie",
+      "Makroökonomie (BIP, Inflation, Arbeitslosigkeit)",
+      "Geldpolitik der EZB"
+    ]
+  },
+  "klasse_13": {
+    "mathe": [
+      "Wiederholung und Vertiefung Analysis (Funktionenscharen, Extremwertaufgaben)",
+      "Lineare Algebra: Matrizen, Lineare Gleichungssysteme, Übergangsmatrizen",
+      "Stochastik vertieft (Hypothesentests, Konfidenzintervalle)",
+      "Abituraufgaben und Sachkontexte"
+    ],
+    "deutsch": [
+      "Abitur-Schwerpunkte: Sachtextanalyse, Interpretation, materialgestütztes Schreiben",
+      "Pflichtlektüren je Bundesland",
+      "Sprachreflexion und Sprachgeschichte"
+    ],
+    "englisch": [
+      "Abitur Prep: Reading, Writing, Mediation",
+      "Vertiefte Literaturanalyse",
+      "Komplexe globale Themen"
+    ],
+    "franzoesisch": [
+      "Abitur-Themen je nach Bundesland",
+      "Klassische und moderne Literatur"
+    ],
+    "spanisch": [
+      "Abitur-Themen Lateinamerika und Spanien",
+      "Komplexe Literatur"
+    ],
+    "physik": [
+      "Quantenphysik vertieft (Schrödinger, Heisenbergsche Unschärfe)",
+      "Atomphysik und Kernphysik",
+      "Spezielle Relativitätstheorie (teilweise)",
+      "Festkörperphysik (Halbleiter)"
+    ],
+    "chemie": [
+      "Aromaten vertieft",
+      "Biomoleküle (Kohlenhydrate, Proteine, Fette, DNA)",
+      "Kunststoffe und Polymere",
+      "Naturstoffchemie"
+    ],
+    "biologie": [
+      "Evolution vertieft (Humanevolution)",
+      "Verhalten (Ethologie, Neurobiologie)",
+      "Ökologie und Stoffkreisläufe vertieft",
+      "Immunbiologie"
+    ],
+    "geschichte": [
+      "Globalisierung historisch",
+      "Internationale Konflikte (Nahostkonflikt, Terrorismus)",
+      "21. Jahrhundert (Digitalisierung, Klima)",
+      "Geschichtsbewusstsein und Erinnerungskultur"
+    ],
+    "erdkunde": [
+      "Globale Disparitäten",
+      "Nachhaltigkeit und Klimaschutz",
+      "Komplexe Raumanalysen"
+    ],
+    "politik": [
+      "Politische Theorie vertieft",
+      "Internationale Beziehungen (Theorien)",
+      "Aktuelle Krisen und Konflikte"
+    ],
+    "religion": [
+      "Religion in der Spätmoderne",
+      "Interreligiöser Dialog"
+    ],
+    "ethik": [
+      "Aktuelle ethische Fragen (KI, Bioethik, Klimaethik)",
+      "Eigene philosophische Position"
+    ],
+    "philosophie": [
+      "Politische Philosophie",
+      "Existenzphilosophie (Sartre, Camus)",
+      "Postmoderne (Foucault, Derrida)"
+    ],
+    "psychologie": [
+      "Therapieformen",
+      "Forschungsmethoden",
+      "Aktuelle Forschungsfragen"
+    ],
+    "paedagogik": [
+      "Bildungstheorien",
+      "Inklusion",
+      "Pädagogische Forschung"
+    ],
+    "kunst": [
+      "Bildanalyse auf Abiturniveau",
+      "Eigene künstlerische Position"
+    ],
+    "musik": [
+      "Werkanalyse auf Abiturniveau",
+      "Musikgeschichte und -theorie vertieft"
+    ],
+    "sport": [
+      "Theorie für die Abiturprüfung (Bewegungslehre, Trainingslehre)",
+      "Praktische Prüfung"
+    ],
+    "informatik": [
+      "Komplexe Software-Projekte",
+      "Theoretische Informatik (Automaten, Berechenbarkeit)",
+      "Vernetzung und Kryptographie"
+    ],
+    "wirtschaft": [
+      "Internationale Wirtschaftsbeziehungen",
+      "Wirtschaftspolitik (Keynesianismus, Monetarismus)"
+    ]
+  }
+}
