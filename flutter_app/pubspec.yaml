@@ -3,7 +3,7 @@ description: "A new Flutter project."
 
 publish_to: 'none'
 
-version: 0.3.0+17
+version: 0.4.0+33
 
 environment:
   sdk: ^3.5.4
@@ -13,6 +13,10 @@ dependencies:
     sdk: flutter
 
   sqflite: ^2.3.0
+  # FFI-backed sqflite for Windows/Linux desktop (plain sqflite has no impl there);
+  # sqlite3_flutter_libs bundles the native SQLite library so the FFI factory works.
+  sqflite_common_ffi: ^2.3.3
+  sqlite3_flutter_libs: ^0.5.20
   path_provider: ^2.1.1
   path: ^1.9.0
   shared_preferences: ^2.2.2
@@ -30,14 +34,8 @@ dependencies:
 
   enough_mail: ^2.1.6
 
-  google_sign_in: ^6.2.1
-  googleapis: ^13.2.0
-  googleapis_auth: ^1.6.0
-
   workmanager: ^0.6.0
   flutter_local_notifications: ^17.0.0
-
-  permission_handler: ^11.3.0
 
   intl: ^0.19.0
   uuid: ^4.2.1
@@ -46,6 +44,7 @@ dependencies:
   crypto: ^3.0.3
 
   cupertino_icons: ^1.0.8
+  lottie: ^3.3.1
 
   hive: any
 dev_dependencies:
@@ -70,6 +69,11 @@ flutter:
 
   assets:
     - assets/nexus-logo.png
+    - assets/nav_selection.json
+    - assets/curriculum/formeln.json
+    - assets/curriculum/epochen.json
+    - assets/curriculum/topics.json
+    - assets/curriculum/concepts.json
 
   fonts:
     - family: Inter

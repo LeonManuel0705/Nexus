@@ -255,6 +255,7 @@ let chatHistory = [];
 let ollamaAvailable = false;
 let mlxAvailable = false;
 let ollamaModel = 'llama3.2:1b';
+let activeBackend = 'offline';
 let nexusData = {
     tasks: [],
     homework: [],
@@ -289,7 +290,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     checkOllamaStatus();
 });
 
-function loadChatHistory() {
+async function loadChatHistory() {
+    try {
+        const resp = await fetch('/api/hub/assistant/history', { signal: AbortSignal.timeout(5000) });
+        if (resp.ok) {
+            const data = await resp.json();
+            if (Array.isArray(data.history)) {
+                chatHistory = data.history.map(m => ({ role: m.role, content: m.content }));
+                renderChatHistory();
+                return;
+            }
+        }
+    } catch (e) {}
     try {
         const saved = localStorage.getItem('nexus-chat-history');
         if (saved) {
@@ -299,23 +311,16 @@ function loadChatHistory() {
     } catch (e) {}
 }
 
-function saveChatHistory() {
-    try {
-        if (chatHistory.length > 50) {
-            chatHistory = chatHistory.slice(-50);
-        }
-        localStorage.setItem('nexus-chat-history', JSON.stringify(chatHistory));
-    } catch (e) {}
-}
+function saveChatHistory() {}
 
 function renderChatHistory() {
     const container = document.getElementById('chatMessages');
     if (!chatHistory.length) return;
-
+    container.innerHTML = '';
     chatHistory.forEach(msg => {
         addMessageToUI(msg.role, msg.content, false);
     });
-    scrollToBottom();
+    scrollToBottom(false);
 }
 
 async function loadNexusData() {
@@ -345,30 +350,32 @@ async function loadNexusData() {
 
 async function checkAIStatus() {
     const statusEl = document.getElementById('assistantStatus');
+    statusEl.style.transition = 'color 0.4s ease, opacity 0.3s ease';
 
     try {
         const response = await fetch('/api/hub/assistant/status', {
             method: 'GET',
-            signal: AbortSignal.timeout(3000)
+            signal: AbortSignal.timeout(5000)
         });
         if (response.ok) {
             const data = await response.json();
-            if (data.available) {
+            activeBackend = data.backend || 'offline';
+
+            if (data.backend === 'local') {
+                ollamaAvailable = true; // keep legacy flag for old code paths
+                statusEl.textContent = `Lokale KI (${data.model || 'local'})`;
+                statusEl.style.color = 'var(--success)';
+                return;
+            } else if (data.backend === 'ollama') {
                 ollamaAvailable = true;
-                try {
-                    const modelsRes = await fetch('/api/hub/assistant/models');
-                    if (modelsRes.ok) {
-                        const modelsData = await modelsRes.json();
-                        if (modelsData.models && modelsData.models.length > 0) {
-                            const preferredModel = modelsData.models.find(m => m.name.includes('llama3.2')) || modelsData.models[0];
-                            ollamaModel = preferredModel.name;
-                        }
-                    }
-                } catch (e) {
-                    ollamaModel = 'llama3.2';
-                }
+                ollamaModel = data.model || 'llama3.2';
                 statusEl.textContent = `Ollama (${ollamaModel})`;
                 statusEl.style.color = 'var(--success)';
+                return;
+            } else if (data.backend === 'claude') {
+                ollamaAvailable = true;
+                statusEl.textContent = `Claude API (${data.model || 'Sonnet'})`;
+                statusEl.style.color = 'var(--accent)';
                 return;
             }
         }
@@ -376,24 +383,7 @@ async function checkAIStatus() {
         ollamaAvailable = false;
     }
 
-    try {
-        const mlxResponse = await fetch('/api/mlx/status', {
-            method: 'GET',
-            signal: AbortSignal.timeout(3000)
-        });
-        if (mlxResponse.ok) {
-            const data = await mlxResponse.json();
-            if (data.available) {
-                mlxAvailable = true;
-                statusEl.textContent = 'MLX Offline-KI (Qwen2.5)';
-                statusEl.style.color = 'var(--accent)';
-                return;
-            }
-        }
-    } catch (e) {
-        mlxAvailable = false;
-    }
-
+    activeBackend = 'offline';
     statusEl.textContent = 'Offline-Modus (keine KI)';
     statusEl.style.color = 'var(--text-muted)';
 }
@@ -420,35 +410,42 @@ async function sendMessage(e) {
     const typingId = showTypingIndicator();
 
     try {
-        let response;
+        if (activeBackend !== 'offline') {
+            // Try streaming first
+            const streamSuccess = await streamAIResponse(message, typingId);
+            if (streamSuccess) return;
 
-        if (ollamaAvailable) {
-            response = await getOllamaResponse(message);
-        } else if (mlxAvailable) {
-            response = await getMlxResponse(message);
-        } else {
-            response = getOfflineResponse(message);
-        }
+            // Fallback to non-streaming
+            const resp = await fetch('/api/hub/assistant/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: message,
+                    history: chatHistory.slice(-10)
+                }),
+                signal: AbortSignal.timeout(300000)
+            });
+            removeTypingIndicator(typingId);
 
-        removeTypingIndicator(typingId);
-        addMessageToUI('assistant', response);
-        chatHistory.push({ role: 'assistant', content: response });
-        saveChatHistory();
-    } catch (err) {
-        removeTypingIndicator(typingId);
-
-        if (mlxAvailable && !ollamaAvailable) {
-            try {
-                const mlxResponse = await getMlxResponse(message);
-                addMessageToUI('assistant', mlxResponse);
-                chatHistory.push({ role: 'assistant', content: mlxResponse });
+            if (resp.ok) {
+                const data = await resp.json();
+                addMessageToUI('assistant', data.response);
+                chatHistory.push({ role: 'assistant', content: data.response });
+                if (data.actions_executed && data.actions_executed.length) {
+                    showActionResults(data.actions_executed);
+                }
                 saveChatHistory();
                 return;
-            } catch (mlxErr) {
-                console.log('MLX fallback also failed:', mlxErr);
             }
         }
 
+        removeTypingIndicator(typingId);
+        const fallback = getOfflineResponse(message);
+        addMessageToUI('assistant', fallback);
+        chatHistory.push({ role: 'assistant', content: fallback });
+        saveChatHistory();
+    } catch (err) {
+        removeTypingIndicator(typingId);
         const fallback = getOfflineResponse(message);
         addMessageToUI('assistant', fallback);
         chatHistory.push({ role: 'assistant', content: fallback });
@@ -456,57 +453,397 @@ async function sendMessage(e) {
     }
 }
 
-async function getOllamaResponse(message) {
-    const context = `
-Heutige Hausaufgaben: ${JSON.stringify(nexusData.homework.filter(h => !h.completed).slice(0, 5))}
-Anstehende Klausuren: ${JSON.stringify(nexusData.exams.slice(0, 3))}
-Offene Aufgaben: ${JSON.stringify(nexusData.tasks.filter(t => !t.completed).slice(0, 5))}`;
+async function streamAIResponse(message, typingId) {
+    try {
+        const resp = await fetch('/api/hub/assistant/stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: message,
+                history: chatHistory.slice(-10)
+            }),
+            signal: AbortSignal.timeout(300000)
+        });
 
-    const response = await fetch('/api/hub/assistant/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            message: message,
-            model: ollamaModel,
-            context: context
-        }),
-        signal: AbortSignal.timeout(120000)
-    });
+        if (!resp.ok || !resp.body) return false;
 
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Ollama error');
+        removeTypingIndicator(typingId);
+
+        // Create message bubble with avatar (same format as addMessageToUI)
+        const msgEl = document.createElement('div');
+        msgEl.className = 'message assistant streaming-message';
+        msgEl.style.opacity = '0';
+        msgEl.style.transform = 'translateY(20px)';
+        const avatar = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>';
+        const avatarEl = document.createElement('div');
+        avatarEl.className = 'message-avatar';
+        avatarEl.innerHTML = avatar;
+        const contentEl = document.createElement('div');
+        contentEl.className = 'message-content';
+        msgEl.appendChild(avatarEl);
+        msgEl.appendChild(contentEl);
+        document.getElementById('chatMessages').appendChild(msgEl);
+
+        // Animate in
+        requestAnimationFrame(() => {
+            msgEl.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
+            msgEl.style.opacity = '1';
+            msgEl.style.transform = 'translateY(0)';
+        });
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = '';
+        let revealedLen = 0;
+        let committedLen = 0;
+        let buffer = '';
+        let streamDone = false;
+        let cleanedFromServer = null;
+        let actionsFromServer = null;
+
+        const committedEl = document.createElement('div');
+        committedEl.className = 'reveal-committed';
+        const pendingEl = document.createElement('div');
+        pendingEl.className = 'reveal-pending';
+        contentEl.appendChild(committedEl);
+        contentEl.appendChild(pendingEl);
+
+        const animateHeightGrowth = () => {
+            const before = contentEl.offsetHeight;
+            requestAnimationFrame(() => {
+                const after = contentEl.offsetHeight;
+                if (after <= before) return;
+                contentEl.style.height = before + 'px';
+                contentEl.style.transition = 'height 340ms cubic-bezier(0.22, 0.61, 0.36, 1)';
+                requestAnimationFrame(() => {
+                    contentEl.style.height = after + 'px';
+                    setTimeout(() => {
+                        contentEl.style.height = '';
+                        contentEl.style.transition = '';
+                    }, 380);
+                });
+            });
+        };
+
+        const container = document.getElementById('chatMessages');
+        let autoScroll = true;
+        const scrollThreshold = 80;
+        const isNearBottom = () => (container.scrollHeight - container.scrollTop - container.clientHeight) < scrollThreshold;
+        const onUserScroll = () => { autoScroll = isNearBottom(); };
+        container.addEventListener('scroll', onUserScroll, { passive: true });
+
+        const commitPending = () => {
+            if (committedLen >= revealedLen) return;
+            committedEl.innerHTML = formatMessage(fullText.slice(0, revealedLen));
+            pendingEl.textContent = '';
+            committedLen = revealedLen;
+        };
+
+        let rafPending = false;
+        let lastFrameTs = 0;
+        const scheduleReveal = () => {
+            if (rafPending) return;
+            rafPending = true;
+            requestAnimationFrame(revealTick);
+        };
+        const revealTick = (ts) => {
+            rafPending = false;
+            const remaining = fullText.length - revealedLen;
+            if (remaining <= 0) { lastFrameTs = ts || 0; return; }
+
+            const dt = lastFrameTs ? Math.min(48, ts - lastFrameTs) : 16;
+            lastFrameTs = ts || performance.now();
+            const baseRate = 90;
+            const lag = Math.max(1, Math.min(1.6, remaining / 400));
+            let step = Math.max(1, Math.round((baseRate * lag * dt) / 1000));
+            step = Math.min(step, 4, remaining);
+
+            const chunk = fullText.slice(revealedLen, revealedLen + step);
+            revealedLen += step;
+
+            const segments = chunk.split(/(\n)/).filter(Boolean);
+            let lineStartsHere = false;
+            for (const seg of segments) {
+                if (seg === '\n') {
+                    pendingEl.appendChild(document.createElement('br'));
+                    animateHeightGrowth();
+                    lineStartsHere = true;
+                    continue;
+                }
+                const span = document.createElement('span');
+                span.className = lineStartsHere ? 'reveal-chunk reveal-line-start' : 'reveal-chunk';
+                span.textContent = seg;
+                pendingEl.appendChild(span);
+                lineStartsHere = false;
+            }
+
+            const pendingText = fullText.slice(committedLen, revealedLen);
+            const shouldCommit =
+                pendingText.length > 100 ||
+                /\n\n/.test(pendingText) ||
+                (pendingText.length > 40 && /[.!?]\s*$/.test(pendingText));
+            if (shouldCommit) commitPending();
+
+            if (autoScroll) scrollToBottom(true);
+            if (revealedLen < fullText.length) scheduleReveal();
+        };
+
+        const handleEvent = (data) => {
+            if (data.token) {
+                fullText += data.token;
+                scheduleReveal();
+            }
+            if (data.done) {
+                streamDone = true;
+                if (typeof data.cleaned === 'string') cleanedFromServer = data.cleaned;
+                if (Array.isArray(data.actions_executed)) actionsFromServer = data.actions_executed;
+            }
+        };
+
+        while (!streamDone) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            let eventEnd;
+            while ((eventEnd = buffer.indexOf('\n\n')) !== -1) {
+                const event = buffer.substring(0, eventEnd);
+                buffer = buffer.substring(eventEnd + 2);
+
+                for (const line of event.split('\n')) {
+                    if (!line.startsWith('data: ')) continue;
+                    try { handleEvent(JSON.parse(line.slice(6))); } catch (e) {}
+                }
+            }
+        }
+
+        // Process remaining buffer
+        if (buffer.trim()) {
+            for (const line of buffer.split('\n')) {
+                if (!line.startsWith('data: ')) continue;
+                try { handleEvent(JSON.parse(line.slice(6))); } catch (e) {}
+            }
+        }
+
+        await new Promise(resolve => {
+            const drain = () => {
+                if (revealedLen >= fullText.length) return resolve();
+                requestAnimationFrame(drain);
+            };
+            drain();
+        });
+        commitPending();
+
+        container.removeEventListener('scroll', onUserScroll);
+        msgEl.classList.remove('streaming-message');
+
+        if (!fullText.trim()) {
+            msgEl.remove();
+            return false;
+        }
+
+        const finalText = (cleanedFromServer && cleanedFromServer.trim()) ? cleanedFromServer : fullText;
+        contentEl.innerHTML = formatMessage(finalText);
+
+        if (actionsFromServer && actionsFromServer.length) {
+            showActionResults(actionsFromServer);
+        }
+
+        chatHistory.push({ role: 'assistant', content: finalText });
+        if (autoScroll) scrollToBottom(true);
+        return true;
+    } catch (e) {
+        console.log('Stream failed:', e);
+        const partial = document.querySelector('.streaming-message');
+        if (partial) partial.remove();
+        return false;
     }
-    const data = await response.json();
-    return data.response;
 }
 
-async function getMlxResponse(message) {
-    const systemPrompt = `Du bist Nexus, ein hilfreicher Schulassistent für einen Schüler der 12. Klasse.
-Antworte kurz (max 3-4 Sätze) und präzise auf Deutsch.
-Aktuelle Daten:
-- Hausaufgaben: ${nexusData.homework.filter(h => !h.completed).length} offen
-- Klausuren: ${nexusData.exams.length} geplant
-- Aufgaben: ${nexusData.tasks.filter(t => !t.completed).length} offen`;
+function showActionResults(actions) {
+    const messagesEl = document.getElementById('chatMessages');
+    const nearBottom = (messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight) < 80;
+    actions.forEach(action => {
+        const card = document.createElement('div');
+        card.className = 'action-result-card';
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(10px)';
+        const icon = action.success ? '\u2705' : '\u274C';
+        card.innerHTML = `<span class="action-icon">${icon}</span><span class="action-text">${escapeHtml(action.message)}</span>`;
+        messagesEl.appendChild(card);
+        requestAnimationFrame(() => {
+            card.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        });
+    });
+    if (nearBottom) scrollToBottom();
+}
 
-    const response = await fetch('/api/mlx/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            prompt: message,
-            system: systemPrompt,
-            max_tokens: 300
-        }),
-        signal: AbortSignal.timeout(45000)
+function stripActionBlocks(text) {
+    if (!text) return '';
+    let out = text.replace(/\[ACTION\][\s\S]*?\[\/ACTION\]/g, '');
+    while (true) {
+        const idx = out.indexOf('[ACTION]');
+        if (idx === -1) break;
+        let j = idx + '[ACTION]'.length;
+        while (j < out.length && /\s/.test(out[j])) j++;
+        if (out[j] !== '{') {
+            out = out.slice(0, idx) + out.slice(idx + '[ACTION]'.length);
+            continue;
+        }
+        let depth = 0, inStr = false, esc = false, end = -1;
+        for (let k = j; k < out.length; k++) {
+            const c = out[k];
+            if (esc) { esc = false; continue; }
+            if (c === '\\') { esc = true; continue; }
+            if (c === '"') { inStr = !inStr; continue; }
+            if (inStr) continue;
+            if (c === '{') depth++;
+            else if (c === '}') { depth--; if (depth === 0) { end = k; break; } }
+        }
+        if (end === -1) { out = out.slice(0, idx); break; }
+        out = out.slice(0, idx) + out.slice(end + 1);
+    }
+    out = out.replace(/\n*-{2,}\s*\n+\s*\{[\s\S]*?("type"|"name"|"title")[\s\S]*$/, '');
+    out = out.replace(/\n+\s*\{\s*"(?:type|name|title)"\s*:[\s\S]*$/, '');
+    return out.replace(/\s+$/, '');
+}
+
+function renderLatex(latex) {
+    let s = latex;
+
+    s = s.replace(/\\(?:limits|nolimits|displaystyle|textstyle|scriptstyle|mathstrut|phantom|relax)(?![A-Za-z])/g, '');
+    s = s.replace(/\\(?:quad|qquad)(?![A-Za-z])/g, ' ');
+    s = s.replace(/\\[,;:!]/g, ' ');
+    s = s.replace(/\\ /g, ' ');
+    s = s.replace(/\\\{/g, '\u0001').replace(/\\\}/g, '\u0002').replace(/\\\|/g, '\u0003');
+
+    s = s.replace(/\\begin\{(cases|aligned|align\*?|gathered|split)\}([\s\S]*?)\\end\{\1\}/g, (_, env, body) => {
+        const rows = body.split(/\\\\+/).map(r => r.trim()).filter(Boolean);
+        const cells = rows.map(r => `<span class="math-row">${r.replace(/&/g, ' ')}</span>`).join('');
+        return `<span class="math-env math-${env === 'cases' ? 'cases' : 'stack'}">${cells}</span>`;
+    });
+    s = s.replace(/\\begin\{([pbvVB])?matrix\}([\s\S]*?)\\end\{\1?matrix\}/g, (_, kind, body) => {
+        kind = kind || '';
+        const rows = body.split(/\\\\+/).map(r => r.trim()).filter(Boolean);
+        const grid = rows.map(r => {
+            const cells = r.split('&').map(c => `<span class="math-cell">${c.trim()}</span>`).join('');
+            return `<span class="math-row">${cells}</span>`;
+        }).join('');
+        return `<span class="math-matrix math-matrix-${kind}">${grid}</span>`;
     });
 
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'MLX error');
+    s = s.replace(/\\left\s*([\(\[\|\{])/g, '$1').replace(/\\right\s*([\)\]\|\}])/g, '$1');
+    s = s.replace(/\\left\./g, '').replace(/\\right\./g, '');
+
+    s = s.replace(/\^\{([^{}]+)\}/g, '<sup>$1</sup>');
+    s = s.replace(/_\{([^{}]+)\}/g, '<sub>$1</sub>');
+    s = s.replace(/\^(-?[A-Za-z][A-Za-z0-9]*)/g, '<sup>$1</sup>');
+    s = s.replace(/_(-?[A-Za-z][A-Za-z0-9]*)/g, '<sub>$1</sub>');
+    s = s.replace(/\^(-?\d+(?:\.\d+)?)/g, '<sup>$1</sup>');
+    s = s.replace(/_(-?\d+(?:\.\d+)?)/g, '<sub>$1</sub>');
+
+    s = s.replace(/\\text\s*\{([^{}]*)\}/g, '<span class="math-text">$1</span>');
+    s = s.replace(/\\(?:mathbf|boldsymbol)\s*\{([\s\S]*?)\}/g, '<span class="math-bold">$1</span>');
+    s = s.replace(/\\mathit\s*\{([\s\S]*?)\}/g, '<span class="math-italic">$1</span>');
+    s = s.replace(/\\(?:mathrm|mathsf|operatorname)\s*\{([\s\S]*?)\}/g, '<span class="math-upright">$1</span>');
+    s = s.replace(/\\(?:mathbb|mathcal|mathfrak|mathscr)\s*\{([\s\S]*?)\}/g, '<span class="math-upright">$1</span>');
+
+    const COMB = { hat: '\u0302', widehat: '\u0302', tilde: '\u0303', widetilde: '\u0303',
+                   bar: '\u0304', dot: '\u0307', ddot: '\u0308', vec: '\u20D7', acute: '\u0301', grave: '\u0300', breve: '\u0306', check: '\u030C' };
+    for (const cmd of Object.keys(COMB)) {
+        const mark = COMB[cmd];
+        s = s.replace(new RegExp('\\\\' + cmd + '\\s*\\{([^{}])\\}', 'g'), (_, c) => c + mark);
+        s = s.replace(new RegExp('\\\\' + cmd + '\\s*\\{([^{}]+)\\}', 'g'),
+            (_, c) => `<span class="math-accent math-accent-${cmd}">${c}</span>`);
     }
 
-    const data = await response.json();
-    return data.response;
+    s = s.replace(/\\overline\s*\{([^{}]+)\}/g, '<span class="math-overline">$1</span>');
+    s = s.replace(/\\underline\s*\{([^{}]+)\}/g, '<span class="math-underline">$1</span>');
+    s = s.replace(/\\overrightarrow\s*\{([^{}]+)\}/g, '<span class="math-overrightarrow">$1</span>');
+    s = s.replace(/\\overleftarrow\s*\{([^{}]+)\}/g, '<span class="math-overleftarrow">$1</span>');
+    s = s.replace(/\\overleftrightarrow\s*\{([^{}]+)\}/g, '<span class="math-overlrarrow">$1</span>');
+    s = s.replace(/\\overbrace\s*\{([^{}]+)\}/g, '<span class="math-overbrace">$1</span>');
+    s = s.replace(/\\underbrace\s*\{([^{}]+)\}/g, '<span class="math-underbrace">$1</span>');
+
+    s = s.replace(/\\(?:binom|tbinom|dbinom)\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g,
+        '<span class="math-binom">(<span class="math-binom-stack"><span class="math-binom-top">$1</span><span class="math-binom-bot">$2</span></span>)</span>');
+
+    s = s.replace(/\\sqrt\s*\[([^\[\]]+)\]\s*\{([^{}]+)\}/g, '<span class="sqrt"><sup class="math-root-idx">$1</sup>√<span class="radicand">$2</span></span>');
+    s = s.replace(/\\sqrt\s*\{([^{}]+)\}/g, '<span class="sqrt">√<span class="radicand">$1</span></span>');
+    s = s.replace(/\\sqrt\s*([A-Za-z0-9])/g, '<span class="sqrt">√<span class="radicand">$1</span></span>');
+
+    for (let i = 0; i < 4; i++) {
+        s = s.replace(/\\(?:d|t|c)?frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g,
+            '<span class="frac"><span class="num">$1</span><span class="den">$2</span></span>');
+    }
+    s = s.replace(/\\(?:d|t|c)?frac\s*([A-Za-z0-9])\s*([A-Za-z0-9])/g,
+        '<span class="frac"><span class="num">$1</span><span class="den">$2</span></span>');
+
+    const greek = {alpha:'α',beta:'β',gamma:'γ',delta:'δ',epsilon:'ε',varepsilon:'ε',zeta:'ζ',eta:'η',theta:'θ',vartheta:'ϑ',iota:'ι',kappa:'κ',lambda:'λ',mu:'μ',nu:'ν',xi:'ξ',pi:'π',varpi:'ϖ',rho:'ρ',varrho:'ϱ',sigma:'σ',varsigma:'ς',tau:'τ',upsilon:'υ',phi:'φ',varphi:'ϕ',chi:'χ',psi:'ψ',omega:'ω',Gamma:'Γ',Delta:'Δ',Theta:'Θ',Lambda:'Λ',Xi:'Ξ',Pi:'Π',Sigma:'Σ',Upsilon:'Υ',Phi:'Φ',Psi:'Ψ',Omega:'Ω'};
+    for (const k in greek) s = s.replace(new RegExp('\\\\' + k + '(?![A-Za-z])', 'g'), greek[k]);
+
+    const ops = {
+        cdot:'·', cdots:'⋯', ldots:'…', dots:'…', vdots:'⋮', ddots:'⋱',
+        times:'×', div:'÷', ast:'∗', star:'⋆', circ:'∘', bullet:'•',
+        pm:'±', mp:'∓',
+        leq:'≤', le:'≤', geq:'≥', ge:'≥', neq:'≠', ne:'≠', ll:'≪', gg:'≫',
+        approx:'≈', equiv:'≡', sim:'∼', simeq:'≃', cong:'≅', propto:'∝',
+        infty:'∞', partial:'∂', nabla:'∇',
+        sum:'∑', prod:'∏', coprod:'∐', bigcup:'⋃', bigcap:'⋂', bigoplus:'⨁', bigotimes:'⨂',
+        int:'∫', iint:'∬', iiint:'∭', iiiint:'⨌', oint:'∮', oiint:'∯', oiiint:'∰',
+        forall:'∀', exists:'∃', nexists:'∄',
+        in:'∈', notin:'∉', ni:'∋',
+        subset:'⊂', supset:'⊃', subseteq:'⊆', supseteq:'⊇',
+        cup:'∪', cap:'∩', emptyset:'∅', varnothing:'∅', setminus:'∖',
+        rightarrow:'→', Rightarrow:'⇒', leftarrow:'←', Leftarrow:'⇐',
+        leftrightarrow:'↔', Leftrightarrow:'⇔',
+        longrightarrow:'⟶', longleftarrow:'⟵', Longrightarrow:'⟹', Longleftarrow:'⟸',
+        to:'→', mapsto:'↦', gets:'←', implies:'⇒', iff:'⇔',
+        lceil:'⌈', rceil:'⌉', lfloor:'⌊', rfloor:'⌋', langle:'⟨', rangle:'⟩',
+        degree:'°', prime:'′', pprime:'″', backslash:'\\',
+        hbar:'ℏ', ell:'ℓ', Re:'ℜ', Im:'ℑ', aleph:'ℵ', wp:'℘',
+        land:'∧', lor:'∨', lnot:'¬', neg:'¬', wedge:'∧', vee:'∨',
+        top:'⊤', bot:'⊥', vdash:'⊢', models:'⊨',
+        oplus:'⊕', otimes:'⊗', ominus:'⊖', odot:'⊙',
+        perp:'⊥', parallel:'∥',
+        mid:'|', vert:'|', Vert:'‖',
+        triangle:'△', square:'□', diamond:'◇',
+    };
+    for (const k in ops) s = s.replace(new RegExp('\\\\' + k + '(?![A-Za-z])', 'g'), ops[k]);
+
+    s = s.replace(/\^(-?[^\s^_{}$\\])/g, '<sup>$1</sup>');
+    s = s.replace(/_(-?[^\s^_{}$\\])/g, '<sub>$1</sub>');
+
+    s = s.replace(/\\(ln|log|sin|cos|tan|cot|sec|csc|arcsin|arccos|arctan|sinh|cosh|tanh|exp|max|min|lim|liminf|limsup|sup|inf|arg|det|dim|ker|mod|gcd|lcm|Pr|deg)(?![A-Za-z])/g, '<span class="math-fn">$1</span>');
+
+    s = s.replace(/\\\\/g, '<br>');
+    s = s.replace(/\\([A-Za-z]+)/g, '$1');
+    s = s.replace(/[{}]/g, '');
+    s = s.replace(/\u0001/g, '{').replace(/\u0002/g, '}').replace(/\u0003/g, '‖');
+    return s;
+}
+
+function renderMath(escapedText) {
+    const normalize = m => m.replace(/\s+/g, ' ').trim();
+    let out = escapedText;
+    out = out.replace(/\$\$([\s\S]+?)\$\$/g, (_, m) => `<span class="math-block">${renderLatex(normalize(m))}</span>`);
+    out = out.replace(/\\\[([\s\S]+?)\\\]/g, (_, m) => `<span class="math-block">${renderLatex(normalize(m))}</span>`);
+    out = out.replace(/(^|[^\\])\$([^\$\n]+?)\$/g, (_, pre, m) => `${pre}<span class="math-inline">${renderLatex(normalize(m))}</span>`);
+    out = out.replace(/\\\(([\s\S]+?)\\\)/g, (_, m) => `<span class="math-inline">${renderLatex(normalize(m))}</span>`);
+    return out;
+}
+
+function formatMessage(text) {
+    const stripped = stripActionBlocks(text || '');
+    let html = escapeHtml(stripped);
+    html = renderMath(html);
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/(^|[^*])\*([^\*\n]+)\*/g, '$1<em>$2</em>');
+    html = html.replace(/\n/g, '<br>');
+    return html;
 }
 
 function getOfflineResponse(message) {
@@ -755,7 +1092,7 @@ Oder nutze **Mathe-Hilfe** für mehr Optionen!`;
     const parts = func.split('+').filter(p => p);
 
     parts.forEach(term => {
-        if (!term.includes('x')) return;
+        if (!term.includes('x')) return; // constant -> 0
 
         const powerMatch = term.match(/^(-?\d*)x\^?(\d*)$/);
         if (powerMatch) {
@@ -995,9 +1332,7 @@ function addMessageToUI(role, content, scroll = true) {
         ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`
         : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`;
 
-    let formattedContent = escapeHtml(content)
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\n/g, '<br>');
+    const formattedContent = formatMessage(content);
 
     messageDiv.innerHTML = `
         <div class="message-avatar">${avatar}</div>
@@ -1032,15 +1367,37 @@ function removeTypingIndicator(id) {
     if (el) el.remove();
 }
 
-function scrollToBottom() {
+let _smoothScrollRaf = null;
+function scrollToBottom(smooth = true) {
     const container = document.getElementById('chatMessages');
-    container.scrollTop = container.scrollHeight;
+    if (!smooth) {
+        container.scrollTop = container.scrollHeight;
+        return;
+    }
+    if (_smoothScrollRaf) cancelAnimationFrame(_smoothScrollRaf);
+    const tick = () => {
+        const target = container.scrollHeight - container.clientHeight;
+        const current = container.scrollTop;
+        const distance = target - current;
+        if (distance < 1) {
+            container.scrollTop = target;
+            _smoothScrollRaf = null;
+            return;
+        }
+        const step = Math.max(1, distance * 0.18);
+        container.scrollTop = current + step;
+        _smoothScrollRaf = requestAnimationFrame(tick);
+    };
+    _smoothScrollRaf = requestAnimationFrame(tick);
 }
 
-function clearChat() {
+async function clearChat() {
     if (!confirm('Chat-Verlauf wirklich löschen?')) return;
     chatHistory = [];
     localStorage.removeItem('nexus-chat-history');
+    try {
+        await fetch('/api/hub/assistant/history', { method: 'DELETE' });
+    } catch (e) { /* ignore */ }
     document.getElementById('chatMessages').innerHTML = `
         <div class="message assistant">
             <div class="message-avatar">
@@ -1213,13 +1570,13 @@ function evaluateExpression(expr, x) {
         .replace(/²/g, '^2')
         .replace(/³/g, '^3')
         .replace(/\^/g, '**')
-        .replace(/(\d)([x])/g, '$1*$2')
-        .replace(/([x])(\d)/g, '$1*$2')
-        .replace(/\)(\d)/g, ')*$1')
-        .replace(/(\d)\(/g, '$1*(')
-        .replace(/\)\(/g, ')*(')
-        .replace(/([x])\(/g, '$1*(')
-        .replace(/\)([x])/g, ')*$1')
+        .replace(/(\d)([x])/g, '$1*$2')  // 2x -> 2*x
+        .replace(/([x])(\d)/g, '$1*$2')  // x2 -> x*2
+        .replace(/\)(\d)/g, ')*$1')       // )2 -> )*2
+        .replace(/(\d)\(/g, '$1*(')       // 2( -> 2*(
+        .replace(/\)\(/g, ')*(')          // )( -> )*(
+        .replace(/([x])\(/g, '$1*(')      // x( -> x*(
+        .replace(/\)([x])/g, ')*$1')      // )x -> )*x
         .replace(/sin/g, 'Math.sin')
         .replace(/cos/g, 'Math.cos')
         .replace(/tan/g, 'Math.tan')
@@ -1232,6 +1589,7 @@ function evaluateExpression(expr, x) {
 
     normalized = normalized.replace(/x/g, `(${x})`);
 
+    // Whitelist: only allow safe math characters after all transformations
     const safeMath = normalized.replace(/Math\.(sin|cos|tan|abs|log|sqrt|pow|floor|ceil|round|PI|E|exp|min|max)/g, '');
     if (!/^[\d\s+\-*/().eE,]+$/.test(safeMath)) {
         return NaN;
@@ -2257,19 +2615,290 @@ document.addEventListener('keydown', (e) => {
 .message-content {
     background: var(--glass-bg);
     padding: 12px 16px;
-    border-radius: 16px;
+    border-radius: 22px;
     color: var(--text-primary);
     line-height: 1.5;
+}
+
+.message-content .math-inline {
+    font-family: 'Cambria Math', 'STIX Two Math', 'Latin Modern Math', Georgia, serif;
+    font-style: italic;
+    padding: 0 2px;
+}
+
+.message-content .math-block {
+    display: block;
+    font-family: 'Cambria Math', 'STIX Two Math', 'Latin Modern Math', Georgia, serif;
+    font-style: italic;
+    text-align: center;
+    margin: 10px 0;
+    padding: 8px 4px;
+    overflow-x: auto;
+}
+
+.message-content .math-fn,
+.message-content .math-text {
+    font-style: normal;
+    font-family: inherit;
+}
+
+.message-content .math-text {
+    margin: 0 2px;
+}
+
+.message-content .math-bold {
+    font-weight: 700;
+    font-style: italic;
+}
+
+.message-content .math-italic {
+    font-style: italic;
+}
+
+.message-content .math-upright {
+    font-style: normal;
+}
+
+.message-content .frac {
+    display: inline-flex;
+    flex-direction: column;
+    vertical-align: middle;
+    text-align: center;
+    font-size: 0.92em;
+    margin: 0 3px;
+    line-height: 1.1;
+}
+
+.message-content .frac .num {
+    border-bottom: 1px solid currentColor;
+    padding: 0 4px 1px;
+}
+
+.message-content .frac .den {
+    padding: 1px 4px 0;
+}
+
+.message-content .sqrt {
+    display: inline-flex;
+    align-items: flex-start;
+    white-space: nowrap;
+}
+
+.message-content .sqrt .radicand {
+    border-top: 1px solid currentColor;
+    padding: 0 2px;
+    margin-left: -2px;
+}
+
+.message-content sup,
+.message-content sub {
+    font-style: normal;
+    font-size: 0.75em;
+    line-height: 0;
+}
+
+.message-content .math-overline {
+    text-decoration: overline;
+    text-decoration-thickness: 1px;
+    padding-top: 1px;
+}
+
+.message-content .math-underline {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+}
+
+.message-content .math-overrightarrow,
+.message-content .math-overleftarrow,
+.message-content .math-overlrarrow {
+    display: inline-block;
+    position: relative;
+    padding-top: 0.45em;
+    line-height: 1;
+}
+
+.message-content .math-overrightarrow::before,
+.message-content .math-overleftarrow::before,
+.message-content .math-overlrarrow::before {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    text-align: center;
+    font-size: 0.7em;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.message-content .math-overrightarrow::before { content: '⟶'; }
+.message-content .math-overleftarrow::before  { content: '⟵'; }
+.message-content .math-overlrarrow::before    { content: '⟷'; }
+
+.message-content .math-overbrace,
+.message-content .math-underbrace {
+    display: inline-block;
+    position: relative;
+    padding-top: 0.3em;
+    padding-bottom: 0.3em;
+}
+.message-content .math-overbrace::before  { content: '⏞'; position: absolute; left: 0; right: 0; top: -0.1em; text-align: center; font-size: 0.9em; }
+.message-content .math-underbrace::after  { content: '⏟'; position: absolute; left: 0; right: 0; bottom: -0.1em; text-align: center; font-size: 0.9em; }
+
+.message-content .math-accent {
+    display: inline-block;
+    position: relative;
+    padding-top: 0.35em;
+}
+.message-content .math-accent::before {
+    position: absolute;
+    left: 0; right: 0; top: -0.1em;
+    text-align: center;
+    font-size: 0.75em;
+    line-height: 1;
+    pointer-events: none;
+}
+.message-content .math-accent-hat::before,
+.message-content .math-accent-widehat::before { content: '^'; }
+.message-content .math-accent-tilde::before,
+.message-content .math-accent-widetilde::before { content: '~'; }
+.message-content .math-accent-bar::before   { content: '‾'; }
+.message-content .math-accent-dot::before   { content: '˙'; }
+.message-content .math-accent-ddot::before  { content: '¨'; }
+.message-content .math-accent-vec::before   { content: '⟶'; font-size: 0.7em; }
+.message-content .math-accent-acute::before { content: '´'; }
+.message-content .math-accent-grave::before { content: '`'; }
+.message-content .math-accent-breve::before { content: '˘'; }
+.message-content .math-accent-check::before { content: 'ˇ'; }
+
+.message-content .math-binom {
+    display: inline-flex;
+    align-items: center;
+    font-size: 1.1em;
+    vertical-align: middle;
+}
+.message-content .math-binom-stack {
+    display: inline-flex;
+    flex-direction: column;
+    text-align: center;
+    line-height: 1.05;
+    font-size: 0.85em;
+    margin: 0 1px;
+}
+.message-content .math-binom-top { padding: 1px 4px; }
+.message-content .math-binom-bot { padding: 1px 4px; }
+
+.message-content .math-root-idx {
+    font-size: 0.6em;
+    margin-right: -4px;
+    vertical-align: 0.6em;
+}
+
+.message-content .math-env {
+    display: inline-flex;
+    flex-direction: column;
+    vertical-align: middle;
+    margin: 0 4px;
+    line-height: 1.5;
+}
+.message-content .math-env .math-row {
+    display: block;
+    padding: 1px 0;
+}
+.message-content .math-cases {
+    padding-left: 10px;
+    position: relative;
+}
+.message-content .math-cases::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 2px; bottom: 2px;
+    width: 2px;
+    background: currentColor;
+    border-radius: 1px;
+}
+
+.message-content .math-matrix {
+    display: inline-flex;
+    flex-direction: column;
+    vertical-align: middle;
+    margin: 0 6px;
+    padding: 2px 10px;
+    position: relative;
+    line-height: 1.4;
+}
+.message-content .math-matrix .math-row {
+    display: flex;
+    gap: 14px;
+    justify-content: space-between;
+}
+.message-content .math-matrix .math-cell {
+    padding: 1px 2px;
+    min-width: 1ch;
+}
+.message-content .math-matrix::before,
+.message-content .math-matrix::after {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    border: 1px solid currentColor;
+}
+.message-content .math-matrix::before { left: 0; border-right: none; }
+.message-content .math-matrix::after  { right: 0; border-left: none; }
+.message-content .math-matrix-p::before { border-radius: 60% 0 0 60% / 50% 0 0 50%; border-right: none; }
+.message-content .math-matrix-p::after  { border-radius: 0 60% 60% 0 / 0 50% 50% 0; border-left: none; }
+.message-content .math-matrix-v::before,
+.message-content .math-matrix-v::after { border: none; width: 1px; background: currentColor; }
+.message-content .math-matrix-V::before,
+.message-content .math-matrix-V::after { border: none; width: 3px; background: currentColor; }
+.message-content .math-matrix-b::before { border-radius: 0; }
+.message-content .math-matrix-b::after  { border-radius: 0; }
+.message-content .math-matrix-::before,
+.message-content .math-matrix-::after  { border: none; }
+
+/* No caret — the fading text is signal enough that generation is ongoing. */
+
+.streaming-message .message-content {
+    overflow: hidden;
+}
+
+.reveal-committed,
+.reveal-pending {
+    display: inline;
+}
+
+.reveal-chunk {
+    animation: nexus-reveal 240ms ease-out both;
+}
+
+.reveal-chunk.reveal-line-start {
+    animation: nexus-reveal-line 520ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+    display: inline-block;
+}
+
+@keyframes nexus-reveal {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes nexus-reveal-line {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .reveal-chunk { animation: none; }
+    .streaming-message .message-content { transition: none !important; }
 }
 
 .message.user .message-content {
     background: var(--accent);
     color: white;
-    border-radius: 16px 16px 4px 16px;
+    border-radius: 22px 22px 4px 22px;
 }
 
 .message.assistant .message-content {
-    border-radius: 16px 16px 16px 4px;
+    border-radius: 22px 22px 22px 4px;
 }
 
 .suggestion-list {
@@ -2284,7 +2913,7 @@ document.addEventListener('keydown', (e) => {
 .suggestion-list li {
     background: var(--hover-bg);
     padding: 6px 12px;
-    border-radius: 16px;
+    border-radius: 22px;
     font-size: 13px;
     cursor: pointer;
     transition: all 0.2s;
@@ -2363,6 +2992,7 @@ document.addEventListener('keydown', (e) => {
     color: white;
 }
 
+/* Typing indicator */
 .typing-dots {
     display: flex;
     gap: 4px;
@@ -2399,6 +3029,7 @@ document.addEventListener('keydown', (e) => {
     }
 }
 
+/* Modal styles */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -2419,7 +3050,7 @@ document.addEventListener('keydown', (e) => {
 
 .modal-content {
     background: var(--glass-bg);
-    border-radius: 16px;
+    border-radius: 22px;
     max-width: 500px;
     width: 100%;
     max-height: 90vh;
@@ -2456,7 +3087,7 @@ document.addEventListener('keydown', (e) => {
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 8px;
+    border-radius: 14px;
 }
 
 .modal-close:hover {
@@ -2484,7 +3115,7 @@ document.addEventListener('keydown', (e) => {
     width: 100%;
     padding: 10px 14px;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 14px;
     background: var(--bg-primary);
     color: var(--text-primary);
     font-size: 14px;
@@ -2505,6 +3136,7 @@ document.addEventListener('keydown', (e) => {
     width: 100%;
 }
 
+/* Math helper styles */
 .math-categories {
     display: flex;
     flex-wrap: wrap;
@@ -2548,7 +3180,7 @@ document.addEventListener('keydown', (e) => {
     width: 100%;
     padding: 12px;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 14px;
     background: var(--bg-primary);
     color: var(--text-primary);
     font-size: 15px;
@@ -2572,7 +3204,7 @@ document.addEventListener('keydown', (e) => {
 .math-examples button {
     padding: 4px 10px;
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: 18px;
     background: transparent;
     color: var(--text-secondary);
     font-size: 12px;
@@ -2589,7 +3221,7 @@ document.addEventListener('keydown', (e) => {
     margin-top: 20px;
     padding: 16px;
     background: var(--bg-primary);
-    border-radius: 12px;
+    border-radius: 18px;
     border: 1px solid var(--border-color);
 }
 
@@ -2614,7 +3246,7 @@ document.addEventListener('keydown', (e) => {
 .solution-final {
     padding: 12px;
     background: rgba(99, 102, 241, 0.1);
-    border-radius: 8px;
+    border-radius: 14px;
     margin-top: 12px;
     font-size: 16px;
 }
@@ -2629,6 +3261,7 @@ document.addEventListener('keydown', (e) => {
     color: var(--danger);
 }
 
+/* Essay helper styles */
 .essay-type-selector {
     margin-bottom: 16px;
 }
@@ -2637,7 +3270,7 @@ document.addEventListener('keydown', (e) => {
     width: 100%;
     padding: 10px 14px;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 14px;
     background: var(--bg-primary);
     color: var(--text-primary);
     font-size: 14px;
@@ -2677,7 +3310,7 @@ document.addEventListener('keydown', (e) => {
 .tip {
     padding: 12px;
     background: rgba(245, 158, 11, 0.1);
-    border-radius: 8px;
+    border-radius: 14px;
     margin-top: 16px;
     font-size: 13px;
 }
@@ -2688,10 +3321,11 @@ document.addEventListener('keydown', (e) => {
     margin-top: 12px;
 }
 
+/* Flashcard styles */
 .flashcard {
     background: var(--glass-bg);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: 18px;
     padding: 16px;
     margin-bottom: 12px;
 }

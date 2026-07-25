@@ -52,8 +52,12 @@
 	</array>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>be.tramckrijte.workmanagerExample.iOSBackgroundAppRefresh</string>
-		<string>be.tramckrijte.workmanagerExample.iOSBackgroundProcessing</string>
+		<string>email_sync_periodic</string>
+		<string>calendar_sync_periodic</string>
+		<string>iserv_sync_periodic</string>
+		<string>update_check_periodic</string>
+		<string>cache_cleanup_periodic</string>
+		<string>offline_queue_periodic</string>
 	</array>
 </dict>
 </plist>

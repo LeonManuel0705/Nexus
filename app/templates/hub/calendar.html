@@ -40,7 +40,7 @@
             <span class="cal-filter-dot" style="background: var(--accent-gradient);"></span>Alle
         </button>
         <button class="cal-filter" data-filter="school" onclick="setCalendarFilter('school')">
-            <span class="cal-filter-dot" style="background: #667eea;"></span>Schule
+            <span class="cal-filter-dot" style="background: #3d7bff;"></span>Schule
         </button>
         <button class="cal-filter" data-filter="training" onclick="setCalendarFilter('training')">
             <span class="cal-filter-dot" style="background: #48bb78;"></span>Training
@@ -310,6 +310,23 @@ document.addEventListener('DOMContentLoaded', () => {
         fab.onclick = () => openAddEventModal();
         fab.title = 'Neuer Termin';
     }
+
+    // Apply the entry animation class to freshly rendered event strips.
+    // MutationObserver catches every innerHTML swap inside #calendarDays — both
+    // the direct renderCalendar path and the month-slide path.
+    const grid = document.getElementById('calendarDays');
+    if (grid && typeof MutationObserver !== 'undefined') {
+        const obs = new MutationObserver(() => {
+            grid.querySelectorAll('.event-preview:not(.evp-enter), .event-more:not(.evp-enter)')
+                .forEach(el => {
+                    // Force a reflow so the animation restarts if the class is ever re-added.
+                    el.classList.remove('evp-enter');
+                    void el.offsetWidth;
+                    el.classList.add('evp-enter');
+                });
+        });
+        obs.observe(grid, { childList: true, subtree: true });
+    }
 });
 
 const CACHE_KEY = 'nexus-calendar-pending-changes';
@@ -551,8 +568,8 @@ function renderCalendar() {
         if (dayEvents.length > 0) classes += ' has-events';
 
         const eventPreviews = dayEvents.slice(0, 3).map(e => {
-            const rawColor = e.calendar_color || getCategoryColor(e.category) || '#6366f1';
-            const color = /^#[0-9a-fA-F]{3,8}$/.test(rawColor) ? rawColor : '#6366f1';
+            const rawColor = e.calendar_color || getCategoryColor(e.category) || '#0057ff';
+            const color = /^#[0-9a-fA-F]{3,8}$/.test(rawColor) ? rawColor : '#0057ff';
             const title = e.title.length > 12 ? e.title.substring(0, 12) + '…' : e.title;
             return `<div class="event-preview" style="background: ${color};" title="${escapeHtml(e.title)}">${escapeHtml(title)}</div>`;
         }).join('');
@@ -635,7 +652,7 @@ function getCategoryColor(category) {
         'iserv': '#3498db',
         'holiday': '#e74c3c'
     };
-    return colors[category] || '#6366f1';
+    return colors[category] || '#0057ff';
 }
 
 function escapeHtml(str) {
@@ -806,6 +823,7 @@ function setCalendarFilter(filter) {
 }
 
 async function loadEvents(updatePanel = true) {
+    if (window.NexusLoader) window.NexusLoader.show();
     try {
         events = [];
 
@@ -853,6 +871,8 @@ async function loadEvents(updatePanel = true) {
         if (updatePanel) updateEventsForDate();
     } catch (err) {
         console.log('Calendar API not available:', err);
+    } finally {
+        if (window.NexusLoader) window.NexusLoader.hide();
     }
 }
 
@@ -2217,7 +2237,7 @@ async function loadCalendarAccounts() {
     padding: 4px 12px;
     background: var(--accent-light);
     color: var(--accent);
-    border-radius: 12px;
+    border-radius: 18px;
     font-size: 12px;
     font-weight: 600;
 }
@@ -2289,7 +2309,7 @@ async function loadCalendarAccounts() {
 }
 
 /* Category borders */
-.cal-event-card.category-school { border-left-color: #667eea; }
+.cal-event-card.category-school { border-left-color: #3d7bff; }
 .cal-event-card.category-training { border-left-color: #48bb78; }
 .cal-event-card.category-personal { border-left-color: #9f7aea; }
 .cal-event-card.category-work { border-left-color: #ed8936; }
@@ -2368,7 +2388,7 @@ async function loadCalendarAccounts() {
     padding: 3px 10px;
     background: color-mix(in srgb, var(--tag-color, var(--accent)) 12%, transparent);
     color: var(--tag-color, var(--accent));
-    border-radius: 10px;
+    border-radius: 18px;
     font-size: 11px;
     font-weight: 600;
     white-space: nowrap;
@@ -2501,7 +2521,7 @@ async function loadCalendarAccounts() {
     font-size: 11px;
     font-weight: 600;
     padding: 2px 8px;
-    border-radius: 10px;
+    border-radius: 18px;
 }
 
 .route-header {
@@ -2710,7 +2730,7 @@ async function loadCalendarAccounts() {
 .import-progress-bar {
     height: 100%;
     width: 0%;
-    background: linear-gradient(90deg, var(--accent), #764ba2);
+    background: linear-gradient(90deg, var(--accent), #0057ff);
     border-radius: 4px;
     transition: width 0.3s ease;
 }
@@ -2882,7 +2902,7 @@ async function loadCalendarAccounts() {
     transform: translateX(-50%);
     color: white;
     padding: 12px 22px;
-    border-radius: 10px;
+    border-radius: 18px;
     font-weight: 500;
     font-size: 14px;
     z-index: 10000;
@@ -2899,7 +2919,7 @@ async function loadCalendarAccounts() {
 }
 .toast-success { background: linear-gradient(135deg, #22c55e, #16a34a); }
 .toast-error   { background: linear-gradient(135deg, #ef4444, #dc2626); }
-.toast-info    { background: linear-gradient(135deg, #667eea, #764ba2); }
+.toast-info    { background: linear-gradient(135deg, #3d7bff, #0057ff); }
 
 /* ========== EVENT CARD STAGGER (refined) ========== */
 .cal-event-card {
@@ -2956,13 +2976,20 @@ async function loadCalendarAccounts() {
 
 /* ========== EVENT DOT ENTRANCE IN MONTH GRID ========== */
 @keyframes dotPop {
-    0%   { opacity: 0; transform: scaleX(0.4); }
-    60%  { transform: scaleX(1.08); }
-    100% { opacity: 1; transform: scaleX(1); }
+    0%   { opacity: 0; transform: translateY(8px) scale(0.3); }
+    60%  { opacity: 1; transform: translateY(0)   scale(1.10); }
+    100% { opacity: 1; transform: translateY(0)   scale(1.00); }
 }
-.event-preview {
-    animation: dotPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+.event-preview,
+.event-more {
     transform-origin: left center;
 }
+.event-preview.evp-enter,
+.event-more.evp-enter {
+    animation: dotPop 0.42s cubic-bezier(0.34, 1.45, 0.64, 1) both;
+}
+.day-events .event-preview.evp-enter:nth-child(2) { animation-delay: 0.07s; }
+.day-events .event-preview.evp-enter:nth-child(3) { animation-delay: 0.14s; }
+.day-events .event-more.evp-enter                 { animation-delay: 0.20s; }
 </style>
 {% endblock %}

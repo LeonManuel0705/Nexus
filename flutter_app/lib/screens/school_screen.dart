@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -27,7 +26,6 @@ Color _parseColor(dynamic colorValue, [Color fallback = Colors.grey]) {
   }
 }
 
-/// Mark options for Mittelstufe grade system (1+ to 6)
 const _markOptions = [
   {'label': '1+', 'value': 0.7},
   {'label': '1', 'value': 1.0},
@@ -91,6 +89,8 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
   bool _isLoading = true;
   String _gradeSystem = 'points';
   int _classLevel = 10;
+  bool _iservLoggingIn = false;
+  String? _iservLoginError;
 
   final PageController _vertretungsplanPageController = PageController();
   int _currentVertretungsplanPage = 0;
@@ -128,6 +128,26 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
       _classLevel = prefs.getInt('school_class_level') ?? 10;
       _gradeSystem = _classLevel <= 10 ? 'marks' : 'points';
       _subjects = await _db.getSubjects();
+
+      if (!mounted) return;
+      final provider = context.read<AppProvider>();
+      final existingNames = _subjects.map((s) => s['name'] as String).toSet();
+      final seenNames = <String>{};
+      for (final lesson in provider.lessons) {
+        final name = lesson.subject.trim();
+        if (name.isNotEmpty && !existingNames.contains(name) && seenNames.add(name)) {
+          await _db.insertSubject(
+            name: name,
+            teacher: lesson.teacher,
+            room: lesson.room,
+            color: lesson.color,
+          );
+        }
+      }
+      if (seenNames.isNotEmpty) {
+        _subjects = await _db.getSubjects();
+      }
+
       _homework = await _db.getHomework();
       await _loadTests();
       await _loadExams();
@@ -267,8 +287,8 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: _displayedIsAWeek(provider)
-                                    ? [NexusTheme.primaryColor, NexusTheme.secondaryColor]
-                                    : [NexusTheme.secondaryColor, NexusTheme.accentColor],
+                                    ? [NexusTheme.primaryColor, NexusTheme.primaryLight]
+                                    : [NexusTheme.primaryLight, NexusTheme.accentColor],
                               ),
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
@@ -448,7 +468,43 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         children: [
-          if (isToday && lessonsForDay.isNotEmpty) ...[
+          if (isToday && DateTime.now().weekday > 5) ...[
+            GlassCard(
+              margin: const EdgeInsets.only(top: 8, bottom: 12),
+              padding: const EdgeInsets.all(16),
+              borderRadius: 12,
+              child: Row(
+                children: [
+                  const Icon(Icons.weekend_rounded, color: NexusTheme.primaryColor, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Wochenende',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            color: isDark ? NexusTheme.darkText : NexusTheme.lightText,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Hier siehst du den Plan für nächsten Montag.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (isToday && lessonsForDay.isNotEmpty && DateTime.now().weekday <= 5) ...[
             _buildCurrentLessonCard(lessonsForDay, now, isDark),
             const SizedBox(height: 16),
           ],
@@ -460,7 +516,7 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [NexusTheme.primaryColor, NexusTheme.secondaryColor],
+                      colors: [NexusTheme.primaryColor, NexusTheme.primaryLight],
                     ),
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -729,7 +785,7 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
         decoration: BoxDecoration(
           gradient: isSelected
               ? const LinearGradient(
-                  colors: [NexusTheme.primaryColor, NexusTheme.secondaryColor],
+                  colors: [NexusTheme.primaryColor, NexusTheme.primaryLight],
                 )
               : null,
           borderRadius: BorderRadius.circular(8),
@@ -850,13 +906,13 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
                               ? LinearGradient(
                                   colors: [
                                     NexusTheme.primaryColor.withValues(alpha: 0.3),
-                                    NexusTheme.secondaryColor.withValues(alpha: 0.2),
+                                    NexusTheme.primaryLight.withValues(alpha: 0.2),
                                   ],
                                 )
                               : LinearGradient(
                                   colors: [
                                     NexusTheme.primaryColor.withValues(alpha: 0.1),
-                                    NexusTheme.secondaryColor.withValues(alpha: 0.1),
+                                    NexusTheme.primaryLight.withValues(alpha: 0.1),
                                   ],
                                 ),
                         ),
@@ -908,7 +964,7 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
                             height: 24,
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
-                                colors: [NexusTheme.primaryColor, NexusTheme.secondaryColor],
+                                colors: [NexusTheme.primaryColor, NexusTheme.primaryLight],
                               ),
                               borderRadius: BorderRadius.circular(6),
                             ),
@@ -1135,6 +1191,20 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
                     onDelete: () => _deleteSubject(entry.value['id']),
                   ),
                 )),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Center(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showAddSubjectDialog(isDark),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Fach hinzufügen'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: NexusTheme.primaryColor,
+                        side: BorderSide(color: NexusTheme.primaryColor.withValues(alpha: 0.5)),
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 120),
               ],
             ),
@@ -1241,7 +1311,12 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
           ),
         ],
       ),
-    );
+    ).then((_) {
+      nameController.dispose();
+      shortController.dispose();
+      teacherController.dispose();
+      roomController.dispose();
+    });
   }
 
   Future<void> _deleteSubject(int id) async {
@@ -1309,6 +1384,20 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
                     ),
                   )),
                 ],
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Center(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showHomeworkDialog(null, isDark),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Hausaufgabe hinzufügen'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: NexusTheme.primaryColor,
+                        side: BorderSide(color: NexusTheme.primaryColor.withValues(alpha: 0.5)),
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 120),
               ],
             ),
@@ -1406,7 +1495,7 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
                     dueDate: dueDate,
                   );
                 }
-                await _loadAllData();
+                try { await _loadAllData(); } catch (_) {}
                 if (context.mounted) Navigator.pop(context);
               },
               child: const Text('Speichern'),
@@ -1414,7 +1503,10 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
           ],
         ),
       ),
-    );
+    ).then((_) {
+      titleController.dispose();
+      notesController.dispose();
+    });
   }
 
   Future<void> _toggleHomework(Map<String, dynamic> hw) async {
@@ -1476,6 +1568,20 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
                     ),
                   )),
                 ],
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Center(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showTestExamDialog(null, isExam: false, isDark: isDark),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Test hinzufügen'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: NexusTheme.primaryColor,
+                        side: BorderSide(color: NexusTheme.primaryColor.withValues(alpha: 0.5)),
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 120),
               ],
             ),
@@ -1531,6 +1637,20 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
                     ),
                   )),
                 ],
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Center(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showTestExamDialog(null, isExam: true, isDark: isDark),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Klausur hinzufügen'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: NexusTheme.primaryColor,
+                        side: BorderSide(color: NexusTheme.primaryColor.withValues(alpha: 0.5)),
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 120),
               ],
             ),
@@ -1642,7 +1762,7 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
                     'created_at': DateTime.now().toIso8601String(),
                   });
                 }
-                await _loadAllData();
+                try { await _loadAllData(); } catch (_) {}
                 if (context.mounted) Navigator.pop(context);
               },
               child: const Text('Speichern'),
@@ -1650,7 +1770,11 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
           ],
         ),
       ),
-    );
+    ).then((_) {
+      titleController.dispose();
+      notesController.dispose();
+      gradeController.dispose();
+    });
   }
 
   Future<void> _deleteTest(String id) async {
@@ -1758,7 +1882,7 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
                         ),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? const Color(0xFF4F46E5)
+                              ? const Color(0xFF0057FF)
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(9999),
                         ),
@@ -1790,7 +1914,7 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
                   else ...[
                     _buildSummaryItem('Gesamt', overallAvg.toStringAsFixed(1), NexusTheme.primaryColor, isDark),
                     if (klausurAvg != null)
-                      _buildSummaryItem('Klausuren (1/3)', klausurAvg.toStringAsFixed(1), NexusTheme.secondaryColor, isDark),
+                      _buildSummaryItem('Klausuren (1/3)', klausurAvg.toStringAsFixed(1), NexusTheme.primaryLight, isDark),
                     if (sonstigeAvg != null)
                       _buildSummaryItem('Sonstige (2/3)', sonstigeAvg.toStringAsFixed(1), NexusTheme.accentColor, isDark),
                   ],
@@ -2077,7 +2201,7 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
                     'created_at': DateTime.now().toIso8601String(),
                   });
                 }
-                await _loadAllData();
+                try { await _loadAllData(); } catch (_) {}
                 if (context.mounted) Navigator.pop(context);
               },
               child: const Text('Speichern'),
@@ -2085,7 +2209,9 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
           ],
         ),
       ),
-    );
+    ).then((_) {
+      pointsController.dispose();
+    });
   }
 
   List<Widget> _buildGradesBySubject(List<Map<String, dynamic>> grades, bool isDark) {
@@ -2781,7 +2907,7 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
                   end: Alignment.bottomRight,
                   colors: [
                     NexusTheme.primaryColor.withValues(alpha: 0.2),
-                    NexusTheme.secondaryColor.withValues(alpha: 0.1),
+                    NexusTheme.primaryLight.withValues(alpha: 0.1),
                   ],
                 ),
                 shape: BoxShape.circle,
@@ -2833,94 +2959,122 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
     final usernameController = TextEditingController();
     final passwordController = TextEditingController();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    _iservLoggingIn = false;
+    _iservLoginError = null;
 
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: isDark ? NexusTheme.darkCard : null,
-        title: const Text('Mit IServ verbinden'),
-        content: SizedBox(
-          width: 460,
-          child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Gib deine IServ-URL und Anmeldedaten ein, oder nutze den WebView-Login.',
-                style: TextStyle(fontSize: 14),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: urlController,
-                decoration: const InputDecoration(
-                  labelText: 'IServ URL',
-                  hintText: 'z.B. gymnasium.iserv.de',
-                  prefixIcon: Icon(Icons.public),
-                  border: OutlineInputBorder(),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          backgroundColor: isDark ? NexusTheme.darkCard : null,
+          title: const Text('Mit IServ verbinden'),
+          content: SizedBox(
+            width: 460,
+            child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Gib deine IServ-URL und Anmeldedaten ein, oder nutze den WebView-Login.',
+                  style: TextStyle(fontSize: 14),
                 ),
-                keyboardType: TextInputType.url,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: usernameController,
-                decoration: const InputDecoration(
-                  labelText: 'Benutzername',
-                  prefixIcon: Icon(Icons.person),
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: urlController,
+                  decoration: const InputDecoration(
+                    labelText: 'IServ URL',
+                    hintText: 'z.B. gymnasium.iserv.de',
+                    prefixIcon: Icon(Icons.public),
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.url,
+                  textInputAction: TextInputAction.next,
+                  enabled: !_iservLoggingIn,
                 ),
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: passwordController,
-                decoration: const InputDecoration(
-                  labelText: 'Passwort',
-                  prefixIcon: Icon(Icons.lock),
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: usernameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Benutzername',
+                    prefixIcon: Icon(Icons.person),
+                    border: OutlineInputBorder(),
+                  ),
+                  textInputAction: TextInputAction.next,
+                  enabled: !_iservLoggingIn,
                 ),
-                obscureText: true,
-                autocorrect: false,
-                enableSuggestions: false,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _directIServLogin(
-                  dialogContext,
-                  urlController.text.trim(),
-                  usernameController.text.trim(),
-                  passwordController.text,
+                const SizedBox(height: 12),
+                TextField(
+                  controller: passwordController,
+                  decoration: const InputDecoration(
+                    labelText: 'Passwort',
+                    prefixIcon: Icon(Icons.lock),
+                    border: OutlineInputBorder(),
+                  ),
+                  obscureText: true,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  textInputAction: TextInputAction.done,
+                  enabled: !_iservLoggingIn,
+                  onSubmitted: _iservLoggingIn ? null : (_) => _directIServLogin(
+                    dialogContext,
+                    setDialogState,
+                    urlController.text.trim(),
+                    usernameController.text.trim(),
+                    passwordController.text,
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Abbrechen'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              _showIServWebViewLogin(context, urlController.text.trim());
-            },
-            child: const Text('WebView Login'),
-          ),
-          ElevatedButton(
-            onPressed: () => _directIServLogin(
-              dialogContext,
-              urlController.text.trim(),
-              usernameController.text.trim(),
-              passwordController.text,
+                if (_iservLoginError != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _iservLoginError!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13),
+                  ),
+                ],
+              ],
             ),
-            child: const Text('Anmelden'),
           ),
-        ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: _iservLoggingIn ? null : () => Navigator.pop(dialogContext),
+              child: const Text('Abbrechen'),
+            ),
+            TextButton(
+              onPressed: _iservLoggingIn ? null : () {
+                Navigator.pop(dialogContext);
+                _showIServWebViewLogin(context, urlController.text.trim());
+              },
+              child: const Text('WebView Login'),
+            ),
+            FilledButton(
+              onPressed: _iservLoggingIn ? null : () => _directIServLogin(
+                dialogContext,
+                setDialogState,
+                urlController.text.trim(),
+                usernameController.text.trim(),
+                passwordController.text,
+              ),
+              child: _iservLoggingIn
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Anmelden'),
+            ),
+          ],
+        ),
       ),
-    );
+    ).then((_) {
+      urlController.dispose();
+      usernameController.dispose();
+      passwordController.dispose();
+    });
   }
 
-  Future<void> _directIServLogin(BuildContext dialogContext, String url, String username, String password) async {
+  Future<void> _directIServLogin(
+    BuildContext dialogContext,
+    void Function(void Function()) setDialogState,
+    String url,
+    String username,
+    String password,
+  ) async {
     if (url.isEmpty || username.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -2931,7 +3085,7 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
       return;
     }
 
-    Navigator.pop(dialogContext);
+    setDialogState(() => _iservLoggingIn = true);
 
     final provider = context.read<IServProvider>();
     final result = await provider.connect(
@@ -2943,13 +3097,17 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
     if (!mounted) return;
 
     if (result['success'] == true) {
+      if (dialogContext.mounted) Navigator.pop(dialogContext);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('IServ erfolgreich verbunden')),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['error'] ?? 'Anmeldung fehlgeschlagen')),
-      );
+      if (dialogContext.mounted) {
+        setDialogState(() {
+          _iservLoggingIn = false;
+          _iservLoginError = result['error'] ?? 'Anmeldung fehlgeschlagen';
+        });
+      }
     }
   }
 
@@ -3083,6 +3241,10 @@ class _SubjectCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _parseColor(subject['color'], NexusTheme.primaryColor);
+    final String subjectName = (subject['name'] as String?) ?? '';
+    final String avatarText = ((subject['short_name'] as String?) ??
+            (subjectName.length >= 2 ? subjectName.substring(0, 2) : subjectName))
+        .toUpperCase();
 
     return Dismissible(
       key: Key('subject_${subject['id']}'),
@@ -3133,7 +3295,7 @@ class _SubjectCard extends StatelessWidget {
             ),
             child: Center(
               child: Text(
-                (subject['short_name'] ?? (subject['name'] as String).substring(0, 2)).toUpperCase(),
+                avatarText,
                 style: TextStyle(color: color, fontWeight: FontWeight.bold),
               ),
             ),
@@ -3688,7 +3850,7 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard>
                         fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF0057FF), width: 1.5)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
                       items: _marksTable.map((e) => DropdownMenuItem(
@@ -3712,7 +3874,7 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard>
                               fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                               enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF0057FF), width: 1.5)),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             ),
                             onChanged: (_) => _convertPointsToGrade(),
@@ -3731,7 +3893,7 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard>
                               fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                               enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF0057FF), width: 1.5)),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             ),
                             items: _gradeTable.map((e) => DropdownMenuItem(
@@ -3788,7 +3950,7 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard>
                             fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF0057FF), width: 1.5)),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           ),
                         ),
@@ -3805,7 +3967,7 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard>
                             fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF0057FF), width: 1.5)),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           ),
                         ),
@@ -3822,7 +3984,7 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard>
                             fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF0057FF), width: 1.5)),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           ),
                         ),
@@ -3868,7 +4030,7 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard>
                         fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF0057FF), width: 1.5)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
                     ),
@@ -3901,7 +4063,7 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard>
                         fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF0057FF), width: 1.5)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     ),
                   ),
@@ -3918,7 +4080,7 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard>
                         fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF0057FF), width: 1.5)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
                     ),
@@ -4092,7 +4254,7 @@ class _FullGradeCalculatorCardState extends State<_FullGradeCalculatorCard>
         fillColor: widget.isDark ? const Color(0xFF27272A) : const Color(0xFFF4F4F5),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF0057FF), width: 1.5)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       ),
     );
@@ -4710,7 +4872,7 @@ class _TabChipState extends State<_TabChip> with SingleTickerProviderStateMixin 
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
             color: widget.isSelected
-                ? const Color(0xFF4F46E5)
+                ? const Color(0xFF0057FF)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(9999),
           ),
@@ -4819,8 +4981,8 @@ class _FullscreenVertretungsplanViewerState extends State<_FullscreenVertretungs
       final x = -position.dx * (scale - 1);
       final y = -position.dy * (scale - 1);
       _transformationController.value = Matrix4.identity()
-        ..translate(x, y)
-        ..scale(scale);
+        ..translateByDouble(x, y, 0.0, 1.0)
+        ..scaleByDouble(scale, scale, scale, 1.0);
     }
   }
 

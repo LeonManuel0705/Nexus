@@ -10,24 +10,36 @@ BUILD_VERSION_FILE="$PROJECT_DIR/build_version.txt"
 BUILD_INFO="$PROJECT_DIR/lib/build_info.dart"
 
 read_version() {
-  VERSION=$(grep "static const String version = " "$BUILD_INFO" 2>/dev/null | sed "s/.*= '//;s/'.*//" || echo "0.3")
-  VERSION_NAME=$(grep "static const String versionName = " "$BUILD_INFO" 2>/dev/null | sed "s/.*= '//;s/'.*//" || echo "0.3 Closed Beta")
+  VERSION=$(grep "static const String version = " "$BUILD_INFO" 2>/dev/null | sed "s/.*= '//;s/'.*//" || echo "0.4")
+  VERSION_NAME=$(grep "static const String versionName = " "$BUILD_INFO" 2>/dev/null | sed "s/.*= '//;s/'.*//" || echo "0.4 Closed Beta")
 }
 
 increment_build_number() {
-  local last_version
-  last_version=$(cat "$BUILD_VERSION_FILE" 2>/dev/null || echo "")
-
-  if [ "$last_version" != "$VERSION" ]; then
-    echo "Version changed ($last_version -> $VERSION), resetting build number to 1"
-    BUILD_NUM=1
-  else
-    BUILD_NUM=$(cat "$BUILD_FILE" 2>/dev/null || echo "0")
-    BUILD_NUM=$((BUILD_NUM + 1))
-  fi
+  # Build number is a single, monotonically increasing counter. It must NEVER
+  # reset on a version-name change, because it feeds Android versionCode and
+  # macOS CFBundleVersion, which the OS requires to only ever increase —
+  # otherwise updates fail with INSTALL_FAILED_VERSION_DOWNGRADE.
+  BUILD_NUM=$(cat "$BUILD_FILE" 2>/dev/null || echo "0")
+  BUILD_NUM=$((BUILD_NUM + 1))
 
   echo "$BUILD_NUM" > "$BUILD_FILE"
   echo "$VERSION" > "$BUILD_VERSION_FILE"
+}
+
+update_pubspec_version() {
+  # Keep pubspec's +buildNumber in sync with the scripted counter so an
+  # unscripted build (e.g. `flutter build ios`, which has no wrapper script)
+  # does not ship a stale, lower versionCode than the last scripted release.
+  local pubspec="$PROJECT_DIR/pubspec.yaml"
+  [ -f "$pubspec" ] || return 0
+  python3 -c "
+import re
+p='$pubspec'
+s=open(p).read()
+s=re.sub(r'^(version:\s*[0-9]+\.[0-9]+\.[0-9]+)\+[0-9]+', r'\g<1>+$BUILD_NUM', s, count=1, flags=re.M)
+open(p,'w').write(s)
+"
+  echo "Synced pubspec build number → +$BUILD_NUM"
 }
 
 generate_build_info() {
@@ -49,7 +61,6 @@ update_version_json() {
   if [ -f "$version_json" ]; then
     local today
     today=$(date +%Y-%m-%d)
-    # Update version fields in version.json using python for reliable JSON editing
     python3 -c "
 import json, sys
 with open('$version_json', 'r') as f:
@@ -70,6 +81,7 @@ prepare_build() {
   read_version
   increment_build_number
   generate_build_info "$script_name"
+  update_pubspec_version
   update_version_json
   echo "=== Nexus Build $BUILD_NUM ($VERSION_NAME) ==="
 }

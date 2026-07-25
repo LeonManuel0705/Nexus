@@ -264,7 +264,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> with SingleTickerProvid
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFF4F46E5) : null,
+                    color: isSelected ? const Color(0xFF0057FF) : null,
                     borderRadius: BorderRadius.circular(9999),
                   ),
                   child: Row(

@@ -328,10 +328,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: NexusTheme.secondaryColor.withValues(alpha: 0.1),
+                      color: NexusTheme.primaryLight.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.auto_fix_high, color: NexusTheme.secondaryColor, size: 20),
+                    child: const Icon(Icons.auto_fix_high, color: NexusTheme.primaryLight, size: 20),
                   ),
                   title: const Text('Stundenraster-Assistent'),
                   subtitle: const Text('Zeiten neu konfigurieren'),
@@ -896,22 +896,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: NexusTheme.secondaryColor.withValues(alpha: 0.1),
+                      color: NexusTheme.primaryLight.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.event, color: NexusTheme.secondaryColor, size: 20),
+                    child: const Icon(Icons.event, color: NexusTheme.primaryLight, size: 20),
                   ),
                   title: const Text('Termine'),
                   trailing: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
-                      color: NexusTheme.secondaryColor.withValues(alpha: 0.1),
+                      color: NexusTheme.primaryLight.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '${provider.events.length}',
                       style: const TextStyle(
-                        color: NexusTheme.secondaryColor,
+                        color: NexusTheme.primaryLight,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -1019,7 +1019,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       gradient: LinearGradient(
                         colors: [
                           NexusTheme.primaryColor.withValues(alpha: 0.2),
-                          NexusTheme.secondaryColor.withValues(alpha: 0.2),
+                          NexusTheme.primaryLight.withValues(alpha: 0.2),
                         ],
                       ),
                       borderRadius: BorderRadius.circular(12),
@@ -1142,7 +1142,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       trailing: Switch(
         value: value,
         onChanged: onChanged,
-        activeColor: NexusTheme.primaryColor,
+        activeThumbColor: NexusTheme.primaryColor,
         activeTrackColor: NexusTheme.primaryColor.withValues(alpha: 0.3),
         inactiveThumbColor: isDark ? Colors.white38 : Colors.grey[400],
         inactiveTrackColor: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.08),
@@ -2017,7 +2017,7 @@ class _NotificationSettingsCardState extends State<_NotificationSettingsCard> {
               setState(() => _masterToggle = v);
               _save('notif_master', v);
             },
-            activeColor: NexusTheme.primaryColor,
+            activeThumbColor: NexusTheme.primaryColor,
             activeTrackColor: NexusTheme.primaryColor.withValues(alpha: 0.3),
           ),
 
@@ -2041,19 +2041,19 @@ class _NotificationSettingsCardState extends State<_NotificationSettingsCard> {
               trailing: TextButton(
                 onPressed: () async {
                   final start = await showTimePicker(context: context, initialTime: _quietStart);
-                  if (start != null && mounted) {
-                    final end = await showTimePicker(context: context, initialTime: _quietEnd);
-                    if (end != null && mounted) {
-                      setState(() {
-                        _quietStart = start;
-                        _quietEnd = end;
-                      });
-                      _save('notif_quiet_start_h', start.hour);
-                      _save('notif_quiet_start_m', start.minute);
-                      _save('notif_quiet_end_h', end.hour);
-                      _save('notif_quiet_end_m', end.minute);
-                    }
-                  }
+                  if (start == null) return;
+                  if (!context.mounted) return;
+                  final end = await showTimePicker(context: context, initialTime: _quietEnd);
+                  if (end == null) return;
+                  if (!mounted) return;
+                  setState(() {
+                    _quietStart = start;
+                    _quietEnd = end;
+                  });
+                  _save('notif_quiet_start_h', start.hour);
+                  _save('notif_quiet_start_m', start.minute);
+                  _save('notif_quiet_end_h', end.hour);
+                  _save('notif_quiet_end_m', end.minute);
                 },
                 child: const Text('Ändern'),
               ),
@@ -2124,7 +2124,7 @@ class _NotificationSettingsCardState extends State<_NotificationSettingsCard> {
       subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
       value: value,
       onChanged: onChanged,
-      activeColor: NexusTheme.primaryColor,
+      activeThumbColor: NexusTheme.primaryColor,
       dense: true,
     );
   }
@@ -2150,8 +2150,9 @@ class _NotificationSettingsCardState extends State<_NotificationSettingsCard> {
             SizedBox(
               width: 56,
               height: 32,
-              child: TextField(
-                controller: TextEditingController(text: '$leadValue'),
+              child: TextFormField(
+                key: ValueKey('lead_$title'),
+                initialValue: '$leadValue',
                 keyboardType: TextInputType.number,
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 13),
@@ -2172,7 +2173,7 @@ class _NotificationSettingsCardState extends State<_NotificationSettingsCard> {
           Switch(
             value: value,
             onChanged: onToggle,
-            activeColor: NexusTheme.primaryColor,
+            activeThumbColor: NexusTheme.primaryColor,
             activeTrackColor: NexusTheme.primaryColor.withValues(alpha: 0.3),
           ),
         ],

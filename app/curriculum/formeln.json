@@ -1,0 +1,484 @@
+{
+  "formulas": [
+    {
+      "id": "mitternachtsformel",
+      "subject": "mathe",
+      "grade": "9-10",
+      "name": "Mitternachtsformel (abc-Formel)",
+      "aliases": ["mitternachtsformel", "abc-formel", "abc formel", "quadratische formel", "quadratische gleichung lösen", "quadratische gleichung"],
+      "formula": "x_{1,2} = \\frac{-b \\pm \\sqrt{b^{2} - 4ac}}{2a}",
+      "description": "Lösungsformel für jede quadratische Gleichung der Form ax² + bx + c = 0 (a ≠ 0). Die Diskriminante b² − 4ac entscheidet: > 0 → zwei Lösungen, = 0 → eine, < 0 → keine reelle.",
+      "example": "Für 2x² + 5x − 3 = 0 (a=2, b=5, c=−3): Diskriminante 25 + 24 = 49, √49 = 7. x₁ = (−5 + 7)/4 = 0,5, x₂ = (−5 − 7)/4 = −3."
+    },
+    {
+      "id": "pq-formel",
+      "subject": "mathe",
+      "grade": "9-10",
+      "name": "pq-Formel",
+      "aliases": ["p q formel", "p-q-formel"],
+      "formula": "x_{1,2} = -\\frac{p}{2} \\pm \\sqrt{\\left(\\frac{p}{2}\\right)^{2} - q}",
+      "description": "Lösungsformel für normierte quadratische Gleichungen der Form x² + px + q = 0. Setzt voraus, dass der Koeffizient von x² schon 1 ist.",
+      "example": "Für x² − 4x + 3 = 0 (p=−4, q=3): x = 2 ± √(4 − 3) = 2 ± 1 → x₁ = 3, x₂ = 1."
+    },
+    {
+      "id": "binomische-formeln",
+      "subject": "mathe",
+      "grade": "7-8",
+      "name": "Binomische Formeln",
+      "aliases": ["erste binomische formel", "zweite binomische formel", "dritte binomische formel"],
+      "formula": "(a+b)^{2} = a^{2} + 2ab + b^{2}; \\quad (a-b)^{2} = a^{2} - 2ab + b^{2}; \\quad (a+b)(a-b) = a^{2} - b^{2}",
+      "description": "Drei Formeln zum schnellen Ausmultiplizieren und Faktorisieren von Ausdrücken.",
+      "example": "(x + 3)² = x² + 6x + 9. Rückwärts: x² − 25 = (x+5)(x−5)."
+    },
+    {
+      "id": "pythagoras",
+      "subject": "mathe",
+      "grade": "8-9",
+      "name": "Satz des Pythagoras",
+      "aliases": ["pythagoras", "hypotenuse"],
+      "formula": "a^{2} + b^{2} = c^{2}",
+      "description": "Im rechtwinkligen Dreieck ist die Summe der Quadrate der beiden Katheten (a, b) gleich dem Quadrat der Hypotenuse (c, liegt dem rechten Winkel gegenüber).",
+      "example": "Katheten 3 und 4 → Hypotenuse √(9 + 16) = √25 = 5."
+    },
+    {
+      "id": "hoehensatz",
+      "subject": "mathe",
+      "grade": "9",
+      "name": "Höhensatz",
+      "aliases": ["hoehensatz", "höhensatz euklid"],
+      "formula": "h^{2} = p \\cdot q",
+      "description": "Im rechtwinkligen Dreieck: Quadrat der Höhe h über der Hypotenuse = Produkt der beiden Hypotenusenabschnitte p, q.",
+      "example": "p = 4, q = 9 → h = √36 = 6."
+    },
+    {
+      "id": "kathetensatz",
+      "subject": "mathe",
+      "grade": "9",
+      "name": "Kathetensatz",
+      "aliases": ["kathetensatz euklid"],
+      "formula": "a^{2} = p \\cdot c; \\quad b^{2} = q \\cdot c",
+      "description": "Im rechtwinkligen Dreieck: Quadrat einer Kathete = Produkt aus Hypotenuse c und dem ihr anliegenden Hypotenusenabschnitt.",
+      "example": "c = 10, p = 4 → a² = 40 → a ≈ 6,32."
+    },
+    {
+      "id": "kreisflaeche",
+      "subject": "mathe",
+      "grade": "7-8",
+      "name": "Kreisfläche",
+      "aliases": ["flaeche kreis", "fläche kreis", "kreis fläche", "kreis flaeche", "kreis", "flaeche von einem kreis"],
+      "formula": "A = \\pi r^{2}",
+      "description": "Flächeninhalt eines Kreises mit Radius r.",
+      "example": "r = 5 cm → A = 25π cm² ≈ 78,54 cm²."
+    },
+    {
+      "id": "kreisumfang",
+      "subject": "mathe",
+      "grade": "7-8",
+      "name": "Kreisumfang",
+      "aliases": ["umfang kreis", "kreis umfang"],
+      "formula": "U = 2\\pi r = \\pi d",
+      "description": "Umfang eines Kreises mit Radius r bzw. Durchmesser d.",
+      "example": "r = 5 → U = 10π ≈ 31,42."
+    },
+    {
+      "id": "kugelvolumen",
+      "subject": "mathe",
+      "grade": "9-10",
+      "name": "Kugelvolumen",
+      "aliases": ["volumen kugel", "kugel volumen", "kugel", "volumen von einer kugel", "volumen von der kugel"],
+      "formula": "V = \\frac{4}{3}\\pi r^{3}",
+      "description": "Volumen einer Kugel mit Radius r.",
+      "example": "r = 3 → V = 36π ≈ 113,1."
+    },
+    {
+      "id": "kugeloberflaeche",
+      "subject": "mathe",
+      "grade": "9-10",
+      "name": "Kugeloberfläche",
+      "aliases": ["oberflaeche kugel", "kugel oberfläche"],
+      "formula": "O = 4\\pi r^{2}",
+      "description": "Oberflächeninhalt einer Kugel mit Radius r.",
+      "example": "r = 3 → O = 36π ≈ 113,1."
+    },
+    {
+      "id": "zylindervolumen",
+      "subject": "mathe",
+      "grade": "8-9",
+      "name": "Zylindervolumen",
+      "aliases": ["volumen zylinder", "zylinder volumen"],
+      "formula": "V = \\pi r^{2} h",
+      "description": "Volumen eines geraden Kreiszylinders (Grundkreisradius r, Höhe h).",
+      "example": "r = 4, h = 10 → V = 160π ≈ 502,65."
+    },
+    {
+      "id": "kegelvolumen",
+      "subject": "mathe",
+      "grade": "9-10",
+      "name": "Kegelvolumen",
+      "aliases": ["volumen kegel", "kegel volumen"],
+      "formula": "V = \\frac{1}{3}\\pi r^{2} h",
+      "description": "Volumen eines Kegels mit Grundkreisradius r und Höhe h.",
+      "example": "r = 3, h = 7 → V = 21π ≈ 65,97."
+    },
+    {
+      "id": "pyramidenvolumen",
+      "subject": "mathe",
+      "grade": "9-10",
+      "name": "Pyramidenvolumen",
+      "aliases": ["volumen pyramide", "pyramide volumen"],
+      "formula": "V = \\frac{1}{3} G \\cdot h",
+      "description": "Volumen einer Pyramide mit Grundfläche G und Höhe h.",
+      "example": "G = 16 (4×4-Quadrat), h = 9 → V = 48."
+    },
+    {
+      "id": "trig-pythagoras",
+      "subject": "mathe",
+      "grade": "10-11",
+      "name": "Trigonometrischer Pythagoras",
+      "aliases": ["sin cos quadrat", "sinquadrat cosquadrat"],
+      "formula": "\\sin^{2}(x) + \\cos^{2}(x) = 1",
+      "description": "Grundbeziehung zwischen Sinus und Cosinus für jedes Argument x.",
+      "example": "Bekannt ist sin(x) = 0,6 → cos²(x) = 1 − 0,36 = 0,64 → cos(x) = ±0,8."
+    },
+    {
+      "id": "sinussatz",
+      "subject": "mathe",
+      "grade": "10",
+      "name": "Sinussatz",
+      "aliases": ["sin satz"],
+      "formula": "\\frac{a}{\\sin \\alpha} = \\frac{b}{\\sin \\beta} = \\frac{c}{\\sin \\gamma}",
+      "description": "Zusammenhang zwischen Seiten und gegenüberliegenden Winkeln in jedem Dreieck.",
+      "example": "a = 7, α = 40°, β = 60° → b = 7·sin(60°)/sin(40°) ≈ 9,43."
+    },
+    {
+      "id": "kosinussatz",
+      "subject": "mathe",
+      "grade": "10",
+      "name": "Kosinussatz",
+      "aliases": ["cosinussatz", "cos satz"],
+      "formula": "c^{2} = a^{2} + b^{2} - 2ab \\cdot \\cos \\gamma",
+      "description": "Verallgemeinerter Pythagoras für beliebige Dreiecke. Für γ = 90° ergibt sich der Satz des Pythagoras.",
+      "example": "a = 5, b = 7, γ = 60° → c² = 25 + 49 − 35 = 39 → c ≈ 6,24."
+    },
+    {
+      "id": "potenzgesetze",
+      "subject": "mathe",
+      "grade": "9-10",
+      "name": "Potenzgesetze",
+      "aliases": ["potenz gesetze", "potenzen rechnen"],
+      "formula": "a^{m} \\cdot a^{n} = a^{m+n}; \\quad \\frac{a^{m}}{a^{n}} = a^{m-n}; \\quad (a^{m})^{n} = a^{m \\cdot n}; \\quad a^{-n} = \\frac{1}{a^{n}}",
+      "description": "Regeln für das Rechnen mit Potenzen gleicher Basis bzw. gleicher Exponenten.",
+      "example": "2³ · 2⁴ = 2⁷ = 128. (5²)³ = 5⁶."
+    },
+    {
+      "id": "logarithmusgesetze",
+      "subject": "mathe",
+      "grade": "10-11",
+      "name": "Logarithmusgesetze",
+      "aliases": ["log gesetze", "logarithmen rechnen"],
+      "formula": "\\log(a \\cdot b) = \\log a + \\log b; \\quad \\log\\frac{a}{b} = \\log a - \\log b; \\quad \\log(a^{n}) = n \\log a",
+      "description": "Rechenregeln für Logarithmen. Gelten für jede Basis (natürlicher log, log₁₀, log₂ …).",
+      "example": "log(1000) = log(10³) = 3·log(10) = 3."
+    },
+    {
+      "id": "ableitung-potenz",
+      "subject": "mathe",
+      "grade": "11",
+      "name": "Ableitung der Potenzfunktion",
+      "aliases": ["ableitung x hoch n", "potenzregel ableitung", "ableitung xn", "ableitung von xn"],
+      "formula": "f(x) = x^{n} \\;\\Rightarrow\\; f'(x) = n \\cdot x^{n-1}",
+      "description": "Potenzregel der Differentialrechnung.",
+      "example": "f(x) = x⁵ → f'(x) = 5x⁴. f(x) = 3x² → f'(x) = 6x."
+    },
+    {
+      "id": "ableitung-sin",
+      "subject": "mathe",
+      "grade": "11",
+      "name": "Ableitung von sin(x)",
+      "aliases": ["ableitung sin", "ableitung sinus", "sin ableiten"],
+      "formula": "(\\sin x)' = \\cos x",
+      "description": "Grundableitung der Sinusfunktion.",
+      "example": "f(x) = sin(2x) → f'(x) = 2·cos(2x) (Kettenregel)."
+    },
+    {
+      "id": "ableitung-cos",
+      "subject": "mathe",
+      "grade": "11",
+      "name": "Ableitung von cos(x)",
+      "aliases": ["ableitung cos", "ableitung cosinus", "cos ableiten", "ableitung von cos"],
+      "formula": "(\\cos x)' = -\\sin x",
+      "description": "Grundableitung der Kosinusfunktion (mit Minuszeichen!).",
+      "example": "f(x) = cos(3x) → f'(x) = −3·sin(3x)."
+    },
+    {
+      "id": "ableitung-exp",
+      "subject": "mathe",
+      "grade": "11",
+      "name": "Ableitung von e^x",
+      "aliases": ["ableitung e hoch x", "ableitung exp", "e^x ableiten", "ableitung von ex"],
+      "formula": "(e^{x})' = e^{x}",
+      "description": "Die e-Funktion ist ihre eigene Ableitung — das macht sie so wichtig.",
+      "example": "f(x) = e^(2x) → f'(x) = 2·e^(2x) (Kettenregel)."
+    },
+    {
+      "id": "ableitung-ln",
+      "subject": "mathe",
+      "grade": "11-12",
+      "name": "Ableitung von ln(x)",
+      "aliases": ["ableitung ln", "ableitung logarithmus naturalis", "ableitung natürlicher logarithmus"],
+      "formula": "(\\ln x)' = \\frac{1}{x}",
+      "description": "Ableitung des natürlichen Logarithmus für x > 0.",
+      "example": "f(x) = ln(x²+1) → f'(x) = 2x/(x²+1)."
+    },
+    {
+      "id": "produktregel",
+      "subject": "mathe",
+      "grade": "11",
+      "name": "Produktregel",
+      "aliases": ["produktregel ableitung"],
+      "formula": "(u \\cdot v)' = u' \\cdot v + u \\cdot v'",
+      "description": "Regel zum Ableiten eines Produkts zweier Funktionen u(x) und v(x).",
+      "example": "f(x) = x²·sin(x) → f'(x) = 2x·sin(x) + x²·cos(x)."
+    },
+    {
+      "id": "quotientenregel",
+      "subject": "mathe",
+      "grade": "11",
+      "name": "Quotientenregel",
+      "aliases": ["quotientenregel ableitung"],
+      "formula": "\\left(\\frac{u}{v}\\right)' = \\frac{u' v - u v'}{v^{2}}",
+      "description": "Regel zum Ableiten eines Quotienten zweier Funktionen.",
+      "example": "f(x) = x/(x²+1) → f'(x) = (1·(x²+1) − x·2x)/(x²+1)² = (1−x²)/(x²+1)²."
+    },
+    {
+      "id": "kettenregel",
+      "subject": "mathe",
+      "grade": "11",
+      "name": "Kettenregel",
+      "aliases": ["kettenregel ableitung"],
+      "formula": "(f(g(x)))' = f'(g(x)) \\cdot g'(x)",
+      "description": "Äußere Ableitung mal innere Ableitung. Zentral für verschachtelte Funktionen.",
+      "example": "f(x) = sin(x²) → f'(x) = cos(x²)·2x."
+    },
+    {
+      "id": "stammfunktion-potenz",
+      "subject": "mathe",
+      "grade": "12",
+      "name": "Stammfunktion von x^n",
+      "aliases": ["integral xn", "integral x hoch n", "integral potenz", "integral x", "stammfunktion x", "stammfunktion von x", "integral von x"],
+      "formula": "\\int x^{n} \\, dx = \\frac{x^{n+1}}{n+1} + C \\quad (n \\neq -1)",
+      "description": "Grundstammfunktion der Potenzfunktion. Für n = −1 gilt stattdessen ∫1/x dx = ln|x| + C.",
+      "example": "∫ x³ dx = x⁴/4 + C."
+    },
+    {
+      "id": "vektor-skalarprodukt",
+      "subject": "mathe",
+      "grade": "11-12",
+      "name": "Skalarprodukt",
+      "aliases": ["skalarprodukt vektoren", "inneres produkt"],
+      "formula": "\\vec{a} \\cdot \\vec{b} = a_{1}b_{1} + a_{2}b_{2} + a_{3}b_{3} = |\\vec{a}| \\cdot |\\vec{b}| \\cdot \\cos(\\varphi)",
+      "description": "Skalarprodukt zweier Vektoren. = 0 heißt: die Vektoren stehen senkrecht aufeinander.",
+      "example": "(1,2,3)·(4,−1,2) = 4 − 2 + 6 = 8."
+    },
+    {
+      "id": "vektor-betrag",
+      "subject": "mathe",
+      "grade": "11-12",
+      "name": "Betrag eines Vektors",
+      "aliases": ["vektor laenge", "länge vektor", "vektor betrag"],
+      "formula": "|\\vec{a}| = \\sqrt{a_{1}^{2} + a_{2}^{2} + a_{3}^{2}}",
+      "description": "Länge (euklidische Norm) eines Vektors im Raum.",
+      "example": "|(3,4,0)| = √(9 + 16) = 5."
+    },
+    {
+      "id": "binomialverteilung",
+      "subject": "mathe",
+      "grade": "12",
+      "name": "Binomialverteilung",
+      "aliases": ["bernoulli kette", "binomial"],
+      "formula": "P(X = k) = \\binom{n}{k} p^{k} (1-p)^{n-k}",
+      "description": "Wahrscheinlichkeit für genau k Treffer bei n unabhängigen Versuchen mit Trefferwahrscheinlichkeit p.",
+      "example": "10-mal Münzwurf, genau 3-mal Kopf: P = C(10,3)·0,5³·0,5⁷ = 120/1024 ≈ 0,117."
+    },
+    {
+      "id": "erwartungswert-binomial",
+      "subject": "mathe",
+      "grade": "12",
+      "name": "Erwartungswert & Standardabweichung Binomial",
+      "aliases": ["erwartungswert binomial", "standardabweichung binomial"],
+      "formula": "E(X) = n \\cdot p; \\quad \\sigma(X) = \\sqrt{n \\cdot p \\cdot (1-p)}",
+      "description": "Erwartungswert und Standardabweichung einer binomialverteilten Zufallsgröße X ~ B(n, p).",
+      "example": "n = 100, p = 0,3 → E(X) = 30, σ ≈ 4,58."
+    },
+    {
+      "id": "newton-2",
+      "subject": "physik",
+      "grade": "7-8",
+      "name": "Newtons 2. Gesetz (Grundgleichung der Mechanik)",
+      "aliases": ["newton 2", "newton 2 gesetz", "newton zweites gesetz", "zweites newtonsches gesetz", "kraft formel", "f gleich m mal a"],
+      "formula": "F = m \\cdot a",
+      "description": "Kraft F = Masse m · Beschleunigung a. Einheit: N = kg·m/s².",
+      "example": "Auto 1200 kg mit 2 m/s² → F = 2400 N."
+    },
+    {
+      "id": "ekin",
+      "subject": "physik",
+      "grade": "8-9",
+      "name": "Kinetische Energie",
+      "aliases": ["bewegungsenergie", "e kin"],
+      "formula": "E_{kin} = \\tfrac{1}{2} m v^{2}",
+      "description": "Energie eines Körpers der Masse m mit Geschwindigkeit v.",
+      "example": "m = 2 kg, v = 3 m/s → E = 9 J."
+    },
+    {
+      "id": "epot",
+      "subject": "physik",
+      "grade": "8-9",
+      "name": "Potentielle Energie (Lageenergie)",
+      "aliases": ["lageenergie", "hoehenenergie", "e pot"],
+      "formula": "E_{pot} = m \\cdot g \\cdot h",
+      "description": "Energie im Schwerefeld (g ≈ 9,81 m/s²). h = Höhe über einem Bezugsniveau.",
+      "example": "m = 2 kg, h = 10 m → E ≈ 196,2 J."
+    },
+    {
+      "id": "ohm",
+      "subject": "physik",
+      "grade": "9-10",
+      "name": "Ohmsches Gesetz",
+      "aliases": ["ohm gesetz", "ohmsches gesetz", "ohmsche gesetz", "ohmsche", "ohm'sches gesetz", "u gleich r mal i"],
+      "formula": "U = R \\cdot I",
+      "description": "Spannung U, Widerstand R, Stromstärke I. U in Volt, R in Ohm, I in Ampere.",
+      "example": "R = 220 Ω, I = 0,5 A → U = 110 V."
+    },
+    {
+      "id": "elektrische-leistung",
+      "subject": "physik",
+      "grade": "9-10",
+      "name": "Elektrische Leistung",
+      "aliases": ["leistung elektrisch", "p gleich u mal i"],
+      "formula": "P = U \\cdot I = R \\cdot I^{2} = \\frac{U^{2}}{R}",
+      "description": "Elektrische Leistung in Watt. Drei äquivalente Formen.",
+      "example": "U = 230 V, I = 4 A → P = 920 W."
+    },
+    {
+      "id": "strecke-beschleunigung",
+      "subject": "physik",
+      "grade": "10-11",
+      "name": "Gleichmäßig beschleunigte Bewegung (Weg-Zeit)",
+      "aliases": ["weg zeit gesetz", "beschleunigte bewegung"],
+      "formula": "s(t) = \\tfrac{1}{2} a t^{2} + v_{0} t + s_{0}; \\quad v(t) = a t + v_{0}",
+      "description": "Ort und Geschwindigkeit bei konstanter Beschleunigung a. Startwerte v₀ und s₀.",
+      "example": "Freier Fall aus Ruhe: s = ½·9,81·t². Nach 2 s: s ≈ 19,6 m."
+    },
+    {
+      "id": "wellengleichung",
+      "subject": "physik",
+      "grade": "10-11",
+      "name": "Wellengleichung",
+      "aliases": ["c gleich lambda f", "wellenlaenge frequenz"],
+      "formula": "c = \\lambda \\cdot f",
+      "description": "Ausbreitungsgeschwindigkeit c = Wellenlänge λ · Frequenz f. Gilt für Licht, Schall, Wasserwellen …",
+      "example": "Schall in Luft c ≈ 343 m/s, f = 440 Hz (Kammerton a') → λ ≈ 0,78 m."
+    },
+    {
+      "id": "photonenenergie",
+      "subject": "physik",
+      "grade": "12",
+      "name": "Photonenenergie",
+      "aliases": ["e gleich h mal f", "lichtquant energie"],
+      "formula": "E = h \\cdot f = \\frac{h \\cdot c}{\\lambda}",
+      "description": "Energie eines Lichtquants (Photon). h ≈ 6,626·10⁻³⁴ J·s (Plancksches Wirkungsquantum).",
+      "example": "Grünes Licht λ ≈ 550 nm → E ≈ 3,6·10⁻¹⁹ J ≈ 2,25 eV."
+    },
+    {
+      "id": "radioaktiv-zerfall",
+      "subject": "physik",
+      "grade": "11-12",
+      "name": "Radioaktives Zerfallsgesetz",
+      "aliases": ["halbwertszeit formel", "zerfallsgesetz"],
+      "formula": "N(t) = N_{0} \\cdot e^{-\\lambda t}; \\quad T_{1/2} = \\frac{\\ln 2}{\\lambda}",
+      "description": "Zahl der noch nicht zerfallenen Kerne N(t). λ = Zerfallskonstante, T½ = Halbwertszeit.",
+      "example": "N₀ = 1000, T½ = 5 Jahre → nach 10 Jahren noch 250."
+    },
+    {
+      "id": "hooke",
+      "subject": "physik",
+      "grade": "8-9",
+      "name": "Hookesches Gesetz (Feder)",
+      "aliases": ["hookesches gesetz", "hooke gesetz", "feder kraft", "federgesetz"],
+      "formula": "F = D \\cdot x",
+      "description": "Kraft F einer Feder bei Auslenkung x. D = Federkonstante in N/m.",
+      "example": "D = 100 N/m, x = 0,05 m → F = 5 N."
+    },
+    {
+      "id": "dichte",
+      "subject": "physik",
+      "grade": "5-6",
+      "name": "Dichte",
+      "aliases": ["dichte formel", "rho gleich m durch v"],
+      "formula": "\\rho = \\frac{m}{V}",
+      "description": "Dichte = Masse pro Volumen. Einheit meist g/cm³ oder kg/m³.",
+      "example": "Eisen: m = 7,87 g pro V = 1 cm³ → ρ ≈ 7,87 g/cm³."
+    },
+    {
+      "id": "ideales-gas",
+      "subject": "chemie",
+      "grade": "10-11",
+      "name": "Ideales Gasgesetz",
+      "aliases": ["gasgesetz", "pv nrt"],
+      "formula": "p \\cdot V = n \\cdot R \\cdot T",
+      "description": "p in Pa, V in m³, n in mol, R = 8,314 J/(mol·K), T in K. Verknüpft Druck, Volumen, Stoffmenge und Temperatur idealer Gase.",
+      "example": "1 mol Gas bei 273,15 K und 101325 Pa → V = 22,4 L."
+    },
+    {
+      "id": "ph-wert",
+      "subject": "chemie",
+      "grade": "9-10",
+      "name": "pH-Wert",
+      "aliases": ["ph", "saeurewert"],
+      "formula": "pH = -\\log_{10}([H^{+}])",
+      "description": "Negativer dekadischer Logarithmus der Hydronium-Konzentration in mol/L. pH < 7 sauer, = 7 neutral, > 7 alkalisch.",
+      "example": "[H⁺] = 10⁻³ mol/L → pH = 3."
+    },
+    {
+      "id": "stoffmenge",
+      "subject": "chemie",
+      "grade": "9-10",
+      "name": "Stoffmenge",
+      "aliases": ["mol formel", "n gleich m durch m"],
+      "formula": "n = \\frac{m}{M}",
+      "description": "Stoffmenge n in mol = Masse m / molare Masse M (g/mol).",
+      "example": "18 g H₂O, M = 18 g/mol → n = 1 mol."
+    },
+    {
+      "id": "konzentration",
+      "subject": "chemie",
+      "grade": "9-10",
+      "name": "Stoffmengenkonzentration",
+      "aliases": ["konzentration formel", "c gleich n durch v"],
+      "formula": "c = \\frac{n}{V}",
+      "description": "Stoffmengenkonzentration c in mol/L = Stoffmenge / Volumen der Lösung.",
+      "example": "0,5 mol NaCl in 2 L Wasser → c = 0,25 mol/L."
+    },
+    {
+      "id": "arithmetische-reihe",
+      "subject": "mathe",
+      "grade": "10-11",
+      "name": "Summe arithmetische Reihe",
+      "aliases": ["summe 1 bis n", "gauss summe"],
+      "formula": "\\sum_{k=1}^{n} k = \\frac{n(n+1)}{2}",
+      "description": "Summe der ersten n natürlichen Zahlen. Gauß-Formel.",
+      "example": "1 + 2 + … + 100 = 100·101/2 = 5050."
+    },
+    {
+      "id": "geometrische-reihe",
+      "subject": "mathe",
+      "grade": "11",
+      "name": "Summe geometrische Reihe",
+      "aliases": ["geometrische summe", "summe geometrisch"],
+      "formula": "\\sum_{k=0}^{n-1} q^{k} = \\frac{1 - q^{n}}{1 - q} \\quad (q \\neq 1)",
+      "description": "Summe einer geometrischen Reihe mit Quotient q. Für |q| < 1 und n → ∞: Grenzwert 1/(1−q).",
+      "example": "1 + 2 + 4 + 8 + 16 = (1 − 2⁵)/(1 − 2) = 31."
+    }
+  ]
+}

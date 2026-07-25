@@ -7,11 +7,9 @@ class AppDelegate: FlutterAppDelegate, UNUserNotificationCenterDelegate {
 
   override func applicationDidFinishLaunching(_ notification: Notification) {
     super.applicationDidFinishLaunching(notification)
-    // Override the plugin's delegate so we control foreground presentation
     UNUserNotificationCenter.current().delegate = self
   }
 
-  // Show banner + list when notification arrives while app is in foreground
   func userNotificationCenter(
     _ center: UNUserNotificationCenter,
     willPresent notification: UNNotification,
@@ -24,13 +22,29 @@ class AppDelegate: FlutterAppDelegate, UNUserNotificationCenterDelegate {
     }
   }
 
-  // Keep the app running in the background when the window is closed,
-  // so background tasks and notifications continue to work.
+  // Open the (trusted-domain) URL carried in the notification's userInfo when
+  // the user taps it. Without this handler a tap only focuses the app.
+  private let trustedNotificationHosts = ["nexus-lifehub.netlify.app", "github.com"]
+
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    if let urlString = response.notification.request.content.userInfo["url"] as? String,
+       let url = URL(string: urlString),
+       url.scheme == "https",
+       let host = url.host?.lowercased(),
+       trustedNotificationHosts.contains(where: { host == $0 || host.hasSuffix(".\($0)") }) {
+      NSWorkspace.shared.open(url)
+    }
+    completionHandler()
+  }
+
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
     return false
   }
 
-  // Re-show the main window when the user clicks the dock icon
   override func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
     if !flag {
       for window in sender.windows {

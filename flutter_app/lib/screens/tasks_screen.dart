@@ -1,4 +1,3 @@
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -84,7 +83,7 @@ class _TasksScreenState extends State<TasksScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF4F46E5),
+                            color: const Color(0xFF0057FF),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: const Row(
@@ -159,7 +158,7 @@ class _TasksScreenState extends State<TasksScreen> {
         curve: Curves.easeOut,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF4F46E5) : Colors.transparent,
+          color: isSelected ? const Color(0xFF0057FF) : Colors.transparent,
           borderRadius: BorderRadius.circular(100),
         ),
         child: AnimatedDefaultTextStyle(
@@ -346,7 +345,7 @@ class _TaskListItem extends StatelessWidget {
         textColor = const Color(0xFFE11D48);
         break;
       case 'medium':
-        label = 'Mittel';
+        label = 'Normal';
         bgColor = const Color(0xFFFEF3C7);
         textColor = const Color(0xFFD97706);
         break;
@@ -512,20 +511,20 @@ class _TaskListItem extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: NexusTheme.secondaryColor.withValues(alpha: 0.1),
+                              color: NexusTheme.primaryLight.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.repeat, size: 12, color: NexusTheme.secondaryColor),
+                                const Icon(Icons.repeat, size: 12, color: NexusTheme.primaryLight),
                                 const SizedBox(width: 3),
                                 Text(
                                   Task.repeatTypes[task.repeatType] ?? task.repeatType!,
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w500,
-                                    color: NexusTheme.secondaryColor,
+                                    color: NexusTheme.primaryLight,
                                   ),
                                 ),
                               ],
@@ -641,7 +640,7 @@ class _TaskDialogState extends State<_TaskDialog> {
               leading: const Icon(Icons.calendar_today),
               title: Text(_dueDate != null
                   ? DateFormat('dd.MM.yyyy HH:mm').format(_dueDate!)
-                  : 'Fällig am'),
+                  : 'Fällig am (optional)'),
               trailing: _dueDate != null
                   ? IconButton(
                       icon: const Icon(Icons.clear),
@@ -652,7 +651,7 @@ class _TaskDialogState extends State<_TaskDialog> {
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _priority,
+              initialValue: _priority,
               decoration: const InputDecoration(
                 labelText: 'Priorität',
                 prefixIcon: Icon(Icons.flag),
@@ -666,7 +665,7 @@ class _TaskDialogState extends State<_TaskDialog> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _category,
+              initialValue: _category,
               decoration: const InputDecoration(
                 labelText: 'Kategorie',
                 prefixIcon: Icon(Icons.category),
@@ -678,7 +677,7 @@ class _TaskDialogState extends State<_TaskDialog> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<int?>(
-              value: _estimatedMinutes,
+              initialValue: _estimatedMinutes,
               decoration: const InputDecoration(
                 labelText: 'Geschätzte Dauer (optional)',
                 prefixIcon: Icon(Icons.timer_outlined),
@@ -693,7 +692,7 @@ class _TaskDialogState extends State<_TaskDialog> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String?>(
-              value: _repeatType,
+              initialValue: _repeatType,
               decoration: const InputDecoration(
                 labelText: 'Wiederholung',
                 prefixIcon: Icon(Icons.repeat),
@@ -845,13 +844,6 @@ class _TaskDialogState extends State<_TaskDialog> {
     if (_titleController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Bitte Titel eingeben')),
-      );
-      return;
-    }
-
-    if (_dueDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bitte Datum und Uhrzeit angeben')),
       );
       return;
     }

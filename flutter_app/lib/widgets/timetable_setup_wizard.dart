@@ -12,14 +12,14 @@ class TimetableSetupWizard extends StatefulWidget {
 
 class _TimetableSetupWizardState extends State<TimetableSetupWizard> {
   int _currentStep = 0;
-  String _selectedTemplate = ''; // 'einzelstunden', 'doppelstunden', 'custom'
+  String _selectedTemplate = '';
   TimeOfDay _startTime = const TimeOfDay(hour: 8, minute: 0);
   int _periodCount = 8;
-  List<int> _breakDurations = []; // one per break (length = _periodCount - 1)
-  int _lessonDuration = 45; // derived from template
+  List<int> _breakDurations = [];
+  int _lessonDuration = 45;
   List<Map<String, dynamic>> _generatedPeriods = [];
 
-  // For custom mode
+
   final List<Map<String, dynamic>> _customPeriods = [];
 
   void _selectTemplate(String template) {
@@ -68,7 +68,7 @@ class _TimetableSetupWizardState extends State<TimetableSetupWizard> {
         'splitBreakMinutes': null,
       });
 
-      // Add break after this period (per-break durations)
+
       int breakLen = (i - 1) < _breakDurations.length ? _breakDurations[i - 1] : 5;
       currentTime = endTime.add(Duration(minutes: breakLen));
     }
@@ -366,7 +366,7 @@ class _TimetableSetupWizardState extends State<TimetableSetupWizard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Start time
+
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Beginn'),
@@ -392,7 +392,7 @@ class _TimetableSetupWizardState extends State<TimetableSetupWizard> {
               ),
             ),
             const Divider(),
-            // Period count
+
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(
@@ -417,7 +417,7 @@ class _TimetableSetupWizardState extends State<TimetableSetupWizard> {
               ),
             ),
             const Divider(),
-            // Per-break durations
+
             if (_breakDurations.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.only(top: 4, bottom: 8),
@@ -456,7 +456,7 @@ class _TimetableSetupWizardState extends State<TimetableSetupWizard> {
               }),
             ],
             const SizedBox(height: 16),
-            // Preview
+
             Text('VORSCHAU', style: NexusTheme.sectionLabel(isDark)),
             const SizedBox(height: 8),
             Builder(builder: (context) {
@@ -632,7 +632,7 @@ class _TimetableSetupWizardState extends State<TimetableSetupWizard> {
   }
 
   void _addCustomPeriod() {
-    // Default: start after last period ends, or 08:00 for first
+
     String defaultStart = '08:00';
     if (_customPeriods.isNotEmpty) {
       final lastEnd = _customPeriods.last['endTime'] as String;

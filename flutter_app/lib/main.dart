@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -84,8 +83,14 @@ void main() async {
     } catch (_) {
     }
 
-    await BackgroundService().initialize();
-    await BackgroundService().registerTasks();
+    // Guard these too — a plugin exception here (e.g. WorkManager/BGTask
+    // registration failing on a given OS version) must not abort startup before
+    // runApp(), which would leave the user staring at a white screen.
+    try {
+      await BackgroundService().initialize();
+      await BackgroundService().registerTasks();
+    } catch (_) {
+    }
 
     try {
       await NotificationService().initialize();
@@ -134,7 +139,7 @@ class NexusApp extends StatelessWidget {
               SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
                 statusBarColor: Colors.transparent,
                 statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-                systemNavigationBarColor: isDark ? const Color(0xFF09090B) : const Color(0xFFFAFAFA),
+                systemNavigationBarColor: isDark ? const Color(0xFF101720) : const Color(0xFFF0F8FF),
                 systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
               ));
             }
@@ -177,13 +182,14 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   bool _hasCheckedFirstLaunch = false;
   bool _isMobileMenuOpen = false;
 
-  late AnimationController _sidebarAnimController;
   late AnimationController _pageTransitionController;
   late AnimationController _menuSlideController;
 
-  static const _sidebarSpring = SpringDescription(mass: 1, stiffness: 300, damping: 30);
-
   late final List<Widget> _screens;
+
+
+  static const _sidebarOrder = [0, 1, 2, 3, 6, 10, 8, 7, 14, 16, 9, 15, 5, 11, 17, 12, 13];
+  static const _sidebarItemHeight = 40.0;
 
   static const _bundeslaender = [
     'Baden-Württemberg',
@@ -207,7 +213,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _sidebarAnimController = AnimationController(vsync: this);
     _pageTransitionController = AnimationController(
       vsync: this,
       value: 1,
@@ -244,7 +249,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _sidebarAnimController.dispose();
     _pageTransitionController.dispose();
     _menuSlideController.dispose();
     super.dispose();
@@ -400,10 +404,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     if (screenIndex == _currentIndex || _isNavigating) return;
     _isNavigating = true;
     _currentIndex = screenIndex;
-
-    _sidebarAnimController.animateWith(
-      SpringSimulation(_sidebarSpring, 0, 1, 0),
-    );
 
     _pageTransitionController.stop();
     await _pageTransitionController.animateTo(0,
@@ -585,7 +585,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: isActive
-                    ? (isDark ? const Color(0xFF4F46E5).withValues(alpha: 0.15) : const Color(0xFFEEF2FF))
+                    ? (isDark ? const Color(0xFF0057FF).withValues(alpha: 0.15) : const Color(0xFFEEF2FF))
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -593,7 +593,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                 isActive ? activeIcon : icon,
                 size: isActive ? 24 : 22,
                 color: isActive
-                    ? const Color(0xFF4F46E5)
+                    ? const Color(0xFF0057FF)
                     : (isDark ? const Color(0xFF71717A) : const Color(0xFF71717A)),
               ),
             ),
@@ -833,7 +833,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
           width: width,
           decoration: BoxDecoration(
             color: isDark
-                ? const Color(0xFF09090B).withValues(alpha: 0.55)
+                ? const Color(0xFF101720).withValues(alpha: 0.55)
                 : Colors.white.withValues(alpha: 0.55),
             border: Border(
               right: BorderSide(
@@ -879,27 +879,56 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                 ),
               ),
               Expanded(
-                child: ListView(
+                child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  children: [
-                    _buildTabletNavItem(0, Icons.dashboard_outlined, 'Dashboard', isDark),
-                    _buildTabletNavItem(1, Icons.task_alt_outlined, 'Aufgaben', isDark),
-                    _buildTabletNavItem(2, Icons.calendar_today_outlined, 'Kalender', isDark),
-                    _buildTabletNavItem(3, Icons.school_outlined, 'Schule', isDark),
-                    _buildTabletNavItem(6, Icons.fitness_center_outlined, 'Training', isDark),
-                    _buildTabletNavItem(10, Icons.show_chart_outlined, 'Review', isDark),
-                    _buildTabletNavItem(8, Icons.lightbulb_outlined, 'Wissen', isDark),
-                    _buildTabletNavItem(7, Icons.folder_outlined, 'Projekte', isDark),
-                    _buildTabletNavItem(14, Icons.note_outlined, 'Notizen', isDark),
-                    _buildTabletNavItem(16, Icons.bookmark_outline, 'Lesezeichen', isDark),
-                    _buildTabletNavItem(9, Icons.email_outlined, 'E-Mail', isDark),
-                    _buildTabletNavItem(15, Icons.train_outlined, 'Fahrplan', isDark),
-                    _buildTabletNavItem(5, Icons.timer_outlined, 'Pomodoro', isDark),
-                    _buildTabletNavItem(11, Icons.draw_outlined, 'Zeichnen', isDark),
-                    _buildTabletNavItem(17, Icons.dns_outlined, 'IServ', isDark),
-                    _buildTabletNavItem(12, Icons.smart_toy_outlined, 'Assistent', isDark),
-                    _buildTabletNavItem(13, Icons.settings_outlined, 'Einstellungen', isDark),
-                  ],
+                  child: Stack(
+                    children: [
+                      if (_sidebarOrder.contains(_currentIndex))
+                        AnimatedPositioned(
+                          duration: const Duration(milliseconds: 600),
+                          curve: const Cubic(0.34, 1.56, 0.64, 1),
+                          left: 0,
+                          right: 0,
+                          top: _sidebarOrder.indexOf(_currentIndex) * _sidebarItemHeight,
+                          height: _sidebarItemHeight,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Color(0xFFE1EEF1),
+                                  Color(0xFFC9DAF8),
+                                  Color(0xFFB2C6FE),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      Column(
+                        children: [
+                          _buildTabletNavItem(0, Icons.dashboard_outlined, 'Dashboard', isDark),
+                          _buildTabletNavItem(1, Icons.task_alt_outlined, 'Aufgaben', isDark),
+                          _buildTabletNavItem(2, Icons.calendar_today_outlined, 'Kalender', isDark),
+                          _buildTabletNavItem(3, Icons.school_outlined, 'Schule', isDark),
+                          _buildTabletNavItem(6, Icons.fitness_center_outlined, 'Training', isDark),
+                          _buildTabletNavItem(10, Icons.show_chart_outlined, 'Review', isDark),
+                          _buildTabletNavItem(8, Icons.lightbulb_outlined, 'Wissen', isDark),
+                          _buildTabletNavItem(7, Icons.folder_outlined, 'Projekte', isDark),
+                          _buildTabletNavItem(14, Icons.note_outlined, 'Notizen', isDark),
+                          _buildTabletNavItem(16, Icons.bookmark_outline, 'Lesezeichen', isDark),
+                          _buildTabletNavItem(9, Icons.email_outlined, 'E-Mail', isDark),
+                          _buildTabletNavItem(15, Icons.train_outlined, 'Fahrplan', isDark),
+                          _buildTabletNavItem(5, Icons.timer_outlined, 'Pomodoro', isDark),
+                          _buildTabletNavItem(11, Icons.draw_outlined, 'Zeichnen', isDark),
+                          _buildTabletNavItem(17, Icons.dns_outlined, 'IServ', isDark),
+                          _buildTabletNavItem(12, Icons.smart_toy_outlined, 'Assistent', isDark),
+                          _buildTabletNavItem(13, Icons.settings_outlined, 'Einstellungen', isDark),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -911,38 +940,21 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
 
   Widget _buildTabletNavItem(int index, IconData icon, String label, bool isDark) {
     final isActive = _currentIndex == index;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1),
-      child: GestureDetector(
-        onTap: () => _navigateToScreen(index),
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
+    const activeColor = Color(0xFF1E3A8A);
+    return GestureDetector(
+      onTap: () => _navigateToScreen(index),
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        height: _sidebarItemHeight,
+        child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: isActive
-                ? (isDark ? const Color(0xFF3B82F6).withValues(alpha: 0.10) : const Color(0xFFEFF6FF))
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
           child: Row(
             children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 3,
-                height: isActive ? 20 : 0,
-                margin: const EdgeInsets.only(right: 10),
-                decoration: BoxDecoration(
-                  color: isActive ? const Color(0xFF3B82F6) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
               Icon(
                 icon,
                 size: isActive ? 18 : 16,
                 color: isActive
-                    ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF1D4ED8))
+                    ? activeColor
                     : (isDark ? const Color(0xFFA1A1AA) : const Color(0xFF52525B)),
               ),
               const SizedBox(width: 12),
@@ -953,7 +965,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                     fontSize: 14,
                     fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                     color: isActive
-                        ? (isDark ? const Color(0xFF60A5FA) : const Color(0xFF1D4ED8))
+                        ? activeColor
                         : (isDark ? const Color(0xFFA1A1AA) : const Color(0xFF52525B)),
                   ),
                 ),
@@ -1031,7 +1043,7 @@ class _WelcomeSetupDialogState extends State<_WelcomeSetupDialog>
 
   static const _cardGradients = [
     [Color(0xFF667EEA), Color(0xFF764BA2)],
-    [Color(0xFFF093FB), Color(0xFFF5576C)],
+    [Color(0xFF6BA1FF), Color(0xFFF5576C)],
     [Color(0xFF4FACFE), Color(0xFF00F2FE)],
     [Color(0xFF43E97B), Color(0xFF38F9D7)],
     [Color(0xFFFA709A), Color(0xFFFEE140)],
@@ -1300,7 +1312,7 @@ class _WelcomeSetupDialogState extends State<_WelcomeSetupDialog>
               gradient: LinearGradient(
                 colors: [
                   NexusTheme.primaryColor.withValues(alpha: 0.1),
-                  NexusTheme.secondaryColor.withValues(alpha: 0.05),
+                  NexusTheme.primaryLight.withValues(alpha: 0.05),
                 ],
               ),
               borderRadius: BorderRadius.circular(12),
@@ -2085,95 +2097,3 @@ class _GradientRingPainter extends CustomPainter {
   bool shouldRepaint(_GradientRingPainter old) => old.progress != progress;
 }
 
-class _TabletNavItem extends StatefulWidget {
-  final int index;
-  final IconData icon;
-  final String label;
-  final bool isDark;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  const _TabletNavItem({
-    required this.index,
-    required this.icon,
-    required this.label,
-    required this.isDark,
-    required this.isActive,
-    required this.onTap,
-  });
-
-  @override
-  State<_TabletNavItem> createState() => _TabletNavItemState();
-}
-
-class _TabletNavItemState extends State<_TabletNavItem> {
-  bool _isHovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = widget.isDark;
-    final isActive = widget.isActive;
-
-    Color itemColor;
-    if (isActive) {
-      itemColor = isDark ? const Color(0xFF60A5FA) : const Color(0xFF1D4ED8);
-    } else if (_isHovered) {
-      itemColor = Colors.red;
-    } else {
-      itemColor = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF52525B);
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _isHovered = true),
-        onExit: (_) => setState(() => _isHovered = false),
-        child: GestureDetector(
-          onTap: widget.onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: isActive
-                  ? (isDark ? const Color(0xFF3B82F6).withValues(alpha: 0.10) : const Color(0xFFEFF6FF))
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 3,
-                  height: isActive ? 20 : 0,
-                  margin: const EdgeInsets.only(right: 10),
-                  decoration: BoxDecoration(
-                    color: isActive ? const Color(0xFF3B82F6) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                Icon(
-                  widget.icon,
-                  size: isActive ? 18 : 16,
-                  color: itemColor,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    widget.label,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                      color: itemColor,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

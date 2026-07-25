@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -21,6 +22,11 @@ class _DesktopWebViewScreenState extends State<DesktopWebViewScreen>
     with WidgetsBindingObserver, TickerProviderStateMixin {
   final FlaskServerService _flask = FlaskServerService();
   Timer? _updateCheckTimer;
+
+  // flutter_inappwebview has no Linux implementation, so on Linux the hub is
+  // opened in the system browser instead of an embedded WebView.
+  bool get _useEmbeddedWebView => !Platform.isLinux;
+  bool _openedInBrowser = false;
 
   late AnimationController _logoController;
   late AnimationController _textController;
@@ -82,8 +88,12 @@ class _DesktopWebViewScreenState extends State<DesktopWebViewScreen>
 
   Future<void> _checkForUpdates() async {
     final updateInfo = await UpdateService.checkForUpdate();
-    if (updateInfo != null) {
-      await UpdateService.sendUpdateNotification(updateInfo);
+    if (updateInfo == null) return;
+    await UpdateService.sendUpdateNotification(updateInfo);
+    // Show the in-app dialog (with a working download button) — the desktop
+    // notification tap path is unreliable, so this is the primary update UX.
+    if (mounted) {
+      await UpdateService.showUpdateDialog(context, updateInfo);
     }
   }
 
@@ -95,7 +105,21 @@ class _DesktopWebViewScreenState extends State<DesktopWebViewScreen>
   }
 
   void _onStateChange() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    // On Linux we cannot embed a WebView; open the hub in the browser once the
+    // server is up.
+    if (!_useEmbeddedWebView && _flask.isReady && !_openedInBrowser) {
+      _openedInBrowser = true;
+      _openHubInBrowser();
+    }
+    setState(() {});
+  }
+
+  Future<void> _openHubInBrowser() async {
+    final uri = Uri.tryParse('${_flask.url}/hub');
+    if (uri != null) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   @override
@@ -108,8 +132,80 @@ class _DesktopWebViewScreenState extends State<DesktopWebViewScreen>
         return _buildErrorScreen();
       case FlaskServerState.ready:
       case FlaskServerState.alreadyRunning:
-        return _buildWebView();
+        return _useEmbeddedWebView
+            ? _buildWebView()
+            : _buildBrowserFallbackScreen();
     }
+  }
+
+  Widget _buildBrowserFallbackScreen() {
+    return NexusBackground(
+      keepCenterClear: true,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(26),
+                child: Image.asset(
+                  'assets/nexus-logo.png',
+                  width: 90,
+                  height: 90,
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(height: 28),
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: NexusTheme.primaryGradient,
+                ).createShader(bounds),
+                child: const Text(
+                  'Nexus läuft',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 4,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Text(
+                  'Nexus wurde in deinem Standard-Browser geöffnet.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 28),
+              ElevatedButton.icon(
+                onPressed: _openHubInBrowser,
+                icon: const Icon(Icons.open_in_browser),
+                label: const Text('Im Browser öffnen'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: NexusTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildLoadingScreen() {
@@ -330,7 +426,7 @@ class _DesktopWebViewScreenState extends State<DesktopWebViewScreen>
                         builder: (context, progress, _) {
                           return Column(
                             children: [
-                              SizedBox(
+                              const SizedBox(
                                 width: 28,
                                 height: 28,
                                 child: CircularProgressIndicator(
@@ -371,28 +467,32 @@ class _DesktopWebViewScreenState extends State<DesktopWebViewScreen>
               const SizedBox(height: 24),
               if (!_flask.isSettingUp) ...[
                 if (_flask.isPythonMissing) ...[
-                  ElevatedButton.icon(
-                    onPressed: () async {
-                      final future = _flask.setupPython();
-                      setState(() {});
-                      await future;
-                      if (mounted) setState(() {});
-                    },
-                    icon: const Icon(Icons.download_rounded),
-                    label: const Text('Python automatisch installieren'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: NexusTheme.primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  // Automatic install is Homebrew-based and macOS-only; other
+                  // platforms only get the python.org link + retry.
+                  if (Platform.isMacOS) ...[
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        final future = _flask.setupPython();
+                        setState(() {});
+                        await future;
+                        if (mounted) setState(() {});
+                      },
+                      icon: const Icon(Icons.download_rounded),
+                      label: const Text('Python automatisch installieren'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: NexusTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 12),
+                  ],
                   TextButton.icon(
                     onPressed: () {
                       launchUrl(

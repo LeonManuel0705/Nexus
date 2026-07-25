@@ -113,10 +113,10 @@ class _SwipeToDismissWidgetState extends State<SwipeToDismissWidget>
                 Text(
                   widget.confirmMessage,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: const Color(0xFF71717A),
+                    color: Color(0xFF71717A),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -183,7 +183,7 @@ class _SwipeToDismissWidgetState extends State<SwipeToDismissWidget>
       onHorizontalDragEnd: _handleDragEnd,
       child: Stack(
         children: [
-          // Background reveal
+
           if (_dragExtent < -10)
             Positioned.fill(
               child: Container(
@@ -196,7 +196,7 @@ class _SwipeToDismissWidgetState extends State<SwipeToDismissWidget>
                 child: const Icon(Icons.delete_outline, color: Color(0xFFF43F5E), size: 24),
               ),
             ),
-          // Main content
+
           AnimatedContainer(
             duration: _isDragging ? Duration.zero : const Duration(milliseconds: 200),
             curve: Curves.easeOut,

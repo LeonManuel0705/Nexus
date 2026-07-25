@@ -1,5 +1,4 @@
 import os
-import json
 import base64
 import logging
 from datetime import datetime, timedelta
@@ -24,7 +23,7 @@ try:
 except ImportError:
     GOOGLE_API_AVAILABLE = False
 
-DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+DATA_DIR = os.environ.get("NEXUS_DATA_DIR") or os.path.join(PROJECT_ROOT, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 CREDENTIALS_FILE = Path(DATA_DIR) / "google_credentials.json"
 TOKENS_FILE = Path(DATA_DIR) / "google_tokens.json"
@@ -204,7 +203,7 @@ def complete_oauth_flow(auth_code: str) -> Dict:
             redirect_uri=GOOGLE_REDIRECT_URI
         )
 
-        flow.fetch_token(code=auth_code)
+        flow.fetch_token(code=auth_code, timeout=30)
         creds = flow.credentials
 
         service = build('gmail', 'v1', credentials=creds)
@@ -286,7 +285,7 @@ def fetch_gmail_messages(email: str, max_results: int = 20) -> Dict:
                     from email.utils import parsedate_to_datetime
                     date_obj = parsedate_to_datetime(date_str)
                     date_formatted = date_obj.strftime("%Y-%m-%d %H:%M")
-                except (ValueError, TypeError):
+                except Exception:
                     date_formatted = date_str[:20]
 
                 preview = msg_data.get('snippet', '')[:200]
@@ -302,7 +301,7 @@ def fetch_gmail_messages(email: str, max_results: int = 20) -> Dict:
                     "preview": preview,
                     "read": is_read
                 })
-            except Exception as e:
+            except Exception:
                 continue
 
         return {"success": True, "emails": emails}
@@ -337,7 +336,7 @@ def get_gmail_message_detail(email: str, msg_id: str) -> Dict:
             from email.utils import parsedate_to_datetime
             date_obj = parsedate_to_datetime(date_str)
             date_formatted = date_obj.strftime("%Y-%m-%d %H:%M")
-        except (ValueError, TypeError):
+        except Exception:
             date_formatted = date_str
 
         body = ""
@@ -512,7 +511,7 @@ def fetch_google_calendar_events(days_ahead: int = 30, account_email: str = None
                         "source": "google",
                         "recurring_event_id": event.get('recurringEventId', None)
                     })
-            except Exception as cal_err:
+            except Exception:
 
                 continue
 

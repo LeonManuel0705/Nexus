@@ -1,8 +1,5 @@
-import os
-import json
 import logging
 import socket
-import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -19,10 +16,28 @@ root_logger = logging.getLogger()
 root_logger.addFilter(IServWarningFilter())
 
 from IServAPI import IServAPI
+from .paths import DATA_DIR
 
-CREDENTIALS_FILE = Path(__file__).parent.parent / 'data' / 'iserv_credentials.json'
+CREDENTIALS_FILE = DATA_DIR / 'iserv_credentials.json'
+
+_METADATA_IPS = {'169.254.169.254', 'fd00:ec2::254'}
+
+
+def _check_blocked_ip(addr) -> str:
+    if addr.is_loopback or addr.is_unspecified:
+        return "Connection to loopback address is not allowed"
+    if str(addr) in _METADATA_IPS:
+        return "Connection to cloud metadata endpoint is not allowed"
+    return None
+
 
 def _validate_hostname_ssrf(hostname: str) -> str:
+    """Validate a hostname to prevent SSRF. Returns error message or None if valid.
+
+    Blocks loopback, unspecified (0.0.0.0), and cloud metadata endpoints.
+    Allows RFC 1918 / link-local so self-hosted LAN servers (e.g. an IServ
+    reached via split-horizon DNS returning 10.x.x.x) remain reachable.
+    """
     import ipaddress as _ipaddress
     if not hostname:
         return "Invalid hostname"
@@ -30,19 +45,19 @@ def _validate_hostname_ssrf(hostname: str) -> str:
     if hostname in blocked_hosts:
         return "Connection to localhost or metadata endpoints is not allowed"
     try:
-        addr = _ipaddress.ip_address(hostname)
-        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
-            return "Connection to internal addresses is not allowed"
+        err = _check_blocked_ip(_ipaddress.ip_address(hostname))
+        if err:
+            return err
     except ValueError:
         pass
     try:
         resolved = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
-        for family, _type, _proto, _canonname, sockaddr in resolved:
-            ip_str = sockaddr[0]
+        for _family, _type, _proto, _canonname, sockaddr in resolved:
+            ip_str = sockaddr[0].split('%', 1)[0]
             try:
-                addr = _ipaddress.ip_address(ip_str)
-                if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
-                    return "Connection to internal addresses is not allowed"
+                err = _check_blocked_ip(_ipaddress.ip_address(ip_str))
+                if err:
+                    return err
             except ValueError:
                 pass
     except socket.gaierror:
@@ -435,14 +450,14 @@ class IServService:
                 if events:
                     all_events.extend(events if isinstance(events, list) else [events])
             except Exception as e:
-                logging.debug("get_events failed: %s", e)
+                print(f"get_events failed: {e}")
 
             try:
                 upcoming = self.api.get_upcoming_events()
                 if upcoming:
                     all_events.extend(upcoming if isinstance(upcoming, list) else [upcoming])
             except Exception as e:
-                logging.debug("get_upcoming_events failed: %s", e)
+                print(f"get_upcoming_events failed: {e}")
 
             try:
                 if hasattr(self.api, 'get_calendar_plugin_events'):
@@ -450,7 +465,7 @@ class IServService:
                     if plugin_events:
                         all_events.extend(plugin_events if isinstance(plugin_events, list) else [plugin_events])
             except Exception as e:
-                logging.debug("get_calendar_plugin_events failed: %s", e)
+                print(f"get_calendar_plugin_events failed: {e}")
 
             exercise_keywords = [
                 'aufgabe', 'exercise', 'hausaufgabe', 'abgabe', 'task', 'homework',
@@ -479,7 +494,7 @@ class IServService:
                     })
 
         except Exception as e:
-            logging.debug("calendar exercise filter failed: %s", e)
+            print(f"calendar exercise filter failed: {e}")
 
         seen = set()
         unique_exercises = []
@@ -586,7 +601,7 @@ class IServService:
             logging.error(f"IServ search users error: {e}")
             return {'success': False, 'error': 'Fehler bei der Benutzersuche'}
 
-    VERTRETUNGSPLAN_CACHE_DIR = Path(__file__).parent.parent / 'data' / 'vertretungsplan_cache'
+    VERTRETUNGSPLAN_CACHE_DIR = DATA_DIR / 'vertretungsplan_cache'
 
     def get_vertretungsplan_pdfs(self, display_id: int = 3):
         cache_dir = self.VERTRETUNGSPLAN_CACHE_DIR
@@ -768,7 +783,7 @@ class IServService:
                             pdf_links.append(f'{base_url}{match}')
 
                     img_matches = re.findall(r'["\']([^"\']*\.(png|jpg|jpeg|gif)[^"\']*)["\']', script.string, re.IGNORECASE)
-                    for match, ext in img_matches:
+                    for match, _ext in img_matches:
                         if not match.startswith('http'):
                             match = f'{base_url}{match}' if match.startswith('/') else f'{base_url}/{match}'
                         pdf_links.append(match)
@@ -957,7 +972,6 @@ class IServService:
             return {'success': False, 'error': 'Nicht verbunden'}
 
         try:
-            import requests
 
             base_url = self.iserv_url.rstrip('/')
             if not base_url.startswith('http'):

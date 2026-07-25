@@ -516,7 +516,7 @@
                 <div class="color-select-wrapper">
                     <select id="subjectColor" name="color" onchange="updateColorPreview()">
                         <optgroup label="Standard">
-                            <option value="#667eea">Blau-Lila</option>
+                            <option value="#3d7bff">Blau-Lila</option>
                             <option value="#48bb78">Grün</option>
                             <option value="#ed8936">Orange</option>
                             <option value="#9f7aea">Lila</option>
@@ -543,7 +543,7 @@
                         </optgroup>
                     </select>
                     <div class="color-preview">
-                        <div class="color-swatch" id="colorPreviewSwatch" style="background-color: #667eea;"></div>
+                        <div class="color-swatch" id="colorPreviewSwatch" style="background-color: #3d7bff;"></div>
                         <span class="color-preview-label" id="colorPreviewLabel">Vorschau</span>
                     </div>
                 </div>
@@ -870,7 +870,7 @@
                     <select id="lessonColor" name="color" onchange="updateLessonColorPreview()">
                         <optgroup label="Standard">
                             <option value="#4285f4">Blau</option>
-                            <option value="#667eea">Blau-Lila</option>
+                            <option value="#3d7bff">Blau-Lila</option>
                             <option value="#48bb78">Grün</option>
                             <option value="#ed8936">Orange</option>
                             <option value="#9f7aea">Lila</option>
@@ -925,6 +925,7 @@
     </div>
 </div>
 
+<!-- Period Config Modal -->
 <div class="modal" id="periodConfigModal">
     <div class="modal-content" style="max-width: 520px;">
         <div class="modal-header">
@@ -932,6 +933,7 @@
             <button class="modal-close" onclick="closeModal('periodConfigModal')">&times;</button>
         </div>
         <div class="modal-body" id="periodConfigBody">
+            <!-- Filled by JS -->
         </div>
         <div class="form-actions">
             <button class="btn-secondary" onclick="showPeriodWizard()">
@@ -951,6 +953,7 @@
     </div>
 </div>
 
+<!-- Period Wizard Modal -->
 <div class="modal" id="periodWizardModal">
     <div class="modal-content" style="max-width: 560px;">
         <div class="modal-header">
@@ -1031,8 +1034,8 @@ let calendarEvents = [];
 let iservCalendarEvents = [];
 let currentCalendarDate = new Date();
 let iservConnected = false;
-let currentSemesterFilter = 'Q1';
-let gradeSystem = 'points';
+let currentSemesterFilter = 'Q1'; // Current semester filter (Q1, Q2, Q3, Q4, or 'all' for combined)
+let gradeSystem = 'points'; // 'points' (Oberstufe) or 'marks' (Mittelstufe)
 let classLevel = 10;
 
 const MARK_OPTIONS = [
@@ -1096,12 +1099,12 @@ let timetableSettings = {
 };
 
 let isEditMode = false;
-let selectedSetupOption = 'empty';
+let selectedSetupOption = 'empty'; // 'template' or 'empty'
 
 const DAY_NAMES = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 const DAY_NAMES_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
-let viewingWeek = null;
+let viewingWeek = null; // null = current week, 'A' or 'B' = forced view
 let stundenplanInterval = null;
 let timetableLoaded = false;
 
@@ -1245,6 +1248,7 @@ async function initTimetable() {
 
         updateWeekGroupVisibility();
 
+        // Handle deep-link from settings
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('openPeriodConfig') === '1') {
             isEditMode = true;
@@ -1288,7 +1292,7 @@ async function createTimetableEntry(entry) {
         });
         if (response.ok) {
             const data = await response.json();
-            await loadTimetableEntries();
+            await loadTimetableEntries(); // Reload all entries
             return data;
         }
     } catch (error) {
@@ -1306,7 +1310,7 @@ async function updateTimetableEntry(id, entry) {
         });
         if (response.ok) {
             const data = await response.json();
-            await loadTimetableEntries();
+            await loadTimetableEntries(); // Reload all entries
             return data;
         }
     } catch (error) {
@@ -1321,7 +1325,7 @@ async function deleteTimetableEntry(id) {
             method: 'DELETE'
         });
         if (response.ok) {
-            await loadTimetableEntries();
+            await loadTimetableEntries(); // Reload all entries
             return true;
         }
     } catch (error) {
@@ -1438,7 +1442,7 @@ async function saveBundeslandSelection() {
     let progress = 0;
     const progressInterval = setInterval(() => {
         progress += Math.random() * 15;
-        if (progress > 85) progress = 85;
+        if (progress > 85) progress = 85; // Cap at 85% until complete
         progressBar.style.width = progress + '%';
 
         if (progress < 30) {
@@ -1595,6 +1599,7 @@ function toggleEditMode() {
         document.body.classList.remove('edit-mode-active');
     }
 
+    // Reset week view when exiting edit mode
     if (!isEditMode) {
         viewingWeek = null;
     }
@@ -1806,6 +1811,8 @@ async function confirmClearTimetable() {
     }
 }
 
+// ===== Period Config Modal =====
+
 function openPeriodConfigModal() {
     renderPeriodConfigList();
     openModal('periodConfigModal');
@@ -1892,6 +1899,8 @@ async function savePeriodConfig() {
     }
 }
 
+// ===== Period Wizard =====
+
 let wizardStep = 1;
 let wizardTemplate = null;
 let wizardConfig = {
@@ -1914,6 +1923,7 @@ function renderWizardStep() {
     const content = document.getElementById('wizardContent');
     const actions = document.getElementById('wizardActions');
 
+    // Progress pills
     progress.innerHTML = [1, 2, 3].map(s =>
         `<span class="wizard-pill ${s === wizardStep ? 'active' : ''} ${s < wizardStep ? 'done' : ''}">${s}</span>`
     ).join('<span class="wizard-pill-line"></span>');
@@ -2058,6 +2068,7 @@ function changeWizardPeriodCount(delta) {
     const newCount = wizardConfig.periodCount + delta;
     if (newCount < 1 || newCount > 12) return;
     wizardConfig.periodCount = newCount;
+    // Adjust breaks array
     while (wizardConfig.breaks.length < newCount - 1) {
         wizardConfig.breaks.push(5);
     }
@@ -2768,6 +2779,7 @@ function toggleWeekView() {
     const displayedWeekType = getWeekType(displayedDate);
 
     if (isEditMode) {
+        // In edit mode: permanently change which week is current
         const targetWeek = displayedWeekType === 'A' ? 'B' : 'A';
         const newRef = new Date(REFERENCE_A_WEEK);
         newRef.setDate(newRef.getDate() + 7);
@@ -2781,6 +2793,7 @@ function toggleWeekView() {
         updateStundenplanDisplay();
         showToast(`Woche auf ${targetWeek}-Woche geändert`, 'success');
     } else {
+        // Normal mode: just preview the other week
         if (viewingWeek === null) {
             viewingWeek = displayedWeekType === 'A' ? 'B' : 'A';
         } else {
@@ -3077,7 +3090,7 @@ async function importSubjectsFromTimetable() {
     }
 
     const colors = [
-        '#667eea', // Purple-blue
+        '#3d7bff', // Purple-blue
         '#48bb78', // Green
         '#ed8936', // Orange
         '#9f7aea', // Purple
@@ -3414,7 +3427,7 @@ function renderSubjects() {
         const subjectHomework = homework.filter(h => h.subject_id === s.id && !h.completed);
         const subjectExams = exams.filter(e => e.subject_id === s.id);
         return `
-            <div class="subject-card" style="border-left-color: ${/^#[0-9a-fA-F]{3,8}$/.test(s.color) ? s.color : '#667eea'}" onclick="openEditSubjectModal('${escapeHtml(s.id)}')">
+            <div class="subject-card" style="border-left-color: ${/^#[0-9a-fA-F]{3,8}$/.test(s.color) ? s.color : '#3d7bff'}" onclick="openEditSubjectModal('${escapeHtml(s.id)}')">
                 <div class="subject-header">
                     <span class="subject-name">${escapeHtml(s.name)}</span>
                     ${s.grade ? `<span class="subject-grade">${escapeHtml(String(s.grade))}</span>` : ''}
@@ -3552,7 +3565,7 @@ function openEditSubjectModal(id) {
     document.getElementById('subjectName').value = s.name;
     document.getElementById('subjectTeacher').value = s.teacher || '';
     document.getElementById('subjectRoom').value = s.room || '';
-    document.getElementById('subjectColor').value = s.color || '#667eea';
+    document.getElementById('subjectColor').value = s.color || '#3d7bff';
     const courseType = s.course_type || 'GK';
     const courseTypeRadio = document.querySelector(`input[name="subject_course_type"][value="${courseType}"]`);
     if (courseTypeRadio) courseTypeRadio.checked = true;
@@ -3865,7 +3878,7 @@ async function loadVertretungsplan() {
             if (data.html_preview || data.searched_urls || data.media_elements) {
                 debugInfo = `<details style="margin-top: 12px; font-size: 11px; text-align: left;">
                     <summary style="cursor: pointer;">Debug-Info</summary>
-                    <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; margin-top: 8px;">
+                    <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 14px; margin-top: 8px;">
                         ${data.page_title ? `<p><strong>Seiten-Titel:</strong> ${escapeHtml(data.page_title)}</p>` : ''}
                         ${data.searched_urls && data.searched_urls.length > 0 ? `
                             <p><strong>Geprüfte URLs (${data.searched_urls.length}):</strong></p>
@@ -4834,7 +4847,7 @@ function renderGrades() {
 
     if (isMarks) {
         html = Object.entries(gradesBySubject).map(([subjectId, subjectGrades]) => {
-            const subject = subjects.find(s => s.id === subjectId) || { name: 'Unbekannt', color: '#6366f1' };
+            const subject = subjects.find(s => s.id === subjectId) || { name: 'Unbekannt', color: '#0057ff' };
             const withValue = subjectGrades.filter(g => g.value != null);
             const subjectAvg = withValue.length > 0
                 ? (withValue.reduce((sum, g) => sum + g.value, 0) / withValue.length).toFixed(1)
@@ -4843,7 +4856,7 @@ function renderGrades() {
             subjectGrades.sort((a, b) => new Date(b.date) - new Date(a.date));
 
             return `<div class="subject-grades glass-card">
-                <div class="subject-grades-header" style="border-left: 4px solid ${/^#[0-9a-fA-F]{3,8}$/.test(subject.color) ? subject.color : '#667eea'};">
+                <div class="subject-grades-header" style="border-left: 4px solid ${/^#[0-9a-fA-F]{3,8}$/.test(subject.color) ? subject.color : '#3d7bff'};">
                     <div class="subject-info">
                         <span class="subject-name">${escapeHtml(subject.name)}</span>
                         <span class="subject-average">${subjectAvg !== '--' ? 'Ø ' + subjectAvg : '--'}</span>
@@ -4867,7 +4880,7 @@ function renderGrades() {
         }).join('');
     } else {
         html = Object.entries(gradesBySubject).map(([subjectId, subjectGrades]) => {
-            const subject = subjects.find(s => s.id === subjectId) || { name: 'Unbekannt', color: '#6366f1' };
+            const subject = subjects.find(s => s.id === subjectId) || { name: 'Unbekannt', color: '#0057ff' };
 
             const result = calculateSubjectAveragePoints(subjectGrades);
             const subjectAvg = result.avg !== null ? result.avg.toFixed(1) : '--';
@@ -4877,7 +4890,7 @@ function renderGrades() {
             subjectGrades.sort((a, b) => new Date(b.date) - new Date(a.date));
 
             return `<div class="subject-grades glass-card">
-                <div class="subject-grades-header" style="border-left: 4px solid ${/^#[0-9a-fA-F]{3,8}$/.test(subject.color) ? subject.color : '#667eea'};">
+                <div class="subject-grades-header" style="border-left: 4px solid ${/^#[0-9a-fA-F]{3,8}$/.test(subject.color) ? subject.color : '#3d7bff'};">
                     <div class="subject-info">
                         <span class="subject-name">${escapeHtml(subject.name)}</span>
                         <span class="subject-average">${subjectAvg}P</span>
@@ -4946,7 +4959,7 @@ function renderArchiveSection(archivedGrades) {
     const archivedIsMarks = !isCurrentMarks; // archived grades are the opposite system
 
     let innerHtml = Object.entries(archivedBySubject).map(([subjectId, subjectGrades]) => {
-        const subject = subjects.find(s => s.id === subjectId) || { name: 'Unbekannt', color: '#6366f1' };
+        const subject = subjects.find(s => s.id === subjectId) || { name: 'Unbekannt', color: '#0057ff' };
         subjectGrades.sort((a, b) => new Date(b.date) - new Date(a.date));
 
         let avgDisplay = '--';
@@ -4963,7 +4976,7 @@ function renderArchiveSection(archivedGrades) {
         }
 
         return `<div class="subject-grades glass-card archive-grade-card">
-            <div class="subject-grades-header" style="border-left: 4px solid ${/^#[0-9a-fA-F]{3,8}$/.test(subject.color) ? subject.color : '#667eea'}; opacity: 0.7;">
+            <div class="subject-grades-header" style="border-left: 4px solid ${/^#[0-9a-fA-F]{3,8}$/.test(subject.color) ? subject.color : '#3d7bff'}; opacity: 0.7;">
                 <div class="subject-info">
                     <span class="subject-name">${escapeHtml(subject.name)}</span>
                     <span class="subject-average">${avgDisplay}</span>
@@ -5162,7 +5175,7 @@ function updateGradeModalForSystem(system) {
         markGroup.id = 'gradeMarkGroup';
         markGroup.innerHTML = `
             <label for="gradeMarkValue">Note</label>
-            <select id="gradeMarkValue" name="mark_value" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--glass-bg);color:var(--text-primary);font-size:14px;">
+            <select id="gradeMarkValue" name="mark_value" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:14px;background:var(--glass-bg);color:var(--text-primary);font-size:14px;">
                 ${MARK_OPTIONS.map(m => `<option value="${m.value}">${m.label} (${m.value})</option>`).join('')}
             </select>
         `;
@@ -5250,7 +5263,7 @@ function updateGradeCalculatorForSystem() {
                 <div class="converter-row">
                     <div class="converter-input">
                         <label>Note</label>
-                        <select id="markConverterInput" onchange="convertMarkToRating()" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--glass-bg);color:var(--text-primary);font-size:14px;">
+                        <select id="markConverterInput" onchange="convertMarkToRating()" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:14px;background:var(--glass-bg);color:var(--text-primary);font-size:14px;">
                             <option value="">--</option>
                             ${MARK_OPTIONS.map(m => `<option value="${m.value}">${m.label} (${m.value})</option>`).join('')}
                         </select>
@@ -5258,7 +5271,7 @@ function updateGradeCalculatorForSystem() {
                     <span class="converter-arrow">→</span>
                     <div class="converter-input">
                         <label>Bewertung</label>
-                        <div id="markConverterResult" style="padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--glass-bg);min-height:42px;display:flex;align-items:center;font-size:14px;">--</div>
+                        <div id="markConverterResult" style="padding:10px 12px;border:1px solid var(--border);border-radius:14px;background:var(--glass-bg);min-height:42px;display:flex;align-items:center;font-size:14px;">--</div>
                     </div>
                 </div>
             `;
@@ -5455,6 +5468,7 @@ function convertMarkToRating() {
 </script>
 
 <style>
+/* Bundesland Selection Grid */
 .bundesland-wizard-content {
     padding: 10px 0;
 }
@@ -5531,7 +5545,7 @@ function convertMarkToRating() {
 .import-progress-bar {
     height: 100%;
     width: 0%;
-    background: linear-gradient(90deg, var(--accent), #764ba2);
+    background: linear-gradient(90deg, var(--accent), #0057ff);
     border-radius: 4px;
     transition: width 0.3s ease;
 }
@@ -5553,6 +5567,7 @@ function convertMarkToRating() {
     }
 }
 
+/* Import from Stundenplan Banner */
 .import-from-stundenplan {
     display: flex;
     align-items: center;
@@ -5662,6 +5677,10 @@ function convertMarkToRating() {
     font-size: 11px;
 }
 
+/* ==========================================
+   COLOR PICKER STYLES
+   ========================================== */
+
 #subjectColor {
     padding: 10px 12px;
     padding-right: 36px;
@@ -5701,7 +5720,7 @@ function convertMarkToRating() {
 .color-swatch {
     width: 28px;
     height: 28px;
-    border-radius: 8px;
+    border-radius: 14px;
     border: 2px solid var(--card-border);
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     transition: transform 0.2s ease;
@@ -5719,6 +5738,10 @@ function convertMarkToRating() {
     font-size: 13px;
     color: var(--text-secondary);
 }
+
+/* ==========================================
+   VERTRETUNGSPLAN STYLES
+   ========================================== */
 
 .vertretungsplan-container {
     padding: 16px;
@@ -5909,6 +5932,11 @@ function convertMarkToRating() {
     font-size: 13px;
 }
 
+/* ==========================================
+   STUNDENPLAN STYLES
+   ========================================== */
+
+/* Week Indicator */
 .week-indicator {
     display: flex;
     align-items: center;
@@ -5920,7 +5948,7 @@ function convertMarkToRating() {
 .week-badge {
     width: 48px;
     height: 48px;
-    border-radius: 12px;
+    border-radius: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -5930,11 +5958,11 @@ function convertMarkToRating() {
 }
 
 .week-badge.week-a {
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: linear-gradient(135deg, #3d7bff, #0057ff);
 }
 
 .week-badge.week-b {
-    background: linear-gradient(135deg, #f093fb, #f5576c);
+    background: linear-gradient(135deg, #6ba1ff, #f5576c);
 }
 
 .week-info {
@@ -5960,6 +5988,7 @@ function convertMarkToRating() {
     align-items: center;
 }
 
+/* Current Lesson Section */
 .current-lesson-section {
     margin-bottom: 24px;
 }
@@ -5986,12 +6015,12 @@ function convertMarkToRating() {
 }
 
 .week-type-badge.type-a {
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: linear-gradient(135deg, #3d7bff, #0057ff);
     color: white;
 }
 
 .week-type-badge.type-b {
-    background: linear-gradient(135deg, #f093fb, #f5576c);
+    background: linear-gradient(135deg, #6ba1ff, #f5576c);
     color: white;
 }
 
@@ -6024,7 +6053,7 @@ function convertMarkToRating() {
 }
 
 .status-dot.upcoming {
-    background: #667eea;
+    background: #3d7bff;
     box-shadow: 0 0 8px rgba(102, 126, 234, 0.5);
 }
 
@@ -6049,6 +6078,7 @@ function convertMarkToRating() {
     color: var(--text-secondary);
 }
 
+/* Current Lesson Display */
 .current-lesson-display,
 .upcoming-lesson {
     display: flex;
@@ -6077,14 +6107,14 @@ function convertMarkToRating() {
 
 .lesson-type {
     padding: 4px 10px;
-    border-radius: 6px;
+    border-radius: 14px;
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
 }
 
 .type-lk {
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: linear-gradient(135deg, #3d7bff, #0057ff);
     color: white;
 }
 
@@ -6136,11 +6166,12 @@ function convertMarkToRating() {
 
 .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #667eea, #764ba2);
+    background: linear-gradient(90deg, #3d7bff, #0057ff);
     border-radius: 3px;
     transition: width 0.5s ease;
 }
 
+/* No Lesson State */
 .no-lesson {
     display: flex;
     flex-direction: column;
@@ -6165,15 +6196,18 @@ function convertMarkToRating() {
     color: var(--accent) !important;
 }
 
+/* Schedule Section */
 .schedule-section {
     margin-bottom: 24px;
 }
 
+/* Primary schedule (Today/Next school day) - more prominent */
 .schedule-section.schedule-primary .schedule-item.glass-card {
     background: var(--card-bg);
     border-color: var(--card-border);
 }
 
+/* Secondary schedule (Day after) - slightly faded */
 .schedule-section.schedule-secondary .schedule-item.glass-card {
     opacity: 0.75;
 }
@@ -6284,6 +6318,7 @@ function convertMarkToRating() {
     font-size: 14px;
 }
 
+/* Week Overview */
 .week-overview-section {
     margin-bottom: 24px;
 }
@@ -6389,6 +6424,7 @@ function convertMarkToRating() {
     font-size: 12px;
 }
 
+/* Clickable Teacher Names */
 .clickable {
     cursor: pointer;
     transition: all 0.2s ease;
@@ -6429,6 +6465,7 @@ function convertMarkToRating() {
     color: var(--accent);
 }
 
+/* Email Compose Modal */
 .email-compose-modal {
     max-width: 550px;
 }
@@ -6493,6 +6530,7 @@ function convertMarkToRating() {
     margin-right: 6px;
 }
 
+/* Toast Notifications */
 .toast {
     position: fixed;
     bottom: 100px;
@@ -6562,6 +6600,7 @@ function convertMarkToRating() {
     to { transform: rotate(360deg); }
 }
 
+/* Responsive */
 @media (max-width: 600px) {
     .week-indicator {
         flex-wrap: wrap;
@@ -6595,6 +6634,7 @@ function convertMarkToRating() {
     }
 }
 
+/* Calendar Styles */
 .calendar-container {
     padding: 20px;
 }
@@ -6618,7 +6658,7 @@ function convertMarkToRating() {
 .btn-icon {
     background: var(--glass-bg);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 14px;
     padding: 8px;
     cursor: pointer;
     color: var(--text-secondary);
@@ -6661,7 +6701,7 @@ function convertMarkToRating() {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    border-radius: 8px;
+    border-radius: 14px;
     background: var(--glass-bg);
     cursor: pointer;
     transition: all 0.2s;
@@ -6715,7 +6755,7 @@ function convertMarkToRating() {
 }
 
 .event-dot.school {
-    background: #6366f1;
+    background: #0057ff;
 }
 
 .event-dot.exam {
@@ -6738,6 +6778,7 @@ function convertMarkToRating() {
     background: #0ea5e9;
 }
 
+/* Events List */
 .events-list {
     display: flex;
     flex-direction: column;
@@ -6764,7 +6805,7 @@ function convertMarkToRating() {
     min-width: 50px;
     padding: 8px;
     background: var(--glass-bg);
-    border-radius: 8px;
+    border-radius: 14px;
 }
 
 .event-day {
@@ -6804,13 +6845,13 @@ function convertMarkToRating() {
 .event-category-badge {
     font-size: 11px;
     padding: 4px 10px;
-    border-radius: 12px;
+    border-radius: 18px;
     font-weight: 500;
 }
 
 .event-category-badge.school {
     background: rgba(99, 102, 241, 0.15);
-    color: #6366f1;
+    color: #0057ff;
 }
 
 .event-category-badge.exam {
@@ -6843,11 +6884,13 @@ function convertMarkToRating() {
     gap: 8px;
 }
 
+/* IServ Events Section in Calendar */
 .iserv-events-section {
     border-top: 1px solid var(--border-color);
     padding-top: 24px;
 }
 
+/* Grades Styles */
 .grades-summary {
     padding: 20px;
     margin-bottom: 24px;
@@ -6873,6 +6916,7 @@ function convertMarkToRating() {
     color: var(--accent);
 }
 
+/* Grade Calculator Styles */
 .grade-calculator {
     margin-bottom: 24px;
     overflow: hidden;
@@ -6946,7 +6990,7 @@ function convertMarkToRating() {
     width: 100%;
     padding: 10px 12px;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 14px;
     background: var(--glass-bg);
     color: var(--text-primary);
     font-size: 14px;
@@ -6961,7 +7005,7 @@ function convertMarkToRating() {
 .converter-result {
     margin-top: 12px;
     padding: 12px;
-    border-radius: 8px;
+    border-radius: 14px;
     background: var(--glass-bg);
     text-align: center;
     min-height: 20px;
@@ -7002,7 +7046,7 @@ function convertMarkToRating() {
     width: 100%;
     padding: 8px 10px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 14px;
     background: var(--glass-bg);
     color: var(--text-primary);
     font-size: 13px;
@@ -7011,7 +7055,7 @@ function convertMarkToRating() {
 .target-result {
     margin-top: 12px;
     padding: 12px;
-    border-radius: 8px;
+    border-radius: 14px;
     background: var(--glass-bg);
 }
 
@@ -7019,6 +7063,7 @@ function convertMarkToRating() {
     color: var(--text-secondary);
 }
 
+/* Klausur/Sonstige Calculator */
 .klausur-calc-section {
     margin-bottom: 24px;
     padding-top: 16px;
@@ -7056,7 +7101,7 @@ function convertMarkToRating() {
     min-width: 50px;
     padding: 8px 10px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 14px;
     background: var(--glass-bg);
     color: var(--text-primary);
     font-size: 13px;
@@ -7074,7 +7119,7 @@ function convertMarkToRating() {
     width: 100px;
     padding: 8px 10px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 14px;
     background: var(--glass-bg);
     color: var(--text-primary);
     font-size: 13px;
@@ -7089,7 +7134,7 @@ function convertMarkToRating() {
     width: 100%;
     padding: 8px 10px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 14px;
     background: var(--glass-bg);
     color: var(--text-primary);
     font-size: 13px;
@@ -7101,7 +7146,7 @@ function convertMarkToRating() {
 
 .klausur-result-box {
     padding: 16px;
-    border-radius: 8px;
+    border-radius: 14px;
     background: var(--glass-bg);
 }
 
@@ -7168,7 +7213,7 @@ function convertMarkToRating() {
     display: grid;
     gap: 2px;
     background: var(--border);
-    border-radius: 8px;
+    border-radius: 14px;
     overflow: hidden;
 }
 
@@ -7198,14 +7243,16 @@ function convertMarkToRating() {
 .grade-row.poor span { background: rgba(239, 68, 68, 0.15); }
 .grade-row.fail span { background: rgba(239, 68, 68, 0.25); }
 
+/* Grade color classes */
 .grade-excellent { color: #22c55e; }
-.grade-good { color: #3b82f6; }
+.grade-good { color: #0057ff; }
 .grade-satisfactory { color: #eab308; }
 .grade-sufficient { color: #f97316; }
 .grade-poor { color: #ef4444; }
 
 .error { color: #ef4444; }
 
+/* Semester Tabs */
 .semester-tabs {
     margin-bottom: 16px;
     padding: 12px 16px;
@@ -7220,7 +7267,7 @@ function convertMarkToRating() {
 .semester-tab {
     padding: 8px 16px;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 14px;
     background: transparent;
     color: var(--text-secondary);
     font-size: 14px;
@@ -7251,10 +7298,11 @@ function convertMarkToRating() {
 }
 
 .semester-tab.combined.active {
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: linear-gradient(135deg, #3d7bff, #0057ff);
     border-color: transparent;
 }
 
+/* Summary display for combined view */
 .grades-summary {
     display: flex;
     gap: 24px;
@@ -7282,6 +7330,7 @@ function convertMarkToRating() {
     color: var(--accent);
 }
 
+/* Semester badge on grade items */
 .grade-semester-badge {
     display: inline-block;
     padding: 2px 8px;
@@ -7358,7 +7407,7 @@ function convertMarkToRating() {
     min-width: 50px;
     text-align: center;
     padding: 4px 8px;
-    border-radius: 8px;
+    border-radius: 14px;
 }
 
 .grade-excellent {
@@ -7368,7 +7417,7 @@ function convertMarkToRating() {
 
 .grade-good {
     background: rgba(59, 130, 246, 0.15);
-    color: #3b82f6;
+    color: #0057ff;
 }
 
 .grade-satisfactory {
@@ -7417,6 +7466,7 @@ function convertMarkToRating() {
     color: var(--text-secondary);
 }
 
+/* Archive Section */
 .archive-section {
     margin-top: 24px;
     border-top: 1px solid var(--border);
@@ -7498,6 +7548,7 @@ function convertMarkToRating() {
     }
 }
 
+/* Period Config Modal */
 .period-config-list {
     display: flex;
     flex-direction: column;
@@ -7510,7 +7561,7 @@ function convertMarkToRating() {
     gap: 8px;
     padding: 8px 12px;
     background: rgba(255,255,255,0.05);
-    border-radius: 8px;
+    border-radius: 14px;
 }
 
 .period-badge {
@@ -7530,7 +7581,7 @@ function convertMarkToRating() {
 .period-time-input {
     background: rgba(255,255,255,0.08);
     border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 6px;
+    border-radius: 14px;
     color: var(--text-primary);
     padding: 6px 8px;
     font-size: 14px;
@@ -7554,7 +7605,7 @@ function convertMarkToRating() {
     justify-content: center;
     width: 30px;
     height: 30px;
-    border-radius: 6px;
+    border-radius: 14px;
     border: none;
     background: rgba(255,255,255,0.06);
     color: var(--text-secondary);
@@ -7572,6 +7623,7 @@ function convertMarkToRating() {
     color: #ea4335;
 }
 
+/* Wizard */
 .wizard-progress {
     display: flex;
     align-items: center;
@@ -7622,7 +7674,7 @@ function convertMarkToRating() {
     align-items: center;
     gap: 8px;
     padding: 16px 8px;
-    border-radius: 12px;
+    border-radius: 18px;
     border: 2px solid rgba(255,255,255,0.1);
     background: rgba(255,255,255,0.04);
     cursor: pointer;
@@ -7702,7 +7754,7 @@ function convertMarkToRating() {
 .wizard-break-select {
     background: rgba(255,255,255,0.08);
     border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 6px;
+    border-radius: 14px;
     color: var(--text-primary);
     padding: 4px 8px;
     font-size: 13px;
@@ -7731,7 +7783,7 @@ function convertMarkToRating() {
     gap: 10px;
     padding: 6px 10px;
     background: rgba(255,255,255,0.04);
-    border-radius: 8px;
+    border-radius: 14px;
     font-size: 14px;
 }
 

@@ -1,15 +1,16 @@
 {
   "name": "nexus",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Nexus — Your personal Life Hub",
   "main": "main.js",
   "author": "Leon Manuel",
   "license": "UNLICENSED",
   "scripts": {
     "start": "electron .",
-    "build:win": "electron-builder --win",
-    "build:linux": "electron-builder --linux",
-    "build:all": "electron-builder --win --linux"
+    "bundle-backend": "node scripts/bundle-backend.js",
+    "build:win": "npm run bundle-backend && electron-builder --win",
+    "build:linux": "npm run bundle-backend && electron-builder --linux",
+    "build:all": "npm run bundle-backend && electron-builder --win --linux"
   },
   "devDependencies": {
     "electron": "^35.0.0",
@@ -24,6 +25,26 @@
     "files": [
       "main.js",
       "resources/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "frozen-backend",
+        "to": "backend",
+        "filter": ["**/*", "!.gitkeep"]
+      },
+      {
+        "from": "../app",
+        "to": "backend/app",
+        "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"]
+      },
+      {
+        "from": "../requirements.txt",
+        "to": "backend/requirements.txt"
+      },
+      {
+        "from": "../calendar_sync.py",
+        "to": "backend/calendar_sync.py"
+      }
     ],
     "win": {
       "target": "nsis",

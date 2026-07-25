@@ -298,7 +298,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     gradient: LinearGradient(
                       colors: [
                         NexusTheme.primaryColor.withValues(alpha: 0.15),
-                        NexusTheme.secondaryColor.withValues(alpha: 0.1),
+                        NexusTheme.primaryLight.withValues(alpha: 0.1),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(20),
@@ -564,7 +564,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     height: 6,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Color(0xFF6366F1), Color(0xFF9333EA)],
+                        colors: [Color(0xFF6366F1), Color(0xFF3D7BFF)],
                       ),
                       borderRadius: BorderRadius.circular(4),
                     ),

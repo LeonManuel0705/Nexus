@@ -313,6 +313,7 @@ class IServProvider extends ChangeNotifier {
   }
 
   Future<void> syncData() async {
+    if (_isSyncing) return;
     _log('syncData() called, isConnected=$_isConnected');
     if (!_isConnected) {
       final reconnected = await _service.autoReconnect();

@@ -1,12 +1,10 @@
-import os
 import re
-import json
 import logging
 import requests
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
-from pathlib import Path
+from typing import Dict, List, Optional
 from .crypto_utils import encrypt_file, decrypt_file
+from .paths import DATA_DIR
 
 DB_API_BASE = "https://v6.db.transport.rest"
 VBB_API_BASE = "https://v6.vbb.transport.rest"
@@ -14,9 +12,9 @@ DB_INTERNAL_API = "https://int.bahn.de/web/api"
 
 TRANSPORT_APIS = [DB_API_BASE, VBB_API_BASE]
 
-LOCATIONS_CACHE_FILE = Path(__file__).parent.parent / 'data' / 'vbb_locations_cache.json'
+LOCATIONS_CACHE_FILE = DATA_DIR / 'vbb_locations_cache.json'
 
-KNOWN_LOCATIONS_FILE = Path(__file__).parent.parent / 'data' / 'known_locations.json'
+KNOWN_LOCATIONS_FILE = DATA_DIR / 'known_locations.json'
 
 TICKET_CATALOG = [
     {'id': 'deutschlandticket', 'name': 'Deutschlandticket', 'category': 'national',
@@ -712,6 +710,8 @@ class VBBService:
                 response = self._api_get('/journeys', params, timeout=15)
                 data = response.json()
             except requests.RequestException:
+                # ID-based lookup failed on all APIs (IDs from one API may not
+                # work on the other).  Retry with coordinates if available.
                 has_coords = (
                     from_location.get('latitude') and from_location.get('longitude')
                     and to_location.get('latitude') and to_location.get('longitude')
@@ -821,7 +821,7 @@ class VBBService:
 
                     legs.append(leg_info)
 
-                first_leg = journey.get('legs', [{}])[0]
+                first_leg = (journey.get('legs') or [{}])[0]
                 last_leg = journey.get('legs', [{}])[-1] if journey.get('legs') else {}
                 departure_time_str = first_leg.get('departure') or first_leg.get('plannedDeparture')
                 arrival_time_str = last_leg.get('arrival') or last_leg.get('plannedArrival')
@@ -833,7 +833,7 @@ class VBBService:
                         d2 = datetime.fromisoformat(arrival_time_str.replace('Z', '+00:00'))
                         total_duration = max(0, int((d2 - d1).total_seconds() / 60))
                     except (ValueError, TypeError):
-                        total_duration = sum(l.get('duration', 0) for l in legs)
+                        total_duration = sum(leg.get('duration', 0) for leg in legs)
 
                 tickets_data = journey.get('tickets', [])
                 parsed_tickets = []
@@ -867,7 +867,7 @@ class VBBService:
                     'departure': departure_time_str,
                     'arrival': arrival_time_str,
                     'duration': total_duration,
-                    'transfers': max(0, len([l for l in legs if l['type'] == 'transit']) - 1),
+                    'transfers': max(0, len([leg for leg in legs if leg['type'] == 'transit']) - 1),
                     'legs': legs,
                     'has_delay': has_delay,
                     'max_delay': max_delay,
@@ -1501,14 +1501,13 @@ class VBBService:
                 }
 
             if required_zones and required_zones.issubset(coverage):
-                if not has_ice_ic or ticket.get('zone_coverage') != 'all':
+                if not has_ice_ic:
                     return {
                         'covered': True,
                         'covering_ticket': ticket.get('ticket_name'),
                         'expires_soon': self._ticket_expires_soon(ticket, travel_date)
                     }
 
-        missing_zones = required_zones - set()
         if required_zones:
             zone_str = ''.join(sorted(required_zones))
             return {
@@ -1584,7 +1583,7 @@ class VBBService:
     def check_route_connections(self, route_data: Dict) -> Dict:
         """Check if all connections in a monitored route are still reachable."""
         legs = route_data.get('legs', [])
-        transit_legs = [l for l in legs if l.get('type') == 'transit']
+        transit_legs = [leg for leg in legs if leg.get('type') == 'transit']
 
         connection_issues = []
 

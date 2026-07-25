@@ -10,5 +10,16 @@
 	<true/>
 	<key>com.apple.security.network.server</key>
 	<true/>
+	<!-- Hardened Runtime exceptions required because the app execs an external
+	     Python interpreter (not Team-ID signed) and that interpreter maps
+	     W+X pages and loads unsigned native .so extension modules. -->
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+	<key>com.apple.security.cs.allow-dyld-environment-variables</key>
+	<true/>
 </dict>
 </plist>

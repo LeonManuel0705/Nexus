@@ -93,7 +93,7 @@
                         </svg>
                         Helles Theme ab
                     </label>
-                    <input type="time" id="lightTimeInput" value="07:00" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: inherit; font-size: 14px;">
+                    <input type="time" id="lightTimeInput" value="07:00" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 8px 12px; color: inherit; font-size: 14px;">
                 </div>
                 <div class="schedule-time-input">
                     <label for="darkTimeInput" style="font-size: 13px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
@@ -102,7 +102,7 @@
                         </svg>
                         Dunkles Theme ab
                     </label>
-                    <input type="time" id="darkTimeInput" value="20:00" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: inherit; font-size: 14px;">
+                    <input type="time" id="darkTimeInput" value="20:00" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 8px 12px; color: inherit; font-size: 14px;">
                 </div>
             </div>
             <button class="btn-primary" onclick="saveThemeSchedule()" style="margin-top: 12px; padding: 8px 20px; font-size: 13px;">
@@ -139,14 +139,14 @@
                 <span class="settings-label">Geburtstag</span>
                 <span class="settings-desc">Für altersabhängige Ticket-Empfehlungen</span>
             </div>
-            <input type="date" id="birthdayInput" onchange="saveBirthday(this.value)" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 12px; color: inherit; font-size: 14px;">
+            <input type="date" id="birthdayInput" onchange="saveBirthday(this.value)" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 6px 12px; color: inherit; font-size: 14px;">
         </div>
         <div class="settings-row" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1);">
             <div class="settings-info">
                 <span class="settings-label">Klassenstufe</span>
                 <span class="settings-desc" id="classLevelDesc">Bestimmt das Notensystem (Noten oder Punkte)</span>
             </div>
-            <select id="classLevelSelect" onchange="changeClassLevel(parseInt(this.value))" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: inherit; font-size: 14px; min-width: 180px;">
+            <select id="classLevelSelect" onchange="changeClassLevel(parseInt(this.value))" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 8px 12px; color: inherit; font-size: 14px; min-width: 180px;">
                 <option value="5">Klasse 5 — Noten (1-6)</option>
                 <option value="6">Klasse 6 — Noten (1-6)</option>
                 <option value="7">Klasse 7 — Noten (1-6)</option>
@@ -231,10 +231,10 @@
             </div>
             <div style="display: flex; gap: 8px; align-items: center;">
                 <input type="time" id="notifQuietStart" value="22:00" onchange="saveNotifSetting('quiet-start', this.value)"
-                       style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: inherit; font-size: 13px;">
+                       style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 6px 10px; color: inherit; font-size: 13px;">
                 <span style="color: var(--text-muted); font-size: 13px;">bis</span>
                 <input type="time" id="notifQuietEnd" value="07:00" onchange="saveNotifSetting('quiet-end', this.value)"
-                       style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: inherit; font-size: 13px;">
+                       style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 6px 10px; color: inherit; font-size: 13px;">
             </div>
         </div>
 
@@ -281,7 +281,7 @@
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <input type="number" id="notifHomeworkLead" min="0" max="30" value="1"
                            onchange="saveNotifSetting('cat-homework-lead', this.value)"
-                           style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: inherit; font-size: 13px; width: 56px; text-align: center;">
+                           style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 6px 10px; color: inherit; font-size: 13px; width: 56px; text-align: center;">
                     <span style="color: var(--text-muted); font-size: 13px;">Tage</span>
                 </div>
                 <label class="toggle-switch">
@@ -301,7 +301,7 @@
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <input type="number" id="notifSchoolLead" min="1" max="60" value="10"
                            onchange="saveNotifSetting('cat-school-lead', this.value)"
-                           style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: inherit; font-size: 13px; width: 56px; text-align: center;">
+                           style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 6px 10px; color: inherit; font-size: 13px; width: 56px; text-align: center;">
                     <span style="color: var(--text-muted); font-size: 13px;">Min</span>
                 </div>
                 <label class="toggle-switch">
@@ -321,7 +321,7 @@
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <input type="number" id="notifTrainingLead" min="1" max="120" value="15"
                            onchange="saveNotifSetting('cat-training-lead', this.value)"
-                           style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: inherit; font-size: 13px; width: 56px; text-align: center;">
+                           style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 6px 10px; color: inherit; font-size: 13px; width: 56px; text-align: center;">
                     <span style="color: var(--text-muted); font-size: 13px;">Min</span>
                 </div>
                 <label class="toggle-switch">
@@ -353,7 +353,7 @@
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <input type="number" id="notifTestsLead" min="0" max="30" value="1"
                            onchange="saveNotifSetting('cat-tests-lead', this.value)"
-                           style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; color: inherit; font-size: 13px; width: 56px; text-align: center;">
+                           style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 6px 10px; color: inherit; font-size: 13px; width: 56px; text-align: center;">
                     <span style="color: var(--text-muted); font-size: 13px;">Tage</span>
                 </div>
                 <label class="toggle-switch">
@@ -599,6 +599,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadThemePreferences();
     loadNotifSettings();
 
+    // Detect platform for "Über Nexus"
     var platformEl = document.getElementById('aboutPlatform');
     if (platformEl) {
         var ua = navigator.userAgent;
@@ -618,6 +619,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (toggleThemeBtn) {
         toggleThemeBtn.addEventListener('click', () => {
             if (currentThemeMode !== 'manual') return;
+            // Direct toggle — avoid relying on HubApp if it hasn't init'd yet
             const current = document.documentElement.getAttribute('data-theme') || 'dark';
             const next = current === 'dark' ? 'light' : 'dark';
             document.documentElement.setAttribute('data-theme', next);
@@ -630,11 +632,13 @@ document.addEventListener('DOMContentLoaded', () => {
             document.documentElement.classList.add('theme-transitioning');
             setTimeout(() => document.documentElement.classList.remove('theme-transitioning'), 500);
             document.getElementById('themeLabel').textContent = next === 'dark' ? 'Dunkles Theme' : 'Helles Theme';
+            // Persist to server
             fetch('/api/hub/theme', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ theme: next })
             }).catch(() => {});
+            // Mark that user manually toggled — prevents next scheduled auto-switch
             localStorage.setItem('nexus-theme-manual-override', Date.now().toString());
         });
     }
@@ -644,6 +648,8 @@ function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+
+// ── Notification Settings ────────────────────────────────────────
 
 function loadNotifSettings() {
     var get = function(k, def) { return localStorage.getItem('nexus-notif-' + k) ?? def; };
@@ -669,6 +675,7 @@ function loadNotifSettings() {
 
 function saveNotifSetting(key, value) {
     localStorage.setItem('nexus-notif-' + key, String(value));
+    // Restart notification system to pick up changes
     if (typeof NexusNotifications !== 'undefined') {
         NexusNotifications.restart();
     }
@@ -683,6 +690,7 @@ function sendTestNotification() {
 function _getCalendarRemindersArr() {
     var raw = localStorage.getItem('nexus-notif-cat-calendar-reminders');
     if (raw) { try { return JSON.parse(raw); } catch(e) {} }
+    // Migrate from legacy single value
     var legacy = parseInt(localStorage.getItem('nexus-notif-cat-calendar-lead') || '15', 10);
     return [isNaN(legacy) ? 15 : legacy];
 }
@@ -705,7 +713,7 @@ function renderCalendarReminders(reminders) {
         row.style.cssText = 'display:flex;align-items:center;gap:6px;';
         var input = document.createElement('input');
         input.type = 'number'; input.min = 1; input.max = 1440; input.value = mins;
-        input.style.cssText = 'background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:6px 10px;color:inherit;font-size:13px;width:60px;text-align:center;';
+        input.style.cssText = 'background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:6px 10px;color:inherit;font-size:13px;width:60px;text-align:center;';
         input.onchange = (function(idx) { return function() { updateCalendarReminder(idx, this.value); }; })(i);
         var label = document.createElement('span');
         label.textContent = 'Min';
@@ -724,7 +732,7 @@ function renderCalendarReminders(reminders) {
     });
     var addBtn = document.createElement('button');
     addBtn.textContent = '+ Erinnerung';
-    addBtn.style.cssText = 'background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:rgba(255,255,255,0.55);font-size:12px;padding:4px 12px;cursor:pointer;margin-top:2px;';
+    addBtn.style.cssText = 'background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:14px;color:rgba(255,255,255,0.55);font-size:12px;padding:4px 12px;cursor:pointer;margin-top:2px;';
     addBtn.onclick = addCalendarReminder;
     container.appendChild(addBtn);
 }
@@ -748,10 +756,14 @@ function addCalendarReminder() {
     _saveCalendarRemindersArr(arr);
 }
 
+// ── End Notification Settings ────────────────────────────────────
+
 async function loadSettings() {
+    // Read the actual applied theme from the DOM, not HubApp.state (which may be stale for system/schedule modes)
     const theme = document.documentElement.getAttribute('data-theme') || 'dark';
     document.getElementById('themeLabel').textContent = theme === 'dark' ? 'Dunkles Theme' : 'Helles Theme';
 
+    // Try loading location from server first, fall back to localStorage
     try {
         const res = await fetch('/api/hub/location');
         if (res.ok) {
@@ -813,6 +825,7 @@ function updateThemeModeUI(mode, skipAnimation) {
         schedule: { disabled: true,  title: 'Im Zeitplan-Modus wird das Theme automatisch gewechselt' },
     };
 
+    // Toggle button state
     if (toggleBtn) {
         const ts = toggleStates[mode] || toggleStates.manual;
         toggleBtn.disabled = ts.disabled;
@@ -820,6 +833,10 @@ function updateThemeModeUI(mode, skipAnimation) {
         toggleBtn.title = ts.title;
     }
 
+    // Schedule config expand/collapse
+    // Strategy: single reflow to set final DOM state, then use GPU-only
+    // clip-path (parent card) + translateY (below cards) + opacity (content).
+    // Zero reflow during the animation itself.
     const showSchedule = mode === 'schedule';
     const isOpen = scheduleConfig.classList.contains('open');
     const dur = 500;
@@ -835,16 +852,19 @@ function updateThemeModeUI(mode, skipAnimation) {
             const belowCards = allCards.slice(allCards.indexOf(parentCard) + 1);
             const inner = scheduleConfig.querySelector('.schedule-expand-inner');
 
+            // Measure delta, then show
             inner.style.opacity = '0';
             const beforeH = parentCard.offsetHeight;
             scheduleConfig.classList.add('open');
             const deltaH = parentCard.offsetHeight - beforeH;
 
+            // GPU: clip parent card from old size to full size
             parentCard.animate(
                 [{ clipPath: 'inset(0 0 ' + deltaH + 'px 0 round ' + br + ')' },
                  { clipPath: 'inset(0 0 0px 0 round ' + br + ')' }],
                 { duration: dur, easing: ease }
             );
+            // GPU: slide cards below from old position
             belowCards.forEach(card => {
                 card.animate(
                     [{ transform: 'translateY(' + (-deltaH) + 'px) translateZ(0)' },
@@ -852,6 +872,7 @@ function updateThemeModeUI(mode, skipAnimation) {
                     { duration: dur, easing: ease }
                 );
             });
+            // GPU: fade in content
             inner.animate(
                 [{ opacity: 0 }, { opacity: 1 }],
                 { duration: dur, easing: ease }
@@ -869,12 +890,14 @@ function updateThemeModeUI(mode, skipAnimation) {
             const deltaH = scheduleConfig.offsetHeight +
                 parseFloat(getComputedStyle(scheduleConfig).marginTop || 0);
 
+            // GPU: clip parent card down to hide schedule area
             const anims = [];
             anims.push(parentCard.animate(
                 [{ clipPath: 'inset(0 0 0px 0 round ' + br + ')' },
                  { clipPath: 'inset(0 0 ' + deltaH + 'px 0 round ' + br + ')' }],
                 { duration: dur, easing: ease, fill: 'forwards' }
             ).finished);
+            // GPU: slide cards below up
             belowCards.forEach(card => {
                 anims.push(card.animate(
                     [{ transform: 'translateY(0) translateZ(0)' },
@@ -882,11 +905,13 @@ function updateThemeModeUI(mode, skipAnimation) {
                     { duration: dur, easing: ease, fill: 'forwards' }
                 ).finished);
             });
+            // GPU: fade out content
             anims.push(inner.animate(
                 [{ opacity: 1 }, { opacity: 0 }],
                 { duration: dur, easing: ease, fill: 'forwards' }
             ).finished);
 
+            // Once done, snap to final DOM state
             Promise.all(anims).then(() => {
                 scheduleConfig.classList.remove('open');
                 parentCard.getAnimations().forEach(a => a.cancel());
@@ -897,6 +922,7 @@ function updateThemeModeUI(mode, skipAnimation) {
         }
     }
 
+    // Pure opacity crossfade between two stacked layers
     const newText = texts[mode] || texts.manual;
     const current = _descActiveLayer === 'A' ? layerA : layerB;
     const next    = _descActiveLayer === 'A' ? layerB : layerA;
@@ -905,18 +931,22 @@ function updateThemeModeUI(mode, skipAnimation) {
         current.textContent = newText;
         current.style.opacity = '1';
         next.style.opacity = '0';
+        // Cancel any running crossfade animations
         current.getAnimations().forEach(a => a.cancel());
         next.getAnimations().forEach(a => a.cancel());
         return;
     }
 
+    // Cancel any running crossfade animations from a previous switch
     current.getAnimations().forEach(a => a.cancel());
     next.getAnimations().forEach(a => a.cancel());
 
+    // Set new text on hidden layer
     next.textContent = newText;
     next.style.opacity = '0';
     current.style.opacity = '1';
 
+    // Crossfade using WAAPI — immune to reflow interruptions from other animations
     var crossDur = 500;
     var crossEase = 'cubic-bezier(.4,0,.2,1)';
     current.animate(
@@ -927,12 +957,14 @@ function updateThemeModeUI(mode, skipAnimation) {
         [{ opacity: 0 }, { opacity: 1 }],
         { duration: crossDur, easing: crossEase, fill: 'forwards' }
     ).onfinish = function() {
+        // Commit final state and cancel fill
         current.style.opacity = '0';
         next.style.opacity = '1';
         current.getAnimations().forEach(a => a.cancel());
         next.getAnimations().forEach(a => a.cancel());
     };
 
+    // Swap active layer for next call
     _descActiveLayer = _descActiveLayer === 'A' ? 'B' : 'A';
 }
 
@@ -940,6 +972,9 @@ async function setThemeMode(mode) {
     currentThemeMode = mode;
     updateThemeModeUI(mode);
 
+    // Animate sidebar theme toggle show/hide
+    // Animate the parent .sidebar-footer so the entire button (icon + box)
+    // clips uniformly instead of icon staying full-size inside shrinking button.
     var sidebarToggle = document.getElementById('sidebarThemeToggle');
     if (sidebarToggle) {
         var footer = sidebarToggle.parentElement;
@@ -980,6 +1015,7 @@ async function setThemeMode(mode) {
         }
     }
 
+    // Clear manual override when changing mode
     localStorage.removeItem('nexus-theme-manual-override');
 
     const payload = { theme_mode: mode };
@@ -997,6 +1033,7 @@ async function setThemeMode(mode) {
             body: JSON.stringify(payload)
         });
         if (res.ok) {
+            // Store mode locally for base.html to pick up on load
             localStorage.setItem('nexus-theme-mode', mode);
             if (mode === 'schedule') {
                 localStorage.setItem('nexus-theme-schedule', JSON.stringify(payload.schedule));
@@ -1072,8 +1109,10 @@ function applyScheduledTheme() {
     const scheduleStr = localStorage.getItem('nexus-theme-schedule');
     if (!scheduleStr) return;
 
+    // Check for manual override
     const overrideTs = localStorage.getItem('nexus-theme-manual-override');
     if (overrideTs) {
+        // If user manually toggled since last schedule switch, skip
         return;
     }
 
@@ -1088,8 +1127,10 @@ function applyScheduledTheme() {
 
         let target;
         if (lightMinutes < darkMinutes) {
+            // Normal: light during day, dark at night
             target = (nowMinutes >= lightMinutes && nowMinutes < darkMinutes) ? 'light' : 'dark';
         } else {
+            // Inverted: dark during day, light at night
             target = (nowMinutes >= darkMinutes && nowMinutes < lightMinutes) ? 'dark' : 'light';
         }
 
@@ -1459,6 +1500,7 @@ async function saveBirthday(value) {
 }
 
 async function openBundeslandModal() {
+    // If bundeslaender is empty, fetch it first
     if (Object.keys(bundeslaender).length === 0) {
         try {
             const response = await fetch('/api/hub/bundesland');
@@ -1710,7 +1752,7 @@ async function disconnectIServ() {
     padding: 4px 10px;
     background: var(--accent-light);
     color: var(--accent);
-    border-radius: 12px;
+    border-radius: 18px;
     font-size: 12px;
     font-weight: 500;
 }
@@ -1742,6 +1784,7 @@ async function disconnectIServ() {
     }
 }
 
+/* Toggle Switch */
 .toggle-switch {
     position: relative;
     display: inline-block;
@@ -1787,6 +1830,7 @@ input:checked + .toggle-slider:before {
     transform: translateX(24px);
 }
 
+/* Bundesland Grid */
 .bundesland-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -1799,7 +1843,7 @@ input:checked + .toggle-slider:before {
 .bundesland-card {
     padding: 12px 8px;
     border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 8px;
+    border-radius: 18px;
     text-align: center;
     cursor: pointer;
     transition: all 0.2s;
@@ -1833,6 +1877,7 @@ input:checked + .toggle-slider:before {
     }
 }
 
+/* Theme mode selector */
 .theme-mode-selector {
     display: flex;
     gap: 8px;
@@ -1844,7 +1889,7 @@ input:checked + .toggle-slider:before {
     align-items: center;
     gap: 6px;
     padding: 8px 16px;
-    border-radius: 10px;
+    border-radius: 18px;
     border: 1px solid rgba(255,255,255,0.12);
     background: rgba(255,255,255,0.04);
     color: var(--text-secondary);
@@ -1885,6 +1930,7 @@ input:checked + .toggle-slider:before {
     border-color: var(--accent);
 }
 
+/* Disabled toggle button */
 .btn-disabled,
 .btn-secondary.btn-disabled,
 .btn-secondary:disabled {
@@ -1894,15 +1940,25 @@ input:checked + .toggle-slider:before {
     filter: grayscale(0.5);
 }
 
+/* Skip animation helper */
 .no-transition {
     transition: none !important;
 }
 
+/* Crossfade for mode description text — animated via WAAPI, no CSS transition needed */
+
+/*
+ * When the schedule config expands, every glass-card on the page shifts
+ * and each re-renders its backdrop-filter: blur() → massive lag.
+ * Fix: promote ALL settings cards to own GPU layers so repositioning
+ * is a simple compositor move with no blur repaint.
+ */
 .settings-section.glass-card {
     transform: translateZ(0);
     transition: none !important;
 }
 
+/* Schedule config expand/collapse — display toggle + content fade only (no height animation) */
 .schedule-expand {
     display: none;
     margin-top: 16px;

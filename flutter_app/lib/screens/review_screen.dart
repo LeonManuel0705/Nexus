@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../services/database_service.dart';
+import '../services/database_service.dart'
+    if (dart.library.html) '../services/database_service_web.dart';
 import '../theme.dart';
 import '../widgets/animated_list_item.dart';
 import '../widgets/glass_card.dart';
@@ -286,7 +287,7 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
               child: TabBar(
                 controller: _tabController,
                 indicator: BoxDecoration(
-                  color: const Color(0xFF4F46E5),
+                  color: const Color(0xFF0057FF),
                   borderRadius: BorderRadius.circular(100),
                 ),
                 indicatorSize: TabBarIndicatorSize.tab,
@@ -742,7 +743,7 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [NexusTheme.secondaryColor, NexusTheme.accentColor],
+                  colors: [NexusTheme.primaryLight, NexusTheme.accentColor],
                 ),
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -1329,7 +1330,7 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [NexusTheme.secondaryColor, NexusTheme.accentColor]),
+                    gradient: const LinearGradient(colors: [NexusTheme.primaryLight, NexusTheme.accentColor]),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.date_range, color: Colors.white),

@@ -227,7 +227,7 @@ class MoreScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   Text('Nexus', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF18181B))),
                   const SizedBox(height: 4),
-                  Text('Dein persönlicher Produktivitäts-Hub', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: NexusTheme.lightTextMuted)),
+                  const Text('Dein persönlicher Produktivitäts-Hub', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: NexusTheme.lightTextMuted)),
                   const SizedBox(height: 20),
                   _buildInfoChip('Version', '${BuildInfo.versionName} (${BuildInfo.buildNumber})', isDark),
                   const SizedBox(height: 8),

@@ -1,13 +1,12 @@
 import sqlite3
 import os
-import logging
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+DATA_DIR = os.environ.get("NEXUS_DATA_DIR") or os.path.join(PROJECT_ROOT, "data")
 DATABASE_PATH = os.path.join(DATA_DIR, "nexus.db")
 
 _use_postgres = False
@@ -17,7 +16,7 @@ if DATABASE_URL:
         import psycopg2.extras
         _use_postgres = True
     except ImportError:
-        logging.warning("DATABASE_URL set but psycopg2 not installed. Using SQLite.")
+        print("Warning: DATABASE_URL set but psycopg2 not installed. Using SQLite.")
         _use_postgres = False
 
 def get_connection():
@@ -204,25 +203,6 @@ def init_db():
             cursor.execute('ALTER TABLE notes ADD COLUMN last_formatted_at TIMESTAMP')
         except sqlite3.OperationalError:
             pass
-
-        hub_tables_needing_user_id = [
-            'hub_tasks',
-            'hub_projects',
-            'hub_knowledge',
-            'hub_reviews',
-            'hub_training_sessions',
-            'hub_training_health',
-            'hub_training_goals',
-            'hub_training_schedule_settings',
-            'hub_training_schedule_entries',
-            'hub_timetable_settings',
-            'hub_timetable_entries'
-        ]
-        for table in hub_tables_needing_user_id:
-            try:
-                cursor.execute(f'ALTER TABLE {table} ADD COLUMN user_id TEXT')
-            except sqlite3.OperationalError:
-                pass
 
         repeat_columns = [
             ('repeat_type', "TEXT DEFAULT 'none'"),
@@ -588,6 +568,25 @@ def init_db():
             cursor.execute('ALTER TABLE hub_timetable_settings ADD COLUMN theme_schedule_json TEXT')
         except sqlite3.OperationalError:
             pass
+
+        hub_tables_needing_user_id = [
+            'hub_tasks',
+            'hub_projects',
+            'hub_knowledge',
+            'hub_reviews',
+            'hub_training_sessions',
+            'hub_training_health',
+            'hub_training_goals',
+            'hub_training_schedule_settings',
+            'hub_training_schedule_entries',
+            'hub_timetable_settings',
+            'hub_timetable_entries'
+        ]
+        for table in hub_tables_needing_user_id:
+            try:
+                cursor.execute(f'ALTER TABLE {table} ADD COLUMN user_id TEXT')
+            except sqlite3.OperationalError:
+                pass
 
     conn.commit()
     conn.close()
@@ -1263,8 +1262,6 @@ def update_hub_task(task_id: int, title: str = None, description: str = None,
 
 def toggle_hub_task(task_id: int, stop_recurrence: bool = False) -> dict:
 
-    from datetime import timedelta
-    import json
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -1362,7 +1359,10 @@ def calculate_next_due_date(current_due: str, repeat_type: str, repeat_days: str
         day = min(current_date.day, 28)
         next_date = current_date.replace(year=year, month=month, day=day)
     elif repeat_type == 'yearly':
-        next_date = current_date.replace(year=current_date.year + 1)
+        try:
+            next_date = current_date.replace(year=current_date.year + 1)
+        except ValueError:
+            next_date = current_date.replace(year=current_date.year + 1, day=28)
     elif repeat_type == 'custom' and repeat_days:
 
         try:
@@ -1439,7 +1439,7 @@ def skip_hub_task_occurrence(task_id: int) -> Optional[Dict[str, Any]]:
         conn.close()
         return {'deleted': True, 'next_task': None}
 
-    next_due = calculate_next_due_date(task)
+    next_due = calculate_next_due_date(task.get('due_date'), repeat_type, task.get('repeat_days'))
     if not next_due:
 
         cursor.execute('DELETE FROM hub_tasks WHERE id = ?', (task_id,))

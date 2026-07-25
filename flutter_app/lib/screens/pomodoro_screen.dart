@@ -1,12 +1,12 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../providers/app_provider.dart';
 import '../models/task.dart';
-import '../services/database_service.dart';
+import '../services/database_service.dart'
+    if (dart.library.html) '../services/database_service_web.dart';
 import '../theme.dart';
 import '../services/focus_mode_service.dart';
 import '../widgets/page_fade_in.dart';
@@ -256,7 +256,7 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
       case PomodoroMode.shortBreak:
         return const Color(0xFF10B981);
       case PomodoroMode.longBreak:
-        return const Color(0xFF4F46E5);
+        return const Color(0xFF0057FF);
     }
   }
 

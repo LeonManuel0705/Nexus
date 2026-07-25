@@ -62,7 +62,7 @@ class NexusDrawer extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Dashboard — no section label (matches desktop)
+
                       _NavItem(
                         icon: Icons.dashboard_outlined,
                         selectedIcon: Icons.dashboard,
@@ -73,7 +73,7 @@ class NexusDrawer extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
 
-                      // Alltag section (matches desktop)
+
                       _SectionLabel(label: 'ALLTAG', isDark: isDark),
                       _NavItem(
                         icon: Icons.task_alt_outlined,
@@ -109,7 +109,7 @@ class NexusDrawer extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
 
-                      // Bereiche section (matches desktop)
+
                       _SectionLabel(label: 'BEREICHE', isDark: isDark),
                       _NavItem(
                         icon: Icons.school_outlined,
@@ -153,7 +153,7 @@ class NexusDrawer extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
 
-                      // System section (matches desktop)
+
                       _SectionLabel(label: 'SYSTEM', isDark: isDark),
                       _NavItem(
                         icon: Icons.email_outlined,
@@ -205,7 +205,7 @@ class NexusDrawer extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
 
-                      // Settings at bottom of scroll
+
                       _NavItem(
                         icon: Icons.settings_outlined,
                         selectedIcon: Icons.settings,
@@ -307,7 +307,7 @@ class NexusDrawer extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Theme toggle button (matches desktop sidebar)
+
           Consumer<AppProvider>(
             builder: (context, provider, _) {
               final isDarkMode = provider.themeMode == ThemeMode.dark;

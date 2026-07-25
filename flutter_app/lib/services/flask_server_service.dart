@@ -2,10 +2,11 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show ValueNotifier, kDebugMode;
+import 'package:path/path.dart' as p;
 
 enum FlaskServerState { idle, starting, ready, error, alreadyRunning }
 
-enum SetupResult { success, brewNotFound, error }
+enum SetupResult { success, brewNotFound, error, unsupportedPlatform }
 
 class FlaskServerService {
   static final FlaskServerService _instance = FlaskServerService._internal();
@@ -30,6 +31,14 @@ class FlaskServerService {
   int get port => 5050;
   String get url => 'http://localhost:$port';
 
+  // Cross-platform home directory (HOME on macOS/Linux, USERPROFILE on Windows).
+  String get _homeDir =>
+      Platform.environment['HOME'] ??
+      Platform.environment['USERPROFILE'] ??
+      '';
+
+  String get _defaultProjectPath => p.join(_homeDir, 'Documents', 'Nexus');
+
   Future<void> start() async {
     if (isReady) return;
 
@@ -37,14 +46,29 @@ class FlaskServerService {
     _errorMessage = null;
     isPythonMissing = false;
 
-    await _killExistingServerOnPort();
+    // 1. Reuse an already-running server. This works on every platform,
+    //    including Windows/Linux where we may not be able to spawn Python
+    //    ourselves — the user can start `python -m app.app` manually and the
+    //    app will simply attach to it.
+    if (await _isServerRunning()) {
+      _externalServer = true;
+      state.value = FlaskServerState.alreadyRunning;
+      if (kDebugMode) {
+        print('FlaskServer: Reusing already-running server on port $port');
+      }
+      return;
+    }
 
     await _extractBundledBackend();
 
-    var root = await _resolveProjectRoot();
+    // Clear a dead listener squatting the port (the health check above already
+    // proved nothing healthy is answering, so this only removes a stuck one).
+    await _killExistingServerOnPort();
+
+    final root = await _resolveProjectRoot();
     if (root == null) {
       _errorMessage = 'Nexus-Projektordner nicht gefunden.\n'
-          'Erwartet: ~/Documents/Nexus mit app/app.py';
+          'Erwartet: Documents/Nexus mit app/app.py';
       state.value = FlaskServerState.error;
       return;
     }
@@ -53,7 +77,7 @@ class FlaskServerService {
     if (pythonPath == null) {
       isPythonMissing = true;
       _errorMessage = 'Python 3 wurde nicht gefunden.\n'
-          'Du kannst Python automatisch installieren lassen.';
+          'Bitte installiere Python 3.';
       state.value = FlaskServerState.error;
       return;
     }
@@ -131,22 +155,24 @@ class FlaskServerService {
   }
 
   Future<SetupResult> setupPython() async {
+    // Automatic Python installation is implemented via Homebrew and is
+    // macOS-only. On Windows/Linux, direct the user to install Python manually
+    // (the UI offers a python.org link).
+    if (!Platform.isMacOS) {
+      setupProgress.value =
+          'Automatische Installation wird nur auf macOS unterstützt.\n'
+          'Bitte installiere Python 3 manuell (python.org) und starte neu.';
+      return SetupResult.unsupportedPlatform;
+    }
+
     if (isSettingUp) return SetupResult.error;
     isSettingUp = true;
     setupProgress.value = 'Python-Installation wird vorbereitet...';
 
     try {
-      final root = await _resolveProjectRoot();
-      if (root == null) {
-        setupProgress.value = 'Projektordner nicht gefunden.';
-        isSettingUp = false;
-        return SetupResult.error;
-      }
+      final root = await _resolveProjectRoot() ?? _defaultProjectPath;
 
-      // Step 1: Find or install Python 3
-      String? pythonPath;
-
-      pythonPath = await _findSystemPython3();
+      String? pythonPath = await _findSystemPython3();
 
       if (pythonPath == null) {
         setupProgress.value = 'Prüfe ob Homebrew verfügbar ist...';
@@ -183,7 +209,7 @@ class FlaskServerService {
 
       if (kDebugMode) print('FlaskServer: Setup using Python at $pythonPath');
 
-      final venvPath = '$root/venv';
+      final venvPath = p.join(root, 'venv');
       if (!Directory(venvPath).existsSync()) {
         setupProgress.value = 'Erstelle virtuelle Umgebung...';
         final venvResult = await Process.run(
@@ -199,15 +225,14 @@ class FlaskServerService {
         }
       }
 
-      // Step 3: Install requirements
-      final pipPath = '$venvPath/bin/pip';
-      final reqPath = '$root/requirements.txt';
+      final venvPython = p.join(venvPath, 'bin', 'python3');
+      final reqPath = p.join(root, 'requirements.txt');
       if (File(reqPath).existsSync()) {
         setupProgress.value = 'Installiere Abhängigkeiten...\n'
             'Das kann einige Minuten dauern.';
         final pipResult = await _runProcessWithProgress(
-          pipPath,
-          ['install', '-r', reqPath],
+          File(venvPython).existsSync() ? venvPython : pythonPath,
+          ['-m', 'pip', 'install', '-r', reqPath],
           progressPrefix: 'pip',
         );
         if (pipResult != 0) {
@@ -217,7 +242,6 @@ class FlaskServerService {
         }
       }
 
-      // Step 4: Success — start server
       setupProgress.value = 'Installation abgeschlossen. Server wird gestartet...';
       isPythonMissing = false;
       isSettingUp = false;
@@ -231,10 +255,12 @@ class FlaskServerService {
     }
   }
 
-  /// Find python3 on the system (not in a venv).
   Future<String?> _findSystemPython3() async {
-    // Check common system paths first
-    for (final path in ['/usr/bin/python3', '/usr/local/bin/python3', '/opt/homebrew/bin/python3']) {
+    for (final path in [
+      '/usr/bin/python3',
+      '/usr/local/bin/python3',
+      '/opt/homebrew/bin/python3'
+    ]) {
       if (File(path).existsSync()) {
         try {
           final version = await Process.run(path, ['--version']);
@@ -244,7 +270,6 @@ class FlaskServerService {
       }
     }
 
-    // Fallback: which python3
     try {
       final result = await Process.run('which', ['python3']);
       if (result.exitCode == 0) {
@@ -260,8 +285,6 @@ class FlaskServerService {
     return null;
   }
 
-  /// Runs a process and streams stderr/stdout lines into [setupProgress].
-  /// Returns the exit code.
   Future<int> _runProcessWithProgress(
     String executable,
     List<String> args, {
@@ -294,24 +317,48 @@ class FlaskServerService {
     }
   }
 
-  /// Kill any Python process listening on our port (stale server from previous launch).
+  // Terminate only processes LISTENING on our port — never processes merely
+  // connected to it (a browser tab, curl, the Electron wrapper). Guarded per
+  // platform because lsof does not exist on Windows.
   Future<void> _killExistingServerOnPort() async {
     try {
-      final result = await Process.run('lsof', ['-ti', ':$port']);
-      final pids = (result.stdout as String)
-          .trim()
-          .split('\n')
-          .where((s) => s.isNotEmpty);
-      for (final pid in pids) {
-        final pidInt = int.tryParse(pid.trim());
-        if (pidInt != null) {
-          if (kDebugMode) print('FlaskServer: Killing stale process $pidInt on port $port');
-          Process.killPid(pidInt, ProcessSignal.sigterm);
+      if (Platform.isWindows) {
+        final result = await Process.run('netstat', ['-ano']);
+        final pids = <int>{};
+        for (final line in (result.stdout as String).split('\n')) {
+          if (line.contains(':$port') &&
+              line.toUpperCase().contains('LISTENING')) {
+            final parts = line.trim().split(RegExp(r'\s+'));
+            final pid = int.tryParse(parts.isNotEmpty ? parts.last : '');
+            if (pid != null && pid != 0) pids.add(pid);
+          }
         }
-      }
-      if (pids.isNotEmpty) {
-        // Give the old process a moment to release the port
-        await Future.delayed(const Duration(milliseconds: 500));
+        for (final pid in pids) {
+          if (kDebugMode) print('FlaskServer: taskkill listener $pid on port $port');
+          await Process.run('taskkill', ['/PID', '$pid', '/F']);
+        }
+        if (pids.isNotEmpty) {
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      } else {
+        final result =
+            await Process.run('lsof', ['-ti', 'tcp:$port', '-sTCP:LISTEN']);
+        final pids = (result.stdout as String)
+            .trim()
+            .split('\n')
+            .where((s) => s.isNotEmpty);
+        for (final pid in pids) {
+          final pidInt = int.tryParse(pid.trim());
+          if (pidInt != null) {
+            if (kDebugMode) {
+              print('FlaskServer: Killing stale listener $pidInt on port $port');
+            }
+            Process.killPid(pidInt, ProcessSignal.sigterm);
+          }
+        }
+        if (pids.isNotEmpty) {
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
       }
     } catch (e) {
       if (kDebugMode) print('FlaskServer: Could not check for stale server: $e');
@@ -319,27 +366,34 @@ class FlaskServerService {
   }
 
   Future<bool> _isServerRunning() async {
+    final client = HttpClient();
+    client.connectionTimeout = const Duration(seconds: 2);
     try {
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 2);
       final request = await client.getUrl(Uri.parse('http://localhost:$port/'));
       final response = await request.close().timeout(
         const Duration(seconds: 2),
       );
       await response.drain();
-      client.close();
       return true;
     } catch (_) {
       return false;
+    } finally {
+      client.close(force: true);
     }
   }
 
   Future<String?> _findPythonPath(String projectRoot) async {
-    final venvPaths = [
-      '$projectRoot/venv/bin/python3',
-      '$projectRoot/.venv/bin/python3',
-      '$projectRoot/env/bin/python3',
-    ];
+    final venvPaths = Platform.isWindows
+        ? [
+            p.join(projectRoot, 'venv', 'Scripts', 'python.exe'),
+            p.join(projectRoot, '.venv', 'Scripts', 'python.exe'),
+            p.join(projectRoot, 'env', 'Scripts', 'python.exe'),
+          ]
+        : [
+            p.join(projectRoot, 'venv', 'bin', 'python3'),
+            p.join(projectRoot, '.venv', 'bin', 'python3'),
+            p.join(projectRoot, 'env', 'bin', 'python3'),
+          ];
     for (final path in venvPaths) {
       if (File(path).existsSync()) {
         if (kDebugMode) print('FlaskServer: Found venv Python at $path');
@@ -347,15 +401,23 @@ class FlaskServerService {
       }
     }
 
-    for (final cmd in ['python3', 'python']) {
+    final candidates =
+        Platform.isWindows ? ['python', 'py'] : ['python3', 'python'];
+    final locator = Platform.isWindows ? 'where' : 'which';
+    for (final cmd in candidates) {
       try {
-        final result = await Process.run('which', [cmd]);
+        final result = await Process.run(locator, [cmd]);
         if (result.exitCode == 0) {
-          final path = (result.stdout as String).trim();
+          // `where` can return several lines; take the first hit.
+          final path = (result.stdout as String)
+              .trim()
+              .split('\n')
+              .first
+              .trim();
           if (path.isNotEmpty) {
             final version = await Process.run(path, ['--version']);
-            final versionStr = (version.stdout as String) +
-                (version.stderr as String);
+            final versionStr =
+                (version.stdout as String) + (version.stderr as String);
             if (versionStr.contains('Python 3')) {
               if (kDebugMode) print('FlaskServer: Found system Python at $path');
               return path;
@@ -367,28 +429,24 @@ class FlaskServerService {
     return null;
   }
 
-  /// Run pip install -r requirements.txt if requirements have changed since last install.
   Future<void> _syncPipDependencies(String root, String pythonPath) async {
-    final reqFile = File('$root/requirements.txt');
+    final reqFile = File(p.join(root, 'requirements.txt'));
     if (!reqFile.existsSync()) return;
 
-    // Only run if using a venv (has pip alongside python)
-    final pipPath = pythonPath.replaceAll(RegExp(r'python3?$'), 'pip3');
-    if (!File(pipPath).existsSync() && !File(pipPath.replaceAll('pip3', 'pip')).existsSync()) return;
-    final pip = File(pipPath).existsSync() ? pipPath : pipPath.replaceAll('pip3', 'pip');
-
-    // Hash-based check: skip if requirements haven't changed
-    final hashFile = File('$root/.requirements_hash');
+    final hashFile = File(p.join(root, '.requirements_hash'));
     final currentHash = reqFile.readAsStringSync().hashCode.toString();
-    if (hashFile.existsSync() && hashFile.readAsStringSync().trim() == currentHash) {
+    if (hashFile.existsSync() &&
+        hashFile.readAsStringSync().trim() == currentHash) {
       return;
     }
 
     if (kDebugMode) print('FlaskServer: Syncing pip dependencies...');
     try {
+      // `python -m pip` works identically on every platform and avoids having
+      // to locate a pip binary (which differs: bin/pip vs Scripts/pip.exe).
       final result = await Process.run(
-        pip,
-        ['install', '-r', reqFile.path, '--quiet'],
+        pythonPath,
+        ['-m', 'pip', 'install', '-r', reqFile.path, '--quiet'],
         workingDirectory: root,
       );
       if (result.exitCode == 0) {
@@ -402,19 +460,19 @@ class FlaskServerService {
     }
   }
 
-  /// Find the bundled backend inside the app bundle (Contents/Resources/backend/).
   String? _findBundledBackend() {
-    // Platform.resolvedExecutable → .../Nexus.app/Contents/MacOS/Nexus
-    var dir = File(Platform.resolvedExecutable).parent; // MacOS/
-    final resources = Directory('${dir.parent.path}/Resources/backend');
-    if (resources.existsSync() &&
-        File('${resources.path}/app/app.py').existsSync()) {
-      return resources.path;
+    final exeDir = File(Platform.resolvedExecutable).parent;
+    final candidates = <String>[
+      p.join(exeDir.parent.path, 'Resources', 'backend'), // macOS .app/Contents/Resources
+      p.join(exeDir.path, 'backend'), // Windows/Linux next to the executable
+      p.join(exeDir.path, 'data', 'backend'), // Windows/Linux data dir
+    ];
+    for (final c in candidates) {
+      if (File(p.join(c, 'app', 'app.py')).existsSync()) return c;
     }
     return null;
   }
 
-  /// Copy bundled backend from app bundle to ~/Documents/Nexus.
   Future<bool> _extractBundledBackend() async {
     final bundlePath = _findBundledBackend();
     if (bundlePath == null) {
@@ -422,38 +480,39 @@ class FlaskServerService {
       return false;
     }
 
-    final home = Platform.environment['HOME'] ?? '';
+    final home = _homeDir;
     if (home.isEmpty) return false;
 
-    final dest = '$home/Documents/Nexus';
+    final dest = _defaultProjectPath;
+
+    // NEVER overwrite an existing backend tree — it is the user's live,
+    // possibly git-managed and uncommitted, source. Only extract on a fresh
+    // install where no app/app.py exists yet.
+    if (File(p.join(dest, 'app', 'app.py')).existsSync()) {
+      if (kDebugMode) {
+        print('FlaskServer: Backend already present at $dest, skipping extraction');
+      }
+      return true;
+    }
 
     try {
-      if (kDebugMode) print('FlaskServer: Extracting backend from $bundlePath to $dest');
-      setupProgress.value = 'Backend wird nach ~/Documents/Nexus kopiert...';
-
-      // Create destination if needed
-      final destDir = Directory(dest);
-      if (!destDir.existsSync()) {
-        destDir.createSync(recursive: true);
+      if (kDebugMode) {
+        print('FlaskServer: Extracting backend from $bundlePath to $dest');
       }
+      setupProgress.value = 'Backend wird kopiert...';
 
-      // Use cp -R for reliable recursive copy
-      final result = await Process.run('cp', ['-R', '$bundlePath/app', dest]);
-      if (result.exitCode != 0) {
-        if (kDebugMode) print('FlaskServer: cp app failed: ${result.stderr}');
-        return false;
-      }
+      Directory(dest).createSync(recursive: true);
+      _copyDirectory(
+          Directory(p.join(bundlePath, 'app')), Directory(p.join(dest, 'app')));
 
-      // Copy requirements.txt
-      final reqSrc = File('$bundlePath/requirements.txt');
+      final reqSrc = File(p.join(bundlePath, 'requirements.txt'));
       if (reqSrc.existsSync()) {
-        reqSrc.copySync('$dest/requirements.txt');
+        reqSrc.copySync(p.join(dest, 'requirements.txt'));
       }
 
-      // Copy calendar_sync.py if present
-      final calSrc = File('$bundlePath/calendar_sync.py');
+      final calSrc = File(p.join(bundlePath, 'calendar_sync.py'));
       if (calSrc.existsSync()) {
-        calSrc.copySync('$dest/calendar_sync.py');
+        calSrc.copySync(p.join(dest, 'calendar_sync.py'));
       }
 
       setupProgress.value = '';
@@ -462,6 +521,20 @@ class FlaskServerService {
     } catch (e) {
       if (kDebugMode) print('FlaskServer: Extract failed: $e');
       return false;
+    }
+  }
+
+  // Cross-platform recursive directory copy (replaces the macOS-only `cp -R`).
+  void _copyDirectory(Directory src, Directory dest) {
+    dest.createSync(recursive: true);
+    for (final entity in src.listSync(recursive: false)) {
+      final name = p.basename(entity.path);
+      final target = p.join(dest.path, name);
+      if (entity is Directory) {
+        _copyDirectory(entity, Directory(target));
+      } else if (entity is File) {
+        entity.copySync(target);
+      }
     }
   }
 
@@ -475,15 +548,14 @@ class FlaskServerService {
       dir = dir.parent;
     }
 
-    final home = Platform.environment['HOME'] ?? '';
-    final fallback = '$home/Documents/Nexus';
+    final fallback = _defaultProjectPath;
     if (_hasAppPy(fallback)) return fallback;
 
     return null;
   }
 
   bool _hasAppPy(String dir) {
-    return File('$dir/app/app.py').existsSync();
+    return File(p.join(dir, 'app', 'app.py')).existsSync();
   }
 
   Future<bool> _waitForServer({
