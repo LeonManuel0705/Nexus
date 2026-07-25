@@ -1,7 +1,8 @@
 {
-  "version": "0.3",
-  "versionName": "0.3 Closed Beta",
-  "releaseDate": "2026-03-16",
+  "version": "0.4",
+  "versionName": "0.4 Closed Beta",
+  "buildNumber": 33,
+  "releaseDate": "2026-07-25",
   "minSupportedVersion": "0.1",
   "updateUrl": "https://nexus-lifehub.netlify.app/download",
   "platformUrls": {
@@ -13,10 +14,11 @@
     "web": "https://nexus-lifehub.netlify.app/download#web"
   },
   "changelog": [
-    "Flutter App mit nativem Design",
+    "Neues Design: Signal Blue als Akzentfarbe, Midnight-Blue-Hintergrund im Dark Mode",
+    "Aufgaben: Fälligkeitsdatum jetzt optional, konsistente Prioritäts-Bezeichnungen",
+    "Assistent: korrekte Formatierung der Antworten",
     "VBB Transit mit Ticketmanagement und Sparpreisen",
     "Personalisierte Routensuche",
-    "Sicherheitsverbesserungen und Verschlüsselung",
-    "Performance-Optimierungen"
+    "Sicherheitsverbesserungen und Verschlüsselung"
   ]
 }

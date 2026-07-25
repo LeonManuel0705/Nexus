@@ -1,0 +1,381 @@
+{
+  "epochen": [
+    {
+      "name": "Barock",
+      "aliases": ["barock"],
+      "zeitraum": "ca. 1600–1720",
+      "merkmale": [
+        "Leitmotive: Vanitas (Vergänglichkeit), Memento mori (Gedenke des Todes), Carpe diem (Nutze den Tag)",
+        "Spannung zwischen Diesseits (Lebenslust) und Jenseits (Gottesfurcht)",
+        "Opulente Sprache, Bildhaftigkeit, Antithetik",
+        "Geprägt durch den Dreißigjährigen Krieg"
+      ],
+      "autoren": ["Andreas Gryphius", "Martin Opitz", "Hans Jakob Christoffel von Grimmelshausen", "Paul Fleming"],
+      "werke": [
+        "Es ist alles eitel (Gryphius, Sonett)",
+        "Der abenteuerliche Simplicissimus Teutsch (Grimmelshausen, 1668)"
+      ]
+    },
+    {
+      "name": "Aufklärung",
+      "aliases": ["aufklaerung"],
+      "zeitraum": "ca. 1720–1800",
+      "merkmale": [
+        "Vernunft als oberste Instanz (Kants „sapere aude!“)",
+        "Toleranz, Humanität, Bildung",
+        "Kritik an Adel, Kirche, Aberglaube",
+        "Fabel, Lehrgedicht und Trauerspiel als Gattungen",
+        "Bürgerliches Selbstbewusstsein"
+      ],
+      "autoren": ["Gotthold Ephraim Lessing", "Immanuel Kant", "Friedrich Gottlieb Klopstock", "Christoph Martin Wieland"],
+      "werke": [
+        "Nathan der Weise (Lessing, 1779)",
+        "Emilia Galotti (Lessing, 1772)",
+        "Miß Sara Sampson (Lessing, 1755)",
+        "Was ist Aufklärung? (Kant, 1784, Essay)"
+      ]
+    },
+    {
+      "name": "Sturm und Drang",
+      "aliases": ["sturm und drang", "sturm drang", "geniezeit"],
+      "zeitraum": "ca. 1765–1785",
+      "merkmale": [
+        "Revolte gegen die Regeln der Aufklärung",
+        "Genie-Kult, Gefühlsbetonung, Subjektivität",
+        "Naturverbundenheit, Originalität",
+        "Junge, leidenschaftliche Helden; Kritik an gesellschaftlichen Zwängen"
+      ],
+      "autoren": ["junger Goethe", "junger Schiller", "Jakob Michael Reinhold Lenz", "Friedrich Maximilian Klinger"],
+      "werke": [
+        "Die Leiden des jungen Werthers (Goethe, 1774)",
+        "Götz von Berlichingen (Goethe, 1773)",
+        "Die Räuber (Schiller, 1781)",
+        "Kabale und Liebe (Schiller, 1784)"
+      ]
+    },
+    {
+      "name": "Weimarer Klassik",
+      "aliases": ["klassik", "weimarer klassik"],
+      "zeitraum": "ca. 1786–1805 (Goethes Italienreise bis Schillers Tod)",
+      "merkmale": [
+        "Ideal von Humanität, Harmonie, Maß und Form",
+        "Anknüpfung an antike Vorbilder",
+        "Bildungsideal, sittliche Selbsterziehung",
+        "Strenge Form (Blankvers, Hexameter)"
+      ],
+      "autoren": ["Johann Wolfgang von Goethe", "Friedrich Schiller", "Johann Gottfried Herder", "Christoph Martin Wieland"],
+      "werke": [
+        "Iphigenie auf Tauris (Goethe, 1787)",
+        "Faust I (Goethe, 1808)",
+        "Wilhelm Tell (Schiller, 1804)",
+        "Maria Stuart (Schiller, 1800)",
+        "Don Carlos (Schiller, 1787)"
+      ]
+    },
+    {
+      "name": "Romantik",
+      "aliases": ["romantik"],
+      "zeitraum": "ca. 1790–1840",
+      "merkmale": [
+        "Sehnsucht, Unendlichkeit, Phantasie",
+        "Naturmystik, Mittelalter-Begeisterung",
+        "Volkslied, Märchen, blaue Blume als Symbol",
+        "Schwarze Romantik: Nachtseiten, Doppelgänger, Wahn"
+      ],
+      "autoren": ["Novalis", "Joseph von Eichendorff", "E. T. A. Hoffmann", "Brüder Grimm", "Heinrich Heine"],
+      "werke": [
+        "Heinrich von Ofterdingen (Novalis, 1802)",
+        "Aus dem Leben eines Taugenichts (Eichendorff, 1826)",
+        "Der Sandmann (E. T. A. Hoffmann, 1816)",
+        "Kinder- und Hausmärchen (Brüder Grimm, ab 1812)",
+        "Buch der Lieder (Heine, 1827)"
+      ]
+    },
+    {
+      "name": "Biedermeier und Vormärz",
+      "aliases": ["biedermeier", "vormaerz", "vormärz", "junges deutschland"],
+      "zeitraum": "ca. 1815–1848",
+      "merkmale": [
+        "Biedermeier: Rückzug ins Private, Idylle, Häuslichkeit",
+        "Vormärz: politisches Engagement, Kritik an Restauration, Ruf nach Freiheit",
+        "Parallel-Strömungen: Ordnung vs. Revolution",
+        "Zensur prägt literarisches Klima"
+      ],
+      "autoren": ["Adalbert Stifter", "Eduard Mörike", "Annette von Droste-Hülshoff", "Georg Büchner", "Heinrich Heine"],
+      "werke": [
+        "Der Nachsommer (Stifter, 1857)",
+        "Woyzeck (Büchner, 1836, Fragment)",
+        "Dantons Tod (Büchner, 1835)",
+        "Deutschland. Ein Wintermärchen (Heine, 1844)"
+      ]
+    },
+    {
+      "name": "Realismus",
+      "aliases": ["realismus", "poetischer realismus", "buergerlicher realismus"],
+      "zeitraum": "ca. 1848–1890",
+      "merkmale": [
+        "„Poetischer“ Realismus: Wirklichkeit künstlerisch verklärt dargestellt",
+        "Gesellschaftsromane, bürgerliche Milieus",
+        "Objektive Erzählhaltung, auktorialer Erzähler",
+        "Psychologische Tiefe der Figuren"
+      ],
+      "autoren": ["Theodor Fontane", "Gottfried Keller", "Theodor Storm", "Wilhelm Raabe"],
+      "werke": [
+        "Effi Briest (Fontane, 1896)",
+        "Irrungen, Wirrungen (Fontane, 1888)",
+        "Der grüne Heinrich (Keller, 1855)",
+        "Der Schimmelreiter (Storm, 1888)"
+      ]
+    },
+    {
+      "name": "Naturalismus",
+      "aliases": ["naturalismus"],
+      "zeitraum": "ca. 1880–1900",
+      "merkmale": [
+        "Sekundenstil: exakte, fast protokollarische Wiedergabe",
+        "Milieu- und Vererbungstheorie (Zola)",
+        "Sozialkritik: Armut, Alkoholismus, Arbeiterelend",
+        "Dialekt, Umgangssprache"
+      ],
+      "autoren": ["Gerhart Hauptmann", "Arno Holz", "Johannes Schlaf"],
+      "werke": [
+        "Die Weber (Hauptmann, 1892)",
+        "Vor Sonnenaufgang (Hauptmann, 1889)",
+        "Bahnwärter Thiel (Hauptmann, 1888)"
+      ]
+    },
+    {
+      "name": "Expressionismus",
+      "aliases": ["expressionismus"],
+      "zeitraum": "ca. 1910–1925",
+      "merkmale": [
+        "Ausdruck des Inneren, Übersteigerung",
+        "Themen: Großstadt, Angst, Krieg, Verfall, Ich-Zerfall",
+        "Grelle Bilder, zertrümmerte Syntax",
+        "Apokalyptische Visionen"
+      ],
+      "autoren": ["Georg Trakl", "Gottfried Benn", "Georg Heym", "Else Lasker-Schüler", "Franz Kafka (thematisch nah)"],
+      "werke": [
+        "Menschheitsdämmerung (Anthologie, 1919)",
+        "Der Untergang (Trakl)",
+        "Die Verwandlung (Kafka, 1915)",
+        "Der Prozess (Kafka, postum 1925)"
+      ]
+    },
+    {
+      "name": "Weimarer Republik / Neue Sachlichkeit",
+      "aliases": ["neue sachlichkeit", "weimarer republik literatur"],
+      "zeitraum": "ca. 1919–1933",
+      "merkmale": [
+        "Nüchterner, dokumentarischer Stil",
+        "Gesellschaftskritik, Großstadtroman",
+        "Episches Theater (Brecht): Verfremdung, Publikum soll denken",
+        "Reportage, Zeitroman"
+      ],
+      "autoren": ["Bertolt Brecht", "Alfred Döblin", "Erich Kästner", "Kurt Tucholsky", "Anna Seghers"],
+      "werke": [
+        "Berlin Alexanderplatz (Döblin, 1929)",
+        "Die Dreigroschenoper (Brecht, 1928)",
+        "Mutter Courage und ihre Kinder (Brecht, 1939)",
+        "Fabian (Kästner, 1931)"
+      ]
+    },
+    {
+      "name": "Exilliteratur",
+      "aliases": ["exilliteratur", "exil"],
+      "zeitraum": "1933–1945",
+      "merkmale": [
+        "Autoren im Exil (USA, Schweiz, Mexiko, …)",
+        "Antifaschistische Literatur, Auseinandersetzung mit NS",
+        "Geschichtsroman, Parabel"
+      ],
+      "autoren": ["Thomas Mann", "Bertolt Brecht", "Anna Seghers", "Stefan Zweig"],
+      "werke": [
+        "Der Zauberberg (T. Mann, 1924, Vorläufer)",
+        "Doktor Faustus (T. Mann, 1947)",
+        "Das siebte Kreuz (Seghers, 1942)",
+        "Leben des Galilei (Brecht, 1943)"
+      ]
+    },
+    {
+      "name": "Nachkriegs- und Trümmerliteratur",
+      "aliases": ["truemmerliteratur", "trümmerliteratur", "nachkriegsliteratur", "gruppe 47"],
+      "zeitraum": "ca. 1945–1960",
+      "merkmale": [
+        "Kahlschlag-Literatur: nüchterne, einfache Sprache",
+        "Verarbeitung von Krieg und Schuld",
+        "Kurzgeschichten als Leitgattung",
+        "Gruppe 47: Böll, Grass, Bachmann u. a."
+      ],
+      "autoren": ["Heinrich Böll", "Wolfgang Borchert", "Günter Eich", "Ilse Aichinger"],
+      "werke": [
+        "Draußen vor der Tür (Borchert, 1947)",
+        "Das Brot (Borchert, Kurzgeschichte)",
+        "Ansichten eines Clowns (Böll, 1963)"
+      ]
+    },
+    {
+      "name": "Gegenwartsliteratur / Postmoderne",
+      "aliases": ["postmoderne", "gegenwartsliteratur"],
+      "zeitraum": "ab ca. 1980",
+      "merkmale": [
+        "Intertextualität, Zitate, ironische Brüche",
+        "Pluralität der Stile",
+        "Aufarbeitung deutscher Geschichte (NS, Wende)",
+        "Auflösung klarer Wahrheiten"
+      ],
+      "autoren": ["Patrick Süskind", "Bernhard Schlink", "Herta Müller", "Daniel Kehlmann"],
+      "werke": [
+        "Das Parfum (Süskind, 1985)",
+        "Der Vorleser (Schlink, 1995)",
+        "Die Vermessung der Welt (Kehlmann, 2005)"
+      ]
+    }
+  ],
+  "werke": [
+    {
+      "titel": "Faust. Der Tragödie erster Teil",
+      "kurztitel": ["faust", "faust i", "faust 1"],
+      "autor": "Johann Wolfgang von Goethe",
+      "jahr": "1808 (Druck); Entstehung ab ca. 1772",
+      "epoche": "Weimarer Klassik (Ursprünge im Sturm und Drang)",
+      "gattung": "Tragödie (Drama)",
+      "kurzinfo": "Der Gelehrte Heinrich Faust verzweifelt an den Grenzen menschlicher Erkenntnis und schließt einen Pakt mit dem Teufel Mephisto. Er verführt und verlässt das Mädchen Gretchen, die in Verzweiflung ihr Kind tötet und im Kerker endet. Zentrale Themen: Erkenntnisstreben, Schuld, Liebe, Verführung."
+    },
+    {
+      "titel": "Die Leiden des jungen Werthers",
+      "kurztitel": ["werther", "die leiden des jungen werthers"],
+      "autor": "Johann Wolfgang von Goethe",
+      "jahr": "1774",
+      "epoche": "Sturm und Drang",
+      "gattung": "Briefroman",
+      "kurzinfo": "Werther verliebt sich unglücklich in die bereits verlobte Lotte. Seine Gefühle steigern sich bis zum Selbstmord. Inbegriff der empfindsamen Liebe und des Genie-Individualismus; löste einen Suizid-Nachahmungseffekt („Werther-Fieber“) aus."
+    },
+    {
+      "titel": "Die Verwandlung",
+      "kurztitel": ["die verwandlung", "verwandlung"],
+      "autor": "Franz Kafka",
+      "jahr": "1915",
+      "epoche": "Expressionismus / Moderne",
+      "gattung": "Erzählung (Novelle)",
+      "kurzinfo": "Gregor Samsa erwacht als riesiges Ungeziefer. Seine Familie, die er bisher finanziell getragen hat, wendet sich zunehmend von ihm ab, bis er einsam stirbt. Parabel auf Entfremdung, Funktionalisierung des Menschen und familiäre Kälte."
+    },
+    {
+      "titel": "Der Prozess",
+      "kurztitel": ["der prozess", "der prozeß", "prozess kafka"],
+      "autor": "Franz Kafka",
+      "jahr": "postum 1925 (von Max Brod herausgegeben)",
+      "epoche": "Moderne",
+      "gattung": "Roman (Fragment)",
+      "kurzinfo": "Josef K. wird an seinem 30. Geburtstag verhaftet, ohne dass ihm die Anklage mitgeteilt wird. Er kämpft sich durch ein absurdes, undurchdringliches Gerichtssystem und wird schließlich ohne Urteil hingerichtet. Klassiker der Verunsicherung, des anonymen Apparats, der Schuld ohne Tat."
+    },
+    {
+      "titel": "Die Räuber",
+      "kurztitel": ["die raeuber", "die räuber"],
+      "autor": "Friedrich Schiller",
+      "jahr": "1781",
+      "epoche": "Sturm und Drang",
+      "gattung": "Drama",
+      "kurzinfo": "Brüderkonflikt: Karl Moor, um sein Erbe betrogen, wird Räuberhauptmann; sein Bruder Franz intrigiert gegen die Familie. Revolte gegen soziale Ungerechtigkeit und Willkür; Motto: „In tyrannos!“."
+    },
+    {
+      "titel": "Kabale und Liebe",
+      "kurztitel": ["kabale und liebe"],
+      "autor": "Friedrich Schiller",
+      "jahr": "1784",
+      "epoche": "Sturm und Drang",
+      "gattung": "Bürgerliches Trauerspiel",
+      "kurzinfo": "Die bürgerliche Luise und der adelige Ferdinand lieben sich. Höfische Intrigen, Standesgrenzen und Ferdinands Eifersucht führen zum doppelten Tod. Schiller klagt Ständegesellschaft und fürstliche Willkür an."
+    },
+    {
+      "titel": "Maria Stuart",
+      "kurztitel": ["maria stuart"],
+      "autor": "Friedrich Schiller",
+      "jahr": "1800",
+      "epoche": "Weimarer Klassik",
+      "gattung": "Trauerspiel (Drama)",
+      "kurzinfo": "Konflikt der beiden Königinnen Elisabeth I. von England und Maria Stuart von Schottland. Maria, gefangen, wird schließlich hingerichtet. Fragen von Macht, Schuld, politischer Zweckmäßigkeit gegen Recht und Gewissen."
+    },
+    {
+      "titel": "Wilhelm Tell",
+      "kurztitel": ["wilhelm tell", "tell schiller"],
+      "autor": "Friedrich Schiller",
+      "jahr": "1804",
+      "epoche": "Weimarer Klassik",
+      "gattung": "Schauspiel",
+      "kurzinfo": "Der Bogenschütze Tell tötet den tyrannischen Landvogt Geßler; im Hintergrund der Schweizer Freiheitskampf. Ideal: Freiheit, Recht auf Widerstand gegen Tyrannei."
+    },
+    {
+      "titel": "Nathan der Weise",
+      "kurztitel": ["nathan der weise"],
+      "autor": "Gotthold Ephraim Lessing",
+      "jahr": "1779",
+      "epoche": "Aufklärung",
+      "gattung": "Dramatisches Gedicht",
+      "kurzinfo": "Jerusalem zur Zeit der Kreuzzüge: Der jüdische Kaufmann Nathan erzählt die berühmte Ringparabel und zeigt, dass Judentum, Christentum und Islam gleichwertig sind. Aufklärerisches Toleranzstück."
+    },
+    {
+      "titel": "Emilia Galotti",
+      "kurztitel": ["emilia galotti"],
+      "autor": "Gotthold Ephraim Lessing",
+      "jahr": "1772",
+      "epoche": "Aufklärung",
+      "gattung": "Bürgerliches Trauerspiel",
+      "kurzinfo": "Der Prinz begehrt die bürgerliche Emilia; sein Günstling Marinelli lässt ihren Bräutigam ermorden. Um ihrer Ehre willen bittet Emilia den Vater, sie zu töten. Kritik an fürstlicher Willkür."
+    },
+    {
+      "titel": "Woyzeck",
+      "kurztitel": ["woyzeck"],
+      "autor": "Georg Büchner",
+      "jahr": "1836 (Fragment, UA 1913)",
+      "epoche": "Vormärz",
+      "gattung": "Drama (Fragment)",
+      "kurzinfo": "Der einfache Soldat Woyzeck wird von Vorgesetzten, Wissenschaft und seiner Geliebten Marie gedemütigt. Er ersticht Marie. Erstes „soziales Drama“ des Proletariats; offene Form."
+    },
+    {
+      "titel": "Effi Briest",
+      "kurztitel": ["effi briest"],
+      "autor": "Theodor Fontane",
+      "jahr": "1896",
+      "epoche": "Realismus",
+      "gattung": "Roman",
+      "kurzinfo": "Die junge Effi wird mit dem viel älteren Baron von Innstetten verheiratet. Aus Langeweile beginnt sie eine kurze Affäre; Jahre später findet Innstetten die Briefe und erschießt den Liebhaber im Duell — aus Prinzip. Effi stirbt isoliert. Kritik an gesellschaftlichen Konventionen."
+    },
+    {
+      "titel": "Der Besuch der alten Dame",
+      "kurztitel": ["besuch der alten dame"],
+      "autor": "Friedrich Dürrenmatt",
+      "jahr": "1956",
+      "epoche": "Nachkriegsliteratur (Schweiz)",
+      "gattung": "Tragische Komödie",
+      "kurzinfo": "Die Milliardärin Claire Zachanassian kehrt in ihr verarmtes Heimatdorf zurück und bietet eine Milliarde, wenn die Bürger ihren einstigen Geliebten Ill töten, der sie entehrt hatte. Die Moral bricht unter dem Geld zusammen."
+    },
+    {
+      "titel": "Die Physiker",
+      "kurztitel": ["die physiker"],
+      "autor": "Friedrich Dürrenmatt",
+      "jahr": "1962",
+      "epoche": "Nachkriegsliteratur",
+      "gattung": "Komödie (Drama)",
+      "kurzinfo": "Drei Physiker in einer Irrenanstalt: Möbius hat weltverändernde Erkenntnisse und will sie vor Missbrauch verbergen. Am Ende erweist sich die Anstaltsleiterin als durchtrieben. Warnung vor der Verantwortung der Wissenschaft im Atomzeitalter."
+    },
+    {
+      "titel": "Homo faber",
+      "kurztitel": ["homo faber"],
+      "autor": "Max Frisch",
+      "jahr": "1957",
+      "epoche": "Nachkriegsliteratur",
+      "gattung": "Roman",
+      "kurzinfo": "Der Ingenieur Walter Faber vertraut nur der Technik und lehnt Zufall und Schicksal ab. Auf seinen Reisen stellt sich heraus, dass er mit seiner eigenen (ihm unbekannten) Tochter Sabeth eine Beziehung begonnen hat; sie stirbt. Tragödie der Rationalität."
+    },
+    {
+      "titel": "Der Vorleser",
+      "kurztitel": ["der vorleser"],
+      "autor": "Bernhard Schlink",
+      "jahr": "1995",
+      "epoche": "Postmoderne / Gegenwartsliteratur",
+      "gattung": "Roman",
+      "kurzinfo": "Michael hat als Jugendlicher eine Affäre mit der älteren Hanna; Jahre später entdeckt er sie als Angeklagte in einem NS-Prozess. Er begreift, dass sie Analphabetin ist und deshalb schwieg. Roman über Schuld, Scham, Generationenfrage nach dem Holocaust."
+    }
+  ]
+}

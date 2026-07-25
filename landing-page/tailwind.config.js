@@ -1,4 +1,3 @@
-/** @type {import('tailwindcss').Config} */
 export default {
   content: ['./src/**/*.html', './dist/**/*.html'],
   theme: {
@@ -9,17 +8,17 @@ export default {
       },
       colors: {
         nexus: {
-          purple: '#764BA2',
-          pink: '#F093FB',
-          blue: '#667EEA',
+          purple: '#0057FF',
+          pink: '#6BA1FF',
+          blue: '#3D7BFF',
           text: '#1A202C',
           muted: '#64748B',
           surface: 'rgba(255,255,255,0.7)',
         }
       },
       backgroundImage: {
-        'gradient-brand': 'linear-gradient(135deg, #667EEA 0%, #764BA2 50%, #F093FB 100%)',
-        'gradient-subtle': 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
+        'gradient-brand': 'linear-gradient(135deg, #0057FF 0%, #3D7BFF 50%, #6BA1FF 100%)',
+        'gradient-subtle': 'linear-gradient(180deg, #FFFFFF 0%, #F8F7F4 100%)',
       },
       borderRadius: {
         'xl': '1rem',
