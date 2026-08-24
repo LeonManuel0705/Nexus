@@ -1,6 +1,6 @@
 # Nexus
 
-**A unified productivity system that replaces five apps with one.** Nexus brings together calendar, tasks, email, school management, transit routing, and more — all running locally on your device with zero cloud dependency.
+**A unified productivity system that replaces five apps with one.** Nexus brings together calendar, tasks, email, school management, transit routing, and more, all running locally on your device with zero cloud dependency.
 
 I built Nexus because I was tired of switching between separate apps for school, calendar, transit, and tasks. Instead of stitching together tools that don't talk to each other, I wanted one system that understands how these things connect: a cancelled class means a changed commute, a new homework assignment becomes a task with a deadline, and a calendar event shows the route to get there.
 
@@ -14,22 +14,22 @@ I built Nexus because I was tired of switching between separate apps for school,
 
 ## What it does
 
-Nexus is a full-stack productivity system spanning three platforms:
+Nexus is a full stack productivity system spanning three platforms:
 
-**Mobile App** (Flutter) — Native Android/iOS app with offline-first architecture. 22 screens covering dashboard, tasks, calendar, email, school timetable, transit routing, training tracker, notes, bookmarks, spaced repetition, and a Pomodoro timer. State management via Provider, local storage with SQLite and Hive, background sync via WorkManager.
+**Mobile App** (Flutter). Native Android/iOS app with offline first architecture. 22 screens covering dashboard, tasks, calendar, email, school timetable, transit routing, training tracker, notes, bookmarks, spaced repetition, and a Pomodoro timer. State management via Provider, local storage with SQLite and Hive, background sync via WorkManager.
 
-**Web Dashboard** (Flask) — Browser-based interface with real-time WebSocket updates, Google OAuth, and Progressive Web App support. Serves 80+ API endpoints across 27 database tables. Handles Google Calendar sync, Gmail integration, IServ school system connectivity, CalDAV, and VBB transit routing with personalized recommendations.
+**Web Dashboard** (Flask). Browser based interface with real time WebSocket updates, Google OAuth, and Progressive Web App support. Serves 80+ API endpoints across 27 database tables. Handles Google Calendar sync, Gmail integration, IServ school system connectivity, CalDAV, and VBB transit routing with personalized recommendations.
 
-**Landing Page** (Vite + Tailwind CSS v4) — Marketing site with multi-language support (EN/DE), screenshot gallery, smooth scroll animations, and static export for Netlify.
+**Landing Page** (Vite and Tailwind CSS v4). Marketing site with multi language support (EN/DE), screenshot gallery, smooth scroll animations, and static export for Netlify.
 
-**Desktop App** (Electron) — Bundles the Flask backend with a local HTTP server for Windows and Linux distribution.
+**Desktop App** (Electron). Bundles the Flask backend with a local HTTP server for Windows and Linux distribution.
 
 ## Architecture decisions
 
-- **Privacy-first**: All data stays on-device. Credentials are encrypted at rest using Fernet with PBKDF2 (600k iterations, per-file salts). No telemetry, no accounts required.
-- **Offline-first**: The Flutter app works fully without network access. SQLite for structured data, Hive for encrypted key-value storage. Background sync picks up when connectivity returns.
-- **Security hardened**: OAuth CSRF protection, CSP headers, SSRF validation on CalDAV/email hosts, CRLF header injection prevention, rate limiting, input sanitization across all 80+ endpoints.
-- **Transparent migration**: `decrypt_file()` auto-detects plaintext JSON and legacy encryption schemes, re-encrypting in place without user intervention.
+* **Privacy first.** All data stays on device. Credentials are encrypted at rest using Fernet with PBKDF2 (600k iterations, salts per file). No telemetry, no accounts required.
+* **Offline first.** The Flutter app works fully without network access. SQLite for structured data, Hive for encrypted key value storage. Background sync picks up when connectivity returns.
+* **Security hardened.** OAuth CSRF protection, CSP headers, SSRF validation on CalDAV/email hosts, CRLF header injection prevention, rate limiting, input sanitization across all 80+ endpoints.
+* **Transparent migration.** `decrypt_file()` detects plaintext JSON and legacy encryption schemes, and re encrypts in place without user intervention.
 
 ## Project structure
 
@@ -68,7 +68,7 @@ flutter run
 ### Web dashboard
 
 ```bash
-./setup.sh        # first-time setup
+./setup.sh        # initial setup
 ./start.sh         # starts on http://localhost:5050
 ```
 
@@ -86,21 +86,21 @@ npm run build      # exports to ../site/
 Copy `.env.example` to `.env` and fill in:
 
 ```
-SECRET_KEY=your-secret-key
-GOOGLE_CLIENT_ID=your-client-id
-GOOGLE_CLIENT_SECRET=your-client-secret
-GOOGLE_PROJECT_ID=your-project-id
+SECRET_KEY=<secret key>
+GOOGLE_CLIENT_ID=<client id>
+GOOGLE_CLIENT_SECRET=<client secret>
+GOOGLE_PROJECT_ID=<project id>
 ```
 
 ## Tech stack
 
 | Layer | Technology |
-|-------|-----------|
+|:---|:---|
 | Mobile | Flutter, Dart, SQLite, Hive, Provider, WorkManager |
-| Backend | Flask, Flask-SocketIO, SQLite/PostgreSQL, Fernet |
+| Backend | Flask, Flask SocketIO, SQLite/PostgreSQL, Fernet |
 | Integrations | Google Calendar API, Gmail API, IServ, CalDAV, VBB |
 | Frontend | Vite, Tailwind CSS v4, DOMPurify |
-| Desktop | Electron, electron-builder |
+| Desktop | Electron, electron builder |
 | CI | GitHub Actions (pytest, flutter analyze) |
 
 ## Deployment
@@ -118,4 +118,4 @@ python -m pytest tests/ -v
 
 ## License
 
-Private project.
+MIT
