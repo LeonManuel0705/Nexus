@@ -617,12 +617,12 @@ class DatabaseService {
     }
   }
 
-  Future<void> markOperationFailed(int id, String error) async {
+  Future<void> markOperationFailed(int id, String error, {bool giveUp = true}) async {
     final box = await _box('pending_operations');
     final data = box.get(id);
     if (data != null) {
       final map = _cast(data);
-      map['status'] = 'failed';
+      map['status'] = giveUp ? 'failed' : 'pending';
       map['last_error'] = error;
       map['retry_count'] = ((map['retry_count'] as int?) ?? 0) + 1;
       await box.put(id, map);
@@ -657,14 +657,30 @@ class DatabaseService {
     return box.values.map((v) => EmailAccount.fromMap(_cast(v))).toList();
   }
 
-  Future<void> insertEmailAccount(EmailAccount account) async {
+  Future<void> insertEmailAccount(EmailAccount account, {String? credentialKey}) async {
     final box = await _box('email_accounts');
-    await box.put(account.id, account.toMap());
+    await box.put(account.id, {
+      ...account.toMap(),
+      'credential_key': credentialKey ?? 'email_${account.id}',
+    });
+  }
+
+  Future<String?> getEmailAccountCredentialKey(String id) async {
+    final box = await _box('email_accounts');
+    final data = box.get(id);
+    if (data == null) return null;
+    return _cast(data)['credential_key'] as String?;
   }
 
   Future<void> updateEmailAccount(EmailAccount account) async {
     final box = await _box('email_accounts');
-    await box.put(account.id, account.toMap());
+    final existing = box.get(account.id);
+    final credentialKey =
+        existing == null ? null : _cast(existing)['credential_key'] as String?;
+    await box.put(account.id, {
+      ...account.toMap(),
+      'credential_key': credentialKey ?? 'email_${account.id}',
+    });
   }
 
   Future<void> deleteEmailAccount(String id) async {
@@ -1097,6 +1113,14 @@ class DatabaseService {
     sessions.sort((a, b) => ((b['started_at'] as String?) ?? '')
         .compareTo((a['started_at'] as String?) ?? ''));
     return sessions;
+  }
+
+  Future<int> getPomodoroCountForTask(String taskId) async {
+    final box = await _box('pomodoro_sessions');
+    return box.values
+        .map((v) => _cast(v))
+        .where((s) => s['task_id'] == taskId && _isCompleted(s['completed']))
+        .length;
   }
 
   bool _isCompleted(dynamic v) => v == 1 || v == true;
