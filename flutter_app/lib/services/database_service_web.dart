@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Leon Manuel Töpper
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import 'dart:typed_data';
 import 'package:hive/hive.dart';
 import '../models/task.dart';

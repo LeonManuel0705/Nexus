@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Leon Manuel Töpper
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """End-to-end tests for the assistant's offline surface.
 
 Covers the paths that must work without any LLM backend:

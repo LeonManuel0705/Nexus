@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Leon Manuel Töpper
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';

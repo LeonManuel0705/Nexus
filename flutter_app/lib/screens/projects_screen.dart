@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Leon Manuel Töpper
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/database_service.dart' if (dart.library.html) '../services/database_service_web.dart';

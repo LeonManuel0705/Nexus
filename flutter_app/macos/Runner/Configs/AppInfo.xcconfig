@@ -11,4 +11,4 @@ PRODUCT_NAME = Nexus
 PRODUCT_BUNDLE_IDENTIFIER = com.leon.nexus
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 Leon Manuel Toepper. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 Leon Manuel Toepper. Licensed under AGPL-3.0.

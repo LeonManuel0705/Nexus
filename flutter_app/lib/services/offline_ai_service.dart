@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Leon Manuel Töpper
+// SPDX-License-Identifier: AGPL-3.0-only
+
 class OfflineAIService {
   static final OfflineAIService _instance = OfflineAIService._internal();
   factory OfflineAIService() => _instance;

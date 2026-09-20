@@ -118,4 +118,20 @@ python -m pytest tests/ -v
 
 ## License
 
-MIT
+Nexus is dual licensed.
+
+**[AGPL-3.0](LICENSE)** for everyone. Free to use, study, modify and run. If you
+modify Nexus and let other people use your modified version over a network,
+section 13 requires you to offer them your source. Running it unmodified triggers
+nothing.
+
+**[Commercial license](COMMERCIAL-LICENSE.md)** for schools, school authorities
+and service providers that need private modifications, closed redistribution or
+an operated service with support and a GDPR data processing agreement.
+
+Copyright (C) 2026 Leon Manuel Töpper. See [NOTICE](NOTICE) for the full
+statement, including the license history: Nexus was published under the MIT
+License until 2026-09-20 and that offer has been withdrawn.
+
+Contributions require the [CLA](licensing/CLA.md), which is what keeps the dual
+license possible. See [CONTRIBUTING.md](CONTRIBUTING.md).

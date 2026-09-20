@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Leon Manuel Töpper
+// SPDX-License-Identifier: AGPL-3.0-only
+
 var NexusNotifications = {
     POLL_INTERVAL: 60000,
     SETTINGS_PREFIX: 'nexus-notif-',

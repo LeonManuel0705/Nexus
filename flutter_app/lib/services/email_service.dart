@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Leon Manuel Töpper
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import 'package:uuid/uuid.dart';
 import '../models/email.dart';
 import 'database_service.dart' if (dart.library.html) 'database_service_web.dart';

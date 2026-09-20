@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Leon Manuel Töpper
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Adversarial-style smoke test of the AI assistant's offline surface.
 
 Runs a wide battery of queries through offline_response and classifies the results.

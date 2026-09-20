@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Leon Manuel Töpper
+// SPDX-License-Identifier: AGPL-3.0-only
 
 const CACHE_NAME = 'nexus-hub-v4';
 const STATIC_CACHE = 'nexus-static-v4';

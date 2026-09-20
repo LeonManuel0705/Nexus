@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Leon Manuel Töpper
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Standalone entry point for the frozen desktop backend (PyInstaller).
 
 The Flask app package uses relative imports (`from . import database`), so it

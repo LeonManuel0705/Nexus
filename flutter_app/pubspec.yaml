@@ -1,5 +1,5 @@
 name: nexus
-description: "A new Flutter project."
+description: "Calendar, tasks, mail, school timetable and transit routing in one offline first system."
 
 publish_to: 'none'
 

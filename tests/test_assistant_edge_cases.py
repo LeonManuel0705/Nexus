@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Leon Manuel Töpper
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Adversarial / edge-case tests for the assistant's offline surface."""
 import json
 import os

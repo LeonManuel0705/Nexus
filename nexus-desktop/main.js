@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Leon Manuel Töpper
+// SPDX-License-Identifier: AGPL-3.0-only
+
 const { app, BrowserWindow, shell } = require('electron');
 const path = require('path');
 const { spawn, execSync } = require('child_process');

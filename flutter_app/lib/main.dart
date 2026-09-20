@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Leon Manuel Töpper
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;

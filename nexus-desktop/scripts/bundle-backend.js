@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Leon Manuel Töpper
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // Copy the PyInstaller-frozen backend (../dist/nexus-backend, produced by
 // scripts/build_backend.sh) into frozen-backend/nexus-backend so electron-builder
 // bundles it as extraResources. Cross-platform (uses fs.cpSync). Run before

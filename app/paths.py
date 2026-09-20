@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Leon Manuel Töpper
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Central resolution of the writable data directory.
 
 Every module that reads/writes files under ``data/`` (or ``learning_data/``)

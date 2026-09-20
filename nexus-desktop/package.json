@@ -1,10 +1,10 @@
 {
   "name": "nexus",
   "version": "0.4.0",
-  "description": "Nexus — Your personal Life Hub",
+  "description": "Calendar, tasks, mail, school timetable and transit routing in one offline first system.",
   "main": "main.js",
   "author": "Leon Manuel",
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0-only",
   "scripts": {
     "start": "electron .",
     "bundle-backend": "node scripts/bundle-backend.js",

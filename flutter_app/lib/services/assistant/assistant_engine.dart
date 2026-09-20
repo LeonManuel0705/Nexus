@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Leon Manuel Töpper
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import 'curriculum.dart';
 import 'offline_tools.dart' as tools;
 import 'wiki_cache.dart';

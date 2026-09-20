@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Leon Manuel Töpper
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import 'dart:convert';
 import 'dart:io' show Platform;
 
@@ -6,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_provider.dart';
 import '../providers/iserv_provider.dart';
 import '../services/holiday_service.dart';
@@ -1044,6 +1048,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: const Text('Entwickler'),
                   trailing: const Text('Leon Manuel Töpper'),
                 ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.balance, color: Colors.teal, size: 20),
+                  ),
+                  title: const Text('Lizenz'),
+                  subtitle: const Text('Quellcode offen einsehbar'),
+                  trailing: const Text('AGPL-3.0'),
+                  onTap: () => _launchUrl('https://github.com/LeonManuel0705/Nexus/blob/main/LICENSE'),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.blueGrey.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.code, color: Colors.blueGrey, size: 20),
+                  ),
+                  title: const Text('Quellcode'),
+                  subtitle: const Text('Vollständiger Quellcode dieser Version'),
+                  trailing: const Icon(Icons.open_in_new, size: 18),
+                  onTap: () => _launchUrl('https://github.com/LeonManuel0705/Nexus'),
+                ),
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -1090,6 +1124,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       },
     );
+  }
+
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   Widget _buildSectionTitle(BuildContext context, String title, IconData icon, {bool isWarning = false}) {

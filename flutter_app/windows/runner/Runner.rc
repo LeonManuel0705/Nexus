@@ -93,7 +93,7 @@ BEGIN
             VALUE "FileDescription", "Nexus" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "nexus" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 Leon Manuel. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Leon Manuel Toepper. Licensed under AGPL-3.0." "\0"
             VALUE "OriginalFilename", "nexus.exe" "\0"
             VALUE "ProductName", "Nexus" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
