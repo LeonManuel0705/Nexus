@@ -410,7 +410,6 @@ class _QuickNoteModalState extends State<QuickNoteModal> {
       initialDate: _dueDate ?? DateTime.now().add(const Duration(days: 1)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
-      locale: const Locale('de', 'DE'),
     );
     if (date != null) {
       setState(() => _dueDate = date);

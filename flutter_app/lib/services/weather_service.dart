@@ -109,7 +109,7 @@ class WeatherService {
   factory WeatherService() => _instance;
   WeatherService._internal();
 
-  final Dio _dio = Dio();
+  final Dio _dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 8), receiveTimeout: const Duration(seconds: 10)));
   WeatherData? _cachedData;
   DateTime? _lastFetch;
 

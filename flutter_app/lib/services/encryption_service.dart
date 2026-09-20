@@ -119,6 +119,15 @@ class EncryptionService {
     return jsonDecode(tokens) as Map<String, dynamic>;
   }
 
+  Future<void> deleteGoogleTokens(String email) async {
+    await deleteCredential('google_token_${_hashString(email)}');
+    await deleteCredential('google_token_${_legacyHashString(email)}');
+  }
+
+  Future<void> deleteEmailCredentials(String email) async {
+    await deleteCredential('email_${_hashString(email)}');
+  }
+
   Future<void> clearAccountCredentials(String accountId) async {
     await deleteCredential('iserv_$accountId');
     await deleteCredential('email_$accountId');

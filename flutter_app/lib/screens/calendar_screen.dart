@@ -1302,7 +1302,7 @@ class _MonthPickerSheet extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           const Text(
-            'Monat auswahlen',
+            'Monat auswählen',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -1390,7 +1390,7 @@ class _EventDialogState extends State<_EventDialog> {
       final date = widget.initialDate ?? DateTime.now();
       final now = DateTime.now();
       final bool isToday = date.year == now.year && date.month == now.month && date.day == now.day;
-      final int startHour = isToday ? now.hour + 1 : 9;
+      final int startHour = isToday ? (now.hour + 1).clamp(0, 23) : 9;
       _startTime = DateTime(date.year, date.month, date.day, startHour, 0);
       _endTime = _startTime.add(const Duration(hours: 1));
     }
@@ -1578,7 +1578,7 @@ class _EventDialogState extends State<_EventDialog> {
                           }
                         },
                         icon: const Icon(Icons.delete_rounded),
-                        label: const Text('Loschen'),
+                        label: const Text('Löschen'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: NexusTheme.danger,
                           side: const BorderSide(color: NexusTheme.danger),

@@ -82,6 +82,7 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
   Future<void> _loadReviews() async {
     final dailyMaps = await _db.getDailyReviews();
     final weeklyMaps = await _db.getWeeklyReviews();
+    if (!mounted) return;
 
     setState(() {
       _dailyReviews.clear();
@@ -193,7 +194,7 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
         );
       }
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -254,14 +255,15 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
         );
       }
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   int _getWeekNumber(DateTime date) {
-    final firstDayOfYear = DateTime(date.year, 1, 1);
-    final daysDiff = date.difference(firstDayOfYear).inDays;
-    return ((daysDiff + firstDayOfYear.weekday - 1) / 7).ceil() + 1;
+    final day = DateTime.utc(date.year, date.month, date.day);
+    final thursday = day.add(Duration(days: 4 - day.weekday));
+    final dayOfYear = thursday.difference(DateTime.utc(thursday.year, 1, 1)).inDays + 1;
+    return (dayOfYear - 1) ~/ 7 + 1;
   }
 
   @override
@@ -945,7 +947,7 @@ class _ReviewScreenState extends State<ReviewScreen> with SingleTickerProviderSt
     }
 
     final now = DateTime.now();
-    final weekStart = now.subtract(Duration(days: now.weekday - 1));
+    final weekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
     final thisWeekDailyReviews = _dailyReviews.where((r) =>
         r.date.isAfter(weekStart.subtract(const Duration(days: 1)))).toList();
     final avgEnergy = thisWeekDailyReviews.isNotEmpty

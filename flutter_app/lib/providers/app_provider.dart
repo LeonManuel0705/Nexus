@@ -419,9 +419,10 @@ class AppProvider extends ChangeNotifier {
   }
 
   static bool calculateIsAWeek(DateTime date) {
-    final firstDayOfYear = DateTime(date.year, 1, 1);
-    final daysSinceFirst = date.difference(firstDayOfYear).inDays;
-    final weekNumber = ((daysSinceFirst + firstDayOfYear.weekday - 1) / 7).ceil();
+    final day = DateTime.utc(date.year, date.month, date.day);
+    final firstDayOfYear = DateTime.utc(date.year, 1, 1);
+    final daysSinceFirst = day.difference(firstDayOfYear).inDays;
+    final weekNumber = (daysSinceFirst + firstDayOfYear.weekday - 1) ~/ 7 + 1;
     return weekNumber % 2 == 0;
   }
 

@@ -42,22 +42,25 @@ class _KnowledgeScreenState extends State<KnowledgeScreen> {
   Future<void> _loadEntries() async {
     try {
       final rows = await _db.getKnowledgeEntries();
+      if (!mounted) return;
       setState(() {
         _entries = rows.map(KnowledgeEntry.fromMap).toList();
         _isLoading = false;
       });
     } catch (_) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _addEntry(KnowledgeEntry entry) async {
     await _db.insertKnowledgeEntry(entry.toMap());
+    if (!mounted) return;
     setState(() => _entries.insert(0, entry));
   }
 
   Future<void> _updateEntry(KnowledgeEntry updated) async {
     await _db.updateKnowledgeEntry(updated.id, updated.toMap());
+    if (!mounted) return;
     setState(() {
       final index = _entries.indexWhere((e) => e.id == updated.id);
       if (index != -1) _entries[index] = updated;
@@ -66,6 +69,7 @@ class _KnowledgeScreenState extends State<KnowledgeScreen> {
 
   Future<void> _deleteEntry(KnowledgeEntry entry) async {
     await _db.deleteKnowledgeEntry(entry.id);
+    if (!mounted) return;
     setState(() => _entries.remove(entry));
   }
 
@@ -182,7 +186,7 @@ class _KnowledgeScreenState extends State<KnowledgeScreen> {
 
           Positioned(
             right: 16,
-            bottom: 16,
+            bottom: MediaQuery.of(context).padding.bottom + 16,
             child: FloatingActionButton(
               heroTag: 'fab_knowledge',
               onPressed: () => _showAddEntryDialog(context),
@@ -708,7 +712,12 @@ class _KnowledgeScreenState extends State<KnowledgeScreen> {
           ),
         );
       },
-    );
+    ).then((_) => Future.delayed(const Duration(milliseconds: 300), () {
+      titleController.dispose();
+      contentController.dispose();
+      categoryController.dispose();
+      tagsController.dispose();
+    }));
   }
 
   void _showEditEntryDialog(BuildContext context, KnowledgeEntry entry) {
@@ -835,7 +844,12 @@ class _KnowledgeScreenState extends State<KnowledgeScreen> {
           ),
         );
       },
-    );
+    ).then((_) => Future.delayed(const Duration(milliseconds: 300), () {
+      titleController.dispose();
+      contentController.dispose();
+      categoryController.dispose();
+      tagsController.dispose();
+    }));
   }
 
   Widget _buildTextField({

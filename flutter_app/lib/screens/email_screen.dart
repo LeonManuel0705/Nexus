@@ -470,7 +470,7 @@ class _EmailScreenState extends State<EmailScreen> {
 
           Positioned(
             right: 16,
-            bottom: 16,
+            bottom: MediaQuery.of(context).padding.bottom + 16,
             child: Consumer<EmailProvider>(
               builder: (context, provider, child) {
                 if (!provider.hasAccounts) {
@@ -1074,7 +1074,7 @@ class _EmailListItem extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          email.displayFrom[0].toUpperCase(),
+                          (email.displayFrom.isNotEmpty ? email.displayFrom[0] : '?').toUpperCase(),
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -1293,7 +1293,7 @@ class _EmailDetailView extends StatelessWidget {
                                 ),
                                 child: Center(
                                   child: Text(
-                                    email.displayFrom[0].toUpperCase(),
+                                    (email.displayFrom.isNotEmpty ? email.displayFrom[0] : '?').toUpperCase(),
                                     style: const TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.bold,

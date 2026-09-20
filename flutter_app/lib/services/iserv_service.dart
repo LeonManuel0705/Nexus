@@ -81,7 +81,7 @@ class IServService {
 
     try {
       final db = await _db.database;
-      final credentials = await db.query('iserv_credentials', limit: 1);
+      final credentials = await db.query('iserv_credentials', orderBy: 'created_at DESC', limit: 1);
 
       if (credentials.isNotEmpty) {
         final cred = IServCredentials.fromMap(credentials.first);
@@ -114,7 +114,7 @@ class IServService {
   Future<IServCredentials?> getSavedCredentials() async {
     try {
       final db = await _db.database;
-      final credentials = await db.query('iserv_credentials', limit: 1);
+      final credentials = await db.query('iserv_credentials', orderBy: 'created_at DESC', limit: 1);
 
       if (credentials.isNotEmpty) {
         return IServCredentials.fromMap(credentials.first);
@@ -243,6 +243,7 @@ class IServService {
           );
 
           final db = await _db.database;
+          await db.delete('iserv_credentials');
           await db.insert(
             'iserv_credentials',
             IServCredentials(
@@ -460,6 +461,7 @@ class IServService {
       );
 
       final db = await _db.database;
+      await db.delete('iserv_credentials');
       await db.insert(
         'iserv_credentials',
         IServCredentials(
@@ -492,13 +494,13 @@ class IServService {
         ),
       );
 
-      if (response.statusCode != 200) return getCachedNotifications();
+      if (response.statusCode != 200) return await getCachedNotifications();
 
       final data = response.data;
 
       if (data is! List) {
         if (kDebugMode) print('IServ: Notifications response is not a List, returning cached');
-        return getCachedNotifications();
+        return await getCachedNotifications();
       }
 
       final List<IServNotification> notifications = [];
@@ -542,13 +544,13 @@ class IServService {
         ),
       );
 
-      if (response.statusCode != 200) return getCachedExercises();
+      if (response.statusCode != 200) return await getCachedExercises();
 
       final data = response.data;
 
       if (data is! Map || data['data'] is! List) {
         if (kDebugMode) print('IServ: Exercises response is not valid, returning cached');
-        return getCachedExercises();
+        return await getCachedExercises();
       }
 
       final List<IServExercise> exercises = [];
@@ -608,7 +610,7 @@ class IServService {
 
       if (sourcesResponse.statusCode != 200) {
         _log('getEvents: eventsources non-200 → cached');
-        return getCachedEvents();
+        return await getCachedEvents();
       }
 
       final sourcesData = sourcesResponse.data;
@@ -621,7 +623,7 @@ class IServService {
 
       if (sourcesList == null || sourcesList.isEmpty) {
         _log('getEvents: no event sources found. Data: ${sourcesData.toString().substring(0, (sourcesData.toString().length).clamp(0, 300))}');
-        return getCachedEvents();
+        return await getCachedEvents();
       }
 
       _log('getEvents: found ${sourcesList.length} event sources');
@@ -814,7 +816,7 @@ class IServService {
       _log('  event: "$title" raw=$startRaw→$endRaw parsed=$startTime→$endTime allDay=$allDay');
     }
     return IServEvent(
-      id: item['id']?.toString() ?? item['uid']?.toString() ?? '',
+      id: _eventId(item, title, startRaw),
       title: title,
       startTime: startTime,
       endTime: endTime,
@@ -856,7 +858,8 @@ class IServService {
     batch.delete('iserv_notifications');
 
     for (final notification in notifications) {
-      batch.insert('iserv_notifications', notification.toMap());
+      batch.insert('iserv_notifications', notification.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace);
     }
 
     await batch.commit(noResult: true);
@@ -871,10 +874,22 @@ class IServService {
     batch.delete('iserv_exercises');
 
     for (final exercise in exercises) {
-      batch.insert('iserv_exercises', exercise.toMap());
+      batch.insert('iserv_exercises', exercise.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace);
     }
 
     await batch.commit(noResult: true);
+  }
+
+  String _decodeBody(dynamic data) {
+    if (data is List<int>) return utf8.decode(data, allowMalformed: true);
+    return data?.toString() ?? '';
+  }
+
+  String _eventId(dynamic item, String title, dynamic startRaw) {
+    final raw = item['id']?.toString() ?? item['uid']?.toString();
+    if (raw != null && raw.isNotEmpty) return raw;
+    return 'gen_${title.hashCode}_${startRaw ?? ''}';
   }
 
   Future<void> _cacheEvents(List<IServEvent> events) async {
@@ -950,6 +965,7 @@ class IServService {
       final htmlResponse = await _dio!.get(
         showUrl,
         options: Options(
+          responseType: ResponseType.bytes,
           receiveTimeout: const Duration(seconds: 10),
           validateStatus: (status) => status != null && status < 500,
         ),
@@ -969,7 +985,7 @@ class IServService {
         }
 
         if (contentType.contains('text/html')) {
-          final html = htmlResponse.data?.toString() ?? '';
+          final html = _decodeBody(htmlResponse.data);
 
           final urlsToTry = <String>{};
 

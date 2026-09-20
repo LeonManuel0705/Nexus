@@ -333,7 +333,7 @@ class BackgroundService {
     await Workmanager().registerPeriodicTask(
       kOfflineQueuePeriodic,
       kOfflineQueueTask,
-      frequency: const Duration(minutes: 5),
+      frequency: const Duration(minutes: 15),
       constraints: Constraints(
         networkType: NetworkType.connected,
       ),

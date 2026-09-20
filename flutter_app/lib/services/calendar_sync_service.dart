@@ -86,6 +86,7 @@ class CalendarSyncService {
   }
 
   Future<void> clearTokens() async {
+    await _encryption.deleteGoogleTokens('default');
     await _encryption.deleteCredential('google_tokens');
     _accessToken = null;
     _tokenExpiry = null;
@@ -103,7 +104,7 @@ class CalendarSyncService {
       final response = await http.get(
         Uri.parse('$_calendarApiBase/users/me/calendarList'),
         headers: {'Authorization': 'Bearer $accessToken'},
-      );
+      ).timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -174,7 +175,7 @@ class CalendarSyncService {
         final response = await http.get(
           uri,
           headers: {'Authorization': 'Bearer $accessToken'},
-        );
+        ).timeout(const Duration(seconds: 20));
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -206,7 +207,7 @@ class CalendarSyncService {
           pageToken = data['nextPageToken'] as String?;
         } else if (response.statusCode == 410 ||
             (response.statusCode == 400 && syncToken != null)) {
-          return syncCalendar(calendarId, syncToken: null);
+          return await syncCalendar(calendarId, syncToken: null);
         } else {
           return SyncResult(success: false, error: 'Unbekannter Fehler');
         }
@@ -298,7 +299,7 @@ class CalendarSyncService {
           'Content-Type': 'application/json',
         },
         body: jsonEncode(event.toApiMap()),
-      );
+      ).timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -355,7 +356,7 @@ class CalendarSyncService {
           'Content-Type': 'application/json',
         },
         body: jsonEncode(event.toApiMap()),
-      );
+      ).timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
         await _db.updateGoogleEvent(event.copyWith(isSynced: true));
@@ -401,7 +402,7 @@ class CalendarSyncService {
       final response = await http.delete(
         Uri.parse('$_calendarApiBase/calendars/${Uri.encodeComponent(calendarId)}/events/${Uri.encodeComponent(eventId)}'),
         headers: {'Authorization': 'Bearer $accessToken'},
-      );
+      ).timeout(const Duration(seconds: 20));
 
       return response.statusCode == 204 || response.statusCode == 200;
     } catch (e) {
@@ -453,7 +454,7 @@ class CalendarSyncService {
                   'Content-Type': 'application/json',
                 },
                 body: jsonEncode(op.payload),
-              );
+              ).timeout(const Duration(seconds: 20));
 
               if (response.statusCode == 200) {
                 final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -479,7 +480,7 @@ class CalendarSyncService {
                   'Content-Type': 'application/json',
                 },
                 body: jsonEncode(op.payload),
-              );
+              ).timeout(const Duration(seconds: 20));
 
               if (response.statusCode == 200) {
                 final existingEvent = await _db.getGoogleEvent(op.entityId!);
@@ -501,7 +502,7 @@ class CalendarSyncService {
               final response = await http.delete(
                 Uri.parse('$_calendarApiBase/calendars/${Uri.encodeComponent(calendarId)}/events/${Uri.encodeComponent(op.entityId!)}'),
                 headers: {'Authorization': 'Bearer $accessToken'},
-              );
+              ).timeout(const Duration(seconds: 20));
               success = response.statusCode == 204 || response.statusCode == 200 || response.statusCode == 410;
             } catch (e) {
               if (kDebugMode) debugPrint('CalendarSync: delete op failed: $e');
@@ -521,8 +522,9 @@ class CalendarSyncService {
 
     _connectivity.onConnected(() async {
       await Future.delayed(const Duration(seconds: 2));
-      await processOfflineQueue();
-      await syncAllCalendars();
+      try {
+        await syncAllCalendars();
+      } catch (_) {}
     });
   }
 
@@ -542,7 +544,7 @@ class CalendarSyncService {
                 'Content-Type': 'application/json',
               },
               body: jsonEncode(op.payload),
-            );
+            ).timeout(const Duration(seconds: 20));
 
             if (response.statusCode == 200) {
               final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -568,7 +570,7 @@ class CalendarSyncService {
                 'Content-Type': 'application/json',
               },
               body: jsonEncode(op.payload),
-            );
+            ).timeout(const Duration(seconds: 20));
 
             if (response.statusCode == 200) {
               final existingEvent = await _db.getGoogleEvent(op.entityId!);
@@ -590,7 +592,7 @@ class CalendarSyncService {
             final response = await http.delete(
               Uri.parse('$_calendarApiBase/calendars/${Uri.encodeComponent(calendarId)}/events/${Uri.encodeComponent(op.entityId!)}'),
               headers: {'Authorization': 'Bearer $accessToken'},
-            );
+            ).timeout(const Duration(seconds: 20));
             return response.statusCode == 204 || response.statusCode == 200 || response.statusCode == 410;
           } catch (e) {
             return false;
@@ -723,7 +725,9 @@ class GoogleEvent {
 
       isAllDay = true;
       start = DateTime.parse(json['start']['date'] as String);
-      end = DateTime.parse(json['end']['date'] as String);
+      final exclusiveEnd = DateTime.parse(json['end']['date'] as String);
+      end = DateTime(exclusiveEnd.year, exclusiveEnd.month, exclusiveEnd.day - 1);
+      if (end.isBefore(start)) end = start;
     } else {
       start = DateTime.parse(json['start']['dateTime'] as String);
       end = DateTime.parse(json['end']['dateTime'] as String);
@@ -753,7 +757,8 @@ class GoogleEvent {
 
     if (isAllDay) {
       map['start'] = {'date': '${start.year}-${start.month.toString().padLeft(2, '0')}-${start.day.toString().padLeft(2, '0')}'};
-      map['end'] = {'date': '${end.year}-${end.month.toString().padLeft(2, '0')}-${end.day.toString().padLeft(2, '0')}'};
+      final exclusiveEnd = DateTime(end.year, end.month, end.day + 1);
+      map['end'] = {'date': '${exclusiveEnd.year}-${exclusiveEnd.month.toString().padLeft(2, '0')}-${exclusiveEnd.day.toString().padLeft(2, '0')}'};
     } else {
       map['start'] = {'dateTime': start.toUtc().toIso8601String()};
       map['end'] = {'dateTime': end.toUtc().toIso8601String()};

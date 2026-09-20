@@ -215,6 +215,7 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
     ''');
     try { await db.execute('ALTER TABLE grades ADD COLUMN grade_system TEXT DEFAULT \'points\''); } catch (_) {}
     try { await db.execute('ALTER TABLE grades ADD COLUMN value REAL'); } catch (_) {}
+    try { await db.execute('ALTER TABLE subjects ADD COLUMN course_type TEXT'); } catch (_) {}
     _grades = await db.rawQuery('''
       SELECT g.*, s.name as subject_name, s.color as subject_color, s.course_type as course_type
       FROM grades g
@@ -439,7 +440,7 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
 
   bool _isTomorrowNextWeek() {
     final today = DateTime.now().weekday;
-    return today >= 6;
+    return today >= 5;
   }
 
   Widget _buildDaySchedule(AppProvider provider, int dayOfWeek, String dayLabel, bool isDark) {
@@ -447,8 +448,9 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
     final isToday = dayLabel == 'Heute';
 
     final displayed = _displayedIsAWeek(provider);
+    final showsNextWeek = (dayLabel == 'Morgen' && _isTomorrowNextWeek()) || (isToday && now.weekday > 5);
     String currentWeekType;
-    if (dayLabel == 'Morgen' && _isTomorrowNextWeek()) {
+    if (showsNextWeek) {
       currentWeekType = displayed ? 'B' : 'A';
     } else {
       currentWeekType = displayed ? 'A' : 'B';
@@ -750,7 +752,7 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
           ),
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 24),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: _buildTimetableGrid(provider, periods, currentWeekType, abWeeksEnabled, isDark),
@@ -2740,7 +2742,7 @@ class _SchoolScreenState extends State<SchoolScreen> with TickerProviderStateMix
         ),
         if (files.length > 1)
           Padding(
-            padding: const EdgeInsets.only(bottom: 16),
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(files.length, (index) {

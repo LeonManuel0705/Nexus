@@ -284,7 +284,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
 
           Positioned(
             right: 16,
-            bottom: 16,
+            bottom: MediaQuery.of(context).padding.bottom + 16,
             child: PageFadeIn(
               delay: const Duration(milliseconds: 300),
               child: FloatingActionButton(

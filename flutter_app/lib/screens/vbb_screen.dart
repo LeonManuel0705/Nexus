@@ -1173,7 +1173,7 @@ class _LegDetailCard extends StatelessWidget {
                           Icon(Icons.cancel, size: 14, color: NexusTheme.error),
                           SizedBox(width: 4),
                           Text(
-                            'Fahrt faellt aus',
+                            'Fahrt fällt aus',
                             style: TextStyle(
                               color: NexusTheme.error,
                               fontSize: 12,
@@ -1338,8 +1338,8 @@ class _DeparturesTab extends StatelessWidget {
                             provider.selectedStation?.name ?? 'Station auswählen...',
                             style: TextStyle(
                               color: provider.selectedStation != null
-                                  ? Colors.white
-                                  : Colors.white54,
+                                  ? Theme.of(context).colorScheme.onSurface
+                                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54),
                               fontSize: 16,
                             ),
                           ),
@@ -1426,7 +1426,7 @@ class _DeparturesTab extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: () async => provider.loadDepartures(),
       child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.of(context).padding.bottom + 24),
         itemCount: futureDepartures.length,
         itemBuilder: (context, index) {
           final departure = futureDepartures[index];
@@ -2025,7 +2025,7 @@ class _SetupWizardState extends State<_SetupWizard> {
                 ),
                 Text(
                   name,
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
@@ -2077,7 +2077,7 @@ class _TicketsTab extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: () => _showAddTicketSheet(context),
                   icon: const Icon(Icons.add),
-                  label: const Text('Ticket hinzufuegen'),
+                  label: const Text('Ticket hinzufügen'),
                 ),
               ],
             ),
@@ -2099,7 +2099,7 @@ class _TicketsTab extends StatelessWidget {
         if (provider.tickets.isNotEmpty)
           Positioned(
             right: 16,
-            bottom: 16,
+            bottom: MediaQuery.of(context).padding.bottom + 16,
             child: FloatingActionButton(
               onPressed: () => _showAddTicketSheet(context),
               backgroundColor: NexusTheme.primaryColor,
@@ -2192,20 +2192,20 @@ class _TicketsTab extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
-            _buildDetailRow(Icons.schedule, 'Gueltigkeit', ticket.validityDisplay, isDark),
+            _buildDetailRow(Icons.schedule, 'Gültigkeit', ticket.validityDisplay, isDark),
             if (ticket.validFrom != null)
               _buildDetailRow(
                 Icons.calendar_today,
-                'Gueltig ab',
+                'Gültig ab',
                 '${ticket.validFrom!.day.toString().padLeft(2, '0')}.${ticket.validFrom!.month.toString().padLeft(2, '0')}.${ticket.validFrom!.year}',
                 isDark,
               ),
             if (ticket.autoRenews)
-              _buildDetailRow(Icons.autorenew, 'Typ', 'Abo (verlaengert sich automatisch)', isDark),
+              _buildDetailRow(Icons.autorenew, 'Typ', 'Abo (verlängert sich automatisch)', isDark),
             _buildDetailRow(
               ticket.isValid ? Icons.check_circle : Icons.cancel,
               'Status',
-              ticket.isValid ? 'Gueltig' : 'Abgelaufen',
+              ticket.isValid ? 'Gültig' : 'Abgelaufen',
               isDark,
               valueColor: ticket.isValid ? NexusTheme.success : NexusTheme.error,
             ),
@@ -2224,7 +2224,7 @@ class _TicketsTab extends StatelessWidget {
                       Icon(Icons.warning_amber, color: NexusTheme.warning, size: 18),
                       SizedBox(width: 8),
                       Text(
-                        'Ticket laeuft bald ab!',
+                        'Ticket läuft bald ab!',
                         style: TextStyle(color: NexusTheme.warning, fontSize: 13),
                       ),
                     ],
@@ -2240,7 +2240,7 @@ class _TicketsTab extends StatelessWidget {
                   _confirmDeleteTicket(context, ticket);
                 },
                 icon: const Icon(Icons.delete_outline, color: NexusTheme.error),
-                label: const Text('Ticket loeschen', style: TextStyle(color: NexusTheme.error)),
+                label: const Text('Ticket löschen', style: TextStyle(color: NexusTheme.error)),
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: NexusTheme.error.withValues(alpha: 0.5)),
                   padding: const EdgeInsets.all(14),
@@ -2272,7 +2272,7 @@ class _TicketsTab extends StatelessWidget {
           Text(
             value,
             style: TextStyle(
-              color: valueColor ?? Colors.white,
+              color: valueColor ?? (isDark ? Colors.white : const Color(0xFF18181B)),
               fontWeight: FontWeight.w500,
               fontSize: 13,
             ),
@@ -2287,8 +2287,8 @@ class _TicketsTab extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Theme.of(context).brightness == Brightness.dark ? NexusTheme.darkSurface : Colors.white,
-        title: const Text('Ticket loeschen?'),
-        content: Text('${ticket.ticketName} wirklich loeschen?'),
+        title: const Text('Ticket löschen?'),
+        content: Text('${ticket.ticketName} wirklich löschen?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -2302,7 +2302,7 @@ class _TicketsTab extends StatelessWidget {
             style: FilledButton.styleFrom(
               backgroundColor: NexusTheme.error,
             ),
-            child: const Text('Loeschen'),
+            child: const Text('Löschen'),
           ),
         ],
       ),
@@ -2379,7 +2379,7 @@ class _TicketCard extends StatelessWidget {
                               fontSize: 15,
                               color: isExpired
                                   ? isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.5)
-                                  : Colors.white,
+                                  : (isDark ? Colors.white : const Color(0xFF18181B)),
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -2455,7 +2455,7 @@ class _TicketCard extends StatelessWidget {
                       icon: Icon(
                         Icons.delete_outline,
                         size: 20,
-                        color: Colors.white.withValues(alpha: 0.4),
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
                       ),
                       onPressed: onDelete,
                       padding: EdgeInsets.zero,
@@ -2502,7 +2502,7 @@ class _AddTicketSheetState extends State<_AddTicketSheet> {
     ('berlin_abo', 'Berlin AB Abo', 'AB', true),
     ('berlin_abc_abo', 'Berlin ABC Abo', 'ABC', true),
     ('semester_ticket', 'Semesterticket', 'ABC', false),
-    ('schuelerticket', 'Schuelerticket Berlin', 'AB', true),
+    ('schuelerticket', 'Schülerticket Berlin', 'AB', true),
   ];
 
   @override
@@ -2532,7 +2532,7 @@ class _AddTicketSheetState extends State<_AddTicketSheet> {
             ),
           ),
           Text(
-            'Ticket hinzufuegen',
+            'Ticket hinzufügen',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -2584,7 +2584,7 @@ class _AddTicketSheetState extends State<_AddTicketSheet> {
                       qt.$2,
                       style: TextStyle(
                         fontSize: 13,
-                        color: isSelected ? NexusTheme.primaryColor : Colors.white70,
+                        color: isSelected ? NexusTheme.primaryColor : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                       ),
                     ),
@@ -2640,7 +2640,7 @@ class _AddTicketSheetState extends State<_AddTicketSheet> {
             children: [
               Expanded(
                 child: _buildDatePicker(context,
-                  label: 'Gueltig ab',
+                  label: 'Gültig ab',
                   value: _validFrom,
                   onPicked: (date) => setState(() => _validFrom = date),
                 ),
@@ -2648,7 +2648,7 @@ class _AddTicketSheetState extends State<_AddTicketSheet> {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildDatePicker(context,
-                  label: 'Gueltig bis',
+                  label: 'Gültig bis',
                   value: _validUntil,
                   onPicked: (date) => setState(() => _validUntil = date),
                 ),
@@ -2669,7 +2669,7 @@ class _AddTicketSheetState extends State<_AddTicketSheet> {
                   border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.06)),
                 ),
                 child: SwitchListTile(
-                  title: const Text('Abo (verlaengert sich automatisch)', style: TextStyle(fontSize: 14)),
+                  title: const Text('Abo (verlängert sich automatisch)', style: TextStyle(fontSize: 14)),
                   value: _autoRenews,
                   onChanged: (value) => setState(() => _autoRenews = value),
                   activeThumbColor: NexusTheme.primaryColor,
@@ -2738,7 +2738,7 @@ class _AddTicketSheetState extends State<_AddTicketSheet> {
                     ? '${value.day.toString().padLeft(2, '0')}.${value.month.toString().padLeft(2, '0')}.${value.year}'
                     : label,
                 style: TextStyle(
-                  color: value != null ? Colors.white : Colors.white54,
+                  color: value != null ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.54),
                   fontSize: 14,
                 ),
               ),

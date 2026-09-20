@@ -41,13 +41,15 @@ class _TrainingScreenState extends State<TrainingScreen> {
   }
 
   DateTime _getWeekStart(DateTime date) {
-    return date.subtract(Duration(days: date.weekday - 1));
+    final day = DateTime(date.year, date.month, date.day);
+    return day.subtract(Duration(days: day.weekday - 1));
   }
 
   int _getWeekNumber(DateTime date) {
-    final firstDayOfYear = DateTime(date.year, 1, 1);
-    final daysDiff = date.difference(firstDayOfYear).inDays;
-    return ((daysDiff + firstDayOfYear.weekday - 1) / 7).ceil() + 1;
+    final day = DateTime.utc(date.year, date.month, date.day);
+    final thursday = day.add(Duration(days: 4 - day.weekday));
+    final dayOfYear = thursday.difference(DateTime.utc(thursday.year, 1, 1)).inDays + 1;
+    return (dayOfYear - 1) ~/ 7 + 1;
   }
 
   Future<void> _loadData() async {
@@ -80,13 +82,13 @@ class _TrainingScreenState extends State<TrainingScreen> {
 
   void _previousWeek() {
     setState(() {
-      _selectedWeekStart = _selectedWeekStart.subtract(const Duration(days: 7));
+      _selectedWeekStart = DateTime(_selectedWeekStart.year, _selectedWeekStart.month, _selectedWeekStart.day - 7);
     });
   }
 
   void _nextWeek() {
     setState(() {
-      _selectedWeekStart = _selectedWeekStart.add(const Duration(days: 7));
+      _selectedWeekStart = DateTime(_selectedWeekStart.year, _selectedWeekStart.month, _selectedWeekStart.day + 7);
     });
   }
 
@@ -154,7 +156,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
         ),
         Positioned(
           right: 16,
-          bottom: 16,
+          bottom: MediaQuery.of(context).padding.bottom + 16,
           child: PageFadeIn(
             delay: const Duration(milliseconds: 300),
             child: FloatingActionButton(
@@ -923,6 +925,10 @@ class _TrainingScreenState extends State<TrainingScreen> {
         ],
       ),
     );
+    Future.delayed(const Duration(milliseconds: 300), () {
+      titleController.dispose();
+      durationController.dispose();
+    });
 
     if (result == true && titleController.text.isNotEmpty) {
       try {

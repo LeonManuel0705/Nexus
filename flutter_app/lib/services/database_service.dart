@@ -1199,11 +1199,11 @@ class DatabaseService {
     await db.update('pending_operations', {'status': 'completed'}, where: 'id = ?', whereArgs: [id]);
   }
 
-  Future<void> markOperationFailed(int id, String error) async {
+  Future<void> markOperationFailed(int id, String error, {bool giveUp = true}) async {
     final db = await database;
     await db.rawUpdate(
       'UPDATE pending_operations SET status = ?, last_error = ?, retry_count = retry_count + 1 WHERE id = ?',
-      ['failed', error, id],
+      [giveUp ? 'failed' : 'pending', error, id],
     );
   }
 
@@ -1240,14 +1240,21 @@ class DatabaseService {
     };
   }
 
-  Future<void> insertEmailAccount(EmailAccount account) async {
+  Future<String?> getEmailAccountCredentialKey(String id) async {
+    final db = await database;
+    final rows = await db.query('email_accounts', columns: ['credential_key'], where: 'id = ?', whereArgs: [id], limit: 1);
+    if (rows.isEmpty) return null;
+    return rows.first['credential_key'] as String?;
+  }
+
+  Future<void> insertEmailAccount(EmailAccount account, {String? credentialKey}) async {
     final db = await database;
     await db.insert('email_accounts', {
       'id': account.id,
       'email': account.email,
       'provider': account.type.name,
       'display_name': account.displayName,
-      'credential_key': 'email_${account.id}',
+      'credential_key': credentialKey ?? 'email_${account.id}',
       'is_active': account.isDefault ? 1 : 0,
       'added_at': account.createdAt.toIso8601String(),
     });

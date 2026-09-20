@@ -64,8 +64,8 @@ class _GlassCardState extends State<GlassCard> with SingleTickerProviderStateMix
 
     final cardDecoration = BoxDecoration(
       color: isDark
-          ? (widget.tint ?? Colors.black).withValues(alpha: shouldUseBlur ? 0.40 : 0.60)
-          : (widget.tint ?? Colors.white).withValues(alpha: shouldUseBlur ? 0.40 : 0.60),
+          ? (widget.tint ?? Colors.black).withValues(alpha: shouldUseBlur || widget.tint != null ? 0.40 : 0.60)
+          : (widget.tint ?? Colors.white).withValues(alpha: shouldUseBlur || widget.tint != null ? 0.40 : 0.60),
       borderRadius: BorderRadius.circular(widget.borderRadius),
       border: widget.hasBorder
           ? Border.all(
@@ -172,8 +172,8 @@ class GlassContainer extends StatelessWidget {
     final containerDecoration = BoxDecoration(
       color: gradient == null
           ? (isDark
-              ? (tint ?? Colors.black).withValues(alpha: shouldUseBlur ? 0.40 : 0.60)
-              : (tint ?? Colors.white).withValues(alpha: shouldUseBlur ? 0.40 : 0.60))
+              ? (tint ?? Colors.black).withValues(alpha: shouldUseBlur || tint != null ? 0.40 : 0.60)
+              : (tint ?? Colors.white).withValues(alpha: shouldUseBlur || tint != null ? 0.40 : 0.60))
           : null,
       gradient: gradient,
       borderRadius: BorderRadius.circular(borderRadius),

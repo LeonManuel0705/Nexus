@@ -138,19 +138,22 @@ class OfflineQueue {
 
           if (success) {
             await _db.markOperationCompleted(operation.id!);
-          } else if (operation.retryCount >= maxRetries) {
-            await _db.markOperationFailed(operation.id!, 'Max retries exceeded');
+          } else {
+            await _db.markOperationFailed(
+              operation.id!,
+              'Processor returned false',
+              giveUp: operation.retryCount + 1 >= maxRetries,
+            );
           }
         } catch (e) {
-          if (operation.retryCount >= maxRetries) {
-            await _db.markOperationFailed(operation.id!, e.toString());
-          } else {
-            await _db.markOperationFailed(operation.id!, e.toString());
-          }
-
           if (_isNetworkError(e)) {
             break;
           }
+          await _db.markOperationFailed(
+            operation.id!,
+            e.toString(),
+            giveUp: operation.retryCount + 1 >= maxRetries,
+          );
         }
       }
     } finally {

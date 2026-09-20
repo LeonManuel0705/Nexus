@@ -163,8 +163,10 @@ class VbbJourney {
         .map((leg) => VbbLeg.fromApiResponse(leg as Map<String, dynamic>))
         .toList();
 
-    final departure = DateTime.parse(json['legs'][0]['departure'] as String);
-    final arrival = DateTime.parse(json['legs'].last['arrival'] as String);
+    final firstLeg = json['legs'][0] as Map<String, dynamic>;
+    final lastLeg = json['legs'].last as Map<String, dynamic>;
+    final departure = DateTime.parse((firstLeg['departure'] ?? firstLeg['plannedDeparture']) as String);
+    final arrival = DateTime.parse((lastLeg['arrival'] ?? lastLeg['plannedArrival']) as String);
 
     double? price;
     String? tariffZone;
@@ -322,8 +324,10 @@ class VbbLeg {
     return VbbLeg(
       origin: VbbLocation.fromApiResponse(json['origin'] as Map<String, dynamic>),
       destination: VbbLocation.fromApiResponse(json['destination'] as Map<String, dynamic>),
-      departure: DateTime.parse(json['departure'] as String),
-      arrival: json['arrival'] != null ? DateTime.parse(json['arrival'] as String) : null,
+      departure: DateTime.parse((json['departure'] ?? json['plannedDeparture']) as String),
+      arrival: (json['arrival'] ?? json['plannedArrival']) != null
+          ? DateTime.parse((json['arrival'] ?? json['plannedArrival']) as String)
+          : null,
       line: json['line']?['name'] as String?,
       lineName: json['line']?['productName'] as String?,
       direction: json['direction'] as String?,

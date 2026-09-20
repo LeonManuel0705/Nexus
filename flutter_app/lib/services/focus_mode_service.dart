@@ -17,11 +17,11 @@ class FocusModeService {
       return _isFocusModeActive;
     } on PlatformException catch (_) {
 
-      _isFocusModeActive = true;
+      _isFocusModeActive = false;
       return false;
     } on MissingPluginException catch (_) {
 
-      _isFocusModeActive = true;
+      _isFocusModeActive = false;
       return false;
     }
   }

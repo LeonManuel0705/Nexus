@@ -324,14 +324,16 @@ class FlaskServerService {
     try {
       if (Platform.isWindows) {
         final result = await Process.run('netstat', ['-ano']);
+        final listener = RegExp(
+          r'^\s*TCP\s+\S+:' '$port' r'\s+\S+\s+LISTENING\s+(\d+)\s*$',
+          caseSensitive: false,
+        );
         final pids = <int>{};
         for (final line in (result.stdout as String).split('\n')) {
-          if (line.contains(':$port') &&
-              line.toUpperCase().contains('LISTENING')) {
-            final parts = line.trim().split(RegExp(r'\s+'));
-            final pid = int.tryParse(parts.isNotEmpty ? parts.last : '');
-            if (pid != null && pid != 0) pids.add(pid);
-          }
+          final match = listener.firstMatch(line.trimRight());
+          if (match == null) continue;
+          final pid = int.tryParse(match.group(1)!);
+          if (pid != null && pid != 0) pids.add(pid);
         }
         for (final pid in pids) {
           if (kDebugMode) print('FlaskServer: taskkill listener $pid on port $port');
@@ -419,6 +421,15 @@ class FlaskServerService {
             final versionStr =
                 (version.stdout as String) + (version.stderr as String);
             if (versionStr.contains('Python 3')) {
+              if (Platform.isWindows && cmd == 'py') {
+                final interpreter = await _resolveLauncherInterpreter(path);
+                if (interpreter != null) {
+                  if (kDebugMode) {
+                    print('FlaskServer: py launcher resolved to $interpreter');
+                  }
+                  return interpreter;
+                }
+              }
               if (kDebugMode) print('FlaskServer: Found system Python at $path');
               return path;
             }
@@ -426,6 +437,22 @@ class FlaskServerService {
         }
       } catch (_) {}
     }
+    return null;
+  }
+
+  Future<String?> _resolveLauncherInterpreter(String launcher) async {
+    try {
+      final result = await Process.run(
+        launcher,
+        ['-3', '-c', 'import sys; print(sys.executable)'],
+      );
+      final interpreter = (result.stdout as String).trim();
+      if (result.exitCode == 0 &&
+          interpreter.isNotEmpty &&
+          File(interpreter).existsSync()) {
+        return interpreter;
+      }
+    } catch (_) {}
     return null;
   }
 

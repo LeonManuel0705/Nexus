@@ -54,7 +54,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> with SingleTickerProvid
     } catch (e) {
       _error = 'Fehler beim Laden der Projekte.';
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -139,7 +139,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> with SingleTickerProvid
 
           Positioned(
             right: 16,
-            bottom: 16,
+            bottom: MediaQuery.of(context).padding.bottom + 16,
             child: FloatingActionButton(
               heroTag: 'fab_projects',
               onPressed: () => _showProjectEditor(null),
@@ -934,9 +934,10 @@ class _ProjectEditorScreenState extends State<_ProjectEditorScreen> {
           ),
           FilledButton(
             onPressed: () async {
+              final editorNavigator = Navigator.of(this.context);
               Navigator.pop(context);
               await widget.onDelete?.call();
-              if (context.mounted) Navigator.pop(context);
+              if (mounted) editorNavigator.pop();
             },
             style: FilledButton.styleFrom(backgroundColor: NexusTheme.danger),
             child: const Text('Löschen'),

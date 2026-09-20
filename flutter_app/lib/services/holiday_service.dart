@@ -108,7 +108,7 @@ class HolidayService {
       if (kDebugMode) print('HolidayService: Fetched ${events.length} holiday events (web platform - not persisted)');
     }
 
-    return events;
+    return filteredEvents;
   }
 
   Future<List<Event>> _fetchPublicHolidays(String bundeslandCode, int year) async {
@@ -129,7 +129,7 @@ class HolidayService {
 
       if (response.statusCode != 200 || response.data == null) {
         if (kDebugMode) print('HolidayService: Public holidays API failed - status: ${response.statusCode}');
-        return _fetchPublicHolidaysNager(bundeslandCode, year);
+        return await _fetchPublicHolidaysNager(bundeslandCode, year);
       }
 
       Map<String, dynamic> data;
@@ -139,7 +139,7 @@ class HolidayService {
         data = jsonDecode(response.data as String) as Map<String, dynamic>;
       } else {
         if (kDebugMode) print('HolidayService: Unexpected response type for public holidays');
-        return _fetchPublicHolidaysNager(bundeslandCode, year);
+        return await _fetchPublicHolidaysNager(bundeslandCode, year);
       }
 
       final events = <Event>[];

@@ -36,7 +36,7 @@ class EmailService {
   }) async {
     final id = _uuid.v4();
 
-    await _encryption.storeEmailCredentials(
+    final credentialKey = await _encryption.storeEmailCredentials(
       email: email,
       password: password,
       provider: 'imap',
@@ -59,7 +59,7 @@ class EmailService {
       createdAt: DateTime.now(),
     );
 
-    await _db.insertEmailAccount(account);
+    await _db.insertEmailAccount(account, credentialKey: credentialKey);
 
     await _createDefaultFolders(id);
 
@@ -111,7 +111,11 @@ class EmailService {
   }
 
   Future<void> removeAccount(String accountId) async {
+    final credentialKey = await _db.getEmailAccountCredentialKey(accountId);
     await _db.deleteEmailAccount(accountId);
+    if (credentialKey != null) {
+      await _encryption.deleteCredential(credentialKey);
+    }
     await _encryption.deleteCredential('email_$accountId');
   }
 

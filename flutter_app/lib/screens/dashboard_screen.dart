@@ -1182,7 +1182,7 @@ class _EventRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final eventColor = event.color != null
-        ? Color(int.parse(event.color!.replaceFirst('#', '0xFF')))
+        ? Color(int.tryParse(event.color!.replaceFirst('#', '0xFF')) ?? 0xFF0057FF)
         : NexusTheme.primaryColor;
 
     return Padding(
@@ -1230,11 +1230,15 @@ class _EventRow extends StatelessWidget {
               color: isDark ? Colors.white38 : Colors.black38,
             ),
             const SizedBox(width: 4),
-            Text(
-              event.location!,
-              style: TextStyle(
-                fontSize: 11,
-                color: isDark ? Colors.white38 : Colors.black38,
+            Flexible(
+              child: Text(
+                event.location!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isDark ? Colors.white38 : Colors.black38,
+                ),
               ),
             ),
           ],

@@ -24,6 +24,7 @@ class _NotesScreenState extends State<NotesScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await context.read<NotesProvider>().loadNotes();
+      if (!mounted) return;
       _initializeTextController();
     });
   }
@@ -261,7 +262,7 @@ class _NotesScreenState extends State<NotesScreen> {
 
               Positioned(
                 right: 16,
-                bottom: 16,
+                bottom: MediaQuery.of(context).padding.bottom + 16,
                 child: FloatingActionButton(
                   heroTag: 'fab_notes',
                   onPressed: _createNewNote,

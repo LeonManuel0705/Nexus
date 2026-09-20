@@ -224,7 +224,7 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen>
               child: FilledButton.icon(
                 onPressed: () => _showAddPeriodDialog(periods.length + 1),
                 icon: const Icon(Icons.add),
-                label: const Text('Stunde hinzufugen'),
+                label: const Text('Stunde hinzufügen'),
                 style: FilledButton.styleFrom(
                   backgroundColor: NexusTheme.primaryColor,
                   minimumSize: const Size.fromHeight(48),
@@ -263,7 +263,7 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            'Fuege deine erste Schulstunde hinzu',
+            'Füge deine erste Schulstunde hinzu',
             style: TextStyle(
               color: isDark ? NexusTheme.darkTextMuted : NexusTheme.lightTextMuted,
             ),
@@ -373,7 +373,7 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen>
                       children: [
                         Icon(Icons.delete, size: 20, color: Colors.red),
                         SizedBox(width: 8),
-                        Text('Loschen', style: TextStyle(color: Colors.red)),
+                        Text('Löschen', style: TextStyle(color: Colors.red)),
                       ],
                     ),
                   ),
@@ -487,10 +487,9 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen>
             ),
             FilledButton(
               onPressed: () {
-                final startParts = startTimeController.text.split(':');
-                final endParts = endTimeController.text.split(':');
-                final startMinutes = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
-                final endMinutes = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+                final startMinutes = _parseMinutes(startTimeController.text);
+                final endMinutes = _parseMinutes(endTimeController.text);
+                if (startMinutes == null || endMinutes == null) return;
 
                 if (startMinutes >= endMinutes) {
                   Navigator.pop(context);
@@ -532,14 +531,27 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen>
           ],
         ),
       ),
-    );
+    ).then((_) => Future.delayed(const Duration(milliseconds: 300), () {
+      startTimeController.dispose();
+      endTimeController.dispose();
+      nameController.dispose();
+    }));
+  }
+
+  int? _parseMinutes(String value) {
+    final parts = value.trim().split(':');
+    if (parts.length != 2) return null;
+    final hours = int.tryParse(parts[0]);
+    final minutes = int.tryParse(parts[1]);
+    if (hours == null || minutes == null) return null;
+    return hours * 60 + minutes;
   }
 
   Future<String?> _selectTime(String currentTime) async {
-    final parts = currentTime.split(':');
+    final total = _parseMinutes(currentTime) ?? 8 * 60;
     final initialTime = TimeOfDay(
-      hour: int.parse(parts[0]),
-      minute: int.parse(parts[1]),
+      hour: (total ~/ 60).clamp(0, 23),
+      minute: (total % 60).clamp(0, 59),
     );
 
     final time = await showTimePicker(
@@ -557,8 +569,8 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Stunde loschen?'),
-        content: Text('Mochtest du "${period.displayName}" wirklich loschen?'),
+        title: const Text('Stunde löschen?'),
+        content: Text('Möchtest du "${period.displayName}" wirklich löschen?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -570,7 +582,7 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen>
               Navigator.pop(context);
             },
             style: TextButton.styleFrom(foregroundColor: NexusTheme.danger),
-            child: const Text('Loschen'),
+            child: const Text('Löschen'),
           ),
         ],
       ),
@@ -903,7 +915,7 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen>
 
     final lesson = lessons.first;
     final color = lesson.color != null
-        ? Color(int.parse(lesson.color!.replaceFirst('#', '0xFF')))
+        ? Color(int.tryParse(lesson.color!.replaceFirst('#', '0xFF')) ?? 0xFF0057FF)
         : NexusTheme.primaryColor;
 
     return InkWell(

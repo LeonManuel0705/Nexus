@@ -444,7 +444,9 @@ class _TaskListItem extends StatelessWidget {
                       ),
                     ],
                     const SizedBox(height: 6),
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
                       children: [
                         if (task.dueDate != null) ...[
                           Container(
@@ -464,7 +466,6 @@ class _TaskListItem extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
                         ],
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -482,7 +483,6 @@ class _TaskListItem extends StatelessWidget {
                           ),
                         ),
                         if (task.estimatedMinutes != null) ...[
-                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
@@ -507,7 +507,6 @@ class _TaskListItem extends StatelessWidget {
                           ),
                         ],
                         if (task.repeatType != null) ...[
-                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(

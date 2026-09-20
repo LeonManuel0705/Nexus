@@ -46,3 +46,5 @@ node_modules/
 *.pack
 
 windows-build/
+
+.requirements_hash

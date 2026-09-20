@@ -176,19 +176,19 @@ class _IServScreenState extends State<IServScreen> with SingleTickerProviderStat
 
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => IServWebViewLogin(
+        builder: (routeContext) => IServWebViewLogin(
           iservUrl: url,
           onLoginSuccess: (cookies, username) async {
-            Navigator.of(context).pop();
+            final provider = routeContext.read<IServProvider>();
+            Navigator.of(routeContext).pop();
 
-            final provider = context.read<IServProvider>();
             final result = await provider.connectWithWebViewCookies(
               iservUrl: url,
               cookies: cookies,
               username: username,
             );
 
-            if (!context.mounted) return;
+            if (!mounted) return;
 
             if (result['success'] == true) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -207,7 +207,7 @@ class _IServScreenState extends State<IServScreen> with SingleTickerProviderStat
             }
           },
           onCancel: () {
-            Navigator.of(context).pop();
+            Navigator.of(routeContext).pop();
           },
         ),
       ),
@@ -985,7 +985,9 @@ class _VertretungsplanTabState extends State<_VertretungsplanTab> {
               ),
             ),
 
-            Container(
+            SafeArea(
+              top: false,
+              child: Container(
               padding: const EdgeInsets.all(12),
               color: NexusTheme.darkSurface,
               child: Row(
@@ -1004,6 +1006,7 @@ class _VertretungsplanTabState extends State<_VertretungsplanTab> {
                   ),
                 ],
               ),
+            ),
             ),
           ],
         );

@@ -103,10 +103,23 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
   }
 
   void _startTimer() async {
+    _timer?.cancel();
     setState(() {
       _isRunning = true;
       if (_currentMode == PomodoroMode.work && _sessionStartedAt == null) {
         _sessionStartedAt = DateTime.now();
+      }
+    });
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_remainingSeconds > 0) {
+        setState(() => _remainingSeconds--);
+      } else {
+        _onTimerComplete();
       }
     });
 
@@ -116,14 +129,6 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
         setState(() => _focusModeEnabled = enabled);
       }
     }
-
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_remainingSeconds > 0) {
-        setState(() => _remainingSeconds--);
-      } else {
-        _onTimerComplete();
-      }
-    });
   }
 
   void _pauseTimer() async {
@@ -164,6 +169,7 @@ class _PomodoroScreenState extends State<PomodoroScreen> with TickerProviderStat
       }
     }
 
+    if (!mounted) return;
     final wasWork = _currentMode == PomodoroMode.work;
 
     setState(() {

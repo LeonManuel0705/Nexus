@@ -214,6 +214,7 @@ class VbbProvider extends ChangeNotifier {
         alias: alias,
         location: location,
       );
+      _knownLocations.removeWhere((l) => l.alias == alias);
       _knownLocations.add(knownLocation);
       notifyListeners();
     } catch (e) {

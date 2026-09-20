@@ -190,6 +190,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
 
   static const _sidebarOrder = [0, 1, 2, 3, 6, 10, 8, 7, 14, 16, 9, 15, 5, 11, 17, 12, 13];
   static const _sidebarItemHeight = 40.0;
+  static const _pillNavClearance = 76.0;
 
   static const _bundeslaender = [
     'Baden-Württemberg',
@@ -499,7 +500,19 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
             children: [
               SafeArea(
                 bottom: false,
-                child: _buildScreenStack(isTablet: false, isDark: isDark),
+                child: Builder(
+                  builder: (innerContext) {
+                    final media = MediaQuery.of(innerContext);
+                    final clearance = media.viewInsets.bottom == 0 ? _pillNavClearance : 0.0;
+                    return MediaQuery(
+                      data: media.copyWith(
+                        padding: media.padding.copyWith(bottom: media.padding.bottom + clearance),
+                        viewPadding: media.viewPadding.copyWith(bottom: media.viewPadding.bottom + clearance),
+                      ),
+                      child: _buildScreenStack(isTablet: false, isDark: isDark),
+                    );
+                  },
+                ),
               ),
 
               if (MediaQuery.of(context).viewInsets.bottom == 0)
@@ -1762,7 +1775,7 @@ class _WelcomeSetupDialogState extends State<_WelcomeSetupDialog>
               child: OutlinedButton.icon(
                 onPressed: () => setState(() => _currentStep = _currentStep - 1),
                 icon: const Icon(Icons.arrow_back, size: 18),
-                label: const Text('Zuruck'),
+                label: const Text('Zurück'),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   side: BorderSide(

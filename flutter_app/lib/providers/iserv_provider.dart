@@ -169,6 +169,7 @@ class IServProvider extends ChangeNotifier {
   }
 
   bool _isInitializing = false;
+  bool _connectivityHooked = false;
 
   Future<void> initialize() async {
     if (_isInitializing) {
@@ -209,7 +210,10 @@ class IServProvider extends ChangeNotifier {
         }
       }
 
-      _connectivity.onConnected(_onConnectivityRestored);
+      if (!_connectivityHooked) {
+        _connectivityHooked = true;
+        _connectivity.onConnected(_onConnectivityRestored);
+      }
     } catch (e) {
       _log('initialize ERROR: $e');
     } finally {

@@ -60,6 +60,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       _weatherCity = prefs.getString('weather_city');
       _bundesland = prefs.getString('user_bundesland');
@@ -316,7 +317,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: const Icon(Icons.grid_on, color: NexusTheme.primaryColor, size: 20),
                   ),
                   title: const Text('Stundenplan konfigurieren'),
-                  subtitle: const Text('Zeiten und Facher einrichten'),
+                  subtitle: const Text('Zeiten und Fächer einrichten'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.push(
                     context,
@@ -1963,6 +1964,7 @@ class _NotificationSettingsCardState extends State<_NotificationSettingsCard> {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       _masterToggle = prefs.getBool('notif_master') ?? true;
       _calendarEnabled = prefs.getBool('notif_calendar') ?? true;
